@@ -12,11 +12,7 @@ from apps.vehicle.domain.exceptions import (
     VehicleInvalidStateTransitionError,
     VehicleNotFoundError,
 )
-from apps.vehicle.domain.value_objects import (
-    VIN,
-    PlateNumber,
-    SAPEquipmentNumber,
-)
+from apps.vehicle.domain.value_objects import VIN, PlateNumber, SAPEquipmentNumber
 
 
 def _make_vehicle(**kwargs: object) -> Vehicle:

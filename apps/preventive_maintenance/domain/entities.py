@@ -10,9 +10,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 
-from apps.preventive_maintenance.domain.exceptions import (
-    PMInvalidStateTransitionError,
-)
+from apps.preventive_maintenance.domain.exceptions import PMInvalidStateTransitionError
 from apps.preventive_maintenance.domain.value_objects import (
     MaintenanceInterval,
     TriggerCondition,

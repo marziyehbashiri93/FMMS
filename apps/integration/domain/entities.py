@@ -12,9 +12,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from apps.integration.domain.exceptions import (
-    SAPRetryExhaustedError,
-)
+from apps.integration.domain.exceptions import SAPRetryExhaustedError
 
 
 class SAPTransactionStatus(StrEnum):

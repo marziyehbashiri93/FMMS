@@ -92,9 +92,18 @@ class TestValueObjects:
         with pytest.raises(ValueError, match="non-negative"):
             Money(amount=Decimal("-1"), currency="IRR")
 
-    def test_money_invalid_currency(self) -> None:
+    def test_money_lowercase_currency_normalised_to_uppercase(self) -> None:
+        """Domain rule: currency codes are case-insensitive; 'irr' normalises to 'IRR'."""
+        m = Money(amount=Decimal("100"), currency="irr")
+        assert m.currency == "IRR"
+
+    def test_money_invalid_currency_non_alpha_raises(self) -> None:
         with pytest.raises(ValueError, match="ISO 4217"):
             Money(amount=Decimal("100"), currency="IR1")
+
+    def test_money_invalid_currency_too_short_raises(self) -> None:
+        with pytest.raises(ValueError, match="ISO 4217"):
+            Money(amount=Decimal("100"), currency="IR")
 
     def test_money_valid(self) -> None:
         m = Money(amount=Decimal("1500.00"), currency="IRR")
