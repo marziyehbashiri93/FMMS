@@ -129,4 +129,5 @@ dump.rdb
 *.orig
 
 
-prototypes/*
+prototypes/*test.db
+test_fmms.db
