@@ -11,7 +11,7 @@
 |-------------------------|--------------------------------------------------------------------|
 | **Current Phase**       | Implementation — Phase 1                                           |
 | **Current Milestone**   | M6 — Application Services: Maintenance Domains (In Progress)       |
-| **Last Commit**         | `39a5317` — docs(tracker): start M6 — Application Services: Maintenance Domains |
+| **Last Commit**         | `b375fed` — feat(application): implement Repair application services — M6 |
 | **Completed**           | M0 ✓, M1 ✓, M2 ✓, M3 ✓, M4 ✓, M5 ✓ — 6 / 10 implementation milestones |
 | **In Progress**         | M6 — Application Services: Maintenance Domains                     |
 | **Blocked**             | —                                                                  |
