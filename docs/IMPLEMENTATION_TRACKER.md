@@ -608,12 +608,13 @@ Services that interact with SAP must import only from `core/sap/ports/` — neve
 - [x] Create `apps/repair/application/services/get_repair_order_service.py` — `GetRepairOrderService`, `ListRepairOrdersService`
 - [x] Create `tests/unit/application/test_repair_services.py` — 23 unit tests, all passing
 
-**Preventive Maintenance Application**
-- [ ] Create `apps/preventive_maintenance/application/dto/pm_dto.py` — `CreatePMPlanDTO`, `TriggerPMWorkOrderDTO`, `PMPlanResponseDTO`
-- [ ] Create `apps/preventive_maintenance/application/services/create_pm_plan_service.py` — `CreatePMPlanService`
-- [ ] Create `apps/preventive_maintenance/application/services/trigger_pm_work_order_service.py` — `TriggerPMWorkOrderService` (uses `ISAPPMNotificationPort`)
-- [ ] Create `apps/preventive_maintenance/application/services/complete_pm_service.py` — `CompletePMService`
-- [ ] Create `apps/preventive_maintenance/application/services/get_pm_service.py` — `GetPMPlanService`, `ListPMWorkOrderService`
+**Preventive Maintenance Application** ✓ COMPLETE
+- [x] Create `apps/preventive_maintenance/application/dto/pm_dto.py` — create/trigger/complete DTOs + response DTOs
+- [x] Create `apps/preventive_maintenance/application/services/create_pm_plan_service.py` — `CreatePMPlanService`
+- [x] Create `apps/preventive_maintenance/application/services/trigger_pm_work_order_service.py` — `TriggerPMWorkOrderService` (optional `ISAPPMNotificationPort` only; no Celery/schedulers)
+- [x] Create `apps/preventive_maintenance/application/services/complete_pm_work_order_service.py` — `CompletePMWorkOrderService`
+- [x] Create `apps/preventive_maintenance/application/services/get_pm_service.py` — `GetPMPlanService`, `ListPMPlansService`, `ListPMWorkOrdersService`
+- [x] Create `tests/unit/application/test_pm_services.py` — 16 unit tests, all passing
 
 **Procurement Application**
 - [ ] Create `apps/procurement/application/dto/procurement_dto.py` — `CreatePRDTO`, `ApprovePODTO`, `GoodsReceiptDTO`, `GoodsIssueDTO`
