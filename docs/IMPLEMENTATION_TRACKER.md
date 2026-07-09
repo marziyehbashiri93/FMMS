@@ -10,10 +10,10 @@
 | Field                   | Value                                                              |
 |-------------------------|--------------------------------------------------------------------|
 | **Current Phase**       | Implementation — Phase 1                                           |
-| **Current Milestone**   | M4 complete — Awaiting approval to begin M5                        |
-| **Last Commit**         | `fb13b26` — fix(sap): add BAPI_PR_GET_DETAIL mock route (M4 architecture review) |
+| **Current Milestone**   | M5 — Application Services: Core Domains (In Progress)              |
+| **Last Commit**         | `bdcaebd` — docs(tracker): M4 architecture review results          |
 | **Completed**           | M0 ✓, M1 ✓, M2 ✓, M3 ✓, M4 ✓ — 5 / 10 implementation milestones |
-| **In Progress**         | —                                                                  |
+| **In Progress**         | M5 — Application Services: Core Domains                           |
 | **Blocked**             | —                                                                  |
 | **Last Updated**        | 2026-07-09                                                         |
 | **Validation Status**   | PASSED — 14 issues found and corrected (2026-07-09)                |
@@ -505,10 +505,10 @@ infrastructure/sap/transaction/
 
 | Field         | Value                                                                              |
 |---------------|------------------------------------------------------------------------------------|
-| **Status**    | `Pending`                                                                          |
+| **Status**    | `In Progress`                                                                      |
 | **Branch**    | `feat/milestone-5-services-core`                                                   |
 | **Commit**    | `feat(application): implement core domain services (vehicle, driver, inspection, fault)` |
-| **Started**   | —                                                                                  |
+| **Started**   | 2026-07-10                                                                         |
 | **Completed** | —                                                                                  |
 
 **Goal:**
