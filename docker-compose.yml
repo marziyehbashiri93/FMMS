@@ -117,7 +117,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: celery -A infrastructure.messaging.celery_app beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    command: celery -A infrastructure.messaging.celery_app beat --loglevel=info
     profiles:
       - celery
 

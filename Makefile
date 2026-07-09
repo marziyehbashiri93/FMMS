@@ -92,9 +92,7 @@ worker:
 	celery -A infrastructure.messaging.celery_app worker --loglevel=info
 
 beat:
-	celery -A infrastructure.messaging.celery_app beat \
-		--loglevel=info \
-		--scheduler django_celery_beat.schedulers:DatabaseScheduler
+	celery -A infrastructure.messaging.celery_app beat --loglevel=info
 
 # ── Code Quality ──────────────────────────────────────────────────────────────
 

@@ -264,8 +264,11 @@ class TriggerPMWorkOrderService:
             "work_order_id": str(work_order_id),
             "plan_id": str(dto.plan_id),
             "equipment_number": create_request.equipment_number,
+            "fault_description": create_request.fault_description,
             "defect_code": create_request.defect_code,
             "priority": create_request.priority,
+            "reported_by": create_request.reported_by,
+            "reported_at": create_request.reported_at.isoformat(),
         }
         idempotency_key = f"pm-notification:{work_order_id}"
 

@@ -40,6 +40,9 @@ from apps.inspection.application.services.submit_inspection_service import (
     SubmitInspectionService,
 )
 from apps.inspection.infrastructure.repositories import DjangoInspectionRepository
+from apps.integration.application.services.retry_failed_sap_transactions_service import (
+    RetryFailedSAPTransactionsService,
+)
 from apps.integration.infrastructure.repositories import DjangoSAPTransactionRepository
 from apps.preventive_maintenance.application.services.complete_pm_work_order_service import (
     CompletePMWorkOrderService,
@@ -51,6 +54,9 @@ from apps.preventive_maintenance.application.services.get_pm_service import (
     GetPMPlanService,
     ListPMPlansService,
     ListPMWorkOrdersService,
+)
+from apps.preventive_maintenance.application.services.trigger_overdue_pm_work_orders_service import (
+    TriggerOverduePMWorkOrdersService,
 )
 from apps.preventive_maintenance.application.services.trigger_pm_work_order_service import (
     TriggerPMWorkOrderService,
@@ -414,6 +420,25 @@ def get_trigger_pm_work_order_service() -> TriggerPMWorkOrderService:
         get_vehicle_repository(),
         get_sap_transaction_manager(),
         PMNotificationBAPIAdapter(_sap_client()),
+    )
+
+
+def get_trigger_overdue_pm_work_orders_service() -> TriggerOverduePMWorkOrdersService:
+    """Return TriggerOverduePMWorkOrdersService."""
+    return TriggerOverduePMWorkOrdersService(
+        get_pm_plan_repository(),
+        get_trigger_pm_work_order_service(),
+    )
+
+
+def get_retry_failed_sap_transactions_service() -> RetryFailedSAPTransactionsService:
+    """Return RetryFailedSAPTransactionsService."""
+    client = _sap_client()
+    return RetryFailedSAPTransactionsService(
+        get_sap_transaction_manager(),
+        PurchaseRequisitionBAPIAdapter(client),
+        PMOrderBAPIAdapter(client),
+        PMNotificationBAPIAdapter(client),
     )
 
 

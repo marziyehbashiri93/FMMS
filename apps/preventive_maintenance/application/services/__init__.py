@@ -11,6 +11,9 @@ from apps.preventive_maintenance.application.services.get_pm_service import (
     ListPMPlansService,
     ListPMWorkOrdersService,
 )
+from apps.preventive_maintenance.application.services.trigger_overdue_pm_work_orders_service import (
+    TriggerOverduePMWorkOrdersService,
+)
 from apps.preventive_maintenance.application.services.trigger_pm_work_order_service import (
     TriggerPMWorkOrderService,
 )
@@ -18,6 +21,7 @@ from apps.preventive_maintenance.application.services.trigger_pm_work_order_serv
 __all__ = [
     "CreatePMPlanService",
     "TriggerPMWorkOrderService",
+    "TriggerOverduePMWorkOrdersService",
     "CompletePMWorkOrderService",
     "GetPMPlanService",
     "ListPMPlansService",

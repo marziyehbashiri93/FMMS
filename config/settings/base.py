@@ -9,6 +9,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import environ
+from celery.schedules import crontab
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Environment
@@ -48,6 +49,8 @@ THIRD_PARTY_APPS = [
     "rest_framework",
     "rest_framework_simplejwt",
     "drf_spectacular",
+    "django_celery_beat",
+    "django_celery_results",
 ]
 
 FMMS_APPS = [
@@ -219,7 +222,7 @@ SPECTACULAR_SETTINGS = {
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Celery — broker and result backend (tasks registered in Milestone 8)
+# Celery — broker, result backend, and reduced M8 beat schedule
 # ──────────────────────────────────────────────────────────────────────────────
 CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="redis://localhost:6379/1")
 CELERY_RESULT_BACKEND = env("REDIS_URL", default="redis://localhost:6379/2")
@@ -229,6 +232,24 @@ CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TIMEZONE = "UTC"
 CELERY_ENABLE_UTC = True
 CELERY_TASK_TRACK_STARTED = True
+CELERY_RESULT_EXTENDED = True
+CELERY_IMPORTS = (
+    "infrastructure.messaging.tasks.sap_retry_tasks",
+    "infrastructure.messaging.tasks.sap_sync_tasks",
+    "infrastructure.messaging.tasks.maintenance_tasks",
+)
+# Reduced M8 scope: retry + overdue PM. Single-equipment sync is on-demand only
+# (requires sap_equipment_number) and is not beat-scheduled.
+CELERY_BEAT_SCHEDULE = {
+    "retry-failed-sap-every-15m": {
+        "task": "fmms.retry_failed_sap_transactions",
+        "schedule": 15 * 60,
+    },
+    "trigger-overdue-pm-daily": {
+        "task": "fmms.trigger_overdue_pm_work_orders",
+        "schedule": crontab(hour=2, minute=0),
+    },
+}
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Logging — structured JSON, all FMMS logs use fmms.* namespace
