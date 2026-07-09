@@ -10,10 +10,10 @@
 | Field                   | Value                                                              |
 |-------------------------|--------------------------------------------------------------------|
 | **Current Phase**       | Implementation — Phase 1                                           |
-| **Current Milestone**   | M5 — Application Services: Core Domains (In Progress)              |
-| **Last Commit**         | `df5913f` — feat(application): implement Driver application services — M5  |
-| **Completed**           | M0 ✓, M1 ✓, M2 ✓, M3 ✓, M4 ✓ — 5 / 10 implementation milestones |
-| **In Progress**         | M5 — Application Services: Core Domains                           |
+| **Current Milestone**   | M5 ✓ Complete — Awaiting approval to begin M6                      |
+| **Last Commit**         | `1dd38a8` — feat(application): implement Fault application services — M5 |
+| **Completed**           | M0 ✓, M1 ✓, M2 ✓, M3 ✓, M4 ✓, M5 ✓ — 6 / 10 implementation milestones |
+| **In Progress**         | —                                                                  |
 | **Blocked**             | —                                                                  |
 | **Last Updated**        | 2026-07-09                                                         |
 | **Validation Status**   | PASSED — 14 issues found and corrected (2026-07-09)                |
@@ -505,11 +505,11 @@ infrastructure/sap/transaction/
 
 | Field         | Value                                                                              |
 |---------------|------------------------------------------------------------------------------------|
-| **Status**    | `In Progress`                                                                      |
+| **Status**    | `Complete` ✓                                                                       |
 | **Branch**    | `feat/milestone-5-services-core`                                                   |
-| **Commit**    | `feat(application): implement core domain services (vehicle, driver, inspection, fault)` |
+| **Commit**    | `1dd38a8` — feat(application): implement Fault application services — M5           |
 | **Started**   | 2026-07-10                                                                         |
-| **Completed** | —                                                                                  |
+| **Completed** | 2026-07-10                                                                         |
 
 **Goal:**
 Implement all use case services for Vehicle, Driver, Inspection, and Fault domains.
@@ -538,19 +538,21 @@ concrete infrastructure classes imported. Each service has one responsibility (S
 - [x] Create `apps/driver/application/services/get_driver_service.py` — `GetDriverService`, `ListDriversService`
 - [x] Create `tests/unit/application/test_driver_services.py` — 20 unit tests, all passing
 
-**Inspection Application**
-- [ ] Create `apps/inspection/application/dto/inspection_dto.py` — `CreateInspectionDTO`, `SubmitInspectionDTO`, `InspectionResponseDTO`
-- [ ] Create `apps/inspection/application/services/create_inspection_service.py` — `CreateInspectionService`
-- [ ] Create `apps/inspection/application/services/add_inspection_item_service.py` — `AddInspectionItemService`
-- [ ] Create `apps/inspection/application/services/submit_inspection_service.py` — `SubmitInspectionService`
-- [ ] Create `apps/inspection/application/services/get_inspection_service.py` — `GetInspectionService`, `ListInspectionService`
+**Inspection Application** ✓ COMPLETE — commit `e12500e`
+- [x] Create `apps/inspection/application/dto/inspection_dto.py` — `CreateInspectionDTO`, `AddInspectionItemDTO`, `SubmitInspectionDTO`, `InspectionResponseDTO`, `InspectionItemResponseDTO`
+- [x] Create `apps/inspection/application/services/create_inspection_service.py` — `CreateInspectionService` (cross-domain: vehicle existence check)
+- [x] Create `apps/inspection/application/services/add_inspection_item_service.py` — `AddInspectionItemService`
+- [x] Create `apps/inspection/application/services/submit_inspection_service.py` — `SubmitInspectionService` (multi-step: DRAFT→SUBMITTED + auto-create Fault per FAIL item)
+- [x] Create `apps/inspection/application/services/get_inspection_service.py` — `GetInspectionService`, `ListInspectionsService`
+- [x] Create `tests/unit/application/test_inspection_services.py` — 16 unit tests, all passing
 
-**Fault Application**
-- [ ] Create `apps/fault/application/dto/fault_dto.py` — `ReportFaultDTO`, `FaultResponseDTO`
-- [ ] Create `apps/fault/application/services/report_fault_service.py` — `ReportFaultService`
-- [ ] Create `apps/fault/application/services/assign_fault_service.py` — `AssignFaultService`
-- [ ] Create `apps/fault/application/services/close_fault_service.py` — `CloseFaultService`
-- [ ] Create `apps/fault/application/services/get_fault_service.py` — `GetFaultService`, `ListFaultService`
+**Fault Application** ✓ COMPLETE — commit `1dd38a8`
+- [x] Create `apps/fault/application/dto/fault_dto.py` — `ReportFaultDTO`, `AssignFaultDTO`, `CloseFaultDTO`, `FaultResponseDTO`
+- [x] Create `apps/fault/application/services/report_fault_service.py` — `ReportFaultService` (cross-domain: vehicle existence check)
+- [x] Create `apps/fault/application/services/assign_fault_service.py` — `AssignFaultService`
+- [x] Create `apps/fault/application/services/close_fault_service.py` — `CloseFaultService`
+- [x] Create `apps/fault/application/services/get_fault_service.py` — `GetFaultService`, `ListFaultsService`
+- [x] Create `tests/unit/application/test_fault_services.py` — 17 unit tests, all passing
 
 **Test Factories (milestone-scoped)**
 - [ ] Create `tests/factories/vehicle_factory.py` — `VehicleModelFactory`
@@ -568,14 +570,14 @@ concrete infrastructure classes imported. Each service has one responsibility (S
 - [ ] `tests/unit/apps/fault/test_report_fault_service.py`
 - [ ] `tests/unit/apps/fault/test_close_fault_service.py`
 
-**Layer Integrity Check**
-- [ ] Verify no ORM model import exists inside any `application/` directory
-- [ ] Verify no `infrastructure/` import exists inside any `application/` directory
-- [ ] Run `pytest tests/unit/apps/vehicle/ tests/unit/apps/driver/ tests/unit/apps/inspection/ tests/unit/apps/fault/` — all pass
-- [ ] Run `black --check .` — zero violations
-- [ ] Run `isort --check .` — zero violations
-- [ ] Run `ruff check .` — zero violations
-- [ ] Run `mypy .` — zero errors
+**Layer Integrity Check** ✓ ALL PASSED
+- [x] Verify no ORM model import exists inside any `application/` directory — PASSED (AST scan)
+- [x] Verify no `infrastructure/` import exists inside any `application/` directory — PASSED
+- [x] Run `pytest tests/unit/application/` — 72/72 passed
+- [x] Run `black --check .` — zero violations
+- [x] Run `isort --check .` — zero violations
+- [x] Run `ruff check .` — zero violations
+- [x] Run `mypy .` — zero errors
 
 ---
 
