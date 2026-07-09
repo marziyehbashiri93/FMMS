@@ -15,8 +15,8 @@
 | **Completed**           | M0 ✓, M1 ✓, M2 ✓, M3 ✓, M4 ✓, M5 ✓, M6 ✓ — 7 / 10 implementation milestones |
 | **In Progress**         | —                                                                  |
 | **Blocked**             | —                                                                  |
-| **Last Updated**        | 2026-07-09                                                         |
-| **Validation Status**   | PASSED — 14 issues found and corrected (2026-07-09)                |
+| **Last Updated**        | 2026-07-10                                                         |
+| **Validation Status**   | M6 PASSED — 55/55 tests, layer integrity PASS (2026-07-10)         |
 
 ---
 
@@ -957,6 +957,14 @@ N+1 query audit, final security hardening, complete README, and Phase 1 release 
 | 30 | 2026-07-10 | `e12500e` | feat(application): implement Inspection application services — M5 | `feat/milestone-5-services-core` | 9 | ✓ Committed |
 | 31 | 2026-07-10 | `1dd38a8` | feat(application): implement Fault application services — M5 | `feat/milestone-5-services-core` | 9 | ✓ Committed |
 | 32 | 2026-07-10 | `e041276` | docs(tracker): complete M5 — Application Services: Core Domains | `feat/milestone-5-services-core` | 1 | ✓ Committed |
+| 33 | 2026-07-10 | `42ea524` | docs(tracker): M5 final — integrity PASSED, 72 tests | `feat/milestone-5-services-core` | 1 | ✓ Committed |
+| 34 | 2026-07-10 | `39a5317` | docs(tracker): start M6 — Application Services: Maintenance Domains | `feat/milestone-6-services-maintenance` | 1 | ✓ Committed |
+| 35 | 2026-07-10 | `b375fed` | feat(application): implement Repair application services — M6 | `feat/milestone-6-services-maintenance` | 12 | ✓ Committed |
+| 36 | 2026-07-10 | `5f635ad` | docs(tracker): mark Repair application services complete (M6) | `feat/milestone-6-services-maintenance` | 1 | ✓ Committed |
+| 37 | 2026-07-10 | `795f0a4` | feat(application): implement Preventive Maintenance application services — M6 | `feat/milestone-6-services-maintenance` | 10 | ✓ Committed |
+| 38 | 2026-07-10 | `06e4484` | docs(tracker): mark PM application services complete (M6) | `feat/milestone-6-services-maintenance` | 1 | ✓ Committed |
+| 39 | 2026-07-10 | `e29418f` | feat(application): implement Procurement application services — M6 | `feat/milestone-6-services-maintenance` | 11 | ✓ Committed |
+| 40 | 2026-07-10 | `cc919aa` | docs(tracker): set M6 Last Commit to e29418f (Procurement complete) | `feat/milestone-6-services-maintenance` | 1 | ✓ Committed |
 
 ---
 
