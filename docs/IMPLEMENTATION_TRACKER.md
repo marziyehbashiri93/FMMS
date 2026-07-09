@@ -11,7 +11,7 @@
 |-------------------------|--------------------------------------------------------------------|
 | **Current Phase**       | Implementation — Phase 1                                           |
 | **Current Milestone**   | M7 Complete — M8 entry corrections committed (awaiting final M8 approval) |
-| **Last Commit**         | `refactor(sap): centralize SAP write transaction management` (hash after commit) |
+| **Last Commit**         | `385da40` — refactor(sap): centralize SAP write transaction management |
 | **Completed**           | M0 ✓, M1 ✓, M2 ✓, M3 ✓, M4 ✓, M5 ✓, M6 ✓, M7 ✓ — 8 / 10 implementation milestones |
 | **In Progress**         | — (M8 entry corrections done; M8 coding not started)               |
 | **Blocked**             | —                                                                  |
@@ -996,7 +996,7 @@ N+1 query audit, final security hardening, complete README, and Phase 1 release 
 | 44 | 2026-07-10 | `b1947b5` | docs(tracker): finalize M7 — REST API v1 complete | `feat/milestone-7-api-v1` | 1 | ✓ Committed |
 | 45 | 2026-07-10 | `7cdfb33` | docs(tracker): set M7 Last Commit and git history row 44 | `feat/milestone-7-api-v1` | 1 | ✓ Committed |
 | 46 | 2026-07-10 | `2a19611` | docs(tracker): sync M7 Last Commit to HEAD | `feat/milestone-7-api-v1` | 1 | ✓ Committed |
-| 47 | 2026-07-10 | _(pending)_ | refactor(sap): centralize SAP write transaction management | `feat/milestone-7-api-v1` | — | ✓ Committed |
+| 47 | 2026-07-10 | `385da40` | refactor(sap): centralize SAP write transaction management | `feat/milestone-7-api-v1` | 13 | ✓ Committed |
 
 ---
 
