@@ -11,7 +11,7 @@
 |-------------------------|--------------------------------------------------------------------|
 | **Current Phase**       | Implementation — Phase 1                                           |
 | **Current Milestone**   | M5 — Application Services: Core Domains (In Progress)              |
-| **Last Commit**         | `bdcaebd` — docs(tracker): M4 architecture review results          |
+| **Last Commit**         | `4db243a` — feat(application): implement Vehicle application services — M5 |
 | **Completed**           | M0 ✓, M1 ✓, M2 ✓, M3 ✓, M4 ✓ — 5 / 10 implementation milestones |
 | **In Progress**         | M5 — Application Services: Core Domains                           |
 | **Blocked**             | —                                                                  |
@@ -518,16 +518,17 @@ concrete infrastructure classes imported. Each service has one responsibility (S
 
 **Tasks:**
 
-**Vehicle Application**
-- [ ] Create `apps/vehicle/application/__init__.py`
-- [ ] Create `apps/vehicle/application/dto/__init__.py`
-- [ ] Create `apps/vehicle/application/dto/vehicle_dto.py` — `CreateVehicleDTO`, `UpdateVehicleDTO`, `VehicleResponseDTO` (dataclasses)
-- [ ] Create `apps/vehicle/application/services/__init__.py`
-- [ ] Create `apps/vehicle/application/services/create_vehicle_service.py` — `CreateVehicleService`
-- [ ] Create `apps/vehicle/application/services/update_vehicle_service.py` — `UpdateVehicleService`
-- [ ] Create `apps/vehicle/application/services/deactivate_vehicle_service.py` — `DeactivateVehicleService`
-- [ ] Create `apps/vehicle/application/services/get_vehicle_service.py` — `GetVehicleService`, `ListVehicleService`
-- [ ] Create `apps/vehicle/application/services/sync_sap_equipment_service.py` — `SyncSAPEquipmentService` (imports `ISAPEquipmentPort` from `core/sap/ports/`)
+**Vehicle Application** ✓ COMPLETE — commit `4db243a`
+- [x] Create `apps/vehicle/application/__init__.py`
+- [x] Create `apps/vehicle/application/dto/__init__.py`
+- [x] Create `apps/vehicle/application/dto/vehicle_dto.py` — `CreateVehicleDTO`, `UpdateVehicleDTO`, `DeactivateVehicleDTO`, `VehicleResponseDTO`
+- [x] Create `apps/vehicle/application/services/__init__.py`
+- [x] Create `apps/vehicle/application/services/create_vehicle_service.py` — `CreateVehicleService`
+- [x] Create `apps/vehicle/application/services/update_vehicle_service.py` — `UpdateVehicleService`
+- [x] Create `apps/vehicle/application/services/deactivate_vehicle_service.py` — `DeactivateVehicleService` (cross-domain guard via `IRepairOrderRepository`)
+- [x] Create `apps/vehicle/application/services/get_vehicle_service.py` — `GetVehicleService`, `ListVehiclesService`
+- [x] Create `apps/vehicle/application/services/sync_sap_equipment_service.py` — `SyncSAPEquipmentService`
+- [x] Create `tests/unit/application/test_vehicle_services.py` — 19 unit tests, all passing
 
 **Driver Application**
 - [ ] Create `apps/driver/application/dto/driver_dto.py` — `RegisterDriverDTO`, `DriverResponseDTO`
