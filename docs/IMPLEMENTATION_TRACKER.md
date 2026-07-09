@@ -11,7 +11,7 @@
 |-------------------------|--------------------------------------------------------------------|
 | **Current Phase**       | Implementation — Phase 1                                           |
 | **Current Milestone**   | M6 — Application Services: Maintenance Domains (In Progress)       |
-| **Last Commit**         | `42ea524` — docs(tracker): M5 final — integrity PASSED, 72 tests   |
+| **Last Commit**         | `39a5317` — docs(tracker): start M6 — Application Services: Maintenance Domains |
 | **Completed**           | M0 ✓, M1 ✓, M2 ✓, M3 ✓, M4 ✓, M5 ✓ — 6 / 10 implementation milestones |
 | **In Progress**         | M6 — Application Services: Maintenance Domains                     |
 | **Blocked**             | —                                                                  |
@@ -598,15 +598,15 @@ Services that interact with SAP must import only from `core/sap/ports/` — neve
 
 **Tasks:**
 
-**Repair Application**
-- [ ] Create `apps/repair/application/dto/repair_dto.py` — `CreateRepairOrderDTO`, `AssignTechnicianDTO`, `RepairOrderResponseDTO`
-- [ ] Create `apps/repair/application/services/create_repair_order_service.py` — `CreateRepairOrderService`
-- [ ] Create `apps/repair/application/services/assign_technician_service.py` — `AssignTechnicianService`
-- [ ] Create `apps/repair/application/services/add_repair_activity_service.py` — `AddRepairActivityService`
-- [ ] Create `apps/repair/application/services/add_repair_part_service.py` — `AddRepairPartService`
-- [ ] Create `apps/repair/application/services/close_repair_order_service.py` — `CloseRepairOrderService`
-- [ ] Create `apps/repair/application/services/sync_repair_to_sap_service.py` — `SyncRepairToSAPService` (uses `ISAPPMOrderPort` from `core/sap/ports/`)
-- [ ] Create `apps/repair/application/services/get_repair_service.py` — `GetRepairOrderService`, `ListRepairOrderService`
+**Repair Application** ✓ COMPLETE
+- [x] Create `apps/repair/application/dto/repair_dto.py` — create/assign/complete/cancel/activity/part/sync DTOs + response DTOs
+- [x] Create `apps/repair/application/services/create_repair_order_service.py` — `CreateRepairOrderService` (vehicle + fault existence, vehicle match)
+- [x] Create `apps/repair/application/services/assign_repair_order_service.py` — `AssignRepairOrderService` (delegates to `assign_technician()`)
+- [x] Create `apps/repair/application/services/update_repair_status_service.py` — `StartRepairService`, `CompleteRepairOrderService`, `CancelRepairOrderService`
+- [x] Create `apps/repair/application/services/add_repair_activity_service.py` — `AddRepairActivityService`, `AddRepairPartService`
+- [x] Create `apps/repair/application/services/sync_repair_to_sap_service.py` — `SyncRepairToSAPService` (depends only on `ISAPPMOrderPort`)
+- [x] Create `apps/repair/application/services/get_repair_order_service.py` — `GetRepairOrderService`, `ListRepairOrdersService`
+- [x] Create `tests/unit/application/test_repair_services.py` — 23 unit tests, all passing
 
 **Preventive Maintenance Application**
 - [ ] Create `apps/preventive_maintenance/application/dto/pm_dto.py` — `CreatePMPlanDTO`, `TriggerPMWorkOrderDTO`, `PMPlanResponseDTO`

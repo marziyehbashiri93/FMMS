@@ -1,0 +1,199 @@
+"""Application-layer DTOs for the Repair domain.
+
+Rules:
+- No ORM models, no Django objects, no database objects.
+- All fields are primitive Python types or domain enums.
+- Mapping DTO <-> Domain Entity happens explicitly inside each service.
+"""
+
+from __future__ import annotations
+
+import uuid
+from dataclasses import dataclass, field
+from datetime import datetime
+from decimal import Decimal
+
+from apps.repair.domain.entities import RepairOrderStatus
+
+
+@dataclass(frozen=True)
+class CreateRepairOrderDTO:
+    """Input DTO for creating a new repair order.
+
+    Attributes:
+        vehicle_id: UUID of the vehicle requiring repair.
+        fault_id: UUID of the originating fault.
+        request_id: Correlation ID for tracing.
+        created_by: UUID of the authenticated user creating the order.
+    """
+
+    vehicle_id: uuid.UUID
+    fault_id: uuid.UUID
+    request_id: str
+    created_by: uuid.UUID
+
+
+@dataclass(frozen=True)
+class AssignRepairOrderDTO:
+    """Input DTO for assigning a technician to a repair order.
+
+    Attributes:
+        repair_order_id: UUID of the repair order to assign.
+        technician_id: UUID of the technician receiving the assignment.
+        request_id: Correlation ID for tracing.
+        assigned_by: UUID of the user performing the assignment.
+    """
+
+    repair_order_id: uuid.UUID
+    technician_id: uuid.UUID
+    request_id: str
+    assigned_by: uuid.UUID
+
+
+@dataclass(frozen=True)
+class CloseRepairOrderDTO:
+    """Input DTO for cancelling a repair order.
+
+    Attributes:
+        repair_order_id: UUID of the repair order to cancel.
+        request_id: Correlation ID for tracing.
+        requested_by: UUID of the user requesting cancellation.
+    """
+
+    repair_order_id: uuid.UUID
+    request_id: str
+    requested_by: uuid.UUID
+
+
+@dataclass(frozen=True)
+class CompleteRepairOrderDTO:
+    """Input DTO for completing a repair order (IN_PROGRESS → COMPLETED).
+
+    Attributes:
+        repair_order_id: UUID of the repair order to complete.
+        completed_at: UTC timestamp when the repair was physically completed.
+        request_id: Correlation ID for tracing.
+        completed_by: UUID of the user marking the order complete.
+    """
+
+    repair_order_id: uuid.UUID
+    completed_at: datetime
+    request_id: str
+    completed_by: uuid.UUID
+
+
+@dataclass(frozen=True)
+class AddRepairActivityDTO:
+    """Input DTO for adding a repair activity to an active order.
+
+    Attributes:
+        repair_order_id: UUID of the target repair order (must be mutable).
+        description: Description of the work performed.
+        labor_hours: Hours spent expressed as a decimal.
+        performed_by_id: UUID of the technician who performed the activity.
+        performed_at: UTC timestamp when the activity was completed.
+        request_id: Correlation ID for tracing.
+        notes: Optional additional technician notes.
+    """
+
+    repair_order_id: uuid.UUID
+    description: str
+    labor_hours: Decimal
+    performed_by_id: uuid.UUID
+    performed_at: datetime
+    request_id: str
+    notes: str | None = field(default=None)
+
+
+@dataclass(frozen=True)
+class SyncRepairToSAPDTO:
+    """Input DTO for syncing a repair order to SAP as a PM Order.
+
+    The service depends only on ``ISAPPMOrderPort`` (from ``core/sap/ports``).
+    Idempotency and transaction tracking are wired at the composition root
+    around the port — never imported as concrete infrastructure here.
+
+    Attributes:
+        repair_order_id: UUID of the repair order to sync.
+        order_type: SAP order type code (e.g. corrective maintenance).
+        description: Short description of the work for SAP.
+        planned_start: UTC datetime when work is planned to begin.
+        request_id: Correlation ID for tracing.
+        requested_by: UUID of the user initiating the sync.
+        plant: Optional SAP plant code.
+        work_center: Optional SAP work centre.
+    """
+
+    repair_order_id: uuid.UUID
+    order_type: str
+    description: str
+    planned_start: datetime
+    request_id: str
+    requested_by: uuid.UUID
+    plant: str | None = field(default=None)
+    work_center: str | None = field(default=None)
+
+
+@dataclass(frozen=True)
+class AddRepairPartDTO:
+    """Input DTO for recording a spare part consumed during a repair.
+
+    Attributes:
+        repair_order_id: UUID of the target repair order (must be mutable).
+        material_number: SAP material number for the part.
+        quantity: Positive integer number of units consumed.
+        unit_of_measure: Unit of measure (e.g. "EA", "KG").
+        request_id: Correlation ID for tracing.
+    """
+
+    repair_order_id: uuid.UUID
+    material_number: str
+    quantity: int
+    unit_of_measure: str
+    request_id: str
+
+
+@dataclass(frozen=True)
+class RepairActivityResponseDTO:
+    """Output DTO for a single repair activity."""
+
+    id: uuid.UUID
+    description: str
+    labor_hours: Decimal
+    performed_by_id: uuid.UUID
+    performed_at: datetime
+    notes: str | None = field(default=None)
+
+
+@dataclass(frozen=True)
+class RepairPartResponseDTO:
+    """Output DTO for a single repair part record."""
+
+    id: uuid.UUID
+    material_number: str
+    quantity: int
+    unit_of_measure: str
+    goods_issue_id: uuid.UUID | None = field(default=None)
+    posted_at: datetime | None = field(default=None)
+
+
+@dataclass(frozen=True)
+class RepairOrderResponseDTO:
+    """Output DTO returned by all repair order read and write operations.
+
+    Contains only primitive types safe to serialise directly to JSON.
+    """
+
+    id: uuid.UUID
+    vehicle_id: uuid.UUID
+    fault_id: uuid.UUID
+    status: RepairOrderStatus
+    created_by_id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+    activities: list[RepairActivityResponseDTO] = field(default_factory=list)
+    parts: list[RepairPartResponseDTO] = field(default_factory=list)
+    technician_id: uuid.UUID | None = field(default=None)
+    assigned_at: datetime | None = field(default=None)
+    sap_order_number: str | None = field(default=None)
+    completed_at: datetime | None = field(default=None)
