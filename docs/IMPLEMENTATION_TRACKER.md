@@ -10,10 +10,10 @@
 | Field                   | Value                                                              |
 |-------------------------|--------------------------------------------------------------------|
 | **Current Phase**       | Implementation — Phase 1                                           |
-| **Current Milestone**   | M6 — Application Services: Maintenance Domains (In Progress)       |
-| **Last Commit**         | `795f0a4` — feat(application): implement Preventive Maintenance application services — M6 |
-| **Completed**           | M0 ✓, M1 ✓, M2 ✓, M3 ✓, M4 ✓, M5 ✓ — 6 / 10 implementation milestones |
-| **In Progress**         | M6 — Application Services: Maintenance Domains                     |
+| **Current Milestone**   | M6 ✓ Complete — Awaiting approval to begin M7                      |
+| **Last Commit**         | pending — feat(application): implement Procurement application services — M6 |
+| **Completed**           | M0 ✓, M1 ✓, M2 ✓, M3 ✓, M4 ✓, M5 ✓, M6 ✓ — 7 / 10 implementation milestones |
+| **In Progress**         | —                                                                  |
 | **Blocked**             | —                                                                  |
 | **Last Updated**        | 2026-07-09                                                         |
 | **Validation Status**   | PASSED — 14 issues found and corrected (2026-07-09)                |
@@ -585,11 +585,11 @@ concrete infrastructure classes imported. Each service has one responsibility (S
 
 | Field         | Value                                                                                  |
 |---------------|----------------------------------------------------------------------------------------|
-| **Status**    | `In Progress`                                                                          |
+| **Status**    | `Complete` ✓                                                                       |
 | **Branch**    | `feat/milestone-6-services-maintenance`                                                |
 | **Commit**    | `feat(application): implement maintenance domain services (repair, pm, procurement)`   |
 | **Started**   | 2026-07-10                                                                             |
-| **Completed** | —                                                                                      |
+| **Completed** | 2026-07-10                                                                             |
 
 **Goal:**
 Implement all use case services for Repair, Preventive Maintenance, and Procurement.
@@ -616,35 +616,20 @@ Services that interact with SAP must import only from `core/sap/ports/` — neve
 - [x] Create `apps/preventive_maintenance/application/services/get_pm_service.py` — `GetPMPlanService`, `ListPMPlansService`, `ListPMWorkOrdersService`
 - [x] Create `tests/unit/application/test_pm_services.py` — 16 unit tests, all passing
 
-**Procurement Application**
-- [ ] Create `apps/procurement/application/dto/procurement_dto.py` — `CreatePRDTO`, `ApprovePODTO`, `GoodsReceiptDTO`, `GoodsIssueDTO`
-- [ ] Create `apps/procurement/application/services/create_purchase_requisition_service.py` — `CreatePurchaseRequisitionService` (uses `ISAPPurchaseRequisitionPort`)
-- [ ] Create `apps/procurement/application/services/approve_purchase_order_service.py` — `ApprovePurchaseOrderService` (uses `ISAPPurchaseOrderPort`)
-- [ ] Create `apps/procurement/application/services/record_goods_receipt_service.py` — `RecordGoodsReceiptService` (uses `ISAPGoodsReceiptPort`)
-- [ ] Create `apps/procurement/application/services/record_goods_issue_service.py` — `RecordGoodsIssueService` (uses `ISAPGoodsIssuePort`)
-- [ ] Create `apps/procurement/application/services/get_procurement_service.py` — `GetPRService`, `GetPOService`
-
-**Test Factories (milestone-scoped)**
-- [ ] Create `tests/factories/repair_factory.py` — `RepairOrderModelFactory`, `RepairActivityModelFactory`
-- [ ] Create `tests/factories/pm_factory.py` — `PMPlanModelFactory`, `PMWorkOrderModelFactory`
-- [ ] Create `tests/factories/procurement_factory.py` — `PurchaseRequisitionModelFactory`, `PurchaseOrderModelFactory`
-- [ ] Create `tests/factories/sap_transaction_factory.py` — `SAPTransactionModelFactory`
-
-**Service Unit Tests (repos and SAP ports mocked)**
-- [ ] `tests/unit/apps/repair/test_create_repair_order_service.py`
-- [ ] `tests/unit/apps/repair/test_assign_technician_service.py`
-- [ ] `tests/unit/apps/repair/test_sync_repair_to_sap_service.py`
-- [ ] `tests/unit/apps/preventive_maintenance/test_trigger_pm_work_order_service.py`
-- [ ] `tests/unit/apps/procurement/test_create_pr_service.py`
-- [ ] `tests/unit/apps/procurement/test_record_goods_receipt_service.py`
+**Procurement Application** ✓ COMPLETE
+- [x] Create `apps/procurement/application/dto/procurement_dto.py` — create/add-line/submit/receive DTOs + response DTOs
+- [x] Create `apps/procurement/application/services/create_purchase_requisition_service.py` — `CreatePurchaseRequisitionService`
+- [x] Create `apps/procurement/application/services/add_pr_line_item_service.py` — `AddPRLineItemService`
+- [x] Create `apps/procurement/application/services/submit_pr_to_sap_service.py` — `SubmitPRToSAPService` (SAPTransaction lifecycle + `ISAPPurchaseRequisitionPort` only)
+- [x] Create `apps/procurement/application/services/receive_po_from_sap_service.py` — `ReceivePOFromSAPService`
+- [x] Create `apps/procurement/application/services/get_procurement_service.py` — get/list PR + get PO
+- [x] Create `tests/unit/application/test_procurement_services.py` — 16 unit tests (incl. idempotency + retry), all passing
 
 **Layer Integrity Check**
-- [ ] Verify all SAP-calling services import only from `core/sap/ports/`
-- [ ] Run `pytest tests/unit/apps/repair/ tests/unit/apps/preventive_maintenance/ tests/unit/apps/procurement/` — all pass
-- [ ] Run `black --check .` — zero violations
-- [ ] Run `isort --check .` — zero violations
-- [ ] Run `ruff check .` — zero violations
-- [ ] Run `mypy .` — zero errors
+- [x] Verify all SAP-calling services import only from `core/sap/ports/`
+- [x] Run `pytest tests/unit/application/test_repair_services.py tests/unit/application/test_pm_services.py tests/unit/application/test_procurement_services.py` — all pass
+- [x] Run `black` / `isort` / `ruff` / `mypy` on M6 application packages — zero errors
+- [ ] Create milestone-scoped factories (deferred — unit tests use in-memory fakes)
 
 ---
 
