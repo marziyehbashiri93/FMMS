@@ -10,7 +10,7 @@ from apps.repair.application.services.create_repair_order_service import (
 )
 from apps.repair.domain.entities import RepairOrderStatus
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
-from core.exceptions.base_exception import FMMSNotFoundError
+from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
 
 logger = get_structured_logger("repair", __name__)
@@ -52,12 +52,11 @@ class GetRepairOrderService:
             },
         )
 
-        order = self._repo.get_by_id(repair_order_id)
-        if order is None:
-            raise FMMSNotFoundError(
-                message=f"Repair order '{repair_order_id}' not found.",
-                details={"repair_order_id": str(repair_order_id)},
-            )
+        order = load_or_not_found(
+            lambda: self._repo.get_by_id(repair_order_id),
+            message=f"Repair order '{repair_order_id}' not found.",
+            details={"repair_order_id": str(repair_order_id)},
+        )
 
         logger.info(
             "Repair order fetched",

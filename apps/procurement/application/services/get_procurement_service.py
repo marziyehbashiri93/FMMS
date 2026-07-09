@@ -19,7 +19,7 @@ from apps.procurement.domain.interfaces.procurement_repository import (
     IPurchaseOrderRepository,
     IPurchaseRequisitionRepository,
 )
-from core.exceptions.base_exception import FMMSNotFoundError
+from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
 
 logger = get_structured_logger("procurement", __name__)
@@ -49,12 +49,11 @@ class GetPurchaseRequisitionService:
                 "entity_id": str(pr_id),
             },
         )
-        pr = self._repo.get_by_id(pr_id)
-        if pr is None:
-            raise FMMSNotFoundError(
-                message=f"Purchase requisition '{pr_id}' not found.",
-                details={"pr_id": str(pr_id)},
-            )
+        pr = load_or_not_found(
+            lambda: self._repo.get_by_id(pr_id),
+            message=f"Purchase requisition '{pr_id}' not found.",
+            details={"pr_id": str(pr_id)},
+        )
         return _pr_to_response_dto(pr)
 
 
@@ -120,10 +119,9 @@ class GetPurchaseOrderService:
                 "entity_id": str(po_id),
             },
         )
-        po = self._repo.get_by_id(po_id)
-        if po is None:
-            raise FMMSNotFoundError(
-                message=f"Purchase order '{po_id}' not found.",
-                details={"po_id": str(po_id)},
-            )
+        po = load_or_not_found(
+            lambda: self._repo.get_by_id(po_id),
+            message=f"Purchase order '{po_id}' not found.",
+            details={"po_id": str(po_id)},
+        )
         return _po_to_response_dto(po)

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from core.domain.exceptions import DomainError, DomainNotFoundError, DomainStateError
 
-class PMDomainError(Exception):
+
+class PMDomainError(DomainError):
     """Base class for all Preventive Maintenance domain exceptions."""
 
 
-class PMPlanNotFoundError(PMDomainError):
+class PMPlanNotFoundError(PMDomainError, DomainNotFoundError):
     """Raised when a PM plan cannot be located by its identifier.
 
     Args:
@@ -19,7 +21,7 @@ class PMPlanNotFoundError(PMDomainError):
         self.plan_id = plan_id
 
 
-class PMWorkOrderNotFoundError(PMDomainError):
+class PMWorkOrderNotFoundError(PMDomainError, DomainNotFoundError):
     """Raised when a PM work order cannot be located by its identifier.
 
     Args:
@@ -31,7 +33,7 @@ class PMWorkOrderNotFoundError(PMDomainError):
         self.work_order_id = work_order_id
 
 
-class PMAlreadyTriggeredError(PMDomainError):
+class PMAlreadyTriggeredError(PMDomainError, DomainStateError):
     """Raised when a PM plan trigger is requested but a work order is already active.
 
     Args:
@@ -45,7 +47,7 @@ class PMAlreadyTriggeredError(PMDomainError):
         self.plan_id = plan_id
 
 
-class PMInvalidStateTransitionError(PMDomainError):
+class PMInvalidStateTransitionError(PMDomainError, DomainStateError):
     """Raised when a PM work order status transition is not permitted.
 
     Args:

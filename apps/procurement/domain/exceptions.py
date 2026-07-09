@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from core.domain.exceptions import DomainError, DomainNotFoundError, DomainStateError
 
-class ProcurementDomainError(Exception):
+
+class ProcurementDomainError(DomainError):
     """Base class for all Procurement domain exceptions."""
 
 
-class PRNotFoundError(ProcurementDomainError):
+class PRNotFoundError(ProcurementDomainError, DomainNotFoundError):
     """Raised when a Purchase Requisition cannot be located.
 
     Args:
@@ -19,7 +21,7 @@ class PRNotFoundError(ProcurementDomainError):
         self.pr_id = pr_id
 
 
-class PONotFoundError(ProcurementDomainError):
+class PONotFoundError(ProcurementDomainError, DomainNotFoundError):
     """Raised when a Purchase Order cannot be located.
 
     Args:
@@ -31,7 +33,7 @@ class PONotFoundError(ProcurementDomainError):
         self.po_id = po_id
 
 
-class GoodsDocumentNotFoundError(ProcurementDomainError):
+class GoodsDocumentNotFoundError(ProcurementDomainError, DomainNotFoundError):
     """Raised when a Goods Receipt or Goods Issue document cannot be located.
 
     Args:
@@ -43,7 +45,7 @@ class GoodsDocumentNotFoundError(ProcurementDomainError):
         self.doc_id = doc_id
 
 
-class ProcurementInvalidStateTransitionError(ProcurementDomainError):
+class ProcurementInvalidStateTransitionError(ProcurementDomainError, DomainStateError):
     """Raised when a procurement document status transition is not permitted.
 
     Args:

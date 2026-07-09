@@ -15,7 +15,7 @@ from apps.inspection.application.services.create_inspection_service import (
 from apps.inspection.domain.interfaces.inspection_repository import (
     IInspectionRepository,
 )
-from core.exceptions.base_exception import FMMSNotFoundError
+from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
 
 logger = get_structured_logger("inspection", __name__)
@@ -57,12 +57,11 @@ class GetInspectionService:
             },
         )
 
-        inspection = self._repo.get_by_id(inspection_id)
-        if inspection is None:
-            raise FMMSNotFoundError(
-                message=f"Inspection '{inspection_id}' not found.",
-                details={"inspection_id": str(inspection_id)},
-            )
+        inspection = load_or_not_found(
+            lambda: self._repo.get_by_id(inspection_id),
+            message=f"Inspection '{inspection_id}' not found.",
+            details={"inspection_id": str(inspection_id)},
+        )
 
         logger.info(
             "Inspection fetched",

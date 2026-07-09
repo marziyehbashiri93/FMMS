@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from core.domain.exceptions import DomainError, DomainNotFoundError, DomainStateError
 
-class InspectionDomainError(Exception):
+
+class InspectionDomainError(DomainError):
     """Base class for all Inspection domain exceptions."""
 
 
-class InspectionNotFoundError(InspectionDomainError):
+class InspectionNotFoundError(InspectionDomainError, DomainNotFoundError):
     """Raised when an inspection cannot be located by its identifier.
 
     Args:
@@ -19,7 +21,7 @@ class InspectionNotFoundError(InspectionDomainError):
         self.inspection_id = inspection_id
 
 
-class InspectionAlreadySubmittedError(InspectionDomainError):
+class InspectionAlreadySubmittedError(InspectionDomainError, DomainStateError):
     """Raised when attempting to modify or re-submit an already-submitted inspection.
 
     Args:
@@ -31,7 +33,7 @@ class InspectionAlreadySubmittedError(InspectionDomainError):
         self.inspection_id = inspection_id
 
 
-class InspectionItemRequiredError(InspectionDomainError):
+class InspectionItemRequiredError(InspectionDomainError, DomainStateError):
     """Raised when attempting to submit an inspection that has no checklist items."""
 
     def __init__(self) -> None:
@@ -40,7 +42,7 @@ class InspectionItemRequiredError(InspectionDomainError):
         )
 
 
-class InspectionInvalidStateTransitionError(InspectionDomainError):
+class InspectionInvalidStateTransitionError(InspectionDomainError, DomainStateError):
     """Raised when an inspection status transition is not permitted.
 
     Args:

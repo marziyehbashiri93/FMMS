@@ -21,7 +21,8 @@ from apps.driver.domain.entities import Driver
 from apps.driver.domain.interfaces.driver_repository import IDriverRepository
 from apps.vehicle.domain.entities import VehicleStatus
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
-from core.exceptions.base_exception import FMMSConflictError, FMMSNotFoundError
+from core.exceptions.base_exception import FMMSConflictError
+from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
 
 logger = get_structured_logger("driver", __name__)
@@ -90,19 +91,17 @@ class AssignDriverToVehicleService:
             },
         )
 
-        driver = self._driver_repo.get_by_id(dto.driver_id)
-        if driver is None:
-            raise FMMSNotFoundError(
-                message=f"Driver '{dto.driver_id}' not found.",
-                details={"driver_id": str(dto.driver_id)},
-            )
+        driver = load_or_not_found(
+            lambda: self._driver_repo.get_by_id(dto.driver_id),
+            message=f"Driver '{dto.driver_id}' not found.",
+            details={"driver_id": str(dto.driver_id)},
+        )
 
-        vehicle = self._vehicle_repo.get_by_id(dto.vehicle_id)
-        if vehicle is None:
-            raise FMMSNotFoundError(
-                message=f"Vehicle '{dto.vehicle_id}' not found.",
-                details={"vehicle_id": str(dto.vehicle_id)},
-            )
+        vehicle = load_or_not_found(
+            lambda: self._vehicle_repo.get_by_id(dto.vehicle_id),
+            message=f"Vehicle '{dto.vehicle_id}' not found.",
+            details={"vehicle_id": str(dto.vehicle_id)},
+        )
 
         if not driver.is_available:
             raise FMMSConflictError(

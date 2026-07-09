@@ -19,7 +19,8 @@ from apps.vehicle.application.dto.vehicle_dto import (
     VehicleResponseDTO,
 )
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
-from core.exceptions.base_exception import FMMSConflictError, FMMSNotFoundError
+from core.exceptions.base_exception import FMMSConflictError
+from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
 
 logger = get_structured_logger("vehicle", __name__)
@@ -73,12 +74,11 @@ class DeactivateVehicleService:
             },
         )
 
-        vehicle = self._vehicle_repo.get_by_id(dto.vehicle_id)
-        if vehicle is None:
-            raise FMMSNotFoundError(
-                message=f"Vehicle '{dto.vehicle_id}' not found.",
-                details={"vehicle_id": str(dto.vehicle_id)},
-            )
+        vehicle = load_or_not_found(
+            lambda: self._vehicle_repo.get_by_id(dto.vehicle_id),
+            message=f"Vehicle '{dto.vehicle_id}' not found.",
+            details={"vehicle_id": str(dto.vehicle_id)},
+        )
 
         active_orders = self._repair_repo.list_active_by_vehicle(dto.vehicle_id)
         if active_orders:

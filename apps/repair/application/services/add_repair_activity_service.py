@@ -20,7 +20,7 @@ from apps.repair.application.services.create_repair_order_service import (
 from apps.repair.domain.entities import RepairActivity, RepairPart
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
 from apps.repair.domain.value_objects import LaborHours, PartQuantity
-from core.exceptions.base_exception import FMMSNotFoundError
+from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
 
 logger = get_structured_logger("repair", __name__)
@@ -60,12 +60,11 @@ class AddRepairActivityService:
             },
         )
 
-        order = self._repo.get_by_id(dto.repair_order_id)
-        if order is None:
-            raise FMMSNotFoundError(
-                message=f"Repair order '{dto.repair_order_id}' not found.",
-                details={"repair_order_id": str(dto.repair_order_id)},
-            )
+        order = load_or_not_found(
+            lambda: self._repo.get_by_id(dto.repair_order_id),
+            message=f"Repair order '{dto.repair_order_id}' not found.",
+            details={"repair_order_id": str(dto.repair_order_id)},
+        )
 
         activity = RepairActivity(
             id=uuid.uuid4(),
@@ -131,12 +130,11 @@ class AddRepairPartService:
             },
         )
 
-        order = self._repo.get_by_id(dto.repair_order_id)
-        if order is None:
-            raise FMMSNotFoundError(
-                message=f"Repair order '{dto.repair_order_id}' not found.",
-                details={"repair_order_id": str(dto.repair_order_id)},
-            )
+        order = load_or_not_found(
+            lambda: self._repo.get_by_id(dto.repair_order_id),
+            message=f"Repair order '{dto.repair_order_id}' not found.",
+            details={"repair_order_id": str(dto.repair_order_id)},
+        )
 
         part = RepairPart(
             id=uuid.uuid4(),

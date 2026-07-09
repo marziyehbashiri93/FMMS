@@ -29,6 +29,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import exception_handler
 
+from core.domain.exceptions import DomainStateError
 from core.exceptions.base_exception import (
     FMMSBaseException,
     FMMSConflictError,
@@ -158,6 +159,22 @@ def fmms_exception_handler(exc: Exception, context: dict[str, Any]) -> Response 
             exc.error_code,
             exc.message,
             exc.details,
+            request_id,
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
+
+    if isinstance(exc, DomainStateError):
+        # Domain entities raise DomainStateError subclasses for illegal
+        # transitions/operations. Map by category only — no app-specific types.
+        logger.warning(
+            "Invalid domain state: %s",
+            str(exc),
+            extra={"domain": "core", "request_id": request_id},
+        )
+        return _build_error_response(
+            "INVALID_STATE_TRANSITION",
+            str(exc),
+            {},
             request_id,
             status.HTTP_422_UNPROCESSABLE_ENTITY,
         )

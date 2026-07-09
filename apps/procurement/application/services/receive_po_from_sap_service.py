@@ -22,7 +22,8 @@ from apps.procurement.domain.value_objects import (
     SAPDocumentNumber,
     VendorNumber,
 )
-from core.exceptions.base_exception import FMMSConflictError, FMMSNotFoundError
+from core.exceptions.base_exception import FMMSConflictError
+from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
 
 logger = get_structured_logger("procurement", __name__)
@@ -86,12 +87,11 @@ class ReceivePOFromSAPService:
             },
         )
 
-        pr = self._pr_repo.get_by_id(dto.pr_id)
-        if pr is None:
-            raise FMMSNotFoundError(
-                message=f"Purchase requisition '{dto.pr_id}' not found.",
-                details={"pr_id": str(dto.pr_id)},
-            )
+        pr = load_or_not_found(
+            lambda: self._pr_repo.get_by_id(dto.pr_id),
+            message=f"Purchase requisition '{dto.pr_id}' not found.",
+            details={"pr_id": str(dto.pr_id)},
+        )
 
         if pr.sap_pr_number is None:
             raise FMMSConflictError(

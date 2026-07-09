@@ -11,7 +11,7 @@ from apps.fault.application.dto.fault_dto import FaultResponseDTO
 from apps.fault.application.services.report_fault_service import _to_response_dto
 from apps.fault.domain.interfaces.fault_repository import IFaultRepository
 from apps.fault.domain.value_objects import FaultSeverity
-from core.exceptions.base_exception import FMMSNotFoundError
+from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
 
 logger = get_structured_logger("fault", __name__)
@@ -51,12 +51,11 @@ class GetFaultService:
             },
         )
 
-        fault = self._repo.get_by_id(fault_id)
-        if fault is None:
-            raise FMMSNotFoundError(
-                message=f"Fault '{fault_id}' not found.",
-                details={"fault_id": str(fault_id)},
-            )
+        fault = load_or_not_found(
+            lambda: self._repo.get_by_id(fault_id),
+            message=f"Fault '{fault_id}' not found.",
+            details={"fault_id": str(fault_id)},
+        )
 
         logger.info(
             "Fault fetched",

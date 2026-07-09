@@ -22,7 +22,7 @@ from apps.preventive_maintenance.domain.value_objects import (
     TriggerCondition,
 )
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
-from core.exceptions.base_exception import FMMSNotFoundError
+from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
 
 logger = get_structured_logger("preventive_maintenance", __name__)
@@ -88,12 +88,11 @@ class CreatePMPlanService:
             },
         )
 
-        vehicle = self._vehicle_repo.get_by_id(dto.vehicle_id)
-        if vehicle is None:
-            raise FMMSNotFoundError(
-                message=f"Vehicle '{dto.vehicle_id}' not found.",
-                details={"vehicle_id": str(dto.vehicle_id)},
-            )
+        load_or_not_found(
+            lambda: self._vehicle_repo.get_by_id(dto.vehicle_id),
+            message=f"Vehicle '{dto.vehicle_id}' not found.",
+            details={"vehicle_id": str(dto.vehicle_id)},
+        )
 
         now = datetime.now(tz=UTC)
         plan = PMPlan(

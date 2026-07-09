@@ -19,7 +19,7 @@ from apps.preventive_maintenance.domain.interfaces.pm_repository import (
     IPMPlanRepository,
     IPMWorkOrderRepository,
 )
-from core.exceptions.base_exception import FMMSNotFoundError
+from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
 
 logger = get_structured_logger("preventive_maintenance", __name__)
@@ -59,12 +59,11 @@ class GetPMPlanService:
             },
         )
 
-        plan = self._repo.get_by_id(plan_id)
-        if plan is None:
-            raise FMMSNotFoundError(
-                message=f"PM plan '{plan_id}' not found.",
-                details={"plan_id": str(plan_id)},
-            )
+        plan = load_or_not_found(
+            lambda: self._repo.get_by_id(plan_id),
+            message=f"PM plan '{plan_id}' not found.",
+            details={"plan_id": str(plan_id)},
+        )
 
         logger.info(
             "PM plan fetched",

@@ -20,7 +20,8 @@ from apps.repair.application.dto.repair_dto import (
 from apps.repair.domain.entities import RepairOrder, RepairOrderStatus
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
-from core.exceptions.base_exception import FMMSConflictError, FMMSNotFoundError
+from core.exceptions.base_exception import FMMSConflictError
+from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
 
 logger = get_structured_logger("repair", __name__)
@@ -115,19 +116,17 @@ class CreateRepairOrderService:
             },
         )
 
-        vehicle = self._vehicle_repo.get_by_id(dto.vehicle_id)
-        if vehicle is None:
-            raise FMMSNotFoundError(
-                message=f"Vehicle '{dto.vehicle_id}' not found.",
-                details={"vehicle_id": str(dto.vehicle_id)},
-            )
+        load_or_not_found(
+            lambda: self._vehicle_repo.get_by_id(dto.vehicle_id),
+            message=f"Vehicle '{dto.vehicle_id}' not found.",
+            details={"vehicle_id": str(dto.vehicle_id)},
+        )
 
-        fault = self._fault_repo.get_by_id(dto.fault_id)
-        if fault is None:
-            raise FMMSNotFoundError(
-                message=f"Fault '{dto.fault_id}' not found.",
-                details={"fault_id": str(dto.fault_id)},
-            )
+        fault = load_or_not_found(
+            lambda: self._fault_repo.get_by_id(dto.fault_id),
+            message=f"Fault '{dto.fault_id}' not found.",
+            details={"fault_id": str(dto.fault_id)},
+        )
 
         if fault.vehicle_id != dto.vehicle_id:
             raise FMMSConflictError(

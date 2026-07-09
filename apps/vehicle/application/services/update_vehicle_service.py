@@ -15,7 +15,7 @@ from apps.vehicle.application.dto.vehicle_dto import (
 from apps.vehicle.domain.entities import Vehicle
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
 from apps.vehicle.domain.value_objects import ChassisNumber, SAPEquipmentNumber
-from core.exceptions.base_exception import FMMSNotFoundError
+from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
 
 logger = get_structured_logger("vehicle", __name__)
@@ -57,12 +57,11 @@ class UpdateVehicleService:
             },
         )
 
-        vehicle = self._repo.get_by_id(dto.vehicle_id)
-        if vehicle is None:
-            raise FMMSNotFoundError(
-                message=f"Vehicle '{dto.vehicle_id}' not found.",
-                details={"vehicle_id": str(dto.vehicle_id)},
-            )
+        vehicle = load_or_not_found(
+            lambda: self._repo.get_by_id(dto.vehicle_id),
+            message=f"Vehicle '{dto.vehicle_id}' not found.",
+            details={"vehicle_id": str(dto.vehicle_id)},
+        )
 
         vehicle = _apply_updates(vehicle, dto)
 

@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from core.domain.exceptions import DomainError, DomainNotFoundError
 
-class IntegrationDomainError(Exception):
+
+class IntegrationDomainError(DomainError):
     """Base class for all SAP Integration domain exceptions."""
 
 
@@ -54,7 +56,7 @@ class SAPIdempotencyError(IntegrationDomainError):
         self.existing_transaction_id = existing_transaction_id
 
 
-class SAPTransactionNotFoundError(IntegrationDomainError):
+class SAPTransactionNotFoundError(IntegrationDomainError, DomainNotFoundError):
     """Raised when a SAP transaction cannot be located by its identifier.
 
     Args:

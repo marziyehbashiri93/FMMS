@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from core.domain.exceptions import DomainError, DomainNotFoundError, DomainStateError
 
-class VehicleDomainError(Exception):
+
+class VehicleDomainError(DomainError):
     """Base class for all Vehicle domain exceptions."""
 
 
-class VehicleNotFoundError(VehicleDomainError):
+class VehicleNotFoundError(VehicleDomainError, DomainNotFoundError):
     """Raised when a vehicle cannot be located by its identifier.
 
     Args:
@@ -33,7 +35,7 @@ class VehicleAlreadyExistsError(VehicleDomainError):
         self.plate_number = plate_number
 
 
-class VehicleInvalidStateTransitionError(VehicleDomainError):
+class VehicleInvalidStateTransitionError(VehicleDomainError, DomainStateError):
     """Raised when a vehicle status transition is not permitted.
 
     Args:

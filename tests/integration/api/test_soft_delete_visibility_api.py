@@ -36,10 +36,9 @@ class TestSoftDeleteVisibility:
         ids = {row["id"] for row in listed.data["results"]}
         assert vehicle["id"] not in ids
 
-        authenticated_client.raise_request_exception = False
-        # DEFECT-M9-01: get of soft-deleted currently 500 (same not-found path).
         detail = authenticated_client.get(f"/api/v1/vehicles/{vehicle['id']}/")
-        assert detail.status_code == 500
+        assert detail.status_code == 404
+        assert detail.data["error_code"] == "NOT_FOUND"
 
     def test_deactivate_does_not_soft_delete(
         self, authenticated_client: APIClient

@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from apps.fault.application.dto.fault_dto import CloseFaultDTO, FaultResponseDTO
 from apps.fault.application.services.report_fault_service import _to_response_dto
 from apps.fault.domain.interfaces.fault_repository import IFaultRepository
-from core.exceptions.base_exception import FMMSNotFoundError
+from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
 
 logger = get_structured_logger("fault", __name__)
@@ -55,12 +55,11 @@ class CloseFaultService:
             },
         )
 
-        fault = self._repo.get_by_id(dto.fault_id)
-        if fault is None:
-            raise FMMSNotFoundError(
-                message=f"Fault '{dto.fault_id}' not found.",
-                details={"fault_id": str(dto.fault_id)},
-            )
+        fault = load_or_not_found(
+            lambda: self._repo.get_by_id(dto.fault_id),
+            message=f"Fault '{dto.fault_id}' not found.",
+            details={"fault_id": str(dto.fault_id)},
+        )
 
         fault.close()
         fault.updated_at = datetime.now(tz=UTC)

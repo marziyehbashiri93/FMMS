@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from core.domain.exceptions import DomainError, DomainNotFoundError, DomainStateError
 
-class DriverDomainError(Exception):
+
+class DriverDomainError(DomainError):
     """Base class for all Driver domain exceptions."""
 
 
-class DriverNotFoundError(DriverDomainError):
+class DriverNotFoundError(DriverDomainError, DomainNotFoundError):
     """Raised when a driver cannot be located by its identifier.
 
     Args:
@@ -19,7 +21,7 @@ class DriverNotFoundError(DriverDomainError):
         self.driver_id = driver_id
 
 
-class DriverSuspendedError(DriverDomainError):
+class DriverSuspendedError(DriverDomainError, DomainStateError):
     """Raised when an operation is attempted on a suspended driver.
 
     Args:
@@ -45,7 +47,7 @@ class DriverAlreadyExistsError(DriverDomainError):
         self.license_number = license_number
 
 
-class DriverInvalidStateTransitionError(DriverDomainError):
+class DriverInvalidStateTransitionError(DriverDomainError, DomainStateError):
     """Raised when a driver status transition is not permitted.
 
     Args:

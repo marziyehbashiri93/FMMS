@@ -19,7 +19,7 @@ from apps.preventive_maintenance.domain.entities import PMWorkOrderStatus
 from apps.preventive_maintenance.domain.interfaces.pm_repository import (
     IPMWorkOrderRepository,
 )
-from core.exceptions.base_exception import FMMSNotFoundError
+from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
 
 logger = get_structured_logger("preventive_maintenance", __name__)
@@ -62,12 +62,11 @@ class CompletePMWorkOrderService:
             },
         )
 
-        work_order = self._wo_repo.get_by_id(dto.work_order_id)
-        if work_order is None:
-            raise FMMSNotFoundError(
-                message=f"PM work order '{dto.work_order_id}' not found.",
-                details={"work_order_id": str(dto.work_order_id)},
-            )
+        work_order = load_or_not_found(
+            lambda: self._wo_repo.get_by_id(dto.work_order_id),
+            message=f"PM work order '{dto.work_order_id}' not found.",
+            details={"work_order_id": str(dto.work_order_id)},
+        )
 
         if work_order.status in {
             PMWorkOrderStatus.TRIGGERED,

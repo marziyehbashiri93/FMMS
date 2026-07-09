@@ -1,31 +1,9 @@
-"""P0 — API error-handling scenarios through the FMMS exception handler.
+"""API error-handling scenarios through the FMMS exception handler.
 
-Known production defects discovered during M9 (awaiting approval before any
-production code change):
-
-DEFECT-M9-01
-  Symptom: ``GET /api/v1/vehicles/{missing}/`` returns HTTP 500.
-  Cause: ``DjangoVehicleRepository.get_by_id`` raises ``VehicleNotFoundError``
-  (plain domain exception). ``GetVehicleService`` documents ``None`` →
-  ``FMMSNotFoundError``, but the repository never returns ``None``, so the
-  service never raises ``FMMSNotFoundError``. The DRF handler only maps
-  ``FMMS*`` types, so the response is an unhandled 500.
-  Proposed fix (needs approval):
-    A) Repository returns ``None`` / optional and services raise
-       ``FMMSNotFoundError`` (match interface intent), OR
-    B) Map ``VehicleNotFoundError`` (and peer *NotFound domain exceptions) in
-       ``fmms_exception_handler`` to HTTP 404, OR
-    C) Services catch domain not-found and re-raise ``FMMSNotFoundError``.
-
-DEFECT-M9-02
-  Symptom: Illegal repair transitions (e.g. start from CREATED) return HTTP 500.
-  Cause: ``RepairOrderInvalidStateTransitionError`` /
-  ``RepairOrderInvalidStateError`` are not ``FMMSBaseException`` subclasses and
-  are not wrapped by application services before reaching the API.
-  Proposed fix (needs approval):
-    A) Application services catch repair state errors and raise
-       ``FMMSStateError``, OR
-    B) Map those domain exceptions in ``fmms_exception_handler`` to HTTP 422.
+DEFECT-M9-01 and DEFECT-M9-02 production fixes are verified here:
+- Domain not-found exceptions are translated by application services to
+  ``FMMSNotFoundError`` → HTTP 404.
+- Domain state violations (``DomainStateError``) map to HTTP 422.
 """
 
 from __future__ import annotations
@@ -46,20 +24,18 @@ pytestmark = pytest.mark.django_db
 class TestAPIErrorMapping:
     """Domain/application errors must map to the standard FMMS error body."""
 
-    def test_missing_vehicle_currently_returns_500_defect_m9_01(
-        self, authenticated_client: APIClient
-    ) -> None:
-        """DEFECT-M9-01: missing vehicle currently surfaces as unhandled 500."""
-        authenticated_client.raise_request_exception = False
+    def test_missing_vehicle_maps_to_404(self, authenticated_client: APIClient) -> None:
+        """DEFECT-M9-01 Option C: repo not-found → FMMSNotFoundError → 404."""
         missing = uuid4()
         response = authenticated_client.get(f"/api/v1/vehicles/{missing}/")
-        assert response.status_code == 500
+        assert response.status_code == 404
+        assert response.data["error_code"] == "NOT_FOUND"
+        assert "request_id" in response.data
 
-    def test_illegal_repair_start_currently_returns_500_defect_m9_02(
+    def test_illegal_repair_start_maps_to_422(
         self, authenticated_client: APIClient
     ) -> None:
-        """DEFECT-M9-02: invalid repair transition currently surfaces as 500."""
-        authenticated_client.raise_request_exception = False
+        """DEFECT-M9-02: DomainStateError from repair transitions → 422."""
         vehicle = create_vehicle(
             authenticated_client, plate="12ERR001", vin="1HGCM82633A004394"
         )
@@ -86,7 +62,9 @@ class TestAPIErrorMapping:
             {},
             format="json",
         )
-        assert response.status_code == 500
+        assert response.status_code == 422
+        assert response.data["error_code"] == "INVALID_STATE_TRANSITION"
+        assert "request_id" in response.data
 
     def test_validation_error_maps_to_400(
         self, authenticated_client: APIClient

@@ -40,9 +40,9 @@ from apps.procurement.domain.value_objects import SAPDocumentNumber
 from core.exceptions.base_exception import (
     FMMSConflictError,
     FMMSIntegrationError,
-    FMMSNotFoundError,
     FMMSValidationError,
 )
+from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
 from core.sap.dtos.purchase_requisition import CreatePRRequest, PRLineItemRequest
 from core.sap.ports.purchase_requisition_port import ISAPPurchaseRequisitionPort
@@ -96,12 +96,11 @@ class SubmitPRToSAPService:
             },
         )
 
-        pr = self._pr_repo.get_by_id(dto.pr_id)
-        if pr is None:
-            raise FMMSNotFoundError(
-                message=f"Purchase requisition '{dto.pr_id}' not found.",
-                details={"pr_id": str(dto.pr_id)},
-            )
+        pr = load_or_not_found(
+            lambda: self._pr_repo.get_by_id(dto.pr_id),
+            message=f"Purchase requisition '{dto.pr_id}' not found.",
+            details={"pr_id": str(dto.pr_id)},
+        )
 
         if not pr.line_items:
             raise FMMSValidationError(

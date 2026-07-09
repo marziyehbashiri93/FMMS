@@ -37,7 +37,7 @@ from apps.inspection.domain.interfaces.inspection_repository import (
     IInspectionRepository,
 )
 from apps.inspection.domain.value_objects import ChecklistResult
-from core.exceptions.base_exception import FMMSNotFoundError
+from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
 
 logger = get_structured_logger("inspection", __name__)
@@ -96,12 +96,11 @@ class SubmitInspectionService:
             },
         )
 
-        inspection = self._inspection_repo.get_by_id(dto.inspection_id)
-        if inspection is None:
-            raise FMMSNotFoundError(
-                message=f"Inspection '{dto.inspection_id}' not found.",
-                details={"inspection_id": str(dto.inspection_id)},
-            )
+        inspection = load_or_not_found(
+            lambda: self._inspection_repo.get_by_id(dto.inspection_id),
+            message=f"Inspection '{dto.inspection_id}' not found.",
+            details={"inspection_id": str(dto.inspection_id)},
+        )
 
         inspection.submit()
         now = datetime.now(tz=UTC)

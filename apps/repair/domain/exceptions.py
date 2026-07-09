@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from core.domain.exceptions import DomainError, DomainNotFoundError, DomainStateError
 
-class RepairDomainError(Exception):
+
+class RepairDomainError(DomainError):
     """Base class for all Repair domain exceptions."""
 
 
-class RepairOrderNotFoundError(RepairDomainError):
+class RepairOrderNotFoundError(RepairDomainError, DomainNotFoundError):
     """Raised when a repair order cannot be located.
 
     Args:
@@ -19,7 +21,7 @@ class RepairOrderNotFoundError(RepairDomainError):
         self.order_id = order_id
 
 
-class RepairOrderInvalidStateError(RepairDomainError):
+class RepairOrderInvalidStateError(RepairDomainError, DomainStateError):
     """Raised when an operation is not valid in the current repair order state.
 
     Args:
@@ -38,7 +40,7 @@ class RepairOrderInvalidStateError(RepairDomainError):
         self.operation = operation
 
 
-class RepairOrderInvalidStateTransitionError(RepairDomainError):
+class RepairOrderInvalidStateTransitionError(RepairDomainError, DomainStateError):
     """Raised when a repair order status transition is not permitted.
 
     Args:
@@ -54,7 +56,7 @@ class RepairOrderInvalidStateTransitionError(RepairDomainError):
         self.target_status = target_status
 
 
-class RepairActivityNotFoundError(RepairDomainError):
+class RepairActivityNotFoundError(RepairDomainError, DomainNotFoundError):
     """Raised when a repair activity cannot be located.
 
     Args:

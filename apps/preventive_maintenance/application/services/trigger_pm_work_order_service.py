@@ -44,11 +44,8 @@ from apps.preventive_maintenance.domain.interfaces.pm_repository import (
     IPMWorkOrderRepository,
 )
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
-from core.exceptions.base_exception import (
-    FMMSConflictError,
-    FMMSIntegrationError,
-    FMMSNotFoundError,
-)
+from core.exceptions.base_exception import FMMSConflictError, FMMSIntegrationError
+from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
 from core.sap.dtos.pm_notification import CreatePMNotificationRequest
 from core.sap.ports.pm_notification_port import ISAPPMNotificationPort
@@ -140,12 +137,11 @@ class TriggerPMWorkOrderService:
             },
         )
 
-        plan = self._plan_repo.get_by_id(dto.plan_id)
-        if plan is None:
-            raise FMMSNotFoundError(
-                message=f"PM plan '{dto.plan_id}' not found.",
-                details={"plan_id": str(dto.plan_id)},
-            )
+        plan = load_or_not_found(
+            lambda: self._plan_repo.get_by_id(dto.plan_id),
+            message=f"PM plan '{dto.plan_id}' not found.",
+            details={"plan_id": str(dto.plan_id)},
+        )
 
         if not plan.is_active:
             raise FMMSConflictError(
@@ -237,12 +233,11 @@ class TriggerPMWorkOrderService:
                 details={"plan_id": str(dto.plan_id)},
             )
 
-        vehicle = self._vehicle_repo.get_by_id(plan_vehicle_id)
-        if vehicle is None:
-            raise FMMSNotFoundError(
-                message=f"Vehicle '{plan_vehicle_id}' not found.",
-                details={"vehicle_id": str(plan_vehicle_id)},
-            )
+        vehicle = load_or_not_found(
+            lambda: self._vehicle_repo.get_by_id(plan_vehicle_id),
+            message=f"Vehicle '{plan_vehicle_id}' not found.",
+            details={"vehicle_id": str(plan_vehicle_id)},
+        )
         if vehicle.sap_equipment_number is None:
             raise FMMSConflictError(
                 message=(

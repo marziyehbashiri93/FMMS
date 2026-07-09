@@ -33,11 +33,8 @@ from apps.repair.application.services.create_repair_order_service import (
 )
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
-from core.exceptions.base_exception import (
-    FMMSConflictError,
-    FMMSIntegrationError,
-    FMMSNotFoundError,
-)
+from core.exceptions.base_exception import FMMSConflictError, FMMSIntegrationError
+from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
 from core.sap.dtos.pm_order import CreatePMOrderRequest
 from core.sap.ports.pm_order_port import ISAPPMOrderPort
@@ -94,12 +91,11 @@ class SyncRepairToSAPService:
             },
         )
 
-        order = self._repair_repo.get_by_id(dto.repair_order_id)
-        if order is None:
-            raise FMMSNotFoundError(
-                message=f"Repair order '{dto.repair_order_id}' not found.",
-                details={"repair_order_id": str(dto.repair_order_id)},
-            )
+        order = load_or_not_found(
+            lambda: self._repair_repo.get_by_id(dto.repair_order_id),
+            message=f"Repair order '{dto.repair_order_id}' not found.",
+            details={"repair_order_id": str(dto.repair_order_id)},
+        )
 
         if order.sap_order_number:
             raise FMMSConflictError(
@@ -113,12 +109,11 @@ class SyncRepairToSAPService:
                 },
             )
 
-        vehicle = self._vehicle_repo.get_by_id(order.vehicle_id)
-        if vehicle is None:
-            raise FMMSNotFoundError(
-                message=f"Vehicle '{order.vehicle_id}' not found.",
-                details={"vehicle_id": str(order.vehicle_id)},
-            )
+        vehicle = load_or_not_found(
+            lambda: self._vehicle_repo.get_by_id(order.vehicle_id),
+            message=f"Vehicle '{order.vehicle_id}' not found.",
+            details={"vehicle_id": str(order.vehicle_id)},
+        )
 
         if vehicle.sap_equipment_number is None:
             raise FMMSConflictError(

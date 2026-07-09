@@ -18,7 +18,8 @@ from apps.procurement.domain.interfaces.procurement_repository import (
     IPurchaseRequisitionRepository,
 )
 from apps.procurement.domain.value_objects import MaterialNumber, Money, Quantity
-from core.exceptions.base_exception import FMMSNotFoundError, FMMSValidationError
+from core.exceptions.base_exception import FMMSValidationError
+from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
 
 logger = get_structured_logger("procurement", __name__)
@@ -59,12 +60,11 @@ class AddPRLineItemService:
             },
         )
 
-        pr = self._pr_repo.get_by_id(dto.pr_id)
-        if pr is None:
-            raise FMMSNotFoundError(
-                message=f"Purchase requisition '{dto.pr_id}' not found.",
-                details={"pr_id": str(dto.pr_id)},
-            )
+        pr = load_or_not_found(
+            lambda: self._pr_repo.get_by_id(dto.pr_id),
+            message=f"Purchase requisition '{dto.pr_id}' not found.",
+            details={"pr_id": str(dto.pr_id)},
+        )
 
         estimated_price: Money | None = None
         if dto.estimated_amount is not None or dto.currency is not None:

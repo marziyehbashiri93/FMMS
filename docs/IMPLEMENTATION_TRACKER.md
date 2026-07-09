@@ -11,12 +11,12 @@
 |-------------------------|--------------------------------------------------------------------|
 | **Current Phase**       | Implementation — Phase 1                                           |
 | **Current Milestone**   | M9 — Testing Completeness & Production Hardening (Complete)        |
-| **Last Commit**         | `4bb270d` — test(all): harden production scenarios and integration coverage |
+| **Last Commit**         | `fix(core): standardize domain exception handling and API error mapping` |
 | **Completed**           | M0 ✓ … M9 ✓ — 10 / 10 implementation milestones (M10 deferred)     |
 | **In Progress**         | — (M10 not started)                                                |
-| **Blocked**             | DEFECT-M9-01, DEFECT-M9-02 — awaiting approval for production fix  |
+| **Blocked**             | —                                                                  |
 | **Last Updated**        | 2026-07-10                                                         |
-| **Validation Status**   | M9 PASSED — 565/565 tests; coverage 87.99%; black/isort/ruff PASS; mypy baseline 43 (no M9 delta) |
+| **Validation Status**   | DEFECT-M9-01/02 FIXED — 569/569 tests; coverage 88.05%; black/isort/ruff PASS; mypy baseline unchanged |
 
 ---
 
@@ -855,19 +855,19 @@ rules to make tests pass. Production defects require approval before fixes.
 **Fixture fix (tests only)**
 - [x] Role clients use distinct `APIClient` instances (shared client overwrote auth)
 
-**Production defects discovered (awaiting approval — no production code changed)**
+**Production defects — fixed (2026-07-10)**
 
-| ID | Symptom | Cause | Proposed fix |
-|----|---------|-------|--------------|
-| **DEFECT-M9-01** | `GET /vehicles/{missing}/` → **500** | Repo raises `VehicleNotFoundError`; service expects `None` → `FMMSNotFoundError`; handler only maps `FMMS*` | (A) Repo returns `None` / services raise `FMMSNotFoundError`; (B) map domain `*NotFoundError` in handler; (C) services catch & re-raise `FMMSNotFoundError` |
-| **DEFECT-M9-02** | Illegal repair transitions → **500** | `RepairOrderInvalidState*` not `FMMSBaseException`; not wrapped by services | (A) Services wrap as `FMMSStateError`; (B) map repair state exceptions in handler → 422 |
+| ID | Resolution |
+|----|------------|
+| **DEFECT-M9-01** | **Option C** — `load_or_not_found()` in application services translates `DomainNotFoundError` → `FMMSNotFoundError`; handler unchanged (404). Repositories still raise domain not-found. |
+| **DEFECT-M9-02** | Shared `DomainStateError` hierarchy; repair/state exceptions inherit it; handler maps `DomainStateError` → HTTP **422** by category (no domain-specific types in handler). |
 
 **Final Verification**
-- [x] `pytest --cov --cov-fail-under=80` — **565 passed**, coverage **87.99%**
+- [x] `pytest --cov --cov-fail-under=80` — **569 passed**, coverage **88.05%**
 - [x] `black --check .` — pass
 - [x] `isort --check-only .` — pass
 - [x] `ruff check .` — pass
-- [x] `mypy .` — **43 baseline errors** (unchanged vs pre-M9); **0 new from M9**
+- [x] `mypy .` — baseline unchanged (no new from this fix)
 
 ---
 
@@ -1218,4 +1218,15 @@ N+1 query audit, final security hardening, complete README, and Phase 1 release 
 
 ---
 
-*Last updated: 2026-07-10 | Updated by: Lead Backend Architect | Validation: M9 PASSED — 565/565; cov 87.99%; DEFECT-M9-01/02 open pending approval; M10 not started*
+### ADR-021 — Domain Exception Hierarchy and Service NotFound Translation
+
+| Field        | Detail |
+|--------------|--------|
+| **Decision** | Introduce `DomainError` / `DomainNotFoundError` / `DomainStateError` in `core/domain`. Context exceptions inherit these. Application services translate not-found via `load_or_not_found` → `FMMSNotFoundError`. Handler maps `DomainStateError` → 422 by category only. |
+| **Reason**   | Close DEFECT-M9-01/02 without domain-specific knowledge in the global handler and without changing repository contracts. |
+| **Impact**   | Missing resources return 404; illegal state transitions return 422. Domain rules unchanged. |
+| **Date**     | 2026-07-10 |
+
+---
+
+*Last updated: 2026-07-10 | Updated by: Lead Backend Architect | Validation: DEFECT-M9-01/02 FIXED — 569/569; cov 88.05%; M10 not started*

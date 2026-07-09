@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from core.domain.exceptions import DomainError, DomainNotFoundError, DomainStateError
 
-class FaultDomainError(Exception):
+
+class FaultDomainError(DomainError):
     """Base class for all Fault domain exceptions."""
 
 
-class FaultNotFoundError(FaultDomainError):
+class FaultNotFoundError(FaultDomainError, DomainNotFoundError):
     """Raised when a fault cannot be located by its identifier.
 
     Args:
@@ -19,7 +21,7 @@ class FaultNotFoundError(FaultDomainError):
         self.fault_id = fault_id
 
 
-class FaultAlreadyClosedError(FaultDomainError):
+class FaultAlreadyClosedError(FaultDomainError, DomainStateError):
     """Raised when attempting to transition a CLOSED fault to another status.
 
     Args:
@@ -31,7 +33,7 @@ class FaultAlreadyClosedError(FaultDomainError):
         self.fault_id = fault_id
 
 
-class FaultInvalidStateTransitionError(FaultDomainError):
+class FaultInvalidStateTransitionError(FaultDomainError, DomainStateError):
     """Raised when a fault status transition is not permitted.
 
     Args:

@@ -39,7 +39,7 @@ def _create_order(client: APIClient, *, plate: str, vin: str) -> tuple[dict, str
 
 
 class TestRepairWorkflowEdges:
-    """Cancel and illegal-transition edges; documents DEFECT-M9-02 until fixed."""
+    """Cancel and illegal-transition edges after DEFECT-M9-02 fix."""
 
     def test_cancel_from_created(self, authenticated_client: APIClient) -> None:
         """CREATED orders may be cancelled."""
@@ -73,11 +73,10 @@ class TestRepairWorkflowEdges:
         assert cancelled.status_code == 200, cancelled.data
         assert cancelled.data["status"] == "CANCELLED"
 
-    def test_complete_from_created_currently_500_defect_m9_02(
+    def test_complete_from_created_maps_to_422(
         self, authenticated_client: APIClient
     ) -> None:
-        """DEFECT-M9-02: complete from CREATED currently returns unhandled 500."""
-        authenticated_client.raise_request_exception = False
+        """Illegal complete from CREATED returns DomainStateError → 422."""
         _, order_id = _create_order(
             authenticated_client, plate="12WF0003", vin="1HGCM82633A004382"
         )
@@ -86,7 +85,8 @@ class TestRepairWorkflowEdges:
             {"completed_at": datetime.now(tz=UTC).isoformat()},
             format="json",
         )
-        assert response.status_code == 500
+        assert response.status_code == 422
+        assert response.data["error_code"] == "INVALID_STATE_TRANSITION"
 
     def test_assign_then_start_happy_path(
         self, authenticated_client: APIClient

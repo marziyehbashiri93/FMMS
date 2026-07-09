@@ -10,7 +10,7 @@ import uuid
 from apps.driver.application.dto.driver_dto import DriverResponseDTO
 from apps.driver.domain.entities import Driver, DriverStatus
 from apps.driver.domain.interfaces.driver_repository import IDriverRepository
-from core.exceptions.base_exception import FMMSNotFoundError
+from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
 
 logger = get_structured_logger("driver", __name__)
@@ -66,12 +66,11 @@ class GetDriverService:
             },
         )
 
-        driver = self._repo.get_by_id(driver_id)
-        if driver is None:
-            raise FMMSNotFoundError(
-                message=f"Driver '{driver_id}' not found.",
-                details={"driver_id": str(driver_id)},
-            )
+        driver = load_or_not_found(
+            lambda: self._repo.get_by_id(driver_id),
+            message=f"Driver '{driver_id}' not found.",
+            details={"driver_id": str(driver_id)},
+        )
 
         logger.info(
             "Driver fetched",

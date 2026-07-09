@@ -23,7 +23,7 @@ from apps.repair.application.services.create_repair_order_service import (
     _to_response_dto,
 )
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
-from core.exceptions.base_exception import FMMSNotFoundError
+from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
 
 logger = get_structured_logger("repair", __name__)
@@ -66,12 +66,11 @@ class StartRepairService:
             },
         )
 
-        order = self._repo.get_by_id(repair_order_id)
-        if order is None:
-            raise FMMSNotFoundError(
-                message=f"Repair order '{repair_order_id}' not found.",
-                details={"repair_order_id": str(repair_order_id)},
-            )
+        order = load_or_not_found(
+            lambda: self._repo.get_by_id(repair_order_id),
+            message=f"Repair order '{repair_order_id}' not found.",
+            details={"repair_order_id": str(repair_order_id)},
+        )
 
         order.start_work()
         order.updated_at = datetime.now(tz=UTC)
@@ -126,12 +125,11 @@ class CompleteRepairOrderService:
             },
         )
 
-        order = self._repo.get_by_id(dto.repair_order_id)
-        if order is None:
-            raise FMMSNotFoundError(
-                message=f"Repair order '{dto.repair_order_id}' not found.",
-                details={"repair_order_id": str(dto.repair_order_id)},
-            )
+        order = load_or_not_found(
+            lambda: self._repo.get_by_id(dto.repair_order_id),
+            message=f"Repair order '{dto.repair_order_id}' not found.",
+            details={"repair_order_id": str(dto.repair_order_id)},
+        )
 
         order.complete(completed_at=dto.completed_at)
         order.updated_at = datetime.now(tz=UTC)
@@ -187,12 +185,11 @@ class CancelRepairOrderService:
             },
         )
 
-        order = self._repo.get_by_id(dto.repair_order_id)
-        if order is None:
-            raise FMMSNotFoundError(
-                message=f"Repair order '{dto.repair_order_id}' not found.",
-                details={"repair_order_id": str(dto.repair_order_id)},
-            )
+        order = load_or_not_found(
+            lambda: self._repo.get_by_id(dto.repair_order_id),
+            message=f"Repair order '{dto.repair_order_id}' not found.",
+            details={"repair_order_id": str(dto.repair_order_id)},
+        )
 
         order.cancel()
         order.updated_at = datetime.now(tz=UTC)
