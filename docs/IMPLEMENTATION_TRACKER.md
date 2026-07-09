@@ -11,7 +11,7 @@
 |-------------------------|--------------------------------------------------------------------|
 | **Current Phase**       | Implementation — Phase 1                                           |
 | **Current Milestone**   | M9 — Testing Completeness & Production Hardening (Complete)        |
-| **Last Commit**         | `fix(core): standardize domain exception handling and API error mapping` |
+| **Last Commit**         | `9a7a7f9` — fix(core): standardize domain exception handling and API error mapping |
 | **Completed**           | M0 ✓ … M9 ✓ — 10 / 10 implementation milestones (M10 deferred)     |
 | **In Progress**         | — (M10 not started)                                                |
 | **Blocked**             | —                                                                  |
