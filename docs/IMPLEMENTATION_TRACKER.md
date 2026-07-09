@@ -7,16 +7,16 @@
 
 ## Project Status
 
-| Field                   | Value                                              |
-|-------------------------|----------------------------------------------------|
-| **Current Phase**       | Pre-Implementation — Validation Complete           |
-| **Current Milestone**   | Awaiting approval to begin Milestone 1             |
-| **Last Commit**         | —                                                  |
-| **Completed**           | 0 / 10                                             |
-| **In Progress**         | —                                                  |
-| **Blocked**             | —                                                  |
-| **Last Updated**        | 2026-07-09                                         |
-| **Validation Status**   | PASSED — 14 issues found and corrected (2026-07-09)|
+| Field                   | Value                                                      |
+|-------------------------|------------------------------------------------------------|
+| **Current Phase**       | Implementation — Phase 1                                   |
+| **Current Milestone**   | Milestone 0 complete — Awaiting approval to begin M1       |
+| **Last Commit**         | `05a006b` — chore(repo): initialize FMMS repository        |
+| **Completed**           | M0 ✓ — 0 / 10 implementation milestones                   |
+| **In Progress**         | —                                                          |
+| **Blocked**             | —                                                          |
+| **Last Updated**        | 2026-07-09                                                 |
+| **Validation Status**   | PASSED — 14 issues found and corrected (2026-07-09)        |
 
 ---
 
@@ -940,9 +940,9 @@ N+1 query audit, final security hardening, complete README, and Phase 1 release 
 
 ## Git History
 
-| #  | Date | Commit Message | Branch | Files Changed | Status |
-|----|------|----------------|--------|---------------|--------|
-| —  | —    | *(no commits yet)* | — | — | — |
+| #  | Date       | Commit    | Message                                | Branch | Files | Status      |
+|----|------------|-----------|----------------------------------------|--------|-------|-------------|
+| 1  | 2026-07-09 | `05a006b` | chore(repo): initialize FMMS repository | `main` | 14    | ✓ Committed |
 
 ---
 
