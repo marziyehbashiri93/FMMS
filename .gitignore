@@ -127,3 +127,6 @@ dump.rdb
 *.tmp
 *.bak
 *.orig
+
+
+prototypes/*
