@@ -59,9 +59,9 @@ class AddPRLineItemDTO:
 class SubmitPRToSAPDTO:
     """Input DTO for submitting a PR to SAP.
 
-    The service owns SAPTransaction lifecycle (idempotency, start/succeed/fail)
-    and calls only ``ISAPPurchaseRequisitionPort``. Concrete adapters and
-    ``SAPTransactionManager`` are wired at the composition root.
+    The service orchestrates procurement workflow only. SAP writes go through
+    ``ISAPTransactionManager`` → ``ISAPPurchaseRequisitionPort``. Concrete
+    adapters and the manager implementation are wired at the composition root.
 
     Attributes:
         pr_id: Purchase requisition UUID.

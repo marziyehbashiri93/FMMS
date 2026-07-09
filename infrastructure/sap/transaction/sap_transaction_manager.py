@@ -24,11 +24,14 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
-from apps.integration.domain.entities import SAPObjectType, SAPTransaction
+from apps.integration.domain.entities import (
+    SAPObjectType,
+    SAPTransaction,
+    SAPTransactionStatus,
+)
 from apps.integration.domain.exceptions import (
     SAPIdempotencyError,
     SAPIntegrationError,
@@ -37,21 +40,20 @@ from apps.integration.domain.exceptions import (
 from apps.integration.domain.interfaces.sap_transaction_repository import (
     ISAPTransactionRepository,
 )
+from core.sap.ports.sap_transaction_manager_port import (
+    ISAPTransactionManager,
+    SAPAdapterCallable,
+)
 
 logger = logging.getLogger(__name__)
 
-#: Type alias for the adapter callable passed into ``execute()``.
-#: Signature: (request_payload: dict) -> (response_payload: dict, sap_doc_number: str)
-SAPAdapterCallable = Callable[[dict[str, Any]], tuple[dict[str, Any], str]]
 
-
-class SAPTransactionManager:
+class SAPTransactionManager(ISAPTransactionManager):
     """Orchestrates idempotency, retry, and audit for all SAP write operations.
 
-    Application services call ``execute()`` with a unique idempotency key and
-    a lambda wrapping the adapter method. The manager handles the full
-    ``SAPTransaction`` lifecycle without the caller needing to know the
-    transaction state machine.
+    This is the sole concrete gateway for SAP writes. Application services
+    depend on ``ISAPTransactionManager`` and never manage ``SAPTransaction``
+    lifecycle themselves.
 
     Args:
         repository: The ``ISAPTransactionRepository`` used to persist transaction state.
@@ -108,7 +110,12 @@ class SAPTransactionManager:
         """
         existing = self._repo.get_by_idempotency_key(idempotency_key)
         if existing is not None:
-            return self._handle_existing(existing, idempotency_key)
+            return self._handle_existing(
+                existing,
+                idempotency_key=idempotency_key,
+                request_payload=request_payload,
+                adapter_call=adapter_call,
+            )
 
         transaction = self._create_and_start(
             object_type=object_type,
@@ -224,11 +231,12 @@ class SAPTransactionManager:
     def _handle_existing(
         self,
         existing: SAPTransaction,
+        *,
         idempotency_key: str,
+        request_payload: dict[str, Any],
+        adapter_call: SAPAdapterCallable,
     ) -> tuple[dict[str, Any], str]:
-        """Return cached result or raise based on existing transaction status."""
-        from apps.integration.domain.entities import SAPTransactionStatus
-
+        """Return cached result, retry FAILED, or raise for in-flight keys."""
         if existing.status == SAPTransactionStatus.SUCCESS:
             logger.info(
                 "SAP idempotency hit — returning cached response",
@@ -250,8 +258,33 @@ class SAPTransactionManager:
                 existing_transaction_id=existing.id,
             )
 
-        # FAILED / EXHAUSTED — return the last error payload
-        return existing.response_payload or {}, ""
+        if existing.status == SAPTransactionStatus.EXHAUSTED:
+            raise SAPRetryExhaustedError(
+                transaction_id=existing.id,
+                max_retries=existing.max_retries,
+            )
+
+        # FAILED — resume through the retry state machine on re-submit.
+        if not existing.can_retry:
+            raise SAPRetryExhaustedError(
+                transaction_id=existing.id,
+                max_retries=existing.max_retries,
+            )
+
+        existing.prepare_retry()
+        existing.request_payload = request_payload
+        existing.updated_at = datetime.now(tz=UTC)
+        self._repo.save(existing)
+        logger.info(
+            "Resuming FAILED SAP transaction via execute()",
+            extra={
+                "idempotency_key": idempotency_key,
+                "transaction_id": str(existing.id),
+                "retry_count": existing.retry_count,
+                "domain": "integration",
+            },
+        )
+        return self._invoke(existing, adapter_call, request_payload)
 
     def _create_and_start(
         self,
@@ -267,10 +300,7 @@ class SAPTransactionManager:
             object_type=object_type,
             object_id=object_id,
             idempotency_key=idempotency_key,
-            status=__import__(
-                "apps.integration.domain.entities",
-                fromlist=["SAPTransactionStatus"],
-            ).SAPTransactionStatus.PENDING,
+            status=SAPTransactionStatus.PENDING,
             created_at=now,
             updated_at=now,
             request_payload=request_payload,
@@ -302,8 +332,6 @@ class SAPTransactionManager:
         an explicit IN_PROGRESS transition is required before the adapter call,
         following the domain state machine: RETRYING → IN_PROGRESS → SUCCESS/FAILED.
         """
-        from apps.integration.domain.entities import SAPTransactionStatus
-
         if transaction.status == SAPTransactionStatus.RETRYING:
             transaction.status = SAPTransactionStatus.IN_PROGRESS
             self._repo.save(transaction)

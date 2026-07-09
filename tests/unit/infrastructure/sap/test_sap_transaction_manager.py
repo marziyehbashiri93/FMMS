@@ -251,6 +251,37 @@ class TestSAPTransactionManagerIdempotency:
                 adapter_call=_success_adapter,
             )
 
+    def test_failed_transaction_is_resumed_on_execute(self) -> None:
+        """Re-submit with the same key resumes a FAILED transaction."""
+        failed = _make_transaction(
+            status=SAPTransactionStatus.FAILED,
+            retry_count=0,
+            max_retries=3,
+        )
+        saved: list[SAPTransaction] = []
+
+        def _save(tx: SAPTransaction) -> SAPTransaction:
+            saved.append(tx)
+            return tx
+
+        repo = MagicMock()
+        repo.get_by_idempotency_key.return_value = failed
+        repo.save.side_effect = _save
+
+        manager = SAPTransactionManager(repository=repo)
+        response, doc = manager.execute(
+            object_type=SAPObjectType.FAULT,
+            object_id=failed.object_id,
+            idempotency_key=failed.idempotency_key,
+            request_payload={"retry": True},
+            adapter_call=_success_adapter,
+        )
+
+        assert doc
+        assert response
+        assert failed.status == SAPTransactionStatus.SUCCESS
+        assert failed.retry_count == 1
+
 
 # ---------------------------------------------------------------------------
 # Retry path

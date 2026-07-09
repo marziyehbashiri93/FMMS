@@ -1,7 +1,8 @@
 """Unit tests for Procurement application services.
 
-Focus: SubmitPRToSAPService idempotency, SAPTransaction lifecycle, and
-port-only SAP dependency (no infrastructure imports).
+Focus: SubmitPRToSAPService via ISAPTransactionManager gateway,
+idempotency, and port-only SAP dependency (no infrastructure imports
+in the service module).
 """
 
 from __future__ import annotations
@@ -73,6 +74,7 @@ from core.sap.dtos.purchase_requisition import (
     SAPPurchaseRequisitionDTO,
 )
 from core.sap.ports.purchase_requisition_port import ISAPPurchaseRequisitionPort
+from infrastructure.sap.transaction.sap_transaction_manager import SAPTransactionManager
 
 # ---------------------------------------------------------------------------
 # Helpers / fakes
@@ -239,6 +241,13 @@ class FakeSAPTransactionRepository(ISAPTransactionRepository):
         return transaction
 
 
+def _tx_manager(
+    repo: FakeSAPTransactionRepository | None = None,
+) -> SAPTransactionManager:
+    """Wire the real write gateway against an in-memory transaction repo."""
+    return SAPTransactionManager(repository=repo or FakeSAPTransactionRepository())
+
+
 class FakeSAPPRPort(ISAPPurchaseRequisitionPort):
     def __init__(
         self, pr_number: str = "10000001", *, fail_with: Exception | None = None
@@ -361,13 +370,12 @@ class TestSubmitPRToSAPService:
         tx_repo = FakeSAPTransactionRepository()
         sap = FakeSAPPRPort(pr_number="45000011")
 
-        result = SubmitPRToSAPService(FakePRRepository([pr]), tx_repo, sap).execute(
-            _submit_dto(pr.id)
-        )
+        result = SubmitPRToSAPService(
+            FakePRRepository([pr]), _tx_manager(tx_repo), sap
+        ).execute(_submit_dto(pr.id))
 
         assert result.sap_pr_number == "45000011"
         assert result.status == PRStatus.SUBMITTED
-        assert result.sap_transaction_status == SAPTransactionStatus.SUCCESS.value
         assert len(sap.calls) == 1
         assert len(tx_repo._store) == 1
         tx = next(iter(tx_repo._store.values()))
@@ -380,7 +388,7 @@ class TestSubmitPRToSAPService:
         pr_repo = FakePRRepository([pr])
         tx_repo = FakeSAPTransactionRepository()
         sap = FakeSAPPRPort(pr_number="45000022")
-        service = SubmitPRToSAPService(pr_repo, tx_repo, sap)
+        service = SubmitPRToSAPService(pr_repo, _tx_manager(tx_repo), sap)
 
         first = service.execute(_submit_dto(pr.id, idempotency_key="idem-1"))
         second = service.execute(_submit_dto(pr.id, idempotency_key="idem-1"))
@@ -394,7 +402,7 @@ class TestSubmitPRToSAPService:
         pr_repo = FakePRRepository([pr])
         tx_repo = FakeSAPTransactionRepository()
         failing = FakeSAPPRPort(fail_with=RuntimeError("SAP down"))
-        service_fail = SubmitPRToSAPService(pr_repo, tx_repo, failing)
+        service_fail = SubmitPRToSAPService(pr_repo, _tx_manager(tx_repo), failing)
 
         with pytest.raises(FMMSIntegrationError):
             service_fail.execute(_submit_dto(pr.id, idempotency_key="idem-retry"))
@@ -404,9 +412,9 @@ class TestSubmitPRToSAPService:
         assert tx.retry_count == 0
 
         succeeding = FakeSAPPRPort(pr_number="45000033")
-        result = SubmitPRToSAPService(pr_repo, tx_repo, succeeding).execute(
-            _submit_dto(pr.id, idempotency_key="idem-retry")
-        )
+        result = SubmitPRToSAPService(
+            pr_repo, _tx_manager(tx_repo), succeeding
+        ).execute(_submit_dto(pr.id, idempotency_key="idem-retry"))
 
         assert result.sap_pr_number == "45000033"
         assert result.status == PRStatus.SUBMITTED
@@ -430,7 +438,7 @@ class TestSubmitPRToSAPService:
         with pytest.raises(FMMSConflictError):
             SubmitPRToSAPService(
                 FakePRRepository([pr]),
-                FakeSAPTransactionRepository([tx]),
+                _tx_manager(FakeSAPTransactionRepository([tx])),
                 FakeSAPPRPort(),
             ).execute(_submit_dto(pr.id, idempotency_key="idem-inflight"))
 
@@ -439,7 +447,7 @@ class TestSubmitPRToSAPService:
         with pytest.raises(FMMSValidationError):
             SubmitPRToSAPService(
                 FakePRRepository([pr]),
-                FakeSAPTransactionRepository(),
+                _tx_manager(),
                 FakeSAPPRPort(),
             ).execute(_submit_dto(pr.id))
 
@@ -447,16 +455,16 @@ class TestSubmitPRToSAPService:
         with pytest.raises(FMMSNotFoundError):
             SubmitPRToSAPService(
                 FakePRRepository(),
-                FakeSAPTransactionRepository(),
+                _tx_manager(),
                 FakeSAPPRPort(),
             ).execute(_submit_dto(uuid.uuid4()))
 
     def test_stores_request_payload_for_audit(self) -> None:
         pr = _make_pr()
         tx_repo = FakeSAPTransactionRepository()
-        SubmitPRToSAPService(FakePRRepository([pr]), tx_repo, FakeSAPPRPort()).execute(
-            _submit_dto(pr.id)
-        )
+        SubmitPRToSAPService(
+            FakePRRepository([pr]), _tx_manager(tx_repo), FakeSAPPRPort()
+        ).execute(_submit_dto(pr.id))
         tx = next(iter(tx_repo._store.values()))
         assert "line_items" in tx.request_payload
         assert tx.request_payload["pr_id"] == str(pr.id)

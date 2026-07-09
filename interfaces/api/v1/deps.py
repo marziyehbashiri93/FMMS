@@ -132,6 +132,7 @@ from infrastructure.sap.adapters.odata.equipment_odata_adapter import (
 )
 from infrastructure.sap.client.mock.mock_client import MockSAPClient
 from infrastructure.sap.config import SAPConfig
+from infrastructure.sap.transaction.sap_transaction_manager import SAPTransactionManager
 
 
 def _sap_client() -> MockSAPClient:
@@ -199,6 +200,11 @@ def get_purchase_order_repository() -> DjangoPurchaseOrderRepository:
 def get_sap_transaction_repository() -> DjangoSAPTransactionRepository:
     """Return the SAP transaction repository."""
     return DjangoSAPTransactionRepository()
+
+
+def get_sap_transaction_manager() -> SAPTransactionManager:
+    """Return the sole SAP write gateway (composition-root wiring)."""
+    return SAPTransactionManager(repository=get_sap_transaction_repository())
 
 
 def get_create_vehicle_service() -> CreateVehicleService:
@@ -375,6 +381,7 @@ def get_sync_repair_to_sap_service() -> SyncRepairToSAPService:
     return SyncRepairToSAPService(
         get_repair_order_repository(),
         get_vehicle_repository(),
+        get_sap_transaction_manager(),
         PMOrderBAPIAdapter(_sap_client()),
     )
 
@@ -405,6 +412,7 @@ def get_trigger_pm_work_order_service() -> TriggerPMWorkOrderService:
         get_pm_plan_repository(),
         get_pm_work_order_repository(),
         get_vehicle_repository(),
+        get_sap_transaction_manager(),
         PMNotificationBAPIAdapter(_sap_client()),
     )
 
@@ -441,7 +449,7 @@ def get_submit_pr_to_sap_service() -> SubmitPRToSAPService:
     """Return SubmitPRToSAPService."""
     return SubmitPRToSAPService(
         get_purchase_requisition_repository(),
-        get_sap_transaction_repository(),
+        get_sap_transaction_manager(),
         PurchaseRequisitionBAPIAdapter(_sap_client()),
     )
 

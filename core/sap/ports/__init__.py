@@ -20,6 +20,7 @@ from core.sap.ports.pm_notification_port import ISAPPMNotificationPort
 from core.sap.ports.pm_order_port import ISAPPMOrderPort
 from core.sap.ports.purchase_order_port import ISAPPurchaseOrderPort
 from core.sap.ports.purchase_requisition_port import ISAPPurchaseRequisitionPort
+from core.sap.ports.sap_transaction_manager_port import ISAPTransactionManager
 from core.sap.ports.service_po_port import ISAPServicePOPort
 
 __all__ = [
@@ -35,4 +36,5 @@ __all__ = [
     "ISAPGoodsReceiptPort",
     "ISAPGoodsIssuePort",
     "ISAPServicePOPort",
+    "ISAPTransactionManager",
 ]

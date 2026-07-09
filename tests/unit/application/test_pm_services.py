@@ -10,6 +10,14 @@ from datetime import UTC, datetime
 
 import pytest
 
+from apps.integration.domain.entities import (
+    SAPObjectType,
+    SAPTransaction,
+    SAPTransactionStatus,
+)
+from apps.integration.domain.interfaces.sap_transaction_repository import (
+    ISAPTransactionRepository,
+)
 from apps.preventive_maintenance.application.dto.pm_dto import (
     CompletePMWorkOrderDTO,
     CreatePMPlanDTO,
@@ -59,10 +67,64 @@ from core.sap.dtos.pm_notification import (
     SAPNotificationDTO,
 )
 from core.sap.ports.pm_notification_port import ISAPPMNotificationPort
+from infrastructure.sap.transaction.sap_transaction_manager import SAPTransactionManager
 
 # ---------------------------------------------------------------------------
 # Helpers / fakes
 # ---------------------------------------------------------------------------
+
+
+class FakeSAPTransactionRepository(ISAPTransactionRepository):
+    """In-memory SAP transaction store for write-gateway tests."""
+
+    def __init__(self, initial: list[SAPTransaction] | None = None) -> None:
+        self._store: dict[uuid.UUID, SAPTransaction] = {
+            tx.id: tx for tx in (initial or [])
+        }
+
+    def get_by_id(self, transaction_id: uuid.UUID) -> SAPTransaction:
+        return self._store[transaction_id]
+
+    def get_by_idempotency_key(self, idempotency_key: str) -> SAPTransaction | None:
+        return next(
+            (
+                tx
+                for tx in self._store.values()
+                if tx.idempotency_key == idempotency_key
+            ),
+            None,
+        )
+
+    def list_pending_for_retry(self) -> list[SAPTransaction]:
+        return [
+            tx
+            for tx in self._store.values()
+            if tx.status == SAPTransactionStatus.FAILED
+            and tx.retry_count < tx.max_retries
+        ]
+
+    def list_by_object(
+        self, object_type: SAPObjectType, object_id: uuid.UUID
+    ) -> list[SAPTransaction]:
+        return [
+            tx
+            for tx in self._store.values()
+            if tx.object_type == object_type and tx.object_id == object_id
+        ]
+
+    def list_by_status(self, status: SAPTransactionStatus) -> list[SAPTransaction]:
+        return [tx for tx in self._store.values() if tx.status == status]
+
+    def save(self, transaction: SAPTransaction) -> SAPTransaction:
+        self._store[transaction.id] = transaction
+        return transaction
+
+
+def _tx_manager(
+    repo: FakeSAPTransactionRepository | None = None,
+) -> SAPTransactionManager:
+    """Wire the real SAP write gateway against an in-memory repo."""
+    return SAPTransactionManager(repository=repo or FakeSAPTransactionRepository())
 
 
 def _make_vehicle(*, with_sap: bool = False) -> Vehicle:
@@ -362,6 +424,7 @@ class TestTriggerPMWorkOrderService:
             FakePMPlanRepository([plan]),
             FakePMWorkOrderRepository(),
             FakeVehicleRepository([vehicle]),
+            sap_transaction_manager=_tx_manager(),
             sap_pm_notification_port=sap,
         )
 
@@ -386,6 +449,7 @@ class TestTriggerPMWorkOrderService:
             FakePMPlanRepository([plan]),
             FakePMWorkOrderRepository(),
             FakeVehicleRepository([vehicle]),
+            sap_transaction_manager=None,
             sap_pm_notification_port=None,
         )
 
