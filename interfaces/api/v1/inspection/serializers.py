@@ -1,0 +1,65 @@
+"""Model-free serializers for inspection API v1."""
+
+from __future__ import annotations
+
+from rest_framework import serializers
+
+from apps.inspection.domain.entities import InspectionStatus, InspectionType
+from apps.inspection.domain.value_objects import ChecklistResult, OdometerUnit
+
+
+class InspectionCreateSerializer(serializers.Serializer):
+    """Validate inspection creation input."""
+
+    vehicle_id = serializers.UUIDField()
+    inspection_type = serializers.ChoiceField(
+        choices=[item.value for item in InspectionType]
+    )
+    odometer_value = serializers.IntegerField(min_value=0)
+    odometer_unit = serializers.ChoiceField(
+        choices=[item.value for item in OdometerUnit]
+    )
+    inspected_at = serializers.DateTimeField()
+    driver_id = serializers.UUIDField(required=False, allow_null=True)
+
+
+class InspectionItemCreateSerializer(serializers.Serializer):
+    """Validate checklist item creation input."""
+
+    category = serializers.CharField(max_length=100)
+    description = serializers.CharField(max_length=500)
+    result = serializers.ChoiceField(choices=[item.value for item in ChecklistResult])
+    notes = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+
+
+class InspectionItemResponseSerializer(serializers.Serializer):
+    """Serialize inspection checklist item DTOs."""
+
+    id = serializers.UUIDField()
+    category = serializers.CharField()
+    description = serializers.CharField()
+    result = serializers.ChoiceField(choices=[item.value for item in ChecklistResult])
+    notes = serializers.CharField(allow_null=True)
+
+
+class InspectionResponseSerializer(serializers.Serializer):
+    """Serialize application inspection response DTOs."""
+
+    id = serializers.UUIDField()
+    vehicle_id = serializers.UUIDField()
+    inspection_type = serializers.ChoiceField(
+        choices=[item.value for item in InspectionType]
+    )
+    odometer_value = serializers.IntegerField()
+    odometer_unit = serializers.ChoiceField(
+        choices=[item.value for item in OdometerUnit]
+    )
+    status = serializers.ChoiceField(choices=[item.value for item in InspectionStatus])
+    inspected_at = serializers.DateTimeField()
+    created_at = serializers.DateTimeField()
+    updated_at = serializers.DateTimeField()
+    items = InspectionItemResponseSerializer(many=True)
+    driver_id = serializers.UUIDField(allow_null=True)
+    reviewed_by_id = serializers.UUIDField(allow_null=True)
+    review_notes = serializers.CharField(allow_null=True)
+    has_failures = serializers.BooleanField()

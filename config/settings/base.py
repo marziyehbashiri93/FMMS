@@ -5,6 +5,7 @@ Shared configuration for all environments.
 Never import environment-specific settings from this file.
 """
 
+from datetime import timedelta
 from pathlib import Path
 
 import environ
@@ -45,6 +46,8 @@ DJANGO_APPS = [
 
 THIRD_PARTY_APPS = [
     "rest_framework",
+    "rest_framework_simplejwt",
+    "drf_spectacular",
 ]
 
 FMMS_APPS = [
@@ -190,13 +193,29 @@ REST_FRAMEWORK = {
     ],
     "EXCEPTION_HANDLER": "core.exceptions.http_exception_handler.fmms_exception_handler",
     "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
-    # Pagination configured per-view in Milestone 7
-    "DEFAULT_PAGINATION_CLASS": None,
+    "DEFAULT_PAGINATION_CLASS": "core.pagination.standard_pagination.FMMSPageNumberPagination",
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "AUTH_HEADER_TYPES": ("Bearer",),
+    "USER_ID_FIELD": "id",
+    "USER_ID_CLAIM": "user_id",
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "FMMS API",
+    "DESCRIPTION": "Fleet Maintenance Management System REST API.",
+    "VERSION": "v1",
+    "SERVE_INCLUDE_SCHEMA": False,
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
