@@ -10,10 +10,10 @@
 | Field                   | Value                                                              |
 |-------------------------|--------------------------------------------------------------------|
 | **Current Phase**       | Implementation — Phase 1                                           |
-| **Current Milestone**   | M6 ✓ Complete — Awaiting approval to begin M7                      |
-| **Last Commit**         | `e29418f` — feat(application): implement Procurement application services — M6 |
+| **Current Milestone**   | M7 — Interface Layer: REST API v1 (In Progress)                    |
+| **Last Commit**         | `9dce208` — docs(tracker): finalize M6 — validation PASSED         |
 | **Completed**           | M0 ✓, M1 ✓, M2 ✓, M3 ✓, M4 ✓, M5 ✓, M6 ✓ — 7 / 10 implementation milestones |
-| **In Progress**         | —                                                                  |
+| **In Progress**         | M7 — Interface Layer: REST API v1                                  |
 | **Blocked**             | —                                                                  |
 | **Last Updated**        | 2026-07-10                                                         |
 | **Validation Status**   | M6 PASSED — 55/55 tests, layer integrity PASS (2026-07-10)         |
@@ -637,10 +637,10 @@ Services that interact with SAP must import only from `core/sap/ports/` — neve
 
 | Field         | Value                                                  |
 |---------------|--------------------------------------------------------|
-| **Status**    | `Pending`                                              |
+| **Status**    | `In Progress`                                          |
 | **Branch**    | `feat/milestone-7-api-v1`                              |
 | **Commit**    | `feat(api): implement REST API v1 for all domains`     |
-| **Started**   | —                                                      |
+| **Started**   | 2026-07-10                                             |
 | **Completed** | —                                                      |
 
 **Goal:**
