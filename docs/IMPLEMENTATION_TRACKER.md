@@ -11,7 +11,7 @@
 |-------------------------|--------------------------------------------------------------------|
 | **Current Phase**       | Implementation — Phase 1                                           |
 | **Current Milestone**   | M9 — Testing Completeness & Production Hardening (Complete)        |
-| **Last Commit**         | `test(all): harden production scenarios and integration coverage`  |
+| **Last Commit**         | `4bb270d` — test(all): harden production scenarios and integration coverage |
 | **Completed**           | M0 ✓ … M9 ✓ — 10 / 10 implementation milestones (M10 deferred)     |
 | **In Progress**         | — (M10 not started)                                                |
 | **Blocked**             | DEFECT-M9-01, DEFECT-M9-02 — awaiting approval for production fix  |
@@ -823,7 +823,7 @@ Application services must not manage `SAPTransaction` lifecycle independently.
 |---------------|--------------------------------------------------------------------|
 | **Status**    | `Complete`                                                         |
 | **Branch**    | `feat/milestone-9-testing`                                         |
-| **Commit**    | `test(all): harden production scenarios and integration coverage`  |
+| **Commit**    | `4bb270d` — test(all): harden production scenarios and integration coverage |
 | **Started**   | 2026-07-10                                                         |
 | **Completed** | 2026-07-10                                                         |
 
