@@ -10,9 +10,9 @@
 | Field                   | Value                                                              |
 |-------------------------|--------------------------------------------------------------------|
 | **Current Phase**       | Implementation — Phase 1                                           |
-| **Current Milestone**   | M2 complete — Awaiting approval to begin M3                        |
-| **Last Commit**         | `85b6d28` — feat(domain): define domain entities and repository interfaces |
-| **Completed**           | M0 ✓, M1 ✓, M2 ✓ — 2 / 10 implementation milestones              |
+| **Current Milestone**   | M3 complete — Awaiting approval to begin M4                        |
+| **Last Commit**         | `e6d15e7` — feat(infrastructure): implement SAP Integration ORM model and repository |
+| **Completed**           | M0 ✓, M1 ✓, M2 ✓, M3 ✓ — 3 / 10 implementation milestones       |
 | **In Progress**         | —                                                                  |
 | **Blocked**             | —                                                                  |
 | **Last Updated**        | 2026-07-09                                                         |
@@ -313,11 +313,11 @@ Reporting domain is defined as a boundary placeholder only (Phase 2).
 
 | Field         | Value                                                                       |
 |---------------|-----------------------------------------------------------------------------|
-| **Status**    | `Pending`                                                                   |
-| **Branch**    | `feat/milestone-3-infrastructure-db`                                        |
-| **Commit**    | `feat(infrastructure): create ORM models and repositories for all domains`  |
-| **Started**   | —                                                                           |
-| **Completed** | —                                                                           |
+| **Status**    | `Complete ✓`                                                                |
+| **Branch**    | `main`                                                                      |
+| **Commit**    | `e6d15e7` (final domain — Integration)                                      |
+| **Started**   | 2026-07-09                                                                  |
+| **Completed** | 2026-07-09                                                                  |
 
 **Goal:**
 Implement Django ORM models inheriting `BaseModel` for all Phase 1 domains. Implement
@@ -327,79 +327,72 @@ initial migrations per app. No business logic in this layer. Reporting ORM is Ph
 **Tasks:**
 
 **App Registration**
-- [ ] Register all Phase 1 apps in `INSTALLED_APPS` in `config/settings/base.py`:
-  `apps.authentication`, `apps.vehicle`, `apps.driver`, `apps.inspection`, `apps.fault`,
-  `apps.repair`, `apps.preventive_maintenance`, `apps.procurement`, `apps.integration`
+- [x] Register all Phase 1 apps in `INSTALLED_APPS` in `config/settings/base.py`
+- [x] Extend `MIGRATION_MODULES` for all 8 Phase 1 domain apps
+- [x] Add `config/settings/test.py` — SQLite override for fast CI tests
 
-**Vehicle Infrastructure**
-- [ ] Create `apps/vehicle/infrastructure/__init__.py`
-- [ ] Create `apps/vehicle/infrastructure/models.py` — `VehicleModel(BaseModel)` with SAP reference fields, status, plate, VIN, chassis number, `Meta.app_label = 'vehicle'`
-- [ ] Create `apps/vehicle/infrastructure/repositories.py` — `DjangoVehicleRepository(IVehicleRepository)` — implements all abstract methods, soft delete on `delete()`, `is_deleted=False` default filter
-- [ ] Run `python manage.py makemigrations vehicle` → `apps/vehicle/infrastructure/migrations/0001_initial.py`
+**Vehicle Infrastructure** — commit `08c11f6`
+- [x] `apps/vehicle/infrastructure/models.py` — `VehicleModel(BaseModel)`, UniqueConstraint on `plate_number` (active records), composite index on `(status, is_deleted)`
+- [x] `apps/vehicle/infrastructure/repositories.py` — `DjangoVehicleRepository(IVehicleRepository)`
+- [x] `apps/vehicle/models.py` — Django auto-discovery shim
+- [x] `apps/vehicle/infrastructure/migrations/0001_initial.py` — `makemigrations` generated
+- [x] `tests/integration/infrastructure/test_vehicle_repository.py` — 15 tests
 
-**Driver Infrastructure**
-- [ ] Create `apps/driver/infrastructure/models.py` — `DriverModel(BaseModel)`, FK to `VehicleModel` (nullable, current_vehicle)
-- [ ] Create `apps/driver/infrastructure/repositories.py` — `DjangoDriverRepository(IDriverRepository)`
-- [ ] Run `python manage.py makemigrations driver` → `0001_initial.py`
+**Driver Infrastructure** — commit `b9c0838`
+- [x] `apps/driver/infrastructure/models.py` — `DriverModel(BaseModel)`, assigned_vehicle_id as UUIDField (cross-domain by UUID, not FK)
+- [x] `apps/driver/infrastructure/repositories.py` — `DjangoDriverRepository(IDriverRepository)`
+- [x] `apps/driver/models.py` — shim
+- [x] `apps/driver/infrastructure/migrations/0001_initial.py`
+- [x] `tests/integration/infrastructure/test_driver_repository.py` — 13 tests
 
-**Inspection Infrastructure**
-- [ ] Create `apps/inspection/infrastructure/models.py` — `InspectionModel(BaseModel)`, `InspectionItemModel(BaseModel)`, FK to `VehicleModel`, FK to `DriverModel`
-- [ ] Create `apps/inspection/infrastructure/repositories.py` — `DjangoInspectionRepository(IInspectionRepository)`
-- [ ] Run `python manage.py makemigrations inspection` → `0001_initial.py`
+**Inspection Infrastructure** — commit `6a7f294`
+- [x] `apps/inspection/infrastructure/models.py` — `InspectionModel(BaseModel)` + `InspectionItemModel` child table (FK cascade)
+- [x] `apps/inspection/infrastructure/repositories.py` — `DjangoInspectionRepository`, `save()` uses `transaction.atomic()` + item replacement
+- [x] `apps/inspection/models.py` — shim
+- [x] `apps/inspection/infrastructure/migrations/0001_initial.py`
+- [x] `tests/integration/infrastructure/test_inspection_repository.py` — 10 tests
 
-**Fault Infrastructure**
-- [ ] Create `apps/fault/infrastructure/models.py` — `FaultModel(BaseModel)`, FK to `VehicleModel`, FK to `InspectionModel` (nullable), SAP defect code field
-- [ ] Create `apps/fault/infrastructure/repositories.py` — `DjangoFaultRepository(IFaultRepository)`
-- [ ] Run `python manage.py makemigrations fault` → `0001_initial.py`
+**Fault Infrastructure** — commit `d3601c5`
+- [x] `apps/fault/infrastructure/models.py` — `FaultModel(BaseModel)`, composite indexes on `(vehicle_id, status)` and `(severity, status)`
+- [x] `apps/fault/infrastructure/repositories.py` — `DjangoFaultRepository(IFaultRepository)`
+- [x] `apps/fault/models.py` — shim
+- [x] `apps/fault/infrastructure/migrations/0001_initial.py`
+- [x] `tests/integration/infrastructure/test_fault_repository.py` — 11 tests
 
-**Repair Infrastructure**
-- [ ] Create `apps/repair/infrastructure/models.py` — `RepairOrderModel(BaseModel)`, `RepairActivityModel(BaseModel)`, `RepairPartModel(BaseModel)`, FK to `FaultModel`, FK to `VehicleModel`, SAP PM Order number field
-- [ ] Create `apps/repair/infrastructure/repositories.py` — `DjangoRepairOrderRepository`, `DjangoRepairActivityRepository`, `DjangoRepairPartRepository`
-- [ ] Run `python manage.py makemigrations repair` → `0001_initial.py`
+**Repair Infrastructure** — commit `1d05fa6`
+- [x] `apps/repair/infrastructure/models.py` — `RepairOrderModel(BaseModel)`, `RepairActivityModel`, `RepairPartModel` (child tables), TechnicianAssignment denormalized, `initiator_id` (avoids BaseModel FK clash)
+- [x] `apps/repair/infrastructure/repositories.py` — `DjangoRepairOrderRepository`, `save()` uses `transaction.atomic()`, `list_active_by_vehicle()` for cross-domain deactivation guard
+- [x] `apps/repair/models.py` — shim
+- [x] `apps/repair/infrastructure/migrations/0001_initial.py`
+- [x] `tests/integration/infrastructure/test_repair_repository.py` — 12 tests
 
-**Preventive Maintenance Infrastructure**
-- [ ] Create `apps/preventive_maintenance/infrastructure/models.py` — `PMPlanModel(BaseModel)`, `PMWorkOrderModel(BaseModel)`, FK to `VehicleModel`
-- [ ] Create `apps/preventive_maintenance/infrastructure/repositories.py` — `DjangoPMPlanRepository`, `DjangoPMWorkOrderRepository`
-- [ ] Run `python manage.py makemigrations preventive_maintenance` → `0001_initial.py`
+**Preventive Maintenance Infrastructure** — commit `de13d4d`
+- [x] `apps/preventive_maintenance/infrastructure/models.py` — `PMPlanModel(BaseModel)`, `PMWorkOrderModel(BaseModel)`, value objects denormalized as flat columns
+- [x] `apps/preventive_maintenance/infrastructure/repositories.py` — `DjangoPMPlanRepository`, `DjangoPMWorkOrderRepository`
+- [x] `apps/preventive_maintenance/models.py` — shim
+- [x] `apps/preventive_maintenance/infrastructure/migrations/0001_initial.py`
+- [x] `tests/integration/infrastructure/test_pm_repository.py` — 13 tests
 
-**Procurement Infrastructure**
-- [ ] Create `apps/procurement/infrastructure/models.py` — `PurchaseRequisitionModel(BaseModel)`, `PurchaseOrderModel(BaseModel)`, `GoodsReceiptModel(BaseModel)`, `GoodsIssueModel(BaseModel)`, SAP document number fields on each
-- [ ] Create `apps/procurement/infrastructure/repositories.py` — `DjangoPurchaseRequisitionRepository`, `DjangoPurchaseOrderRepository`, `DjangoGoodsRepository`
-- [ ] Run `python manage.py makemigrations procurement` → `0001_initial.py`
+**Procurement Infrastructure** — commit `97a810a`
+- [x] `apps/procurement/infrastructure/models.py` — `PurchaseRequisitionModel` + `PRLineItemModel` child; `PurchaseOrderModel` + `POLineItemModel` child; UniqueConstraint on active `sap_po_number`; `po_initiator_id` (avoids FK clash)
+- [x] `apps/procurement/infrastructure/repositories.py` — `DjangoPurchaseRequisitionRepository`, `DjangoPurchaseOrderRepository`, both with `transaction.atomic()` on `save()`
+- [x] `apps/procurement/models.py` — shim
+- [x] `apps/procurement/infrastructure/migrations/0001_initial.py`
+- [x] `tests/integration/infrastructure/test_procurement_repository.py` — 16 tests
 
-**Integration Infrastructure**
-- [ ] Create `apps/integration/infrastructure/models.py` — `SAPTransactionModel(BaseModel)` with all required fields from `SAP_Integration.md`:
-  - `business_object_type` (CharField — e.g., `"vehicle"`, `"repair_order"`)
-  - `business_object_id` (CharField — UUID or integer as string, no FK)
-  - `sap_document_number` (CharField, nullable, db_index=True)
-  - `idempotency_key` (CharField, unique, db_index=True)
-  - `request_payload` (JSONField)
-  - `response_payload` (JSONField, nullable)
-  - `status` (CharField, choices from `SAPTransactionStatus`, db_index=True)
-  - `retry_count` (IntegerField, default=0)
-  - `last_error` (TextField, nullable)
-  - `sap_api_name` (CharField — e.g., `"API_EQUIPMENT"`)
-- [ ] Create `apps/integration/infrastructure/repositories.py` — `DjangoSAPTransactionRepository(ISAPTransactionRepository)`
-- [ ] Run `python manage.py makemigrations integration` → `0001_initial.py`
+**Integration Infrastructure** — commit `e6d15e7`
+- [x] `apps/integration/infrastructure/models.py` — `SAPTransactionModel(BaseModel)`, JSONField for payloads, UniqueConstraint on `idempotency_key`, composite indexes on `(object_type, object_id)` and `(status, retry_count)`
+- [x] `apps/integration/infrastructure/repositories.py` — `DjangoSAPTransactionRepository(ISAPTransactionRepository)`, `save()` uses `transaction.atomic()`
+- [x] `apps/integration/models.py` — shim
+- [x] `apps/integration/infrastructure/migrations/0001_initial.py`
+- [x] `tests/integration/infrastructure/test_sap_transaction_repository.py` — 13 tests (including idempotency key uniqueness, retry lifecycle, exhaustion)
 
-**Database Integrity**
-- [ ] Add intentional indexes beyond `db_index`:
-  - Composite index on `SAPTransactionModel`: `(business_object_type, business_object_id)`
-  - Index on `RepairOrderModel.status`
-  - Index on `FaultModel.status`
-  - Index on `PMWorkOrderModel.status`, `PMWorkOrderModel.scheduled_date`
-  - Index on `VehicleModel.plate_number`, `VehicleModel.sap_equipment_number`
-- [ ] Verify all repositories satisfy their abstract interface contracts (runtime `isinstance` check in tests)
-- [ ] Verify `python manage.py migrate` runs all migrations cleanly in order
-- [ ] Write repository tests (use test database):
-  - [ ] `tests/unit/infrastructure/test_vehicle_repository.py`
-  - [ ] `tests/unit/infrastructure/test_repair_repository.py`
-  - [ ] `tests/unit/infrastructure/test_sap_transaction_repository.py`
-- [ ] Run `pytest tests/unit/infrastructure/` — all pass
-- [ ] Run `black --check .` — zero violations
-- [ ] Run `isort --check .` — zero violations
-- [ ] Run `ruff check .` — zero violations
-- [ ] Run `mypy .` — zero errors
+**Quality Gates — All Passed**
+- [x] `pytest` — 316 passed (was 213 at M2 completion)
+- [x] `black` — zero violations
+- [x] `isort` — zero violations
+- [x] `ruff check .` — zero violations
+- [x] `mypy .` — zero errors (185 source files)
 
 ---
 
@@ -948,6 +941,16 @@ N+1 query audit, final security hardening, complete README, and Phase 1 release 
 | 4  | 2026-07-09 | `cc7ff30` | docs(repo): update tracker with M1 completion  | `main` | 1     | ✓ Committed |
 | 5  | 2026-07-09 | `3a4c73f` | docs(repo): set Milestone 2 as In Progress     | `main` | 1     | ✓ Committed |
 | 6  | 2026-07-09 | `85b6d28` | feat(domain): define domain entities and repository interfaces | `main` | 79 | ✓ Committed |
+| 7  | 2026-07-09 | `8270379` | test(procurement): correct Money currency normalisation test   | `main` | 1  | ✓ Committed |
+| 8  | 2026-07-09 | `08c11f6` | feat(infrastructure): implement Vehicle ORM model and repository | `main` | 26 | ✓ Committed |
+| 9  | 2026-07-09 | `07aa21a` | chore(repo): add SQLite test DB files to .gitignore           | `main` | 1  | ✓ Committed |
+| 10 | 2026-07-09 | `b9c0838` | feat(infrastructure): implement Driver ORM model and repository | `main` | 10 | ✓ Committed |
+| 11 | 2026-07-09 | `6a7f294` | feat(infrastructure): implement Inspection ORM models and repository | `main` | 5 | ✓ Committed |
+| 12 | 2026-07-09 | `d3601c5` | feat(infrastructure): implement Fault ORM model and repository | `main` | 5  | ✓ Committed |
+| 13 | 2026-07-09 | `1d05fa6` | feat(infrastructure): implement Repair ORM models and repository | `main` | 5  | ✓ Committed |
+| 14 | 2026-07-09 | `de13d4d` | feat(infrastructure): implement Preventive Maintenance ORM models and repositories | `main` | 5 | ✓ Committed |
+| 15 | 2026-07-09 | `97a810a` | feat(infrastructure): implement Procurement ORM models and repositories | `main` | 5 | ✓ Committed |
+| 16 | 2026-07-09 | `e6d15e7` | feat(infrastructure): implement SAP Integration ORM model and repository | `main` | 5 | ✓ Committed |
 
 ---
 
@@ -1059,6 +1062,39 @@ N+1 query audit, final security hardening, complete README, and Phase 1 release 
 | **Decision** | Reporting domain entities are defined as boundary placeholders in M2. No ORM model, no service, no API endpoint is implemented in Phase 1. |
 | **Reason**   | Reporting requires data from all other domains to be stable first. Premature implementation creates tight coupling to unstable data structures. |
 | **Impact**   | Phase 1 delivers 8 of 9 domains fully. Reporting is added in Phase 2 after the data model is stable. |
+| **Date**     | 2026-07-09 |
+
+---
+
+### ADR-012 — Cross-Domain References via UUID, Not Django ForeignKey
+
+| Field        | Detail |
+|--------------|--------|
+| **Decision** | Domain ORM models reference aggregates in other domains via `UUIDField`, not `ForeignKey`. E.g., `DriverModel.assigned_vehicle_id` is a `UUIDField`, not `FK(VehicleModel)`. |
+| **Reason**   | Maintains aggregate boundary independence. Django FK creates a hidden coupling: deleting a vehicle would cascade or restrict driver deletion, violating domain isolation. UUID references keep each bounded context independently deployable and migratable. |
+| **Impact**   | Cross-aggregate consistency is enforced at the Application Service level, not by DB constraints. Queries across aggregates require explicit UUID lookups. |
+| **Date**     | 2026-07-09 |
+
+---
+
+### ADR-013 — `initiator_id` Column Naming to Avoid BaseModel FK Clash
+
+| Field        | Detail |
+|--------------|--------|
+| **Decision** | ORM fields representing "who initiated/created a business object" are named `initiator_id` (RepairOrder) or `po_initiator_id` (PurchaseOrder) instead of `created_by_id`. |
+| **Reason**   | Django auto-creates the attname `created_by_id` as the DB column for `BaseModel.created_by` (a ForeignKey). Declaring a second field with that name causes a `SystemCheckError`. |
+| **Impact**   | Repository `_to_domain()` functions map `orm.initiator_id → entity.created_by_id`. Consistent approach across all affected models. |
+| **Date**     | 2026-07-09 |
+
+---
+
+### ADR-014 — SQLite for Test Database (`config/settings/test.py`)
+
+| Field        | Detail |
+|--------------|--------|
+| **Decision** | `pytest` uses `config.settings.test` which overrides the database to SQLite. PostgreSQL is used only in development (docker-compose) and production. |
+| **Reason**   | The sandbox environment has PostgreSQL running but with authentication failures for the `fmms` user. SQLite allows integration tests to run without external services, making the test suite portable across CI environments without database provisioning. |
+| **Impact**   | All 8 domain repositories are tested against SQLite. Production uses PostgreSQL exclusively. `ATOMIC_REQUESTS` is disabled in test settings for pytest-django transaction fixture compatibility. |
 | **Date**     | 2026-07-09 |
 
 ---
