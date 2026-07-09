@@ -97,6 +97,11 @@ _BAPI_ROUTES: dict[str, tuple[dict, dict, dict]] = {
         sc.BAPI_PR_CREATE_ERROR,
         sc.BAPI_PR_CREATE_DUPLICATE,
     ),
+    "BAPI_PR_GET_DETAIL": (
+        sc.BAPI_PR_GET_SUCCESS,
+        sc.BAPI_PR_CREATE_ERROR,
+        sc.BAPI_PR_CREATE_ERROR,
+    ),
     "BAPI_PO_CREATE1": (
         sc.BAPI_PO_CREATE_SUCCESS,
         sc.BAPI_PO_CREATE_ERROR,
