@@ -7,16 +7,16 @@
 
 ## Project Status
 
-| Field                   | Value                                                      |
-|-------------------------|------------------------------------------------------------|
-| **Current Phase**       | Implementation — Phase 1                                   |
-| **Current Milestone**   | Milestone 0 complete — Awaiting approval to begin M1       |
-| **Last Commit**         | `05a006b` — chore(repo): initialize FMMS repository        |
-| **Completed**           | M0 ✓ — 0 / 10 implementation milestones                   |
-| **In Progress**         | —                                                          |
-| **Blocked**             | —                                                          |
-| **Last Updated**        | 2026-07-09                                                 |
-| **Validation Status**   | PASSED — 14 issues found and corrected (2026-07-09)        |
+| Field                   | Value                                                              |
+|-------------------------|--------------------------------------------------------------------|
+| **Current Phase**       | Implementation — Phase 1                                           |
+| **Current Milestone**   | M1 complete — Awaiting approval to begin M2                        |
+| **Last Commit**         | `cb3dfa2` — feat(core): initialize project foundation              |
+| **Completed**           | M0 ✓, M1 ✓ — 1 / 10 implementation milestones                    |
+| **In Progress**         | —                                                                  |
+| **Blocked**             | —                                                                  |
+| **Last Updated**        | 2026-07-09                                                         |
+| **Validation Status**   | PASSED — 14 issues found and corrected (2026-07-09)                |
 
 ---
 
@@ -57,11 +57,11 @@ Every milestone must follow this exact sequence. No step may be skipped.
 
 | Field         | Value                                                       |
 |---------------|-------------------------------------------------------------|
-| **Status**    | `Pending`                                                   |
+| **Status**    | `Complete ✓`                                                |
 | **Branch**    | `feat/milestone-1-foundation`                               |
 | **Commit**    | `feat(core): initialize project foundation and configuration` |
-| **Started**   | —                                                           |
-| **Completed** | —                                                           |
+| **Started**   | 2026-07-09                                                  |
+| **Completed** | 2026-07-09                                                  |
 
 **Goal:**
 Establish a working, runnable Django project skeleton with environment-aware configuration,
@@ -940,9 +940,11 @@ N+1 query audit, final security hardening, complete README, and Phase 1 release 
 
 ## Git History
 
-| #  | Date       | Commit    | Message                                | Branch | Files | Status      |
-|----|------------|-----------|----------------------------------------|--------|-------|-------------|
-| 1  | 2026-07-09 | `05a006b` | chore(repo): initialize FMMS repository | `main` | 14    | ✓ Committed |
+| #  | Date       | Commit    | Message                                         | Branch | Files | Status      |
+|----|-----------|-----------|-------------------------------------------------|--------|-------|-------------|
+| 1  | 2026-07-09 | `05a006b` | chore(repo): initialize FMMS repository         | `main` | 14    | ✓ Committed |
+| 2  | 2026-07-09 | `5895a8f` | docs(repo): update tracker for M0 completion    | `main` | 1     | ✓ Committed |
+| 3  | 2026-07-09 | `cb3dfa2` | feat(core): initialize project foundation       | `main` | 58    | ✓ Committed |
 
 ---
 
