@@ -10,10 +10,10 @@
 | Field                   | Value                                                              |
 |-------------------------|--------------------------------------------------------------------|
 | **Current Phase**       | Implementation — Phase 1                                           |
-| **Current Milestone**   | M1 complete — Awaiting approval to begin M2                        |
-| **Last Commit**         | `cb3dfa2` — feat(core): initialize project foundation              |
+| **Current Milestone**   | Milestone 2 — Domain Layer                                         |
+| **Last Commit**         | `cc7ff30` — docs(repo): update tracker for M1 completion           |
 | **Completed**           | M0 ✓, M1 ✓ — 1 / 10 implementation milestones                    |
-| **In Progress**         | —                                                                  |
+| **In Progress**         | M2 — Domain Layer                                                  |
 | **Blocked**             | —                                                                  |
 | **Last Updated**        | 2026-07-09                                                         |
 | **Validation Status**   | PASSED — 14 issues found and corrected (2026-07-09)                |
@@ -198,10 +198,10 @@ development environment (Docker, Makefile). No business features — infrastruct
 
 | Field         | Value                                                      |
 |---------------|------------------------------------------------------------|
-| **Status**    | `Pending`                                                  |
+| **Status**    | `In Progress 🔄`                                           |
 | **Branch**    | `feat/milestone-2-domain`                                  |
 | **Commit**    | `feat(domain): define domain entities and repository interfaces` |
-| **Started**   | —                                                          |
+| **Started**   | 2026-07-09                                                 |
 | **Completed** | —                                                          |
 
 **Goal:**
