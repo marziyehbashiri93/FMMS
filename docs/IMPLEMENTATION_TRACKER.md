@@ -10,10 +10,10 @@
 | Field                   | Value                                                              |
 |-------------------------|--------------------------------------------------------------------|
 | **Current Phase**       | Implementation — Phase 1                                           |
-| **Current Milestone**   | M5 ✓ Complete — Awaiting approval to begin M6                      |
-| **Last Commit**         | `1dd38a8` — feat(application): implement Fault application services — M5 |
+| **Current Milestone**   | M6 — Application Services: Maintenance Domains (In Progress)       |
+| **Last Commit**         | `42ea524` — docs(tracker): M5 final — integrity PASSED, 72 tests   |
 | **Completed**           | M0 ✓, M1 ✓, M2 ✓, M3 ✓, M4 ✓, M5 ✓ — 6 / 10 implementation milestones |
-| **In Progress**         | —                                                                  |
+| **In Progress**         | M6 — Application Services: Maintenance Domains                     |
 | **Blocked**             | —                                                                  |
 | **Last Updated**        | 2026-07-09                                                         |
 | **Validation Status**   | PASSED — 14 issues found and corrected (2026-07-09)                |
@@ -585,10 +585,10 @@ concrete infrastructure classes imported. Each service has one responsibility (S
 
 | Field         | Value                                                                                  |
 |---------------|----------------------------------------------------------------------------------------|
-| **Status**    | `Pending`                                                                              |
+| **Status**    | `In Progress`                                                                          |
 | **Branch**    | `feat/milestone-6-services-maintenance`                                                |
 | **Commit**    | `feat(application): implement maintenance domain services (repair, pm, procurement)`   |
-| **Started**   | —                                                                                      |
+| **Started**   | 2026-07-10                                                                             |
 | **Completed** | —                                                                                      |
 
 **Goal:**
