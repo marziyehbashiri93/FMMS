@@ -1,0 +1,126 @@
+version: "3.9"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# FMMS Local Development Environment
+# ──────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── PostgreSQL 16 ───────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: fmms_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: fmms
+      POSTGRES_USER: fmms
+      POSTGRES_PASSWORD: fmms
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fmms -d fmms"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ── Redis 7 ─────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: fmms_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Django Application ───────────────────────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: fmms_app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://fmms:fmms@db:5432/fmms
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      DJANGO_SETTINGS_MODULE: config.settings.development
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py runserver 0.0.0.0:8000"
+
+  # ── Celery Worker ───────────────────────────────────────────────────────────
+  celery-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: fmms_celery_worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://fmms:fmms@db:5432/fmms
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      DJANGO_SETTINGS_MODULE: config.settings.development
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A infrastructure.messaging.celery_app worker --loglevel=info
+    profiles:
+      - celery
+
+  # ── Celery Beat Scheduler ────────────────────────────────────────────────────
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: fmms_celery_beat
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://fmms:fmms@db:5432/fmms
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      DJANGO_SETTINGS_MODULE: config.settings.development
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A infrastructure.messaging.celery_app beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    profiles:
+      - celery
+
+volumes:
+  postgres_data:
+  redis_data:

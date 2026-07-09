@@ -1,0 +1,14 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# FMMS Production Requirements
+# ──────────────────────────────────────────────────────────────────────────────
+
+-r base.txt
+
+# Production server
+gunicorn>=22.0,<23.0
+
+# Error tracking
+sentry-sdk[django]>=2.0,<3.0
+
+# Psycopg binary replaced by compiled version in production
+# psycopg2-binary -> psycopg2 (compile from source for production deployments)
