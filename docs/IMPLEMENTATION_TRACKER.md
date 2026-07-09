@@ -962,6 +962,15 @@ N+1 query audit, final security hardening, complete README, and Phase 1 release 
 | 21 | 2026-07-09 | `b92ee59` | feat(sap): add SAPTransactionManager, SAPConfig, and Celery task scaffold (Step 4 of M4) | `feat/milestone-4-sap-integration` | 4 | ✓ Committed |
 | 22 | 2026-07-09 | `c3dd46c` | test(sap): add unit tests for mock client, adapters, and transaction manager (Step 5 of M4) | `feat/milestone-4-sap-integration` | 4 | ✓ Committed |
 | 23 | 2026-07-10 | `fb13b26` | fix(sap): add BAPI_PR_GET_DETAIL mock route (M4 architecture review) | `feat/milestone-4-sap-integration` | 4 | ✓ Committed |
+| 24 | 2026-07-10 | `bdcaebd` | docs(tracker): M4 architecture review results — 6/6 checks passed | `feat/milestone-5-services-core` | 1 | ✓ Committed |
+| 25 | 2026-07-10 | `4be6740` | docs(tracker): start M5 — Application Services: Core Domains | `feat/milestone-5-services-core` | 1 | ✓ Committed |
+| 26 | 2026-07-10 | `4db243a` | feat(application): implement Vehicle application services — M5 | `feat/milestone-5-services-core` | 11 | ✓ Committed |
+| 27 | 2026-07-10 | `4ae8d3b` | docs(tracker): mark Vehicle application services complete (M5) | `feat/milestone-5-services-core` | 1 | ✓ Committed |
+| 28 | 2026-07-10 | `df5913f` | feat(application): implement Driver application services — M5 | `feat/milestone-5-services-core` | 9 | ✓ Committed |
+| 29 | 2026-07-10 | `df4249a` | docs(tracker): mark Driver application services complete (M5) | `feat/milestone-5-services-core` | 1 | ✓ Committed |
+| 30 | 2026-07-10 | `e12500e` | feat(application): implement Inspection application services — M5 | `feat/milestone-5-services-core` | 9 | ✓ Committed |
+| 31 | 2026-07-10 | `1dd38a8` | feat(application): implement Fault application services — M5 | `feat/milestone-5-services-core` | 9 | ✓ Committed |
+| 32 | 2026-07-10 | `e041276` | docs(tracker): complete M5 — Application Services: Core Domains | `feat/milestone-5-services-core` | 1 | ✓ Committed |
 
 ---
 
