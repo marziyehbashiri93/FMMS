@@ -10,10 +10,10 @@
 | Field                   | Value                                                              |
 |-------------------------|--------------------------------------------------------------------|
 | **Current Phase**       | Implementation — Phase 1                                           |
-| **Current Milestone**   | M4 — SAP Integration Layer (In Progress)                           |
-| **Last Commit**         | `e00e6f8` — docs(repo): update IMPLEMENTATION_TRACKER.md with M3 completion |
-| **Completed**           | M0 ✓, M1 ✓, M2 ✓, M3 ✓ — 4 / 10 implementation milestones       |
-| **In Progress**         | M4 — SAP Integration Layer                                         |
+| **Current Milestone**   | M4 complete — Awaiting approval to begin M5                        |
+| **Last Commit**         | `c3dd46c` — test(sap): add unit tests for mock client, adapters, and transaction manager |
+| **Completed**           | M0 ✓, M1 ✓, M2 ✓, M3 ✓, M4 ✓ — 5 / 10 implementation milestones |
+| **In Progress**         | —                                                                  |
 | **Blocked**             | —                                                                  |
 | **Last Updated**        | 2026-07-09                                                         |
 | **Validation Status**   | PASSED — 14 issues found and corrected (2026-07-09)                |
@@ -400,11 +400,11 @@ initial migrations per app. No business logic in this layer. Reporting ORM is Ph
 
 | Field         | Value                                                              |
 |---------------|--------------------------------------------------------------------|
-| **Status**    | `In Progress`                                                      |
+| **Status**    | `Complete ✓`                                                       |
 | **Branch**    | `feat/milestone-4-sap-integration`                                 |
-| **Commit**    | `feat(sap): implement SAP integration layer with transaction management` |
+| **Commit**    | `c3dd46c` — test(sap): add unit tests for mock client, adapters, and transaction manager |
 | **Started**   | 2026-07-09                                                         |
-| **Completed** | —                                                                  |
+| **Completed** | 2026-07-09                                                         |
 
 **Goal:**
 Build the complete SAP communication stack. Port interfaces (ABCs) live in `core/sap/ports/`
@@ -427,49 +427,49 @@ infrastructure/sap/transaction/
 **Tasks:**
 
 **SAP Port Interfaces — `core/sap/ports/` (application-layer-visible abstractions)**
-- [ ] Create `core/sap/__init__.py`
-- [ ] Create `core/sap/ports/__init__.py`
-- [ ] Create `core/sap/ports/equipment_port.py` — `ISAPEquipmentPort` (ABC): `get_equipment_by_id`, `list_equipment`
-- [ ] Create `core/sap/ports/object_part_catalog_port.py` — `ISAPObjectPartCatalogPort` (ABC): `get_catalog`, `get_part_by_code`
-- [ ] Create `core/sap/ports/fault_catalog_port.py` — `ISAPFaultCatalogPort` (ABC): `list_defect_codes`, `get_defect_code`
-- [ ] Create `core/sap/ports/material_port.py` — `ISAPMaterialPort` (ABC): `get_material_by_number`, `list_materials`
-- [ ] Create `core/sap/ports/inventory_port.py` — `ISAPInventoryPort` (ABC): `get_stock_by_material`, `get_stock_by_plant`
-- [ ] Create `core/sap/ports/pm_notification_port.py` — `ISAPPMNotificationPort` (ABC): `create_notification`, `close_notification`
-- [ ] Create `core/sap/ports/pm_order_port.py` — `ISAPPMOrderPort` (ABC): `create_pm_order`, `complete_pm_order`, `get_pm_order`
-- [ ] Create `core/sap/ports/purchase_requisition_port.py` — `ISAPPurchaseRequisitionPort` (ABC): `create_purchase_requisition`, `get_purchase_requisition`
-- [ ] Create `core/sap/ports/purchase_order_port.py` — `ISAPPurchaseOrderPort` (ABC): `create_purchase_order`, `approve_purchase_order`, `get_purchase_order`
-- [ ] Create `core/sap/ports/goods_receipt_port.py` — `ISAPGoodsReceiptPort` (ABC): `post_goods_receipt`, `reverse_goods_receipt`
-- [ ] Create `core/sap/ports/goods_issue_port.py` — `ISAPGoodsIssuePort` (ABC): `post_goods_issue`, `reverse_goods_issue`
-- [ ] Create `core/sap/ports/service_po_port.py` — `ISAPServicePOPort` (ABC): `create_service_po`, `confirm_service`, `get_service_po`
+- [x] Create `core/sap/__init__.py`
+- [x] Create `core/sap/ports/__init__.py`
+- [x] Create `core/sap/ports/equipment_port.py` — `ISAPEquipmentPort` (ABC): `get_equipment_by_id`, `list_equipment`
+- [x] Create `core/sap/ports/object_part_catalog_port.py` — `ISAPObjectPartCatalogPort` (ABC): `get_catalog`, `get_part_by_code`
+- [x] Create `core/sap/ports/fault_catalog_port.py` — `ISAPFaultCatalogPort` (ABC): `list_defect_codes`, `get_defect_code`
+- [x] Create `core/sap/ports/material_port.py` — `ISAPMaterialPort` (ABC): `get_material_by_number`, `list_materials`
+- [x] Create `core/sap/ports/inventory_port.py` — `ISAPInventoryPort` (ABC): `get_stock_by_material`, `get_stock_by_plant`
+- [x] Create `core/sap/ports/pm_notification_port.py` — `ISAPPMNotificationPort` (ABC): `create_notification`, `close_notification`
+- [x] Create `core/sap/ports/pm_order_port.py` — `ISAPPMOrderPort` (ABC): `create_pm_order`, `complete_pm_order`, `get_pm_order`
+- [x] Create `core/sap/ports/purchase_requisition_port.py` — `ISAPPurchaseRequisitionPort` (ABC): `create_purchase_requisition`, `get_purchase_requisition`
+- [x] Create `core/sap/ports/purchase_order_port.py` — `ISAPPurchaseOrderPort` (ABC): `create_purchase_order`, `approve_purchase_order`, `get_purchase_order`
+- [x] Create `core/sap/ports/goods_receipt_port.py` — `ISAPGoodsReceiptPort` (ABC): `post_goods_receipt`, `reverse_goods_receipt`
+- [x] Create `core/sap/ports/goods_issue_port.py` — `ISAPGoodsIssuePort` (ABC): `post_goods_issue`, `reverse_goods_issue`
+- [x] Create `core/sap/ports/service_po_port.py` — `ISAPServicePOPort` (ABC): `create_service_po`, `confirm_service`, `get_service_po`
 
 **SAP Clients — `infrastructure/sap/client/`**
-- [ ] Create `infrastructure/sap/__init__.py`
-- [ ] Create `infrastructure/sap/client/__init__.py`
-- [ ] Create `infrastructure/sap/client/sap_odata_client.py` — reusable OData HTTP client (requests/httpx, auth, base URL, headers, timeout, error handling)
-- [ ] Create `infrastructure/sap/client/sap_bapi_client.py` — RFC/BAPI wrapper (abstracted so `pyrfc` can be swapped; raises `SAPIntegrationError` on failure)
+- [x] Create `infrastructure/sap/__init__.py`
+- [x] Create `infrastructure/sap/client/__init__.py`
+- [x] Create `infrastructure/sap/client/sap_odata_client.py` — reusable OData HTTP client (requests/httpx, auth, base URL, headers, timeout, error handling)
+- [x] Create `infrastructure/sap/client/sap_bapi_client.py` — RFC/BAPI wrapper (abstracted so `pyrfc` can be swapped; raises `SAPIntegrationError` on failure)
 
 **SAP OData Adapters — Read integrations (`infrastructure/sap/adapters/odata/`)**
-- [ ] Create `infrastructure/sap/adapters/__init__.py`
-- [ ] Create `infrastructure/sap/adapters/odata/__init__.py`
-- [ ] Create `infrastructure/sap/adapters/odata/equipment_odata_adapter.py` — implements `ISAPEquipmentPort`, calls `API_EQUIPMENT`
-- [ ] Create `infrastructure/sap/adapters/odata/object_part_catalog_odata_adapter.py` — implements `ISAPObjectPartCatalogPort`
-- [ ] Create `infrastructure/sap/adapters/odata/fault_catalog_odata_adapter.py` — implements `ISAPFaultCatalogPort`, calls `API_DEFECTCODE_SRV`
-- [ ] Create `infrastructure/sap/adapters/odata/material_odata_adapter.py` — implements `ISAPMaterialPort`, calls `API_PRODUCT_SRV`
-- [ ] Create `infrastructure/sap/adapters/odata/inventory_odata_adapter.py` — implements `ISAPInventoryPort`, calls `API_MATERIAL_STOCK_SRV`
+- [x] Create `infrastructure/sap/adapters/__init__.py`
+- [x] Create `infrastructure/sap/adapters/odata/__init__.py`
+- [x] Create `infrastructure/sap/adapters/odata/equipment_odata_adapter.py` — implements `ISAPEquipmentPort`, calls `API_EQUIPMENT`
+- [x] Create `infrastructure/sap/adapters/odata/object_part_catalog_odata_adapter.py` — implements `ISAPObjectPartCatalogPort`
+- [x] Create `infrastructure/sap/adapters/odata/fault_catalog_odata_adapter.py` — implements `ISAPFaultCatalogPort`, calls `API_DEFECTCODE_SRV`
+- [x] Create `infrastructure/sap/adapters/odata/material_odata_adapter.py` — implements `ISAPMaterialPort`, calls `API_PRODUCT_SRV`
+- [x] Create `infrastructure/sap/adapters/odata/inventory_odata_adapter.py` — implements `ISAPInventoryPort`, calls `API_MATERIAL_STOCK_SRV`
 
 **SAP BAPI Adapters — Write integrations (`infrastructure/sap/adapters/bapi/`)**
-- [ ] Create `infrastructure/sap/adapters/bapi/__init__.py`
-- [ ] Create `infrastructure/sap/adapters/bapi/pm_notification_bapi_adapter.py` — implements `ISAPPMNotificationPort`
-- [ ] Create `infrastructure/sap/adapters/bapi/pm_order_bapi_adapter.py` — implements `ISAPPMOrderPort`
-- [ ] Create `infrastructure/sap/adapters/bapi/purchase_requisition_bapi_adapter.py` — implements `ISAPPurchaseRequisitionPort` (separate from PO — different BAPI)
-- [ ] Create `infrastructure/sap/adapters/bapi/purchase_order_bapi_adapter.py` — implements `ISAPPurchaseOrderPort`
-- [ ] Create `infrastructure/sap/adapters/bapi/goods_receipt_bapi_adapter.py` — implements `ISAPGoodsReceiptPort`
-- [ ] Create `infrastructure/sap/adapters/bapi/goods_issue_bapi_adapter.py` — implements `ISAPGoodsIssuePort`
-- [ ] Create `infrastructure/sap/adapters/bapi/service_po_bapi_adapter.py` — implements `ISAPServicePOPort`
+- [x] Create `infrastructure/sap/adapters/bapi/__init__.py`
+- [x] Create `infrastructure/sap/adapters/bapi/pm_notification_bapi_adapter.py` — implements `ISAPPMNotificationPort`
+- [x] Create `infrastructure/sap/adapters/bapi/pm_order_bapi_adapter.py` — implements `ISAPPMOrderPort`
+- [x] Create `infrastructure/sap/adapters/bapi/purchase_requisition_bapi_adapter.py` — implements `ISAPPurchaseRequisitionPort` (separate from PO — different BAPI)
+- [x] Create `infrastructure/sap/adapters/bapi/purchase_order_bapi_adapter.py` — implements `ISAPPurchaseOrderPort`
+- [x] Create `infrastructure/sap/adapters/bapi/goods_receipt_bapi_adapter.py` — implements `ISAPGoodsReceiptPort`
+- [x] Create `infrastructure/sap/adapters/bapi/goods_issue_bapi_adapter.py` — implements `ISAPGoodsIssuePort`
+- [x] Create `infrastructure/sap/adapters/bapi/service_po_bapi_adapter.py` — implements `ISAPServicePOPort`
 
 **SAP Transaction Manager**
-- [ ] Create `infrastructure/sap/transaction/__init__.py`
-- [ ] Create `infrastructure/sap/transaction/sap_transaction_manager.py`:
+- [x] Create `infrastructure/sap/transaction/__init__.py`
+- [x] Create `infrastructure/sap/transaction/sap_transaction_manager.py`:
   - Check idempotency key — if `SAPTransaction` with key exists and status is SUCCESS, return cached response
   - Create `SAPTransaction` record with status `PENDING`
   - Execute SAP call via adapter
@@ -480,24 +480,24 @@ infrastructure/sap/transaction/
   - All steps use structured logging with `domain=integration`
 
 **SAP Error Mapping**
-- [ ] Map SAP HTTP 4xx/5xx and BAPI return codes to domain exceptions:
+- [x] Map SAP HTTP 4xx/5xx and BAPI return codes to domain exceptions:
   - Connection failure → `SAPIntegrationError`
   - Duplicate key → `SAPIdempotencyError`
   - BAPI error return → `SAPResponseError` with SAP message
   - Retry limit reached → `SAPRetryExhaustedError`
 
 **Testing**
-- [ ] Write unit tests with mocked SAP HTTP responses:
-  - [ ] `tests/unit/infrastructure/sap/test_sap_transaction_manager.py` — success path, failure path, idempotency check, retry behavior
-  - [ ] `tests/unit/infrastructure/sap/test_equipment_adapter.py` — mocked OData response
-  - [ ] `tests/unit/infrastructure/sap/test_pm_order_adapter.py` — mocked BAPI response
-- [ ] Verify no application or domain file imports from `infrastructure/sap/adapters/` directly
-- [ ] Verify application services can only import from `core/sap/ports/`
-- [ ] Run `pytest tests/unit/infrastructure/sap/` — all pass
-- [ ] Run `black --check .` — zero violations
-- [ ] Run `isort --check .` — zero violations
-- [ ] Run `ruff check .` — zero violations
-- [ ] Run `mypy .` — zero errors
+- [x] Write unit tests with mocked SAP HTTP responses:
+  - [x] `tests/unit/infrastructure/sap/test_sap_transaction_manager.py` — success path, failure path, idempotency check, retry behavior
+  - [x] `tests/unit/infrastructure/sap/test_equipment_adapter.py` — mocked OData response
+  - [x] `tests/unit/infrastructure/sap/test_pm_order_adapter.py` — mocked BAPI response
+- [x] Verify no application or domain file imports from `infrastructure/sap/adapters/` directly
+- [x] Verify application services can only import from `core/sap/ports/`
+- [x] Run `pytest tests/unit/infrastructure/sap/` — all pass
+- [x] Run `black --check .` — zero violations
+- [x] Run `isort --check .` — zero violations
+- [x] Run `ruff check .` — zero violations
+- [x] Run `mypy .` — zero errors
 
 ---
 
@@ -951,6 +951,12 @@ N+1 query audit, final security hardening, complete README, and Phase 1 release 
 | 14 | 2026-07-09 | `de13d4d` | feat(infrastructure): implement Preventive Maintenance ORM models and repositories | `main` | 5 | ✓ Committed |
 | 15 | 2026-07-09 | `97a810a` | feat(infrastructure): implement Procurement ORM models and repositories | `main` | 5 | ✓ Committed |
 | 16 | 2026-07-09 | `e6d15e7` | feat(infrastructure): implement SAP Integration ORM model and repository | `main` | 5 | ✓ Committed |
+| 17 | 2026-07-09 | `e00e6f8` | docs(repo): update IMPLEMENTATION_TRACKER.md with M3 completion | `feat/milestone-4-sap-integration` | 4 | ✓ Committed |
+| 18 | 2026-07-09 | `c2f3f51` | feat(sap): add SAP port interfaces and DTOs (Step 1 of M4) | `feat/milestone-4-sap-integration` | 4 | ✓ Committed |
+| 19 | 2026-07-09 | `259c82e` | feat(sap): add ISAPClient ABC, MockSAPClient, and canned SAP scenarios (Step 2 of M4) | `feat/milestone-4-sap-integration` | 4 | ✓ Committed |
+| 20 | 2026-07-09 | `37d2f96` | feat(sap): add OData and BAPI adapters for all SAP integrations (Step 3 of M4) | `feat/milestone-4-sap-integration` | 4 | ✓ Committed |
+| 21 | 2026-07-09 | `b92ee59` | feat(sap): add SAPTransactionManager, SAPConfig, and Celery task scaffold (Step 4 of M4) | `feat/milestone-4-sap-integration` | 4 | ✓ Committed |
+| 22 | 2026-07-09 | `c3dd46c` | test(sap): add unit tests for mock client, adapters, and transaction manager (Step 5 of M4) | `feat/milestone-4-sap-integration` | 4 | ✓ Committed |
 
 ---
 
@@ -1106,6 +1112,39 @@ N+1 query audit, final security hardening, complete README, and Phase 1 release 
 | **Decision** | All tool configurations (`black`, `isort`, `ruff`, `mypy`, `pytest`, `coverage`) live in `pyproject.toml` |
 | **Reason**   | Centralizes all developer tooling in one file. Avoids configuration drift across `setup.cfg`, `.flake8`, `mypy.ini`, `pytest.ini`. |
 | **Impact**   | Every developer and CI pipeline uses identical settings. `make lint` is a single, reproducible command. |
+| **Date**     | 2026-07-09 |
+
+---
+
+### ADR-015 — `ISAPClient` ABC Injected into Adapters (Strategy Pattern)
+
+| Field        | Detail |
+|--------------|--------|
+| **Decision** | Every SAP adapter receives an `ISAPClient` instance by constructor injection. The concrete client (OData, BAPI, or Mock) is decided at composition root, not inside the adapter. |
+| **Reason**   | Enables seamless swap between `MockSAPClient` (dev/test) and real clients (production) without any adapter code changes. Satisfies DIP and OCP. |
+| **Impact**   | Adapters are fully testable without real SAP. `MockSAPClient` is the default in `SAP_USE_MOCK=True` environments. Production wiring deferred until SAP credentials are provided. |
+| **Date**     | 2026-07-09 |
+
+---
+
+### ADR-016 — `SAPTransactionManager.execute()` Accepts `adapter_call: Callable`
+
+| Field        | Detail |
+|--------------|--------|
+| **Decision** | `SAPTransactionManager` accepts an `adapter_call: Callable[[dict], tuple[dict, str]]` parameter rather than a direct adapter reference. |
+| **Reason**   | Decouples the transaction manager from all concrete adapters. The manager orchestrates idempotency/retry lifecycle; the caller provides the SAP operation as a lambda. Avoids a dependency on 12 adapter classes in a single manager. |
+| **Impact**   | Application services compose the adapter call and pass it to the manager. The manager remains a pure transaction state machine. |
+| **Date**     | 2026-07-09 |
+
+---
+
+### ADR-017 — `SAP_USE_MOCK=True` Default; Production Requires Explicit Credentials
+
+| Field        | Detail |
+|--------------|--------|
+| **Decision** | `SAPConfig.from_env()` defaults to `SAP_USE_MOCK=True`. When `False`, it raises `ImproperlyConfigured` if any required credential environment variable is missing. |
+| **Reason**   | Prevents accidental production deployment without SAP credentials. Eliminates the risk of silent failures where an unconfigured client calls a real SAP system. |
+| **Impact**   | Development and test environments work without any SAP configuration. Production deployment requires all 5 credential variables to be explicitly set. |
 | **Date**     | 2026-07-09 |
 
 ---
