@@ -11,7 +11,7 @@
 |-------------------------|--------------------------------------------------------------------|
 | **Current Phase**       | Implementation — Phase 1                                           |
 | **Current Milestone**   | M8 — Async Background Tasks (Complete)                             |
-| **Last Commit**         | _(pending)_ — feat(messaging): implement Celery tasks for SAP sync and PM scheduling |
+| **Last Commit**         | `7693264` — feat(messaging): implement Celery tasks for SAP sync and PM scheduling |
 | **Completed**           | M0 ✓, M1 ✓, M2 ✓, M3 ✓, M4 ✓, M5 ✓, M6 ✓, M7 ✓, M8 ✓ — 9 / 10 implementation milestones |
 | **In Progress**         | — (ready for M9; not started)                                      |
 | **Blocked**             | —                                                                  |
@@ -996,7 +996,7 @@ N+1 query audit, final security hardening, complete README, and Phase 1 release 
 | 45 | 2026-07-10 | `7cdfb33` | docs(tracker): set M7 Last Commit and git history row 44 | `feat/milestone-7-api-v1` | 1 | ✓ Committed |
 | 46 | 2026-07-10 | `2a19611` | docs(tracker): sync M7 Last Commit to HEAD | `feat/milestone-7-api-v1` | 1 | ✓ Committed |
 | 47 | 2026-07-10 | `385da40` | refactor(sap): centralize SAP write transaction management | `feat/milestone-7-api-v1` | 13 | ✓ Committed |
-| 48 | 2026-07-10 | _(pending)_ | feat(messaging): implement Celery tasks for SAP sync and PM scheduling | `feat/milestone-8-celery-tasks` | — | ✓ Committed |
+| 48 | 2026-07-10 | `7693264` | feat(messaging): implement Celery tasks for SAP sync and PM scheduling | `feat/milestone-8-celery-tasks` | — | ✓ Committed |
 
 ---
 
