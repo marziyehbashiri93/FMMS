@@ -10,10 +10,10 @@
 | Field                   | Value                                                              |
 |-------------------------|--------------------------------------------------------------------|
 | **Current Phase**       | Implementation — Phase 1                                           |
-| **Current Milestone**   | Milestone 2 — Domain Layer                                         |
-| **Last Commit**         | `cc7ff30` — docs(repo): update tracker for M1 completion           |
-| **Completed**           | M0 ✓, M1 ✓ — 1 / 10 implementation milestones                    |
-| **In Progress**         | M2 — Domain Layer                                                  |
+| **Current Milestone**   | M2 complete — Awaiting approval to begin M3                        |
+| **Last Commit**         | `85b6d28` — feat(domain): define domain entities and repository interfaces |
+| **Completed**           | M0 ✓, M1 ✓, M2 ✓ — 2 / 10 implementation milestones              |
+| **In Progress**         | —                                                                  |
 | **Blocked**             | —                                                                  |
 | **Last Updated**        | 2026-07-09                                                         |
 | **Validation Status**   | PASSED — 14 issues found and corrected (2026-07-09)                |
@@ -198,11 +198,11 @@ development environment (Docker, Makefile). No business features — infrastruct
 
 | Field         | Value                                                      |
 |---------------|------------------------------------------------------------|
-| **Status**    | `In Progress 🔄`                                           |
-| **Branch**    | `feat/milestone-2-domain`                                  |
-| **Commit**    | `feat(domain): define domain entities and repository interfaces` |
+| **Status**    | `Complete ✓`                                               |
+| **Branch**    | `feat/milestone-2-domain` → merged to `main`               |
+| **Commit**    | `85b6d28` feat(domain): define domain entities and repository interfaces |
 | **Started**   | 2026-07-09                                                 |
-| **Completed** | —                                                          |
+| **Completed** | 2026-07-09                                                 |
 
 **Goal:**
 Define all Phase 1 domain boundaries in pure Python. Zero Django or ORM dependency
@@ -945,6 +945,9 @@ N+1 query audit, final security hardening, complete README, and Phase 1 release 
 | 1  | 2026-07-09 | `05a006b` | chore(repo): initialize FMMS repository         | `main` | 14    | ✓ Committed |
 | 2  | 2026-07-09 | `5895a8f` | docs(repo): update tracker for M0 completion    | `main` | 1     | ✓ Committed |
 | 3  | 2026-07-09 | `cb3dfa2` | feat(core): initialize project foundation       | `main` | 58    | ✓ Committed |
+| 4  | 2026-07-09 | `cc7ff30` | docs(repo): update tracker with M1 completion  | `main` | 1     | ✓ Committed |
+| 5  | 2026-07-09 | `3a4c73f` | docs(repo): set Milestone 2 as In Progress     | `main` | 1     | ✓ Committed |
+| 6  | 2026-07-09 | `85b6d28` | feat(domain): define domain entities and repository interfaces | `main` | 79 | ✓ Committed |
 
 ---
 
