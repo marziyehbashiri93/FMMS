@@ -11,7 +11,7 @@
 |-------------------------|--------------------------------------------------------------------|
 | **Current Phase**       | Implementation — Phase 1                                           |
 | **Current Milestone**   | M5 — Application Services: Core Domains (In Progress)              |
-| **Last Commit**         | `4db243a` — feat(application): implement Vehicle application services — M5 |
+| **Last Commit**         | `df5913f` — feat(application): implement Driver application services — M5  |
 | **Completed**           | M0 ✓, M1 ✓, M2 ✓, M3 ✓, M4 ✓ — 5 / 10 implementation milestones |
 | **In Progress**         | M5 — Application Services: Core Domains                           |
 | **Blocked**             | —                                                                  |
@@ -530,12 +530,13 @@ concrete infrastructure classes imported. Each service has one responsibility (S
 - [x] Create `apps/vehicle/application/services/sync_sap_equipment_service.py` — `SyncSAPEquipmentService`
 - [x] Create `tests/unit/application/test_vehicle_services.py` — 19 unit tests, all passing
 
-**Driver Application**
-- [ ] Create `apps/driver/application/dto/driver_dto.py` — `RegisterDriverDTO`, `DriverResponseDTO`
-- [ ] Create `apps/driver/application/services/register_driver_service.py` — `RegisterDriverService`
-- [ ] Create `apps/driver/application/services/assign_driver_to_vehicle_service.py` — `AssignDriverToVehicleService`
-- [ ] Create `apps/driver/application/services/suspend_driver_service.py` — `SuspendDriverService`
-- [ ] Create `apps/driver/application/services/get_driver_service.py` — `GetDriverService`
+**Driver Application** ✓ COMPLETE — commit `df5913f`
+- [x] Create `apps/driver/application/dto/driver_dto.py` — `RegisterDriverDTO`, `AssignDriverToVehicleDTO`, `SuspendDriverDTO`, `DriverResponseDTO`
+- [x] Create `apps/driver/application/services/register_driver_service.py` — `RegisterDriverService`
+- [x] Create `apps/driver/application/services/assign_driver_to_vehicle_service.py` — `AssignDriverToVehicleService` (cross-domain: driver availability + vehicle ACTIVE + no double-assignment)
+- [x] Create `apps/driver/application/services/suspend_driver_service.py` — `SuspendDriverService`
+- [x] Create `apps/driver/application/services/get_driver_service.py` — `GetDriverService`, `ListDriversService`
+- [x] Create `tests/unit/application/test_driver_services.py` — 20 unit tests, all passing
 
 **Inspection Application**
 - [ ] Create `apps/inspection/application/dto/inspection_dto.py` — `CreateInspectionDTO`, `SubmitInspectionDTO`, `InspectionResponseDTO`
