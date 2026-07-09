@@ -296,7 +296,18 @@ class SAPTransactionManager:
         adapter_call: SAPAdapterCallable,
         request_payload: dict[str, Any],
     ) -> tuple[dict[str, Any], str]:
-        """Invoke the adapter callable and update transaction state."""
+        """Invoke the adapter callable and update transaction state.
+
+        When the transaction arrives in RETRYING state (from ``retry()``),
+        an explicit IN_PROGRESS transition is required before the adapter call,
+        following the domain state machine: RETRYING → IN_PROGRESS → SUCCESS/FAILED.
+        """
+        from apps.integration.domain.entities import SAPTransactionStatus
+
+        if transaction.status == SAPTransactionStatus.RETRYING:
+            transaction.status = SAPTransactionStatus.IN_PROGRESS
+            self._repo.save(transaction)
+
         try:
             response_payload, sap_doc_number = adapter_call(request_payload)
         except SAPIntegrationError as exc:
