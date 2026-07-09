@@ -120,7 +120,7 @@ django_settings_module = "config.settings.development"
 # pytest
 # ──────────────────────────────────────────────────────────────────────────────
 [tool.pytest.ini_options]
-DJANGO_SETTINGS_MODULE = "config.settings.development"
+DJANGO_SETTINGS_MODULE = "config.settings.test"
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]

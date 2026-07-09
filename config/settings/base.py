@@ -49,15 +49,16 @@ THIRD_PARTY_APPS = [
 
 FMMS_APPS = [
     "apps.authentication",
-    # Domain apps registered in Milestone 3:
-    # "apps.vehicle",
-    # "apps.driver",
-    # "apps.inspection",
-    # "apps.fault",
-    # "apps.repair",
-    # "apps.preventive_maintenance",
-    # "apps.procurement",
-    # "apps.integration",
+    # Phase 1 domain apps — registered in Milestone 3:
+    "apps.vehicle",
+    "apps.driver",
+    "apps.inspection",
+    "apps.fault",
+    "apps.repair",
+    "apps.preventive_maintenance",
+    "apps.procurement",
+    "apps.integration",
+    # "apps.reporting",  # Phase 2 — not activated until reporting domain is implemented
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + FMMS_APPS
@@ -148,6 +149,15 @@ CACHES = {
 # ──────────────────────────────────────────────────────────────────────────────
 MIGRATION_MODULES = {
     "authentication": "apps.authentication.infrastructure.migrations",
+    # Phase 1 domain apps — migrations live inside each app's infrastructure package:
+    "vehicle": "apps.vehicle.infrastructure.migrations",
+    "driver": "apps.driver.infrastructure.migrations",
+    "inspection": "apps.inspection.infrastructure.migrations",
+    "fault": "apps.fault.infrastructure.migrations",
+    "repair": "apps.repair.infrastructure.migrations",
+    "preventive_maintenance": "apps.preventive_maintenance.infrastructure.migrations",
+    "procurement": "apps.procurement.infrastructure.migrations",
+    "integration": "apps.integration.infrastructure.migrations",
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
