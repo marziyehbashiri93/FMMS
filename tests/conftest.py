@@ -58,25 +58,38 @@ def viewer_user(db: None) -> "FMMSUser":  # type: ignore[name-defined]  # noqa: 
 
 
 @pytest.fixture
-def authenticated_client(api_client: APIClient, admin_user: "FMMSUser") -> APIClient:  # type: ignore[name-defined]  # noqa: F821
+def authenticated_client(admin_user: "FMMSUser") -> APIClient:  # type: ignore[name-defined]  # noqa: F821
     """
     Return an API client authenticated as an admin user.
 
     Uses force_authenticate to bypass token/session setup in unit-style tests.
+    Each role fixture owns a distinct client so concurrent fixtures do not
+    overwrite each other's credentials.
     """
-    api_client.force_authenticate(user=admin_user)
-    return api_client
+    client = APIClient()
+    client.force_authenticate(user=admin_user)
+    return client
 
 
 @pytest.fixture
-def supervisor_client(api_client: APIClient, supervisor_user: "FMMSUser") -> APIClient:  # type: ignore[name-defined]  # noqa: F821
+def supervisor_client(supervisor_user: "FMMSUser") -> APIClient:  # type: ignore[name-defined]  # noqa: F821
     """Return an API client authenticated as a supervisor."""
-    api_client.force_authenticate(user=supervisor_user)
-    return api_client
+    client = APIClient()
+    client.force_authenticate(user=supervisor_user)
+    return client
 
 
 @pytest.fixture
-def technician_client(api_client: APIClient, technician_user: "FMMSUser") -> APIClient:  # type: ignore[name-defined]  # noqa: F821
+def technician_client(technician_user: "FMMSUser") -> APIClient:  # type: ignore[name-defined]  # noqa: F821
     """Return an API client authenticated as a technician."""
-    api_client.force_authenticate(user=technician_user)
-    return api_client
+    client = APIClient()
+    client.force_authenticate(user=technician_user)
+    return client
+
+
+@pytest.fixture
+def viewer_client(viewer_user: "FMMSUser") -> APIClient:  # type: ignore[name-defined]  # noqa: F821
+    """Return an API client authenticated as a read-only viewer."""
+    client = APIClient()
+    client.force_authenticate(user=viewer_user)
+    return client

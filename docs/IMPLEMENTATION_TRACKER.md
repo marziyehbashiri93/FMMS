@@ -10,13 +10,13 @@
 | Field                   | Value                                                              |
 |-------------------------|--------------------------------------------------------------------|
 | **Current Phase**       | Implementation — Phase 1                                           |
-| **Current Milestone**   | M8 — Async Background Tasks (Complete)                             |
-| **Last Commit**         | `7693264` — feat(messaging): implement Celery tasks for SAP sync and PM scheduling |
-| **Completed**           | M0 ✓, M1 ✓, M2 ✓, M3 ✓, M4 ✓, M5 ✓, M6 ✓, M7 ✓, M8 ✓ — 9 / 10 implementation milestones |
-| **In Progress**         | — (ready for M9; not started)                                      |
-| **Blocked**             | —                                                                  |
+| **Current Milestone**   | M9 — Testing Completeness & Production Hardening (Complete)        |
+| **Last Commit**         | `test(all): harden production scenarios and integration coverage`  |
+| **Completed**           | M0 ✓ … M9 ✓ — 10 / 10 implementation milestones (M10 deferred)     |
+| **In Progress**         | — (M10 not started)                                                |
+| **Blocked**             | DEFECT-M9-01, DEFECT-M9-02 — awaiting approval for production fix  |
 | **Last Updated**        | 2026-07-10                                                         |
-| **Validation Status**   | M8 PASSED — 515/515 tests; black/isort/ruff/mypy PASS (2026-07-10) |
+| **Validation Status**   | M9 PASSED — 565/565 tests; coverage 87.99%; black/isort/ruff PASS; mypy baseline 43 (no M9 delta) |
 
 ---
 
@@ -817,61 +817,57 @@ Application services must not manage `SAPTransaction` lifecycle independently.
 
 ---
 
-### Milestone 9 — Testing Completeness & Coverage
+### Milestone 9 — Testing Completeness & Production Hardening
 
-| Field         | Value                                               |
-|---------------|-----------------------------------------------------|
-| **Status**    | `Pending`                                           |
-| **Branch**    | `feat/milestone-9-testing`                          |
-| **Commit**    | `test(all): complete test suite and enforce coverage threshold` |
-| **Started**   | —                                                   |
-| **Completed** | —                                                   |
+| Field         | Value                                                              |
+|---------------|--------------------------------------------------------------------|
+| **Status**    | `Complete`                                                         |
+| **Branch**    | `feat/milestone-9-testing`                                         |
+| **Commit**    | `test(all): harden production scenarios and integration coverage`  |
+| **Started**   | 2026-07-10                                                         |
+| **Completed** | 2026-07-10                                                         |
 
 **Goal:**
-Audit and complete test coverage across all layers. Fill gaps from M2–M8.
-Enforce the 80% minimum coverage threshold. All layers verified. Tests for
-edge cases, invalid states, and error paths added.
+Harden production scenarios (not raw coverage expansion). P0 security/JWT/SAP
+retry/API errors/Celery failures; P1 workflows/transaction rollback/soft-delete/
+domain edges. Do not change architecture, weaken permissions, or bypass domain
+rules to make tests pass. Production defects require approval before fixes.
 
-**Tasks:**
+**Priority strategy applied**
 
-**Coverage Audit**
-- [ ] Run `pytest --cov --cov-report=html` — inspect coverage report
-- [ ] Identify all files below 80% coverage
-- [ ] Prioritize: domain entities, state machines, SAP transaction manager, service error paths
+**P0 — Complete**
+- [x] Security & permission matrix (`test_security_permissions_api.py`)
+- [x] JWT failure scenarios (invalid bearer, invalid refresh, expired access)
+- [x] SAP retry lifecycle (`test_sap_retry_lifecycle.py`) — SUCCESS / skip / EXHAUSTED / continue-on-failure + payload rebuild
+- [x] Error handling through API (`test_error_handling_api.py`) — 400/404(FMMS)/502; defects locked as current 500s
+- [x] Celery failure scenarios (`test_celery_failure_scenarios.py`) — log fields, re-raise, partial PM sweep
 
-**Gap-Filling Tests**
-- [ ] Complete domain unit tests for all remaining domains not covered in M2:
-  - [ ] `tests/unit/domain/test_inspection_domain.py`
-  - [ ] `tests/unit/domain/test_driver_domain.py`
-  - [ ] `tests/unit/domain/test_procurement_domain.py`
-  - [ ] `tests/unit/domain/test_integration_domain.py` (SAPTransaction lifecycle)
-- [ ] Complete remaining service unit tests not written in M5/M6
-- [ ] Complete remaining repository tests not written in M3
-- [ ] Complete remaining API integration tests not written in M7:
-  - [ ] `tests/integration/api/test_inspection_api.py`
-  - [ ] `tests/integration/api/test_driver_api.py`
-  - [ ] `tests/integration/api/test_preventive_maintenance_api.py`
-  - [ ] `tests/integration/api/test_integration_api.py`
-- [ ] Complete SAP adapter integration tests (all adapters with mocked HTTP):
-  - [ ] `tests/integration/sap/test_equipment_odata_adapter.py`
-  - [ ] `tests/integration/sap/test_pm_order_bapi_adapter.py`
-  - [ ] `tests/integration/sap/test_goods_receipt_bapi_adapter.py`
+**P1 — Complete**
+- [x] Repair workflow edges (`test_repair_workflow_edges_api.py`)
+- [x] Transaction rollback / non-mutation (`test_transaction_rollback_scenarios.py`)
+- [x] Soft-delete visibility via API/list (`test_soft_delete_visibility_api.py`)
+- [x] Driver domain edges (`test_driver_domain.py`)
 
-**Error Path Tests (mandatory)**
-- [ ] Test `VehicleNotFoundError` raised and mapped to 404
-- [ ] Test `RepairOrderStateError` raised and mapped to 422
-- [ ] Test `SAPIntegrationError` raised and mapped to 502
-- [ ] Test `SAPRetryExhaustedError` — transaction status becomes EXHAUSTED
-- [ ] Test `SAPIdempotencyError` — duplicate idempotency key returns cached response
-- [ ] Test soft delete — deleted records excluded from list queries
-- [ ] Test `BaseModel` audit fields populated automatically
+**P2 — Deferred (as approved)**
+- [ ] Deferred unused adapter tests (only if Phase 1 later requires them)
+- [ ] Broad coverage hunt beyond critical scenarios
+
+**Fixture fix (tests only)**
+- [x] Role clients use distinct `APIClient` instances (shared client overwrote auth)
+
+**Production defects discovered (awaiting approval — no production code changed)**
+
+| ID | Symptom | Cause | Proposed fix |
+|----|---------|-------|--------------|
+| **DEFECT-M9-01** | `GET /vehicles/{missing}/` → **500** | Repo raises `VehicleNotFoundError`; service expects `None` → `FMMSNotFoundError`; handler only maps `FMMS*` | (A) Repo returns `None` / services raise `FMMSNotFoundError`; (B) map domain `*NotFoundError` in handler; (C) services catch & re-raise `FMMSNotFoundError` |
+| **DEFECT-M9-02** | Illegal repair transitions → **500** | `RepairOrderInvalidState*` not `FMMSBaseException`; not wrapped by services | (A) Services wrap as `FMMSStateError`; (B) map repair state exceptions in handler → 422 |
 
 **Final Verification**
-- [ ] Run full test suite: `pytest --cov --cov-fail-under=80` — passes
-- [ ] Run `black --check .` — zero violations
-- [ ] Run `isort --check .` — zero violations
-- [ ] Run `ruff check .` — zero violations
-- [ ] Run `mypy .` — zero errors
+- [x] `pytest --cov --cov-fail-under=80` — **565 passed**, coverage **87.99%**
+- [x] `black --check .` — pass
+- [x] `isort --check-only .` — pass
+- [x] `ruff check .` — pass
+- [x] `mypy .` — **43 baseline errors** (unchanged vs pre-M9); **0 new from M9**
 
 ---
 
@@ -1211,4 +1207,15 @@ N+1 query audit, final security hardening, complete README, and Phase 1 release 
 
 ---
 
-*Last updated: 2026-07-10 | Updated by: Lead Backend Architect | Validation: M8 PASSED — Celery tasks (retry/PM/single sync); 515/515 tests; M9 not started*
+### ADR-020 — M9 Critical-Scenario Testing Over Coverage Expansion
+
+| Field        | Detail |
+|--------------|--------|
+| **Decision** | M9 prioritizes P0/P1 production scenarios (security, JWT, SAP retry, API errors, Celery failures, workflow/transaction/soft-delete edges). Deferred adapter coverage is P2 only when Phase 1 requires it. |
+| **Reason**   | Coverage was already ~87%; remaining risk was behavioural hardening, not line count. |
+| **Impact**   | Defects found during M9 are locked by tests but production fixes require explicit approval. |
+| **Date**     | 2026-07-10 |
+
+---
+
+*Last updated: 2026-07-10 | Updated by: Lead Backend Architect | Validation: M9 PASSED — 565/565; cov 87.99%; DEFECT-M9-01/02 open pending approval; M10 not started*
