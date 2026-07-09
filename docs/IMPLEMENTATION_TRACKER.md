@@ -11,7 +11,7 @@
 |-------------------------|--------------------------------------------------------------------|
 | **Current Phase**       | Implementation — Phase 1                                           |
 | **Current Milestone**   | M4 complete — Awaiting approval to begin M5                        |
-| **Last Commit**         | `c3dd46c` — test(sap): add unit tests for mock client, adapters, and transaction manager |
+| **Last Commit**         | `fb13b26` — fix(sap): add BAPI_PR_GET_DETAIL mock route (M4 architecture review) |
 | **Completed**           | M0 ✓, M1 ✓, M2 ✓, M3 ✓, M4 ✓ — 5 / 10 implementation milestones |
 | **In Progress**         | —                                                                  |
 | **Blocked**             | —                                                                  |
@@ -957,6 +957,7 @@ N+1 query audit, final security hardening, complete README, and Phase 1 release 
 | 20 | 2026-07-09 | `37d2f96` | feat(sap): add OData and BAPI adapters for all SAP integrations (Step 3 of M4) | `feat/milestone-4-sap-integration` | 4 | ✓ Committed |
 | 21 | 2026-07-09 | `b92ee59` | feat(sap): add SAPTransactionManager, SAPConfig, and Celery task scaffold (Step 4 of M4) | `feat/milestone-4-sap-integration` | 4 | ✓ Committed |
 | 22 | 2026-07-09 | `c3dd46c` | test(sap): add unit tests for mock client, adapters, and transaction manager (Step 5 of M4) | `feat/milestone-4-sap-integration` | 4 | ✓ Committed |
+| 23 | 2026-07-10 | `fb13b26` | fix(sap): add BAPI_PR_GET_DETAIL mock route (M4 architecture review) | `feat/milestone-4-sap-integration` | 4 | ✓ Committed |
 
 ---
 
@@ -1149,4 +1150,4 @@ N+1 query audit, final security hardening, complete README, and Phase 1 release 
 
 ---
 
-*Last updated: 2026-07-09 | Updated by: Lead Backend Architect | Validation: PASSED*
+*Last updated: 2026-07-10 | Updated by: Lead Backend Architect | Validation: PASSED — M4 architecture review clean (6/6 checks passed, 1 minor fix applied)*
