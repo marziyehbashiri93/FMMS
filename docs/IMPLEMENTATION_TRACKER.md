@@ -11,7 +11,7 @@
 |-------------------------|--------------------------------------------------------------------|
 | **Current Phase**       | Implementation — Phase 1                                           |
 | **Current Milestone**   | Demo Backend Workflow Prep (Complete)                              |
-| **Last Commit**         | `feat(demo): prepare backend workflow APIs for FMMS demonstration` |
+| **Last Commit**         | `d0a5ecd` — feat(demo): prepare backend workflow APIs for FMMS demonstration |
 | **Completed**           | M0 ✓ … M9 ✓ + demo backend workflow APIs                           |
 | **In Progress**         | — (demo-frontend deferred until backend APIs approved)             |
 | **Blocked**             | —                                                                  |
