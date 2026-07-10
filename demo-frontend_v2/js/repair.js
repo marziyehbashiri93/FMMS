@@ -119,6 +119,165 @@ FMMS.pages = FMMS.pages || {};
   // ---------------------------------------------------------------------
   // Transport supervisor
   // ---------------------------------------------------------------------
+  function vehicleIsInactive(vehicle) {
+    if (!vehicle) return false;
+    return ["INACTIVE", "OUT_OF_SERVICE", "SUSPENDED"].includes(vehicle.status);
+  }
+
+  function distributionDecisionLabel(fault, vehicle) {
+    if (!fault) return "—";
+    if (fault.status === "CLOSED") return "خودرو قابل استفاده است";
+    if (fault.status === "OPEN" && vehicleIsInactive(vehicle)) return "خودرو غیرقابل استفاده است";
+    if (fault.status === "OPEN") return "در انتظار تصمیم توزیع";
+    return "—";
+  }
+
+  function renderFaultItemsTable(items) {
+    const caps = FMMS.api.capabilities;
+    if (caps.severityScope === "fault" || !items?.length) return "";
+    const rows = items.map(
+      (item) => `<tr>
+        <td>${FMMS.ui.escapeHtml(item.component)}</td>
+        <td>${FMMS.ui.escapeHtml(item.description)}</td>
+        <td>${FMMS.ui.badge(item.severity)}</td>
+        <td class="mono">${FMMS.ui.escapeHtml(item.inspection_item_id || "—")}</td>
+      </tr>`
+    );
+    return (
+      `<div class="modal-section"><div class="modal-section-title">آیتم‌های خرابی (بازرسی)</div>` +
+      FMMS.ui.renderTable(["قطعه", "توضیح", "شدت", "آیتم بازرسی"], rows) +
+      `</div>`
+    );
+  }
+
+  function hideDetailModal() {
+    bootstrap.Modal.getInstance(document.getElementById("detail-modal"))?.hide();
+  }
+
+  async function showTransportDetail(order) {
+    FMMS.ui.openDetailModalLoading("جزئیات دستور تعمیر");
+    try {
+      await ensureVehicles();
+      const [fullOrder, fault] = await Promise.all([
+        FMMS.api.getRepairOrder(order.id),
+        order.fault_id ? FMMS.api.getFault(order.fault_id).catch(() => null) : Promise.resolve(null),
+      ]);
+
+      let vehicle = vehiclesById[fullOrder.vehicle_id];
+      if (!vehicle) {
+        try {
+          vehicle = await FMMS.api.getVehicle(fullOrder.vehicle_id);
+          vehiclesById[vehicle.id] = vehicle;
+        } catch (_) {
+          vehicle = null;
+        }
+      }
+
+      const distributionLabel = distributionDecisionLabel(fault, vehicle);
+      const reporterValue = fault?.created_by
+        ? FMMS.ui.createdByLabel(fault.created_by)
+        : fault?.reported_by_id
+          ? `<span class="mono">${FMMS.ui.escapeHtml(fault.reported_by_id)}</span>`
+          : "—";
+
+      const orderRows = [
+        ["شناسه دستور تعمیر", `<span class="mono">${FMMS.ui.escapeHtml(fullOrder.id)}</span>`],
+        ["وضعیت دستور", FMMS.ui.badge(fullOrder.status)],
+        ["نوع تعمیرگاه", fullOrder.workshop_type ? workshopTypeLabel(fullOrder.workshop_type) : "—"],
+        ["زمان ایجاد", FMMS.ui.formatDateTime(fullOrder.created_at)],
+        ["آخرین بروزرسانی", FMMS.ui.formatDateTime(fullOrder.updated_at)],
+        ["شماره PM (SAP)", fullOrder.sap_order_number ? `<span class="mono">${FMMS.ui.escapeHtml(fullOrder.sap_order_number)}</span>` : "—"],
+      ];
+
+      const vehicleRows = [
+        ["خودرو", vehicle ? FMMS.ui.vehicleLabel(vehicle) : `<span class="mono">${fullOrder.vehicle_id}</span>`],
+        ["پلاک", vehicle ? `<span class="mono">${FMMS.ui.escapeHtml(vehicle.plate_number)}</span>` : "—"],
+        ["وضعیت خودرو", vehicle ? FMMS.ui.badge(vehicle.status) : "—"],
+        ["شماره تجهیز SAP", vehicle?.sap_equipment_number ? `<span class="mono">${FMMS.ui.escapeHtml(vehicle.sap_equipment_number)}</span>` : "—"],
+      ];
+
+      const faultRows = fault
+        ? [
+            ["شناسه خرابی", `<span class="mono">${FMMS.ui.escapeHtml(fault.id)}</span>`],
+            ["کد خرابی", `<span class="mono">${FMMS.ui.escapeHtml(fault.code)}</span>`],
+            ["توضیح خرابی", FMMS.ui.escapeHtml(fault.description)],
+            ["وضعیت خرابی", FMMS.ui.badge(fault.status)],
+            ["شدت", FMMS.ui.badge(fault.severity)],
+            ["ثبت‌کننده", reporterValue],
+            ["زمان ثبت خرابی", FMMS.ui.formatDateTime(fault.reported_at || fault.created_at)],
+            ["تصمیم توزیع", distributionLabel],
+            ["شناسه بازرسی", fault.inspection_id ? `<span class="mono">${fault.inspection_id}</span>` : "—"],
+          ]
+        : [["خرابی مرتبط", `<span class="text-muted">اطلاعات خرابی در دسترس نیست.</span>`]];
+
+      let actionBar = "";
+      if (fullOrder.status === "CREATED") {
+        actionBar = `<div class="transport-detail-actions">
+          <p class="small text-muted mb-2">پس از بررسی جزئیات، تایید ترابری را ثبت کنید.</p>
+          <button type="button" class="btn btn-fmms-success btn-sm" id="transport-detail-approve">تایید ترابری</button>
+        </div>`;
+      } else if (fullOrder.status === "APPROVED") {
+        actionBar = `<div class="transport-detail-actions">
+          <p class="small text-muted mb-2">دستور تایید شده — نوع تعمیرگاه را انتخاب کنید.</p>
+          <button type="button" class="btn btn-fmms-success btn-sm" id="transport-detail-assign">تخصیص تعمیرگاه</button>
+        </div>`;
+      }
+
+      let body =
+        `<div class="modal-section"><div class="modal-section-title">خودرو</div>${FMMS.ui.renderDl(vehicleRows)}</div>` +
+        `<div class="modal-section"><div class="modal-section-title">خرابی و توزیع</div>${FMMS.ui.renderDl(faultRows)}</div>` +
+        `<div class="modal-section"><div class="modal-section-title">دستور تعمیر</div>${FMMS.ui.renderDl(orderRows)}</div>` +
+        renderFaultItemsTable(fault?.items) +
+        (FMMS.api.capabilities.repairTimeline
+          ? `<div class="modal-section"><div class="modal-section-title">تاریخچه مراحل</div><div id="transport-detail-timeline" class="text-muted">در حال بارگذاری…</div></div>`
+          : "") +
+        actionBar;
+
+      const titlePlate = vehicle?.plate_number || fullOrder.id.slice(0, 8);
+      FMMS.ui.openDetailModal(`بررسی تایید ترابری · ${titlePlate}`, body);
+
+      document.getElementById("transport-detail-approve")?.addEventListener("click", async (e) => {
+        const btn = e.currentTarget;
+        btn.disabled = true;
+        const prev = btn.textContent;
+        btn.textContent = "در حال تایید…";
+        try {
+          await FMMS.api.approveRepair(fullOrder.id);
+          FMMS.ui.toast("تعمیر تایید شد.");
+          hideDetailModal();
+          renderTransport();
+        } catch (err) {
+          FMMS.ui.toast(err.message, "error");
+          btn.disabled = false;
+          btn.textContent = prev;
+        }
+      });
+
+      document.getElementById("transport-detail-assign")?.addEventListener("click", () => {
+        hideDetailModal();
+        assignWorkshop(fullOrder);
+      });
+
+      if (FMMS.api.capabilities.repairTimeline) {
+        try {
+          const events = await FMMS.api.getRepairTimeline(fullOrder.id);
+          const labeled = events.map((e) => ({
+            ...e,
+            event: EVENT_LABELS[e.event] || e.event,
+          }));
+          const host = document.getElementById("transport-detail-timeline");
+          if (host) host.innerHTML = FMMS.ui.renderTimeline(labeled);
+        } catch (_) {
+          const host = document.getElementById("transport-detail-timeline");
+          if (host) host.textContent = "بارگذاری تاریخچه ممکن نشد.";
+        }
+      }
+    } catch (err) {
+      FMMS.ui.openDetailModal("جزئیات دستور تعمیر", `<div class="text-danger">${FMMS.ui.escapeHtml(err.message)}</div>`);
+      FMMS.ui.toast(err.message, "error");
+    }
+  }
+
   async function approve(order, btn) {
     btn.disabled = true;
     const prev = btn.textContent;
@@ -152,19 +311,23 @@ FMMS.pages = FMMS.pages || {};
   }
 
   function transportActions(order) {
+    const parts = [`<button type="button" class="btn btn-fmms-outline btn-sm" data-action="detail">مشاهده جزئیات</button>`];
     if (order.status === "CREATED") {
-      return `<button class="btn btn-fmms-success btn-sm" data-action="approve">تایید ترابری</button>`;
+      parts.push(`<button type="button" class="btn btn-fmms-success btn-sm" data-action="approve">تایید ترابری</button>`);
     }
     if (order.status === "APPROVED") {
-      return `<button class="btn btn-fmms-success btn-sm" data-action="assign-workshop">تخصیص تعمیرگاه</button>`;
+      parts.push(`<button type="button" class="btn btn-fmms-success btn-sm" data-action="assign-workshop">تخصیص تعمیرگاه</button>`);
     }
     if (order.status === "COMPLETED") {
-      return `<span class="reviewed-notice">این تعمیر تکمیل شده است.</span>`;
+      return `<div class="d-flex flex-wrap gap-1 align-items-center">${parts.join("")}<span class="reviewed-notice">تکمیل شده</span></div>`;
     }
     if (order.status === "CANCELLED") {
-      return `<span class="reviewed-notice">این تعمیر لغو شده است.</span>`;
+      return `<div class="d-flex flex-wrap gap-1 align-items-center">${parts.join("")}<span class="reviewed-notice">لغو شده</span></div>`;
     }
-    return `<span class="reviewed-notice">این مرحله قبلاً انجام شده است.</span>`;
+    if (parts.length === 1) {
+      parts.push(`<span class="reviewed-notice">این مرحله قبلاً انجام شده است.</span>`);
+    }
+    return `<div class="d-flex flex-wrap gap-1">${parts.join("")}</div>`;
   }
 
   function transportRow(order) {
@@ -274,6 +437,7 @@ FMMS.pages = FMMS.pages || {};
 
       tbody.querySelectorAll("tr[data-id]").forEach((tr) => {
         const order = orders.find((r) => r.id === tr.dataset.id);
+        tr.querySelector('[data-action="detail"]')?.addEventListener("click", () => showTransportDetail(order));
         tr.querySelector('[data-action="approve"]')?.addEventListener("click", (e) => approve(order, e.currentTarget));
         tr.querySelector('[data-action="assign-workshop"]')?.addEventListener("click", () => assignWorkshop(order));
       });

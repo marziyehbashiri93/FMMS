@@ -34,30 +34,20 @@ FMMS.pages = FMMS.pages || {};
     return { reviewed: false };
   }
 
-  function distributionReviewedCell(fault, decision, vehicle) {
-    const reviewer = FMMS.session.roleLabel(FMMS.session.getRole());
-    const vehicleStatus = vehicle ? FMMS.ui.badge(vehicle.status) : "—";
-    return `<div class="distribution-reviewed">
-      <div class="distribution-reviewed-title">${FMMS.ui.escapeHtml(fault.description)}</div>
-      <div class="distribution-reviewed-row"><span>وضعیت:</span> بررسی شد</div>
-      <div class="distribution-reviewed-row"><span>تصمیم:</span> ${FMMS.ui.escapeHtml(decision)}</div>
-      <div class="distribution-reviewed-row"><span>وضعیت خودرو:</span> ${vehicleStatus}</div>
-      <div class="distribution-reviewed-row"><span>ثبت‌کننده:</span> ${FMMS.ui.escapeHtml(reviewer)}</div>
-    </div>`;
-  }
-
   function distributionActionsCell(fault, vehicle) {
+    const detailBtn = `<button type="button" class="btn btn-fmms-outline btn-sm" data-action="dist-detail">مشاهده جزئیات</button>`;
     const state = getDistributionDecision(fault, vehicle);
     if (state.reviewed) {
-      return distributionReviewedCell(fault, state.decision, vehicle);
+      return `<div class="d-flex flex-wrap gap-1 align-items-center">${detailBtn}<span class="reviewed-notice">${FMMS.ui.escapeHtml(state.decision)}</span></div>`;
     }
     if (!DISTRIBUTION_ACTIONABLE.has(fault.status)) {
-      return `<span class="reviewed-notice">این خرابی قبلاً بررسی شده است.</span>`;
+      return `<div class="d-flex flex-wrap gap-1 align-items-center">${detailBtn}<span class="reviewed-notice">این خرابی قبلاً بررسی شده است.</span></div>`;
     }
     const groupId = `dist-actions-${fault.id}`;
-    return `<div class="d-flex gap-2" id="${groupId}">
-      <button class="btn btn-fmms-success btn-sm" data-action="usable">خودرو قابل استفاده است</button>
-      <button class="btn btn-fmms-danger btn-sm" data-action="unusable">خودرو غیرقابل استفاده است</button>
+    return `<div class="d-flex flex-wrap gap-1" id="${groupId}">
+      ${detailBtn}
+      <button type="button" class="btn btn-fmms-success btn-sm" data-action="usable">خودرو قابل استفاده است</button>
+      <button type="button" class="btn btn-fmms-danger btn-sm" data-action="unusable">خودرو غیرقابل استفاده است</button>
     </div>`;
   }
 
@@ -93,7 +83,7 @@ FMMS.pages = FMMS.pages || {};
 
   function renderItemSeverityTable(items) {
     const caps = FMMS.api.capabilities;
-    if (caps.severityScope === "fault") return "";
+    if (caps.severityScope === "fault" || !items?.length) return "";
     const rows = (items || []).map(
       (item) => `<tr>
         <td>${FMMS.ui.escapeHtml(item.component)}</td>
@@ -103,9 +93,150 @@ FMMS.pages = FMMS.pages || {};
       </tr>`
     );
     return (
-      `<h6 class="mt-3 mb-2">آیتم‌های خرابی</h6>` +
-      FMMS.ui.renderTable(["قطعه / component", "توضیح", "شدت آیتم", "شناسه آیتم بازرسی"], rows)
+      `<div class="modal-section"><div class="modal-section-title">آیتم‌های خرابی (بازرسی)</div>` +
+      FMMS.ui.renderTable(["قطعه", "توضیح", "شدت", "آیتم بازرسی"], rows) +
+      `</div>`
     );
+  }
+
+  function hideDetailModal() {
+    bootstrap.Modal.getInstance(document.getElementById("detail-modal"))?.hide();
+  }
+
+  async function showDistributionDetail(faultId) {
+    FMMS.ui.openDetailModalLoading("بررسی تصمیم توزیع");
+    try {
+      await ensureVehicles();
+      const fault = await FMMS.api.getFault(faultId);
+      let vehicle = vehiclesById[fault.vehicle_id];
+      if (!vehicle) {
+        try {
+          vehicle = await FMMS.api.getVehicle(fault.vehicle_id);
+          vehiclesById[vehicle.id] = vehicle;
+        } catch (_) {
+          vehicle = null;
+        }
+      }
+
+      const repairOrder = await findRepairOrderForFault(fault);
+      const decisionState = getDistributionDecision(fault, vehicle);
+      const reviewer = FMMS.session.roleLabel(FMMS.session.getRole());
+
+      const reporterValue = fault.created_by
+        ? FMMS.ui.createdByLabel(fault.created_by)
+        : fault.reported_by_id
+          ? `<span class="mono">${FMMS.ui.escapeHtml(fault.reported_by_id)}</span>`
+          : "—";
+
+      const vehicleRows = [
+        ["خودرو", vehicle ? FMMS.ui.vehicleLabel(vehicle) : `<span class="mono">${fault.vehicle_id}</span>`],
+        ["پلاک", vehicle ? `<span class="mono">${FMMS.ui.escapeHtml(vehicle.plate_number)}</span>` : "—"],
+        ["وضعیت خودرو", vehicle ? FMMS.ui.badge(vehicle.status) : "—"],
+        ["شماره تجهیز SAP", vehicle?.sap_equipment_number ? `<span class="mono">${FMMS.ui.escapeHtml(vehicle.sap_equipment_number)}</span>` : "—"],
+      ];
+
+      const faultRows = [
+        ["شناسه خرابی", `<span class="mono">${FMMS.ui.escapeHtml(fault.id)}</span>`],
+        ["کد خرابی", `<span class="mono">${FMMS.ui.escapeHtml(fault.code)}</span>`],
+        ["توضیح خرابی", FMMS.ui.escapeHtml(fault.description)],
+        ["وضعیت خرابی", FMMS.ui.badge(fault.status)],
+        ["شدت", FMMS.ui.badge(fault.severity)],
+        ["ثبت‌کننده", reporterValue],
+        ["زمان ثبت", FMMS.ui.formatDateTime(fault.reported_at || fault.created_at)],
+        ["شناسه بازرسی", fault.inspection_id ? `<span class="mono">${fault.inspection_id}</span>` : "—"],
+        ["اعلان SAP", fault.sap_notification_number || "—"],
+      ];
+
+      const repairRows = repairOrder
+        ? [
+            ["شناسه دستور تعمیر", `<span class="mono">${FMMS.ui.escapeHtml(repairOrder.id)}</span>`],
+            ["وضعیت دستور", FMMS.ui.badge(repairOrder.status)],
+          ]
+        : [["دستور تعمیر", `<span class="text-muted">هنوز ثبت نشده است.</span>`]];
+
+      let decisionSection = "";
+      if (decisionState.reviewed) {
+        decisionSection = `<div class="modal-section"><div class="modal-section-title">تصمیم ثبت‌شده</div>${FMMS.ui.renderDl([
+          ["وضعیت", "بررسی شد"],
+          ["تصمیم", decisionState.decision],
+          ["وضعیت خودرو", vehicle ? FMMS.ui.badge(vehicle.status) : "—"],
+          ["ثبت‌کننده (نمای فعلی)", FMMS.ui.escapeHtml(reviewer)],
+        ])}</div>`;
+      }
+
+      let actionBar = "";
+      if (!decisionState.reviewed && DISTRIBUTION_ACTIONABLE.has(fault.status)) {
+        actionBar = `<div class="transport-detail-actions">
+          <p class="small text-muted mb-2">پس از بررسی جزئیات خرابی و خودرو، یکی از گزینه‌های زیر را انتخاب کنید.</p>
+          <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-fmms-success btn-sm" id="distribution-detail-usable">خودرو قابل استفاده است</button>
+            <button type="button" class="btn btn-fmms-danger btn-sm" id="distribution-detail-unusable">خودرو غیرقابل استفاده است</button>
+          </div>
+        </div>`;
+      }
+
+      let body =
+        `<div class="modal-section"><div class="modal-section-title">خودرو</div>${FMMS.ui.renderDl(vehicleRows)}</div>` +
+        `<div class="modal-section"><div class="modal-section-title">خرابی</div>${FMMS.ui.renderDl(faultRows)}</div>` +
+        `<div class="modal-section"><div class="modal-section-title">دستور تعمیر مرتبط</div>${FMMS.ui.renderDl(repairRows)}</div>` +
+        renderItemSeverityTable(fault.items) +
+        decisionSection +
+        (repairOrder && FMMS.api.capabilities.repairTimeline
+          ? `<div class="modal-section"><div class="modal-section-title">تاریخچه مراحل</div><div id="distribution-detail-timeline" class="text-muted">در حال بارگذاری…</div></div>`
+          : "") +
+        actionBar;
+
+      const titlePlate = vehicle?.plate_number || fault.code;
+      FMMS.ui.openDetailModal(`بررسی تایید توزیع · ${titlePlate}`, body);
+
+      const bindDecision = (id, usable) => {
+        document.getElementById(id)?.addEventListener("click", async (e) => {
+          const btn = e.currentTarget;
+          btn.disabled = true;
+          document.getElementById("distribution-detail-usable")?.setAttribute("disabled", "disabled");
+          document.getElementById("distribution-detail-unusable")?.setAttribute("disabled", "disabled");
+          try {
+            if (usable) {
+              await FMMS.api.closeFault(fault.id);
+              FMMS.ui.toast("خرابی بسته شد؛ خودرو قابل استفاده اعلام شد.");
+            } else {
+              const updated = await FMMS.api.deactivateVehicleForFault(fault.vehicle_id);
+              if (updated?.id) {
+                vehiclesById[updated.id] = updated;
+              } else {
+                const fresh = await FMMS.api.getVehicle(fault.vehicle_id);
+                vehiclesById[fault.vehicle_id] = fresh;
+              }
+              FMMS.ui.toast("وضعیت خودرو به «غیرفعال» تغییر کرد.");
+            }
+            hideDetailModal();
+            await renderDistribution();
+          } catch (err) {
+            FMMS.ui.toast(err.message, "error");
+            btn.disabled = false;
+            document.getElementById("distribution-detail-usable")?.removeAttribute("disabled");
+            document.getElementById("distribution-detail-unusable")?.removeAttribute("disabled");
+          }
+        });
+      };
+
+      bindDecision("distribution-detail-usable", true);
+      bindDecision("distribution-detail-unusable", false);
+
+      if (repairOrder && FMMS.api.capabilities.repairTimeline) {
+        try {
+          const events = await FMMS.api.getRepairTimeline(repairOrder.id);
+          const host = document.getElementById("distribution-detail-timeline");
+          if (host) host.innerHTML = FMMS.ui.renderTimeline(events);
+        } catch (_) {
+          const host = document.getElementById("distribution-detail-timeline");
+          if (host) host.textContent = "بارگذاری تاریخچه ممکن نشد.";
+        }
+      }
+    } catch (err) {
+      FMMS.ui.openDetailModal("بررسی تصمیم توزیع", `<div class="text-danger">${FMMS.ui.escapeHtml(err.message)}</div>`);
+      FMMS.ui.toast(err.message, "error");
+    }
   }
 
   async function showFaultDetail(faultId) {
@@ -154,11 +285,11 @@ FMMS.pages = FMMS.pages || {};
       }
 
       const body =
-        FMMS.ui.renderDl(dlRows) +
+        `<div class="modal-section"><div class="modal-section-title">اطلاعات خرابی</div>${FMMS.ui.renderDl(dlRows)}</div>` +
         FMMS.ui.renderFaultSeverityBlock(fault) +
         renderItemSeverityTable(fault.items) +
         (repairOrder && FMMS.api.capabilities.repairTimeline
-          ? `<h6 class="mt-3 mb-2">تاریخچه تعمیر</h6><div id="fault-detail-timeline" class="text-muted">در حال بارگذاری…</div>`
+          ? `<div class="modal-section"><div class="modal-section-title">تاریخچه مراحل</div><div id="fault-detail-timeline" class="text-muted">در حال بارگذاری…</div></div>`
           : "");
 
       FMMS.ui.openDetailModal(`جزئیات خرابی · ${fault.code}`, body);
@@ -314,6 +445,9 @@ FMMS.pages = FMMS.pages || {};
       tbody.querySelectorAll("tr[data-fault-id]").forEach((tr) => {
         const fault = faults.find((f) => f.id === tr.dataset.faultId);
         const v = vehiclesById[fault.vehicle_id];
+
+        tr.querySelector('[data-action="dist-detail"]')?.addEventListener("click", () => showDistributionDetail(fault.id));
+
         if (getDistributionDecision(fault, v).reviewed) return;
         if (!DISTRIBUTION_ACTIONABLE.has(fault.status)) return;
         const group = tr.querySelector(`#dist-actions-${fault.id}`);
