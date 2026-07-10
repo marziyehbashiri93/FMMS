@@ -21,12 +21,13 @@ class RepairOrderModel(BaseModel):
 
     vehicle_id = models.UUIDField(db_index=True)
     fault_id = models.UUIDField(db_index=True)
-    status = models.CharField(max_length=20, db_index=True)
+    status = models.CharField(max_length=30, db_index=True)
     # 'initiator_id' stores the domain-level "who created the order".
     # We cannot use 'created_by_id' as it is the auto-generated attname
     # of BaseModel.created_by (a ForeignKey).
     initiator_id = models.UUIDField()
     sap_order_number = models.CharField(max_length=30, blank=True, default="")
+    workshop_type = models.CharField(max_length=20, blank=True, default="")
     completed_at = models.DateTimeField(null=True, blank=True, default=None)
     # TechnicianAssignment (value object — denormalized)
     assigned_technician_id = models.UUIDField(null=True, blank=True, default=None)

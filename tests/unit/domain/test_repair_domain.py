@@ -117,6 +117,37 @@ class TestRepairOrderLifecycle:
         assert order.status == RepairOrderStatus.ASSIGNED
         assert order.assignment == assignment
 
+    def test_approve_from_created(self) -> None:
+        order = _make_order()
+        order.approve()
+        assert order.status == RepairOrderStatus.APPROVED
+
+    def test_assign_workshop_after_approval(self) -> None:
+        from apps.repair.domain.entities import WorkshopType
+
+        order = _make_order()
+        order.approve()
+        order.assign_workshop(WorkshopType.INTERNAL)
+        assert order.status == RepairOrderStatus.WORKSHOP_ASSIGNED
+        assert order.workshop_type == WorkshopType.INTERNAL
+
+    def test_cannot_assign_workshop_before_approval(self) -> None:
+        from apps.repair.domain.entities import WorkshopType
+
+        order = _make_order()
+        with pytest.raises(RepairOrderInvalidStateTransitionError):
+            order.assign_workshop(WorkshopType.EXTERNAL)
+
+    def test_assign_technician_after_workshop_assigned(self) -> None:
+        from apps.repair.domain.entities import WorkshopType
+
+        order = _make_order()
+        order.approve()
+        order.assign_workshop(WorkshopType.EXTERNAL)
+        assignment = _make_assignment()
+        order.assign_technician(assignment)
+        assert order.status == RepairOrderStatus.ASSIGNED
+
     def test_start_work(self) -> None:
         order = _make_order(status=RepairOrderStatus.ASSIGNED)
         order.start_work()

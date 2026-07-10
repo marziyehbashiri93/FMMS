@@ -4,6 +4,10 @@ from apps.repair.application.services.add_repair_activity_service import (
     AddRepairActivityService,
     AddRepairPartService,
 )
+from apps.repair.application.services.approve_repair_order_service import (
+    ApproveRepairOrderService,
+    AssignWorkshopService,
+)
 from apps.repair.application.services.assign_repair_order_service import (
     AssignRepairOrderService,
 )
@@ -26,6 +30,8 @@ from apps.repair.application.services.update_repair_status_service import (
 __all__ = [
     "CreateRepairOrderService",
     "AssignRepairOrderService",
+    "ApproveRepairOrderService",
+    "AssignWorkshopService",
     "StartRepairService",
     "CompleteRepairOrderService",
     "CancelRepairOrderService",

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
-from apps.repair.domain.entities import RepairOrderStatus
+from apps.repair.domain.entities import RepairOrderStatus, WorkshopType
 
 
 class RepairOrderCreateSerializer(serializers.Serializer):
@@ -18,6 +18,14 @@ class RepairAssignSerializer(serializers.Serializer):
     """Validate repair assignment input."""
 
     technician_id = serializers.UUIDField()
+
+
+class RepairAssignWorkshopSerializer(serializers.Serializer):
+    """Validate workshop type selection after transport approval."""
+
+    workshop_type = serializers.ChoiceField(
+        choices=[item.value for item in WorkshopType]
+    )
 
 
 class RepairCompleteSerializer(serializers.Serializer):
@@ -93,4 +101,20 @@ class RepairOrderResponseSerializer(serializers.Serializer):
     technician_id = serializers.UUIDField(allow_null=True)
     assigned_at = serializers.DateTimeField(allow_null=True)
     sap_order_number = serializers.CharField(allow_null=True)
+    workshop_type = serializers.ChoiceField(
+        choices=[item.value for item in WorkshopType], allow_null=True
+    )
     completed_at = serializers.DateTimeField(allow_null=True)
+
+
+class RepairDecisionResponseSerializer(serializers.Serializer):
+    """Serialize transport approval / workshop assignment action responses."""
+
+    id = serializers.UUIDField()
+    status = serializers.ChoiceField(choices=[item.value for item in RepairOrderStatus])
+    message = serializers.CharField()
+    workshop_type = serializers.ChoiceField(
+        choices=[item.value for item in WorkshopType],
+        allow_null=True,
+        required=False,
+    )

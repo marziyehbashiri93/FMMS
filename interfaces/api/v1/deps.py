@@ -97,6 +97,10 @@ from apps.repair.application.services.add_repair_activity_service import (
     AddRepairActivityService,
     AddRepairPartService,
 )
+from apps.repair.application.services.approve_repair_order_service import (
+    ApproveRepairOrderService,
+    AssignWorkshopService,
+)
 from apps.repair.application.services.assign_repair_order_service import (
     AssignRepairOrderService,
 )
@@ -398,6 +402,16 @@ def get_list_repair_orders_service() -> ListRepairOrdersService:
 def get_assign_repair_order_service() -> AssignRepairOrderService:
     """Return AssignRepairOrderService."""
     return AssignRepairOrderService(get_repair_order_repository())
+
+
+def get_approve_repair_order_service() -> ApproveRepairOrderService:
+    """Return ApproveRepairOrderService."""
+    return ApproveRepairOrderService(get_repair_order_repository())
+
+
+def get_assign_workshop_service() -> AssignWorkshopService:
+    """Return AssignWorkshopService."""
+    return AssignWorkshopService(get_repair_order_repository())
 
 
 def get_start_repair_service() -> StartRepairService:

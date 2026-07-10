@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 
-from apps.repair.domain.entities import RepairOrderStatus
+from apps.repair.domain.entities import RepairOrderStatus, WorkshopType
 
 
 @dataclass(frozen=True)
@@ -178,6 +178,55 @@ class RepairPartResponseDTO:
 
 
 @dataclass(frozen=True)
+class ApproveRepairOrderDTO:
+    """Input DTO for transport-supervisor repair approval.
+
+    Attributes:
+        repair_order_id: UUID of the repair order to approve.
+        request_id: Correlation ID for tracing.
+        approved_by: UUID of the supervisor/admin approving the order.
+    """
+
+    repair_order_id: uuid.UUID
+    request_id: str
+    approved_by: uuid.UUID
+
+
+@dataclass(frozen=True)
+class AssignWorkshopDTO:
+    """Input DTO for selecting internal/external workshop after approval.
+
+    Attributes:
+        repair_order_id: UUID of the approved repair order.
+        workshop_type: ``INTERNAL`` or ``EXTERNAL``.
+        request_id: Correlation ID for tracing.
+        assigned_by: UUID of the supervisor/admin selecting the workshop.
+    """
+
+    repair_order_id: uuid.UUID
+    workshop_type: WorkshopType
+    request_id: str
+    assigned_by: uuid.UUID
+
+
+@dataclass(frozen=True)
+class RepairDecisionResponseDTO:
+    """Compact response for transport approval / workshop assignment actions.
+
+    Attributes:
+        id: Repair order UUID.
+        status: Resulting lifecycle status.
+        message: Human-readable confirmation message (Persian for demo UX).
+        workshop_type: Selected workshop type when applicable.
+    """
+
+    id: uuid.UUID
+    status: RepairOrderStatus
+    message: str
+    workshop_type: WorkshopType | None = field(default=None)
+
+
+@dataclass(frozen=True)
 class RepairOrderResponseDTO:
     """Output DTO returned by all repair order read and write operations.
 
@@ -196,4 +245,5 @@ class RepairOrderResponseDTO:
     technician_id: uuid.UUID | None = field(default=None)
     assigned_at: datetime | None = field(default=None)
     sap_order_number: str | None = field(default=None)
+    workshop_type: WorkshopType | None = field(default=None)
     completed_at: datetime | None = field(default=None)

@@ -14,19 +14,23 @@ from rest_framework.viewsets import GenericViewSet
 from apps.repair.application.dto.repair_dto import (
     AddRepairActivityDTO,
     AddRepairPartDTO,
+    ApproveRepairOrderDTO,
     AssignRepairOrderDTO,
+    AssignWorkshopDTO,
     CloseRepairOrderDTO,
     CompleteRepairOrderDTO,
     CreateRepairOrderDTO,
     SyncRepairToSAPDTO,
 )
-from apps.repair.domain.entities import RepairOrderStatus
-from core.permissions import IsReadOnlyOrTechnicianOrAbove
+from apps.repair.domain.entities import RepairOrderStatus, WorkshopType
+from core.permissions import IsReadOnlyOrTechnicianOrAbove, IsSupervisorOrAbove
 from interfaces.api.v1 import deps
 from interfaces.api.v1.repair.serializers import (
     RepairActivityCreateSerializer,
     RepairAssignSerializer,
+    RepairAssignWorkshopSerializer,
     RepairCompleteSerializer,
+    RepairDecisionResponseSerializer,
     RepairOrderCreateSerializer,
     RepairOrderResponseSerializer,
     RepairPartCreateSerializer,
@@ -91,6 +95,43 @@ class RepairOrderViewSet(GenericViewSet):
             RepairOrderResponseSerializer(result).data,
             status=status.HTTP_201_CREATED,
         )
+
+    @extend_schema(request=None, responses=RepairDecisionResponseSerializer)
+    @action(detail=True, methods=["post"], permission_classes=[IsSupervisorOrAbove])
+    def approve(self, request: Request, pk: str | None = None) -> Response:
+        """Transport supervisor approves continuing the repair process."""
+        result = deps.get_approve_repair_order_service().execute(
+            ApproveRepairOrderDTO(
+                repair_order_id=uuid.UUID(str(pk)),
+                request_id=request_id_from(request),
+                approved_by=user_id_from(request),
+            )
+        )
+        return Response(RepairDecisionResponseSerializer(result).data)
+
+    @extend_schema(
+        request=RepairAssignWorkshopSerializer,
+        responses=RepairDecisionResponseSerializer,
+    )
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="assign-workshop",
+        permission_classes=[IsSupervisorOrAbove],
+    )
+    def assign_workshop(self, request: Request, pk: str | None = None) -> Response:
+        """Transport supervisor selects INTERNAL or EXTERNAL workshop."""
+        serializer = RepairAssignWorkshopSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        result = deps.get_assign_workshop_service().execute(
+            AssignWorkshopDTO(
+                repair_order_id=uuid.UUID(str(pk)),
+                workshop_type=WorkshopType(serializer.validated_data["workshop_type"]),
+                request_id=request_id_from(request),
+                assigned_by=user_id_from(request),
+            )
+        )
+        return Response(RepairDecisionResponseSerializer(result).data)
 
     @extend_schema(
         request=RepairAssignSerializer, responses=RepairOrderResponseSerializer

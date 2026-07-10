@@ -26,7 +26,9 @@ class RepairOrderStatus(StrEnum):
     """Lifecycle states of a repair order.
 
     Attributes:
-        CREATED: Order has been created and is awaiting technician assignment.
+        CREATED: Order has been created and awaits transport approval or assignment.
+        APPROVED: Transport supervisor approved continuing the repair process.
+        WORKSHOP_ASSIGNED: Workshop type (internal/external) has been selected.
         ASSIGNED: A technician has been assigned.
         IN_PROGRESS: Active repair work is underway.
         COMPLETED: All repair activities are done; order is closed successfully.
@@ -34,14 +36,38 @@ class RepairOrderStatus(StrEnum):
     """
 
     CREATED = "CREATED"
+    APPROVED = "APPROVED"
+    WORKSHOP_ASSIGNED = "WORKSHOP_ASSIGNED"
     ASSIGNED = "ASSIGNED"
     IN_PROGRESS = "IN_PROGRESS"
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"
 
 
+class WorkshopType(StrEnum):
+    """Where the repair work will be performed.
+
+    Attributes:
+        INTERNAL: Repair handled by the fleet's own workshop.
+        EXTERNAL: Repair outsourced to an external workshop.
+    """
+
+    INTERNAL = "INTERNAL"
+    EXTERNAL = "EXTERNAL"
+
+
 _ALLOWED_TRANSITIONS: dict[RepairOrderStatus, frozenset[RepairOrderStatus]] = {
     RepairOrderStatus.CREATED: frozenset(
+        {
+            RepairOrderStatus.APPROVED,
+            RepairOrderStatus.ASSIGNED,
+            RepairOrderStatus.CANCELLED,
+        }
+    ),
+    RepairOrderStatus.APPROVED: frozenset(
+        {RepairOrderStatus.WORKSHOP_ASSIGNED, RepairOrderStatus.CANCELLED}
+    ),
+    RepairOrderStatus.WORKSHOP_ASSIGNED: frozenset(
         {RepairOrderStatus.ASSIGNED, RepairOrderStatus.CANCELLED}
     ),
     RepairOrderStatus.ASSIGNED: frozenset(
@@ -61,6 +87,8 @@ _ALLOWED_TRANSITIONS: dict[RepairOrderStatus, frozenset[RepairOrderStatus]] = {
 _MUTABLE_STATUSES: frozenset[RepairOrderStatus] = frozenset(
     {
         RepairOrderStatus.CREATED,
+        RepairOrderStatus.APPROVED,
+        RepairOrderStatus.WORKSHOP_ASSIGNED,
         RepairOrderStatus.ASSIGNED,
         RepairOrderStatus.IN_PROGRESS,
     }
@@ -121,6 +149,7 @@ class RepairOrder:
         activities: List of repair activities performed.
         parts: List of spare parts consumed.
         sap_order_number: SAP PM order number after SAP sync (optional).
+        workshop_type: Internal or external workshop selection (optional).
         created_by_id: UUID of the user who created this order.
         created_at: UTC timestamp of creation.
         updated_at: UTC timestamp of the last update.
@@ -138,6 +167,7 @@ class RepairOrder:
     activities: list[RepairActivity] = field(default_factory=list)
     parts: list[RepairPart] = field(default_factory=list)
     sap_order_number: str | None = field(default=None)
+    workshop_type: WorkshopType | None = field(default=None)
     completed_at: datetime | None = field(default=None)
 
     def _assert_mutable(self, operation: str) -> None:
@@ -176,16 +206,39 @@ class RepairOrder:
     def assign_technician(self, assignment: TechnicianAssignment) -> None:
         """Assign a technician to this repair order.
 
+        Allowed from ``CREATED`` (legacy path) or ``WORKSHOP_ASSIGNED``
+        (transport-approved demo path).
+
         Args:
             assignment: The ``TechnicianAssignment`` value object.
 
         Raises:
             RepairOrderInvalidStateError: If the order is not in a mutable state.
-            RepairOrderInvalidStateTransitionError: If not in CREATED status.
+            RepairOrderInvalidStateTransitionError: If transition is not allowed.
         """
         self._assert_mutable("assign_technician")
         self.transition_to(RepairOrderStatus.ASSIGNED)
         self.assignment = assignment
+
+    def approve(self) -> None:
+        """Approve the repair order for continuation (transport supervisor).
+
+        Raises:
+            RepairOrderInvalidStateTransitionError: If not in CREATED status.
+        """
+        self.transition_to(RepairOrderStatus.APPROVED)
+
+    def assign_workshop(self, workshop_type: WorkshopType) -> None:
+        """Select internal or external workshop after transport approval.
+
+        Args:
+            workshop_type: ``INTERNAL`` or ``EXTERNAL``.
+
+        Raises:
+            RepairOrderInvalidStateTransitionError: If not in APPROVED status.
+        """
+        self.transition_to(RepairOrderStatus.WORKSHOP_ASSIGNED)
+        self.workshop_type = workshop_type
 
     def start_work(self) -> None:
         """Mark the repair order as actively in progress.

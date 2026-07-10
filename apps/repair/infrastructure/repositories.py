@@ -16,6 +16,7 @@ from apps.repair.domain.entities import (
     RepairOrder,
     RepairOrderStatus,
     RepairPart,
+    WorkshopType,
 )
 from apps.repair.domain.exceptions import RepairOrderNotFoundError
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
@@ -87,6 +88,7 @@ def _to_domain(
         activities=domain_activities,
         parts=domain_parts,
         sap_order_number=orm.sap_order_number or None,
+        workshop_type=WorkshopType(orm.workshop_type) if orm.workshop_type else None,
         completed_at=orm.completed_at,
     )
 
@@ -159,6 +161,9 @@ class DjangoRepairOrderRepository(IRepairOrderRepository):
                     "status": order.status.value,
                     "initiator_id": order.created_by_id,
                     "sap_order_number": order.sap_order_number or "",
+                    "workshop_type": (
+                        order.workshop_type.value if order.workshop_type else ""
+                    ),
                     "completed_at": order.completed_at,
                     "assigned_technician_id": (
                         order.assignment.technician_id if order.assignment else None

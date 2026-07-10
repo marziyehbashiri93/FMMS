@@ -1287,8 +1287,10 @@ N+1 query audit, final security hardening, complete README, and Phase 1 release 
 - [x] `POST /api/v1/inspections/` accepts optional `items` (template-driven checklist results)
 - [x] `POST /api/v1/inspections/{id}/submit/` FAIL → Fault + RepairOrder + `OUT_OF_SERVICE`
 - [x] PASS submit leaves vehicle `ACTIVE`
-- [x] Unit + integration tests (`test_demo_workflow_api.py`, template/vehicle sync services)
-- [x] Migration `inspection.0002_inspection_template`
+- [x] `POST /api/v1/repair-orders/{id}/approve/` — transport supervisor approval (`APPROVED`)
+- [x] `POST /api/v1/repair-orders/{id}/assign-workshop/` — INTERNAL/EXTERNAL → `WORKSHOP_ASSIGNED`
+- [x] Unit + integration tests (`test_demo_workflow_api.py`, `test_repair_approval_api.py`)
+- [x] Migrations `inspection.0002_inspection_template`, `repair.0002_workshop_type_and_status_length`
 
 **Validation:** 593 tests PASS; black/isort/ruff PASS; mypy on changed modules PASS.
 
