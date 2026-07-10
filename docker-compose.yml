@@ -12,15 +12,15 @@ services:
     container_name: fmms_db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: fmms
-      POSTGRES_USER: fmms
-      POSTGRES_PASSWORD: fmms
+      POSTGRES_DB: ${POSTGRES_DB:-fmms}
+      POSTGRES_USER: ${POSTGRES_USER:-fmms}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fmms}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U fmms -d fmms"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fmms} -d ${POSTGRES_DB:-fmms}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -52,7 +52,11 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgres://fmms:fmms@db:5432/fmms
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-fmms}
+      POSTGRES_USER: ${POSTGRES_USER:-fmms}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fmms}
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/1
       DJANGO_SETTINGS_MODULE: config.settings.development
@@ -66,7 +70,8 @@ services:
       redis:
         condition: service_healthy
     command: >
-      sh -c "python manage.py migrate &&
+      sh -c "python manage.py ensure_database &&
+             python manage.py migrate &&
              python manage.py runserver 0.0.0.0:8000"
 
   # ── Celery Worker ───────────────────────────────────────────────────────────
@@ -80,7 +85,11 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgres://fmms:fmms@db:5432/fmms
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-fmms}
+      POSTGRES_USER: ${POSTGRES_USER:-fmms}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fmms}
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/1
       DJANGO_SETTINGS_MODULE: config.settings.development
@@ -91,7 +100,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: celery -A infrastructure.messaging.celery_app worker --loglevel=info
+    command: >
+      sh -c "python manage.py ensure_database &&
+             celery -A infrastructure.messaging.celery_app worker --loglevel=info"
     profiles:
       - celery
 
@@ -106,7 +117,11 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgres://fmms:fmms@db:5432/fmms
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-fmms}
+      POSTGRES_USER: ${POSTGRES_USER:-fmms}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fmms}
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/1
       DJANGO_SETTINGS_MODULE: config.settings.development
@@ -117,7 +132,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: celery -A infrastructure.messaging.celery_app beat --loglevel=info
+    command: >
+      sh -c "python manage.py ensure_database &&
+             celery -A infrastructure.messaging.celery_app beat --loglevel=info"
     profiles:
       - celery
 

@@ -11,12 +11,12 @@
 |-------------------------|--------------------------------------------------------------------|
 | **Current Phase**       | Implementation — Phase 1                                           |
 | **Current Milestone**   | M9 — Testing Completeness & Production Hardening (Complete)        |
-| **Last Commit**         | `9a7a7f9` — fix(core): standardize domain exception handling and API error mapping |
+| **Last Commit**         | `fix(database): improve postgres configuration and add database bootstrap` |
 | **Completed**           | M0 ✓ … M9 ✓ — 10 / 10 implementation milestones (M10 deferred)     |
-| **In Progress**         | — (M10 not started)                                                |
+| **In Progress**         | — (M10 not started; DB config fix applied post-M9)                  |
 | **Blocked**             | —                                                                  |
 | **Last Updated**        | 2026-07-10                                                         |
-| **Validation Status**   | DEFECT-M9-01/02 FIXED — 569/569 tests; coverage 88.05%; black/isort/ruff PASS; mypy baseline unchanged |
+| **Validation Status**   | Post-M9 DB bootstrap — 576/576 tests; black/isort/ruff PASS; mypy baseline |
 
 ---
 
@@ -1229,4 +1229,15 @@ N+1 query audit, final security hardening, complete README, and Phase 1 release 
 
 ---
 
-*Last updated: 2026-07-10 | Updated by: Lead Backend Architect | Validation: DEFECT-M9-01/02 FIXED — 569/569; cov 88.05%; M10 not started*
+### ADR-022 — Discrete PostgreSQL Env Vars + Idempotent DB Bootstrap
+
+| Field        | Detail |
+|--------------|--------|
+| **Decision** | Replace `DATABASE_URL` with `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_HOST` / `POSTGRES_PORT`. Bootstrap via `infrastructure/database/bootstrap.py` and `manage.py ensure_database` creates the DB if missing (never drops). Wired in Compose, Makefile migrate, WSGI/ASGI. |
+| **Reason**   | Avoid embedded credentials in URLs; make DB initialization part of the backend deployment workflow. |
+| **Impact**   | Local/prod config uses discrete env vars; startup is idempotent for missing databases. |
+| **Date**     | 2026-07-10 |
+
+---
+
+*Last updated: 2026-07-10 | Updated by: Lead Backend Architect | Validation: DB bootstrap fix — 576/576; M10 not started*

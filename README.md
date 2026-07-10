@@ -211,13 +211,25 @@ Key variables:
 ```env
 DJANGO_SETTINGS_MODULE=config.settings.development
 SECRET_KEY=<django-secret-key>
-DATABASE_URL=postgres://user:password@localhost:5432/fmms
+POSTGRES_DB=fmms
+POSTGRES_USER=fmms
+POSTGRES_PASSWORD=fmms
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
 REDIS_URL=redis://localhost:6379/0
-SAP_HOST=https://your-sap-host
-SAP_CLIENT=100
-SAP_USER=your-sap-user
-SAP_PASSWORD=your-sap-password
+SAP_USE_MOCK=True
 ```
+
+Database bootstrap (idempotent):
+
+```bash
+python manage.py ensure_database
+python manage.py migrate
+```
+
+`ensure_database` creates the configured PostgreSQL database when missing and
+is a no-op when it already exists. Docker Compose and WSGI/ASGI startup run
+this automatically before migrations / serving traffic.
 
 ---
 
