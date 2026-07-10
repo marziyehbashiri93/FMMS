@@ -43,6 +43,19 @@ class IFaultRepository(ABC):
         """
 
     @abstractmethod
+    def has_open_fault_for_vehicle(self, vehicle_id: uuid.UUID) -> bool:
+        """Return True if the vehicle has any non-terminal fault.
+
+        Open faults are those whose status is not ``CLOSED``.
+
+        Args:
+            vehicle_id: UUID of the vehicle.
+
+        Returns:
+            ``True`` when at least one open fault exists for the vehicle.
+        """
+
+    @abstractmethod
     def list_open_by_severity(self, severity: FaultSeverity) -> list[Fault]:
         """Return all open faults with a given severity.
 

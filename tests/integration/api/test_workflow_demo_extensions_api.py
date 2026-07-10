@@ -108,6 +108,56 @@ class TestVehicleActivateAPI:
         )
         assert response.status_code == 403
 
+    def test_activate_closes_fault_after_completed_repair(
+        self, authenticated_client: APIClient, supervisor_client: APIClient
+    ) -> None:
+        """Completed repair + vehicle activation should close the linked fault."""
+        vehicle, order = _create_fault_and_repair(
+            authenticated_client, "12ACT004", "1HGCM82633A004404"
+        )
+        order_id = order["id"]
+        fault_id = order["fault_id"]
+
+        approved = authenticated_client.post(
+            f"/api/v1/repair-orders/{order_id}/approve/", {}, format="json"
+        )
+        assert approved.status_code == 200, approved.data
+        assigned = authenticated_client.post(
+            f"/api/v1/repair-orders/{order_id}/assign-workshop/",
+            {"workshop_type": "INTERNAL"},
+            format="json",
+        )
+        assert assigned.status_code == 200, assigned.data
+        started = authenticated_client.post(
+            f"/api/v1/repair-orders/{order_id}/start/", {}, format="json"
+        )
+        assert started.status_code == 200, started.data
+        completed = authenticated_client.post(
+            f"/api/v1/repair-orders/{order_id}/complete/",
+            {"completed_at": datetime.now(tz=UTC).isoformat()},
+            format="json",
+        )
+        assert completed.status_code == 200, completed.data
+
+        open_fault = authenticated_client.get(f"/api/v1/faults/{fault_id}/")
+        assert open_fault.status_code == 200
+        assert open_fault.data["status"] == "OPEN"
+
+        deactivated = authenticated_client.post(
+            f"/api/v1/vehicles/{vehicle['id']}/deactivate/", {}, format="json"
+        )
+        assert deactivated.status_code == 200
+
+        activated = supervisor_client.post(
+            f"/api/v1/vehicles/{vehicle['id']}/activate/", {}, format="json"
+        )
+        assert activated.status_code == 200, activated.data
+        assert activated.data["status"] == VehicleStatus.ACTIVE.value
+
+        closed_fault = authenticated_client.get(f"/api/v1/faults/{fault_id}/")
+        assert closed_fault.status_code == 200
+        assert closed_fault.data["status"] == "CLOSED"
+
 
 class TestFaultCreatedByAPI:
     """Cover created_by enrichment on fault responses."""
@@ -177,6 +227,7 @@ class TestInspectionHistoryAPI:
                             "description": "Seat belt",
                             "result": result,
                             "notes": "Broken" if result == "FAIL" else "",
+                            **({"severity": "MEDIUM"} if result == "FAIL" else {}),
                         }
                     ],
                 },

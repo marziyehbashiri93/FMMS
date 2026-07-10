@@ -68,6 +68,17 @@ class IRepairOrderRepository(ABC):
         """
 
     @abstractmethod
+    def has_open_repair_order_for_vehicle(self, vehicle_id: uuid.UUID) -> bool:
+        """Return True when the vehicle has any non-terminal repair order.
+
+        Args:
+            vehicle_id: UUID of the vehicle.
+
+        Returns:
+            ``True`` when at least one open repair order exists for the vehicle.
+        """
+
+    @abstractmethod
     def save(self, order: RepairOrder) -> RepairOrder:
         """Persist a new or updated repair order aggregate.
 

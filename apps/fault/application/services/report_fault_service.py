@@ -21,9 +21,11 @@ from apps.fault.application.dto.fault_dto import (
 from apps.fault.domain.entities import Fault, FaultStatus
 from apps.fault.domain.interfaces.fault_repository import IFaultRepository
 from apps.fault.domain.value_objects import FaultCode, FaultDescription
+from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
 from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
+from core.workflow import assert_vehicle_has_no_open_flow
 
 logger = get_structured_logger("fault", __name__)
 
@@ -71,6 +73,8 @@ class ReportFaultService:
         fault_repository: Concrete ``IFaultRepository``.
         vehicle_repository: Concrete ``IVehicleRepository`` for cross-domain
             vehicle existence check.
+        repair_order_repository: Used to enforce one open fault/repair flow
+            per vehicle.
         profile_reader: Optional resolver for ``created_by`` enrichment.
     """
 
@@ -78,10 +82,12 @@ class ReportFaultService:
         self,
         fault_repository: IFaultRepository,
         vehicle_repository: IVehicleRepository,
+        repair_order_repository: IRepairOrderRepository,
         profile_reader: IUserProfileReader | None = None,
     ) -> None:
         self._fault_repo = fault_repository
         self._vehicle_repo = vehicle_repository
+        self._repair_repo = repair_order_repository
         self._profile_reader = profile_reader
 
     def execute(self, dto: ReportFaultDTO) -> FaultResponseDTO:
@@ -95,6 +101,7 @@ class ReportFaultService:
 
         Raises:
             FMMSNotFoundError: If no vehicle with ``dto.vehicle_id`` exists.
+            FMMSStateError: If the vehicle already has an open fault or repair flow.
             ValueError: If ``FaultCode`` or ``FaultDescription`` validation fails.
         """
         logger.info(
@@ -113,6 +120,12 @@ class ReportFaultService:
             lambda: self._vehicle_repo.get_by_id(dto.vehicle_id),
             message=f"Vehicle '{dto.vehicle_id}' not found.",
             details={"vehicle_id": str(dto.vehicle_id)},
+        )
+
+        assert_vehicle_has_no_open_flow(
+            dto.vehicle_id,
+            fault_repository=self._fault_repo,
+            repair_order_repository=self._repair_repo,
         )
 
         now = datetime.now(tz=UTC)

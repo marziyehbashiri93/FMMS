@@ -16,12 +16,22 @@ from datetime import UTC, datetime
 
 import pytest
 
+from apps.fault.domain.entities import Fault, FaultStatus
+from apps.fault.domain.exceptions import FaultNotFoundError
+from apps.fault.domain.interfaces.fault_repository import IFaultRepository
+from apps.fault.domain.value_objects import FaultCode, FaultDescription, FaultSeverity
+from apps.repair.domain.entities import RepairOrder, RepairOrderStatus
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
+from apps.repair.domain.value_objects import TechnicianAssignment
 from apps.vehicle.application.dto.vehicle_dto import (
+    ActivateVehicleDTO,
     CreateVehicleDTO,
     DeactivateVehicleDTO,
     UpdateVehicleDTO,
     VehicleResponseDTO,
+)
+from apps.vehicle.application.services.activate_vehicle_service import (
+    ActivateVehicleService,
 )
 from apps.vehicle.application.services.create_vehicle_service import (
     CreateVehicleService,
@@ -124,28 +134,85 @@ class FakeVehicleRepository(IVehicleRepository):
 class FakeRepairOrderRepository(IRepairOrderRepository):
     """In-memory repair order stub with configurable active order list."""
 
-    def __init__(self, active_orders: list | None = None) -> None:
-        self._active: dict[uuid.UUID, list] = {}
-        for order in active_orders or []:
-            self._active.setdefault(order.vehicle_id, []).append(order)
+    def __init__(self, initial: list[RepairOrder] | None = None) -> None:
+        self._store: dict[uuid.UUID, RepairOrder] = {
+            order.id: order for order in (initial or [])
+        }
 
     def get_by_id(self, order_id: uuid.UUID):  # type: ignore[override]
-        return None
+        return self._store.get(order_id)
 
-    def list_by_vehicle(self, vehicle_id: uuid.UUID, status=None):  # type: ignore[override]
-        return []
+    def list_by_vehicle(
+        self,
+        vehicle_id: uuid.UUID,
+        status: RepairOrderStatus | None = None,
+    ) -> list[RepairOrder]:
+        orders = [o for o in self._store.values() if o.vehicle_id == vehicle_id]
+        if status is not None:
+            orders = [o for o in orders if o.status == status]
+        return orders
 
     def list_by_fault(self, fault_id: uuid.UUID):  # type: ignore[override]
-        return []
+        return [o for o in self._store.values() if o.fault_id == fault_id]
 
     def list_active_by_vehicle(self, vehicle_id: uuid.UUID) -> list:
-        return self._active.get(vehicle_id, [])
+        return [o for o in self._store.values() if o.vehicle_id == vehicle_id and o.is_active]
+
+    def has_open_repair_order_for_vehicle(self, vehicle_id: uuid.UUID) -> bool:
+        return bool(self.list_active_by_vehicle(vehicle_id))
 
     def save(self, order):  # type: ignore[override]
+        self._store[order.id] = order
         return order
 
     def delete(self, order_id: uuid.UUID) -> None:
-        pass
+        self._store.pop(order_id, None)
+
+
+class FakeFaultRepository(IFaultRepository):
+    """In-memory fault repository stub."""
+
+    def __init__(self, initial: list[Fault] | None = None) -> None:
+        self._store: dict[uuid.UUID, Fault] = {f.id: f for f in (initial or [])}
+
+    def get_by_id(self, fault_id: uuid.UUID) -> Fault:
+        fault = self._store.get(fault_id)
+        if fault is None:
+            raise FaultNotFoundError(fault_id)
+        return fault
+
+    def list_by_vehicle(
+        self,
+        vehicle_id: uuid.UUID,
+        status: FaultStatus | None = None,
+    ) -> list[Fault]:
+        faults = [f for f in self._store.values() if f.vehicle_id == vehicle_id]
+        if status is not None:
+            faults = [f for f in faults if f.status == status]
+        return faults
+
+    def list_open_by_severity(self, severity: FaultSeverity) -> list[Fault]:
+        return [
+            f
+            for f in self._store.values()
+            if f.severity == severity and f.status != FaultStatus.CLOSED
+        ]
+
+    def list_by_inspection(self, inspection_id: uuid.UUID) -> list[Fault]:
+        return [f for f in self._store.values() if f.inspection_id == inspection_id]
+
+    def has_open_fault_for_vehicle(self, vehicle_id: uuid.UUID) -> bool:
+        return any(
+            f.vehicle_id == vehicle_id and f.status != FaultStatus.CLOSED
+            for f in self._store.values()
+        )
+
+    def save(self, fault: Fault) -> Fault:
+        self._store[fault.id] = fault
+        return fault
+
+    def delete(self, fault_id: uuid.UUID) -> None:
+        self._store.pop(fault_id, None)
 
 
 class FakeSAPEquipmentPort(ISAPEquipmentPort):
@@ -519,3 +586,141 @@ class TestSyncVehiclesFromSAPService:
         assert second.created == 0
         assert second.updated == 1
         assert len(repo.list_active()) == 1
+
+
+# ---------------------------------------------------------------------------
+# ActivateVehicleService
+# ---------------------------------------------------------------------------
+
+
+def _make_fault(
+    vehicle_id: uuid.UUID,
+    *,
+    status: FaultStatus = FaultStatus.OPEN,
+) -> Fault:
+    now = datetime.now(tz=UTC)
+    return Fault(
+        id=uuid.uuid4(),
+        vehicle_id=vehicle_id,
+        code=FaultCode("BRK-01"),
+        description=FaultDescription("Brake pad wear"),
+        severity=FaultSeverity.MEDIUM,
+        status=status,
+        reported_by_id=uuid.uuid4(),
+        reported_at=now,
+        created_at=now,
+        updated_at=now,
+    )
+
+
+def _make_completed_order(*, vehicle_id: uuid.UUID, fault_id: uuid.UUID) -> RepairOrder:
+    now = datetime.now(tz=UTC)
+    order = RepairOrder(
+        id=uuid.uuid4(),
+        vehicle_id=vehicle_id,
+        fault_id=fault_id,
+        status=RepairOrderStatus.CREATED,
+        created_by_id=uuid.uuid4(),
+        created_at=now,
+        updated_at=now,
+    )
+    order.assign_technician(
+        TechnicianAssignment(technician_id=uuid.uuid4(), assigned_at=now)
+    )
+    order.start_work()
+    order.complete(completed_at=now)
+    return order
+
+
+class TestActivateVehicleService:
+    def _service(
+        self,
+        vehicle: Vehicle,
+        *,
+        repair_orders: list[RepairOrder] | None = None,
+        faults: list[Fault] | None = None,
+    ) -> ActivateVehicleService:
+        return ActivateVehicleService(
+            vehicle_repository=FakeVehicleRepository(initial=[vehicle]),
+            repair_order_repository=FakeRepairOrderRepository(repair_orders),
+            fault_repository=FakeFaultRepository(faults),
+        )
+
+    def _dto(self, vehicle_id: uuid.UUID) -> ActivateVehicleDTO:
+        return ActivateVehicleDTO(
+            vehicle_id=vehicle_id,
+            request_id="req-activate",
+            requested_by=uuid.uuid4(),
+        )
+
+    def test_closes_open_fault_linked_to_completed_repair(self) -> None:
+        vehicle = _make_vehicle(status=VehicleStatus.INACTIVE)
+        fault = _make_fault(vehicle.id, status=FaultStatus.OPEN)
+        order = _make_completed_order(vehicle_id=vehicle.id, fault_id=fault.id)
+        fault_repo = FakeFaultRepository([fault])
+        service = ActivateVehicleService(
+            FakeVehicleRepository([vehicle]),
+            FakeRepairOrderRepository([order]),
+            fault_repo,
+        )
+
+        result = service.execute(self._dto(vehicle.id))
+
+        assert result.status == VehicleStatus.ACTIVE
+        assert fault_repo.get_by_id(fault.id).status == FaultStatus.CLOSED
+
+    def test_skips_already_closed_fault_idempotently(self) -> None:
+        vehicle = _make_vehicle(status=VehicleStatus.INACTIVE)
+        fault = _make_fault(vehicle.id, status=FaultStatus.CLOSED)
+        order = _make_completed_order(vehicle_id=vehicle.id, fault_id=fault.id)
+        fault_repo = FakeFaultRepository([fault])
+        service = self._service(vehicle, repair_orders=[order], faults=[fault])
+
+        result = service.execute(self._dto(vehicle.id))
+
+        assert result.status == VehicleStatus.ACTIVE
+        assert fault_repo.get_by_id(fault.id).status == FaultStatus.CLOSED
+
+    def test_closes_assigned_fault_via_in_repair_transition(self) -> None:
+        vehicle = _make_vehicle(status=VehicleStatus.INACTIVE)
+        fault = _make_fault(vehicle.id, status=FaultStatus.ASSIGNED)
+        order = _make_completed_order(vehicle_id=vehicle.id, fault_id=fault.id)
+        fault_repo = FakeFaultRepository([fault])
+        service = self._service(vehicle, repair_orders=[order], faults=[fault])
+
+        service.execute(self._dto(vehicle.id))
+
+        assert fault_repo.get_by_id(fault.id).status == FaultStatus.CLOSED
+
+    def test_raises_conflict_when_active_repair_orders_exist(self) -> None:
+        vehicle = _make_vehicle(status=VehicleStatus.INACTIVE)
+        fault = _make_fault(vehicle.id)
+        active_order = RepairOrder(
+            id=uuid.uuid4(),
+            vehicle_id=vehicle.id,
+            fault_id=fault.id,
+            status=RepairOrderStatus.IN_PROGRESS,
+            created_by_id=uuid.uuid4(),
+            created_at=datetime.now(tz=UTC),
+            updated_at=datetime.now(tz=UTC),
+        )
+        service = self._service(
+            vehicle,
+            repair_orders=[active_order],
+            faults=[fault],
+        )
+
+        with pytest.raises(FMMSConflictError):
+            service.execute(self._dto(vehicle.id))
+
+    def test_returns_early_when_vehicle_already_active(self) -> None:
+        vehicle = _make_vehicle(status=VehicleStatus.ACTIVE)
+        fault = _make_fault(vehicle.id, status=FaultStatus.OPEN)
+        order = _make_completed_order(vehicle_id=vehicle.id, fault_id=fault.id)
+        fault_repo = FakeFaultRepository([fault])
+        service = self._service(vehicle, repair_orders=[order], faults=[fault])
+
+        result = service.execute(self._dto(vehicle.id))
+
+        assert result.status == VehicleStatus.ACTIVE
+        assert fault_repo.get_by_id(fault.id).status == FaultStatus.OPEN

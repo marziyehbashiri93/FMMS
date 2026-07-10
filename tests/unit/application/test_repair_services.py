@@ -228,6 +228,9 @@ class FakeRepairRepository(IRepairOrderRepository):
             if o.vehicle_id == vehicle_id and o.is_active
         ]
 
+    def has_open_repair_order_for_vehicle(self, vehicle_id: uuid.UUID) -> bool:
+        return bool(self.list_active_by_vehicle(vehicle_id))
+
     def save(self, order: RepairOrder) -> RepairOrder:
         self._store[order.id] = order
         return order
@@ -293,6 +296,9 @@ class FakeFaultRepository(IFaultRepository):
 
     def list_by_inspection(self, inspection_id: uuid.UUID) -> list[Fault]:
         return []
+
+    def has_open_fault_for_vehicle(self, vehicle_id: uuid.UUID) -> bool:
+        return False
 
     def save(self, fault: Fault) -> Fault:
         self._store[fault.id] = fault

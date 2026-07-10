@@ -189,6 +189,9 @@ class FakeRepairRepository(IRepairOrderRepository):
     def list_active_by_vehicle(self, vehicle_id: uuid.UUID) -> list[RepairOrder]:
         return []
 
+    def has_open_repair_order_for_vehicle(self, vehicle_id: uuid.UUID) -> bool:
+        return False
+
     def save(self, order: RepairOrder) -> RepairOrder:
         self._store[order.id] = order
         return order

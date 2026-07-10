@@ -145,6 +145,14 @@ class DjangoFaultRepository(IFaultRepository):
         faults = [_to_domain(orm) for orm in qs]
         return self._attach_items(faults)
 
+    def has_open_fault_for_vehicle(self, vehicle_id: uuid.UUID) -> bool:
+        """Return True when the vehicle has any fault that is not CLOSED."""
+        return (
+            FaultModel.objects.filter(vehicle_id=vehicle_id, is_deleted=False)
+            .exclude(status=FaultStatus.CLOSED.value)
+            .exists()
+        )
+
     def list_open_by_severity(self, severity: FaultSeverity) -> list[Fault]:
         """Return all open (not CLOSED) faults with the given severity."""
         qs = FaultModel.objects.filter(

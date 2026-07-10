@@ -273,6 +273,7 @@ def get_activate_vehicle_service() -> ActivateVehicleService:
     return ActivateVehicleService(
         get_vehicle_repository(),
         get_repair_order_repository(),
+        get_fault_repository(),
     )
 
 
@@ -390,6 +391,7 @@ def get_report_fault_service() -> ReportFaultService:
     return ReportFaultService(
         get_fault_repository(),
         get_vehicle_repository(),
+        get_repair_order_repository(),
         get_user_profile_reader(),
     )
 

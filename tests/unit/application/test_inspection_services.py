@@ -15,7 +15,7 @@ import pytest
 
 from apps.fault.domain.entities import Fault, FaultStatus
 from apps.fault.domain.interfaces.fault_repository import IFaultRepository
-from apps.fault.domain.value_objects import FaultSeverity
+from apps.fault.domain.value_objects import FaultCode, FaultDescription, FaultSeverity
 from apps.inspection.application.dto.inspection_dto import (
     AddInspectionItemDTO,
     CreateInspectionDTO,
@@ -54,7 +54,8 @@ from apps.repair.domain.interfaces.repair_repository import IRepairOrderReposito
 from apps.vehicle.domain.entities import Vehicle, VehicleCategory, VehicleStatus
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
 from apps.vehicle.domain.value_objects import VIN, PlateNumber, SAPEquipmentNumber
-from core.exceptions.base_exception import FMMSNotFoundError
+from core.exceptions.base_exception import FMMSNotFoundError, FMMSStateError
+from core.workflow import VEHICLE_OPEN_FLOW_ERROR_CODE, VEHICLE_OPEN_FLOW_MESSAGE
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -89,6 +90,35 @@ def _make_inspection(
         inspected_at=datetime.now(tz=UTC),
         created_at=datetime.now(tz=UTC),
         updated_at=datetime.now(tz=UTC),
+    )
+
+
+def _make_open_fault(vehicle_id: uuid.UUID) -> Fault:
+    now = datetime.now(tz=UTC)
+    return Fault(
+        id=uuid.uuid4(),
+        vehicle_id=vehicle_id,
+        code=FaultCode("INSP-FAIL"),
+        description=FaultDescription("Existing open fault"),
+        severity=FaultSeverity.MEDIUM,
+        status=FaultStatus.OPEN,
+        reported_by_id=uuid.uuid4(),
+        reported_at=now,
+        created_at=now,
+        updated_at=now,
+    )
+
+
+def _make_open_repair_order(vehicle_id: uuid.UUID) -> RepairOrder:
+    now = datetime.now(tz=UTC)
+    return RepairOrder(
+        id=uuid.uuid4(),
+        vehicle_id=vehicle_id,
+        fault_id=uuid.uuid4(),
+        status=RepairOrderStatus.CREATED,
+        created_by_id=uuid.uuid4(),
+        created_at=now,
+        updated_at=now,
     )
 
 
@@ -178,6 +208,12 @@ class FakeFaultRepository(IFaultRepository):
     def list_by_inspection(self, inspection_id: uuid.UUID) -> list[Fault]:
         return [f for f in self.saved if f.inspection_id == inspection_id]
 
+    def has_open_fault_for_vehicle(self, vehicle_id: uuid.UUID) -> bool:
+        return any(
+            f.vehicle_id == vehicle_id and f.status != FaultStatus.CLOSED
+            for f in self.saved
+        )
+
     def save(self, fault: Fault) -> Fault:
         self.saved.append(fault)
         return fault
@@ -209,6 +245,9 @@ class FakeRepairOrderRepository(IRepairOrderRepository):
             and o.status
             not in {RepairOrderStatus.COMPLETED, RepairOrderStatus.CANCELLED}
         ]
+
+    def has_open_repair_order_for_vehicle(self, vehicle_id: uuid.UUID) -> bool:
+        return bool(self.list_active_by_vehicle(vehicle_id))
 
     def save(self, order: RepairOrder) -> RepairOrder:
         self.saved.append(order)
@@ -331,6 +370,8 @@ class TestSubmitInspectionService:
         self,
         inspections: list[Inspection] | None = None,
         vehicles: list[Vehicle] | None = None,
+        faults: list[Fault] | None = None,
+        repair_orders: list[RepairOrder] | None = None,
     ) -> tuple[
         SubmitInspectionService,
         FakeFaultRepository,
@@ -338,7 +379,11 @@ class TestSubmitInspectionService:
         FakeVehicleRepository,
     ]:
         fault_repo = FakeFaultRepository()
+        for fault in faults or []:
+            fault_repo.saved.append(fault)
         repair_repo = FakeRepairOrderRepository()
+        for order in repair_orders or []:
+            repair_repo.saved.append(order)
         vehicle_repo = FakeVehicleRepository(initial=vehicles or [])
         service = SubmitInspectionService(
             inspection_repository=FakeInspectionRepository(initial=inspections or []),
@@ -470,6 +515,41 @@ class TestSubmitInspectionService:
 
         with pytest.raises(InspectionItemRequiredError):
             service.execute(self._dto(inspection.id))
+
+    def test_raises_when_vehicle_has_open_fault(self) -> None:
+        vehicle = _make_vehicle()
+        inspection = _make_inspection(vehicle_id=vehicle.id)
+        inspection.items.append(_make_fail_item("Brakes", "Brake fluid low"))
+        open_fault = _make_open_fault(vehicle.id)
+        service, _, _, _ = self._service(
+            inspections=[inspection],
+            vehicles=[vehicle],
+            faults=[open_fault],
+        )
+
+        with pytest.raises(FMMSStateError) as exc_info:
+            service.execute(self._dto(inspection.id))
+
+        assert exc_info.value.error_code == VEHICLE_OPEN_FLOW_ERROR_CODE
+        assert exc_info.value.message == VEHICLE_OPEN_FLOW_MESSAGE
+        assert inspection.status == InspectionStatus.DRAFT
+
+    def test_raises_when_vehicle_has_open_repair_order(self) -> None:
+        vehicle = _make_vehicle()
+        inspection = _make_inspection(vehicle_id=vehicle.id)
+        inspection.items.append(_make_fail_item("Brakes", "Brake fluid low"))
+        open_order = _make_open_repair_order(vehicle.id)
+        service, fault_repo, _, _ = self._service(
+            inspections=[inspection],
+            vehicles=[vehicle],
+            repair_orders=[open_order],
+        )
+
+        with pytest.raises(FMMSStateError):
+            service.execute(self._dto(inspection.id))
+
+        assert len(fault_repo.saved) == 0
+        assert inspection.status == InspectionStatus.DRAFT
 
 
 # ---------------------------------------------------------------------------

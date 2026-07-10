@@ -38,6 +38,7 @@ from apps.repair.domain.entities import RepairOrder, RepairOrderStatus
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
 from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
+from core.workflow import assert_vehicle_has_no_open_flow
 
 logger = get_structured_logger("inspection", __name__)
 
@@ -100,6 +101,7 @@ class SubmitInspectionService:
             FMMSNotFoundError: If inspection does not exist.
             InspectionItemRequiredError: If the inspection has no items.
             InspectionInvalidStateTransitionError: If not in DRAFT status.
+            FMMSStateError: If the vehicle already has an open fault or repair flow.
         """
         logger.info(
             "Submitting inspection",
@@ -118,14 +120,21 @@ class SubmitInspectionService:
             details={"inspection_id": str(dto.inspection_id)},
         )
 
-        inspection.submit()
-        now = datetime.now(tz=UTC)
-        inspection.updated_at = now
-
         failed_items = inspection.failed_items()
         faults_created = 0
         fault_items_created = 0
         repairs_created = 0
+
+        if failed_items:
+            assert_vehicle_has_no_open_flow(
+                inspection.vehicle_id,
+                fault_repository=self._fault_repo,
+                repair_order_repository=self._repair_repo,
+            )
+
+        inspection.submit()
+        now = datetime.now(tz=UTC)
+        inspection.updated_at = now
 
         if failed_items:
             fault = _build_fault_from_failed_items(

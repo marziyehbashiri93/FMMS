@@ -150,6 +150,15 @@ class DjangoRepairOrderRepository(IRepairOrderRepository):
             for orm in qs
         ]
 
+    def has_open_repair_order_for_vehicle(self, vehicle_id: uuid.UUID) -> bool:
+        """Return True when the vehicle has any non-terminal repair order."""
+        terminal = [s.value for s in _TERMINAL_STATUSES]
+        return (
+            RepairOrderModel.objects.filter(vehicle_id=vehicle_id, is_deleted=False)
+            .exclude(status__in=terminal)
+            .exists()
+        )
+
     def save(self, order: RepairOrder) -> RepairOrder:
         """Atomically persist the repair order aggregate and all child rows."""
         with transaction.atomic():

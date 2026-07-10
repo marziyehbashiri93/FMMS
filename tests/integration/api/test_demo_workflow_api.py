@@ -142,6 +142,7 @@ class TestDriverInspectionWorkflowAPI:
                         "description": "Front light",
                         "result": "FAIL",
                         "notes": "Broken",
+                        "severity": "MEDIUM",
                     }
                 ],
             },
@@ -186,6 +187,7 @@ class TestDriverInspectionWorkflowAPI:
                         "description": "Front light",
                         "result": "FAIL",
                         "notes": "Broken",
+                        "severity": "MEDIUM",
                     }
                 ],
             },
@@ -229,12 +231,14 @@ class TestDriverInspectionWorkflowAPI:
                         "description": "Front light",
                         "result": "FAIL",
                         "notes": "Broken",
+                        "severity": "MEDIUM",
                     },
                     {
                         "category": "COOLING",
                         "description": "Refrigerator",
                         "result": "FAIL",
                         "notes": "Cooling failure",
+                        "severity": "HIGH",
                     },
                 ],
             },
