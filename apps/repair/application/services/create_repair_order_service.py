@@ -17,7 +17,17 @@ from apps.repair.application.dto.repair_dto import (
     CreateRepairOrderDTO,
     RepairOrderResponseDTO,
 )
-from apps.repair.domain.entities import RepairOrder, RepairOrderStatus
+from apps.repair.application.services._timeline_helper import (
+    record_repair_timeline_event,
+)
+from apps.repair.application.services.repair_order_timeline_service import (
+    RecordRepairOrderEventService,
+)
+from apps.repair.domain.entities import (
+    RepairOrder,
+    RepairOrderEventType,
+    RepairOrderStatus,
+)
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
 from core.exceptions.base_exception import FMMSConflictError
@@ -87,10 +97,12 @@ class CreateRepairOrderService:
         repair_order_repository: IRepairOrderRepository,
         vehicle_repository: IVehicleRepository,
         fault_repository: IFaultRepository,
+        event_recorder: RecordRepairOrderEventService | None = None,
     ) -> None:
         self._repair_repo = repair_order_repository
         self._vehicle_repo = vehicle_repository
         self._fault_repo = fault_repository
+        self._event_recorder = event_recorder
 
     def execute(self, dto: CreateRepairOrderDTO) -> RepairOrderResponseDTO:
         """Create and persist a new repair order in CREATED status.
@@ -154,6 +166,14 @@ class CreateRepairOrderService:
         )
 
         saved = self._repair_repo.save(order)
+        record_repair_timeline_event(
+            self._event_recorder,
+            saved.id,
+            RepairOrderEventType.FAULT_CREATED,
+            "خرابی ثبت شد و دستور تعمیر ایجاد گردید.",
+            created_by_id=dto.created_by,
+            request_id=dto.request_id,
+        )
 
         logger.info(
             "Repair order created successfully",

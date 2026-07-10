@@ -68,7 +68,11 @@ _ALLOWED_TRANSITIONS: dict[RepairOrderStatus, frozenset[RepairOrderStatus]] = {
         {RepairOrderStatus.WORKSHOP_ASSIGNED, RepairOrderStatus.CANCELLED}
     ),
     RepairOrderStatus.WORKSHOP_ASSIGNED: frozenset(
-        {RepairOrderStatus.ASSIGNED, RepairOrderStatus.CANCELLED}
+        {
+            RepairOrderStatus.ASSIGNED,
+            RepairOrderStatus.IN_PROGRESS,
+            RepairOrderStatus.CANCELLED,
+        }
     ),
     RepairOrderStatus.ASSIGNED: frozenset(
         {
@@ -243,9 +247,20 @@ class RepairOrder:
     def start_work(self) -> None:
         """Mark the repair order as actively in progress.
 
+        Allowed from ``ASSIGNED`` (technician assigned) or ``WORKSHOP_ASSIGNED``
+        (simplified demo path without explicit technician assignment).
+
         Raises:
-            RepairOrderInvalidStateTransitionError: If not ASSIGNED.
+            RepairOrderInvalidStateTransitionError: If not in a startable state.
         """
+        if self.status not in (
+            RepairOrderStatus.ASSIGNED,
+            RepairOrderStatus.WORKSHOP_ASSIGNED,
+        ):
+            raise RepairOrderInvalidStateTransitionError(
+                current_status=self.status.value,
+                target_status=RepairOrderStatus.IN_PROGRESS.value,
+            )
         self.transition_to(RepairOrderStatus.IN_PROGRESS)
 
     def complete(self, completed_at: datetime) -> None:
@@ -309,3 +324,35 @@ class RepairOrder:
     def is_active(self) -> bool:
         """Return True if the repair order is in a mutable (active) state."""
         return self.status in _MUTABLE_STATUSES
+
+
+class RepairOrderEventType(StrEnum):
+    """Canonical repair-order lifecycle events recorded for audit/timeline."""
+
+    FAULT_CREATED = "FAULT_CREATED"
+    DISTRIBUTION_APPROVED = "DISTRIBUTION_APPROVED"
+    TRANSPORT_APPROVED = "TRANSPORT_APPROVED"
+    WORKSHOP_ASSIGNED = "WORKSHOP_ASSIGNED"
+    REPAIR_STARTED = "REPAIR_STARTED"
+    REPAIR_COMPLETED = "REPAIR_COMPLETED"
+
+
+@dataclass(frozen=True)
+class RepairOrderEvent:
+    """Immutable repair-order lifecycle event.
+
+    Attributes:
+        id: Event UUID.
+        repair_order_id: Parent repair order.
+        event_type: Canonical event code.
+        description: Human-readable Persian/English description.
+        created_at: UTC timestamp when the event occurred.
+        created_by_id: Optional actor UUID.
+    """
+
+    id: uuid.UUID
+    repair_order_id: uuid.UUID
+    event_type: RepairOrderEventType
+    description: str
+    created_at: datetime
+    created_by_id: uuid.UUID | None = None

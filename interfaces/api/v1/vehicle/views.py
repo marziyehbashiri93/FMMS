@@ -12,6 +12,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
 from apps.vehicle.application.dto.vehicle_dto import (
+    ActivateVehicleDTO,
     CreateVehicleDTO,
     DeactivateVehicleDTO,
     UpdateVehicleDTO,
@@ -44,7 +45,7 @@ class VehicleViewSet(GenericViewSet):
 
     @extend_schema(responses=VehicleResponseSerializer(many=True))
     def list(self, request: Request) -> Response:
-        """List vehicles, optionally filtered by status."""
+        """List non-deleted vehicles, optionally filtered by status."""
         raw_status = request.query_params.get("status")
         vehicle_status = VehicleStatus(raw_status) if raw_status else None
         items = deps.get_list_vehicles_service().execute(
@@ -108,6 +109,19 @@ class VehicleViewSet(GenericViewSet):
         result = deps.get_deactivate_vehicle_service().execute(
             DeactivateVehicleDTO(
                 uuid.UUID(str(pk)), request_id_from(request), user_id_from(request)
+            )
+        )
+        return Response(VehicleResponseSerializer(result).data)
+
+    @extend_schema(request=None, responses=VehicleResponseSerializer)
+    @action(detail=True, methods=["post"], permission_classes=[IsSupervisorOrAbove])
+    def activate(self, request: Request, pk: str | None = None) -> Response:
+        """Re-activate a vehicle after maintenance when no open repairs remain."""
+        result = deps.get_activate_vehicle_service().execute(
+            ActivateVehicleDTO(
+                vehicle_id=uuid.UUID(str(pk)),
+                request_id=request_id_from(request),
+                requested_by=user_id_from(request),
             )
         )
         return Response(VehicleResponseSerializer(result).data)

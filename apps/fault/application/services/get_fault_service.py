@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import uuid
 
+from apps.authentication.domain.interfaces.user_profile_reader import IUserProfileReader
 from apps.fault.application.dto.fault_dto import FaultResponseDTO
 from apps.fault.application.services.report_fault_service import _to_response_dto
 from apps.fault.domain.interfaces.fault_repository import IFaultRepository
@@ -22,10 +23,16 @@ class GetFaultService:
 
     Args:
         fault_repository: Concrete ``IFaultRepository``.
+        profile_reader: Optional user profile resolver for ``created_by``.
     """
 
-    def __init__(self, fault_repository: IFaultRepository) -> None:
+    def __init__(
+        self,
+        fault_repository: IFaultRepository,
+        profile_reader: IUserProfileReader | None = None,
+    ) -> None:
         self._repo = fault_repository
+        self._profile_reader = profile_reader
 
     def execute(self, fault_id: uuid.UUID, request_id: str = "") -> FaultResponseDTO:
         """Return the fault identified by ``fault_id``.
@@ -69,7 +76,7 @@ class GetFaultService:
             },
         )
 
-        return _to_response_dto(fault)
+        return _to_response_dto(fault, self._profile_reader)
 
 
 class ListFaultsService:
@@ -77,10 +84,16 @@ class ListFaultsService:
 
     Args:
         fault_repository: Concrete ``IFaultRepository``.
+        profile_reader: Optional user profile resolver for ``created_by``.
     """
 
-    def __init__(self, fault_repository: IFaultRepository) -> None:
+    def __init__(
+        self,
+        fault_repository: IFaultRepository,
+        profile_reader: IUserProfileReader | None = None,
+    ) -> None:
         self._repo = fault_repository
+        self._profile_reader = profile_reader
 
     def execute(
         self,
@@ -134,4 +147,4 @@ class ListFaultsService:
             },
         )
 
-        return [_to_response_dto(f) for f in faults]
+        return [_to_response_dto(f, self._profile_reader) for f in faults]

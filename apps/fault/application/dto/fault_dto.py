@@ -12,6 +12,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from apps.authentication.application.dto.user_profile_dto import UserProfileSummaryDTO
 from apps.fault.domain.entities import FaultStatus
 from apps.fault.domain.value_objects import FaultSeverity
 
@@ -103,6 +104,7 @@ class FaultResponseDTO:
         assigned_to_id: Optional assigned technician UUID.
         sap_notification_number: Optional SAP PM notification number.
         items: Child fault items linked to this incident.
+        created_by: Reporter profile summary when resolvable from auth store.
     """
 
     id: uuid.UUID
@@ -119,3 +121,4 @@ class FaultResponseDTO:
     assigned_to_id: uuid.UUID | None = field(default=None)
     sap_notification_number: str | None = field(default=None)
     items: list[FaultItemResponseDTO] = field(default_factory=list)
+    created_by: UserProfileSummaryDTO | None = field(default=None)

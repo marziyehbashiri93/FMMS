@@ -12,6 +12,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
+from apps.authentication.domain.interfaces.user_profile_reader import IUserProfileReader
 from apps.fault.application.dto.fault_dto import (
     FaultItemResponseDTO,
     FaultResponseDTO,
@@ -27,8 +28,14 @@ from core.logging.structured_logger import get_structured_logger
 logger = get_structured_logger("fault", __name__)
 
 
-def _to_response_dto(fault: Fault) -> FaultResponseDTO:
+def _to_response_dto(
+    fault: Fault,
+    profile_reader: IUserProfileReader | None = None,
+) -> FaultResponseDTO:
     """Map a ``Fault`` domain entity to a ``FaultResponseDTO``."""
+    created_by = None
+    if profile_reader is not None:
+        created_by = profile_reader.get_profile(fault.reported_by_id)
     return FaultResponseDTO(
         id=fault.id,
         vehicle_id=fault.vehicle_id,
@@ -53,6 +60,7 @@ def _to_response_dto(fault: Fault) -> FaultResponseDTO:
             )
             for item in fault.items
         ],
+        created_by=created_by,
     )
 
 
@@ -63,15 +71,18 @@ class ReportFaultService:
         fault_repository: Concrete ``IFaultRepository``.
         vehicle_repository: Concrete ``IVehicleRepository`` for cross-domain
             vehicle existence check.
+        profile_reader: Optional resolver for ``created_by`` enrichment.
     """
 
     def __init__(
         self,
         fault_repository: IFaultRepository,
         vehicle_repository: IVehicleRepository,
+        profile_reader: IUserProfileReader | None = None,
     ) -> None:
         self._fault_repo = fault_repository
         self._vehicle_repo = vehicle_repository
+        self._profile_reader = profile_reader
 
     def execute(self, dto: ReportFaultDTO) -> FaultResponseDTO:
         """Report and persist a new fault.
@@ -133,4 +144,4 @@ class ReportFaultService:
             },
         )
 
-        return _to_response_dto(saved)
+        return _to_response_dto(saved, self._profile_reader)

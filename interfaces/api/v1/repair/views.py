@@ -33,6 +33,7 @@ from interfaces.api.v1.repair.serializers import (
     RepairDecisionResponseSerializer,
     RepairOrderCreateSerializer,
     RepairOrderResponseSerializer,
+    RepairOrderTimelineEventSerializer,
     RepairPartCreateSerializer,
     RepairSyncSAPSerializer,
 )
@@ -156,9 +157,21 @@ class RepairOrderViewSet(GenericViewSet):
     def start(self, request: Request, pk: str | None = None) -> Response:
         """Start work on an assigned repair order."""
         result = deps.get_start_repair_service().execute(
-            uuid.UUID(str(pk)), request_id_from(request)
+            uuid.UUID(str(pk)),
+            request_id_from(request),
+            started_by=user_id_from(request),
         )
         return Response(RepairOrderResponseSerializer(result).data)
+
+    @extend_schema(responses=RepairOrderTimelineEventSerializer(many=True))
+    @action(detail=True, methods=["get"], url_path="timeline")
+    def timeline(self, request: Request, pk: str | None = None) -> Response:
+        """Return chronological workflow events for a repair order."""
+        events = deps.get_get_repair_order_timeline_service().execute(
+            uuid.UUID(str(pk)),
+            request_id_from(request),
+        )
+        return Response(RepairOrderTimelineEventSerializer(events, many=True).data)
 
     @extend_schema(
         request=RepairCompleteSerializer, responses=RepairOrderResponseSerializer

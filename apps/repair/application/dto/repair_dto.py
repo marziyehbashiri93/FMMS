@@ -247,3 +247,13 @@ class RepairOrderResponseDTO:
     sap_order_number: str | None = field(default=None)
     workshop_type: WorkshopType | None = field(default=None)
     completed_at: datetime | None = field(default=None)
+
+
+@dataclass(frozen=True)
+class RepairOrderTimelineEventDTO:
+    """One repair-order workflow event for timeline APIs."""
+
+    event: str
+    description: str
+    created_at: datetime
+    created_by_id: uuid.UUID | None = field(default=None)

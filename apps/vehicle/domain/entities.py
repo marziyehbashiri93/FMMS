@@ -90,7 +90,7 @@ _ALLOWED_TRANSITIONS: dict[VehicleStatus, frozenset[VehicleStatus]] = {
             VehicleStatus.SUSPENDED,
         }
     ),
-    VehicleStatus.INACTIVE: frozenset(),
+    VehicleStatus.INACTIVE: frozenset({VehicleStatus.ACTIVE}),
 }
 
 
@@ -169,6 +169,15 @@ class Vehicle:
 
     def complete_repair(self) -> None:
         """Transition the vehicle back to ACTIVE after repair completion.
+
+        Raises:
+            VehicleInvalidStateTransitionError: If not permitted from the
+                current status.
+        """
+        self.transition_to(VehicleStatus.ACTIVE)
+
+    def activate(self) -> None:
+        """Return the vehicle to ACTIVE when maintenance clearance allows it.
 
         Raises:
             VehicleInvalidStateTransitionError: If not permitted from the

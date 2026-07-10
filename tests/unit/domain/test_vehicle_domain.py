@@ -118,10 +118,10 @@ class TestVehicleEntity:
         v.deactivate()
         assert v.status == VehicleStatus.INACTIVE
 
-    def test_cannot_reactivate_inactive(self) -> None:
+    def test_activate_from_inactive(self) -> None:
         v = _make_vehicle(status=VehicleStatus.INACTIVE)
-        with pytest.raises(VehicleInvalidStateTransitionError):
-            v.transition_to(VehicleStatus.ACTIVE)
+        v.activate()
+        assert v.status == VehicleStatus.ACTIVE
 
     def test_inactive_is_terminal(self) -> None:
         v = _make_vehicle(status=VehicleStatus.INACTIVE)

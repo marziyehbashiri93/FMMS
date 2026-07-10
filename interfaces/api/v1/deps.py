@@ -6,6 +6,9 @@ and SAP adapters. Views consume only the factories defined here.
 
 from __future__ import annotations
 
+from apps.authentication.infrastructure.user_profile_reader import (
+    DjangoUserProfileReader,
+)
 from apps.driver.application.services.assign_driver_to_vehicle_service import (
     AssignDriverToVehicleService,
 )
@@ -111,6 +114,10 @@ from apps.repair.application.services.get_repair_order_service import (
     GetRepairOrderService,
     ListRepairOrdersService,
 )
+from apps.repair.application.services.repair_order_timeline_service import (
+    GetRepairOrderTimelineService,
+    RecordRepairOrderEventService,
+)
 from apps.repair.application.services.sync_repair_to_sap_service import (
     SyncRepairToSAPService,
 )
@@ -119,7 +126,13 @@ from apps.repair.application.services.update_repair_status_service import (
     CompleteRepairOrderService,
     StartRepairService,
 )
+from apps.repair.infrastructure.event_repositories import (
+    DjangoRepairOrderEventRepository,
+)
 from apps.repair.infrastructure.repositories import DjangoRepairOrderRepository
+from apps.vehicle.application.services.activate_vehicle_service import (
+    ActivateVehicleService,
+)
 from apps.vehicle.application.services.create_vehicle_service import (
     CreateVehicleService,
 )
@@ -245,9 +258,22 @@ def get_update_vehicle_service() -> UpdateVehicleService:
     return UpdateVehicleService(get_vehicle_repository())
 
 
+def get_user_profile_reader() -> DjangoUserProfileReader:
+    """Return the FMMS user profile reader."""
+    return DjangoUserProfileReader()
+
+
 def get_deactivate_vehicle_service() -> DeactivateVehicleService:
     """Return DeactivateVehicleService."""
     return DeactivateVehicleService(get_vehicle_repository())
+
+
+def get_activate_vehicle_service() -> ActivateVehicleService:
+    """Return ActivateVehicleService."""
+    return ActivateVehicleService(
+        get_vehicle_repository(),
+        get_repair_order_repository(),
+    )
 
 
 def get_sync_sap_equipment_service() -> SyncSAPEquipmentService:
@@ -314,12 +340,20 @@ def get_create_inspection_service() -> CreateInspectionService:
 
 def get_get_inspection_service() -> GetInspectionService:
     """Return GetInspectionService."""
-    return GetInspectionService(get_inspection_repository())
+    return GetInspectionService(
+        get_inspection_repository(),
+        get_fault_repository(),
+        get_driver_repository(),
+    )
 
 
 def get_list_inspections_service() -> ListInspectionsService:
     """Return ListInspectionsService."""
-    return ListInspectionsService(get_inspection_repository())
+    return ListInspectionsService(
+        get_inspection_repository(),
+        get_fault_repository(),
+        get_driver_repository(),
+    )
 
 
 def get_add_inspection_item_service() -> AddInspectionItemService:
@@ -353,17 +387,21 @@ def get_sync_inspection_templates_from_sap_service() -> (
 
 def get_report_fault_service() -> ReportFaultService:
     """Return ReportFaultService."""
-    return ReportFaultService(get_fault_repository(), get_vehicle_repository())
+    return ReportFaultService(
+        get_fault_repository(),
+        get_vehicle_repository(),
+        get_user_profile_reader(),
+    )
 
 
 def get_get_fault_service() -> GetFaultService:
     """Return GetFaultService."""
-    return GetFaultService(get_fault_repository())
+    return GetFaultService(get_fault_repository(), get_user_profile_reader())
 
 
 def get_list_faults_service() -> ListFaultsService:
     """Return ListFaultsService."""
-    return ListFaultsService(get_fault_repository())
+    return ListFaultsService(get_fault_repository(), get_user_profile_reader())
 
 
 def get_assign_fault_service() -> AssignFaultService:
@@ -376,12 +414,31 @@ def get_close_fault_service() -> CloseFaultService:
     return CloseFaultService(get_fault_repository())
 
 
+def get_repair_order_event_repository() -> DjangoRepairOrderEventRepository:
+    """Return the repair-order event repository."""
+    return DjangoRepairOrderEventRepository()
+
+
+def get_record_repair_order_event_service() -> RecordRepairOrderEventService:
+    """Return RecordRepairOrderEventService."""
+    return RecordRepairOrderEventService(get_repair_order_event_repository())
+
+
+def get_get_repair_order_timeline_service() -> GetRepairOrderTimelineService:
+    """Return GetRepairOrderTimelineService."""
+    return GetRepairOrderTimelineService(
+        get_repair_order_repository(),
+        get_repair_order_event_repository(),
+    )
+
+
 def get_create_repair_order_service() -> CreateRepairOrderService:
     """Return CreateRepairOrderService."""
     return CreateRepairOrderService(
         get_repair_order_repository(),
         get_vehicle_repository(),
         get_fault_repository(),
+        get_record_repair_order_event_service(),
     )
 
 
@@ -402,22 +459,34 @@ def get_assign_repair_order_service() -> AssignRepairOrderService:
 
 def get_approve_repair_order_service() -> ApproveRepairOrderService:
     """Return ApproveRepairOrderService."""
-    return ApproveRepairOrderService(get_repair_order_repository())
+    return ApproveRepairOrderService(
+        get_repair_order_repository(),
+        get_record_repair_order_event_service(),
+    )
 
 
 def get_assign_workshop_service() -> AssignWorkshopService:
     """Return AssignWorkshopService."""
-    return AssignWorkshopService(get_repair_order_repository())
+    return AssignWorkshopService(
+        get_repair_order_repository(),
+        get_record_repair_order_event_service(),
+    )
 
 
 def get_start_repair_service() -> StartRepairService:
     """Return StartRepairService."""
-    return StartRepairService(get_repair_order_repository())
+    return StartRepairService(
+        get_repair_order_repository(),
+        get_record_repair_order_event_service(),
+    )
 
 
 def get_complete_repair_order_service() -> CompleteRepairOrderService:
     """Return CompleteRepairOrderService."""
-    return CompleteRepairOrderService(get_repair_order_repository())
+    return CompleteRepairOrderService(
+        get_repair_order_repository(),
+        get_record_repair_order_event_service(),
+    )
 
 
 def get_cancel_repair_order_service() -> CancelRepairOrderService:

@@ -8,9 +8,14 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
+from apps.driver.domain.interfaces.driver_repository import IDriverRepository
+from apps.fault.domain.interfaces.fault_repository import IFaultRepository
 from apps.inspection.application.dto.inspection_dto import InspectionResponseDTO
 from apps.inspection.application.services.create_inspection_service import (
     _to_response_dto,
+)
+from apps.inspection.application.services.inspection_response_enricher import (
+    enrich_inspection_response,
 )
 from apps.inspection.domain.interfaces.inspection_repository import (
     IInspectionRepository,
@@ -26,10 +31,19 @@ class GetInspectionService:
 
     Args:
         inspection_repository: Concrete ``IInspectionRepository``.
+        fault_repository: Optional fault repository for related fault IDs.
+        driver_repository: Optional driver repository for driver summary.
     """
 
-    def __init__(self, inspection_repository: IInspectionRepository) -> None:
+    def __init__(
+        self,
+        inspection_repository: IInspectionRepository,
+        fault_repository: IFaultRepository | None = None,
+        driver_repository: IDriverRepository | None = None,
+    ) -> None:
         self._repo = inspection_repository
+        self._fault_repo = fault_repository
+        self._driver_repo = driver_repository
 
     def execute(
         self, inspection_id: uuid.UUID, request_id: str = ""
@@ -75,7 +89,13 @@ class GetInspectionService:
             },
         )
 
-        return _to_response_dto(inspection)
+        base = _to_response_dto(inspection)
+        return enrich_inspection_response(
+            inspection,
+            base,
+            self._fault_repo,
+            self._driver_repo,
+        )
 
 
 class ListInspectionsService:
@@ -83,10 +103,19 @@ class ListInspectionsService:
 
     Args:
         inspection_repository: Concrete ``IInspectionRepository``.
+        fault_repository: Optional fault repository for related fault IDs.
+        driver_repository: Optional driver repository for driver summary.
     """
 
-    def __init__(self, inspection_repository: IInspectionRepository) -> None:
+    def __init__(
+        self,
+        inspection_repository: IInspectionRepository,
+        fault_repository: IFaultRepository | None = None,
+        driver_repository: IDriverRepository | None = None,
+    ) -> None:
         self._repo = inspection_repository
+        self._fault_repo = fault_repository
+        self._driver_repo = driver_repository
 
     def execute(
         self,
@@ -142,4 +171,12 @@ class ListInspectionsService:
             },
         )
 
-        return [_to_response_dto(i) for i in inspections]
+        return [
+            enrich_inspection_response(
+                inspection,
+                _to_response_dto(inspection),
+                self._fault_repo,
+                self._driver_repo,
+            )
+            for inspection in inspections
+        ]

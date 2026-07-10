@@ -109,3 +109,24 @@ class RepairPartModel(models.Model):
                 name="unique_repair_part",
             )
         ]
+
+
+class RepairOrderEventModel(BaseModel):
+    """Append-only timeline events for a repair order aggregate."""
+
+    repair_order = models.ForeignKey(
+        RepairOrderModel,
+        on_delete=models.CASCADE,
+        related_name="events",
+        db_index=True,
+    )
+    event_type = models.CharField(max_length=40, db_index=True)
+    description = models.CharField(max_length=500)
+    actor_id = models.UUIDField(null=True, blank=True, default=None)
+
+    class Meta:
+        app_label = "repair"
+        db_table = "repair_order_event"
+        verbose_name = "Repair Order Event"
+        verbose_name_plural = "Repair Order Events"
+        ordering = ["created_at"]

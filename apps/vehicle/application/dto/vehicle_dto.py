@@ -92,6 +92,21 @@ class DeactivateVehicleDTO:
 
 
 @dataclass(frozen=True)
+class ActivateVehicleDTO:
+    """Input DTO for re-activating a vehicle after maintenance.
+
+    Attributes:
+        vehicle_id: Target vehicle to activate.
+        request_id: Correlation ID for tracing.
+        requested_by: UUID of the supervisor/admin performing activation.
+    """
+
+    vehicle_id: uuid.UUID
+    request_id: str
+    requested_by: uuid.UUID
+
+
+@dataclass(frozen=True)
 class VehicleResponseDTO:
     """Output DTO returned by all vehicle read and write operations.
 

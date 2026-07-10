@@ -24,6 +24,14 @@ class FaultAssignSerializer(serializers.Serializer):
     technician_id = serializers.UUIDField()
 
 
+class UserProfileSummarySerializer(serializers.Serializer):
+    """Serialize nested user profile summaries."""
+
+    id = serializers.UUIDField()
+    name = serializers.CharField()
+    role = serializers.CharField()
+
+
 class FaultItemResponseSerializer(serializers.Serializer):
     """Serialize fault item DTOs nested under a fault response."""
 
@@ -51,3 +59,4 @@ class FaultResponseSerializer(serializers.Serializer):
     assigned_to_id = serializers.UUIDField(allow_null=True)
     sap_notification_number = serializers.CharField(allow_null=True)
     items = FaultItemResponseSerializer(many=True)
+    created_by = UserProfileSummarySerializer(allow_null=True, required=False)

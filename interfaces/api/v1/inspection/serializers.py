@@ -33,6 +33,13 @@ class InspectionCreateSerializer(serializers.Serializer):
     items = InspectionItemCreateSerializer(many=True, required=False)
 
 
+class InspectionDriverSummarySerializer(serializers.Serializer):
+    """Serialize nested driver summary on inspection history."""
+
+    id = serializers.UUIDField()
+    name = serializers.CharField()
+
+
 class InspectionItemResponseSerializer(serializers.Serializer):
     """Serialize inspection checklist item DTOs."""
 
@@ -64,3 +71,6 @@ class InspectionResponseSerializer(serializers.Serializer):
     reviewed_by_id = serializers.UUIDField(allow_null=True)
     review_notes = serializers.CharField(allow_null=True)
     has_failures = serializers.BooleanField()
+    overall_result = serializers.CharField()
+    related_fault_ids = serializers.ListField(child=serializers.UUIDField())
+    driver = InspectionDriverSummarySerializer(allow_null=True, required=False)

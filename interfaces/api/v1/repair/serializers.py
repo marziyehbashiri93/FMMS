@@ -86,6 +86,15 @@ class RepairPartResponseSerializer(serializers.Serializer):
     posted_at = serializers.DateTimeField(allow_null=True)
 
 
+class RepairOrderTimelineEventSerializer(serializers.Serializer):
+    """Serialize one repair-order timeline event."""
+
+    event = serializers.CharField()
+    description = serializers.CharField()
+    created_at = serializers.DateTimeField()
+    created_by_id = serializers.UUIDField(allow_null=True, required=False)
+
+
 class RepairOrderResponseSerializer(serializers.Serializer):
     """Serialize application repair order response DTOs."""
 

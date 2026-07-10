@@ -148,6 +148,15 @@ class TestRepairOrderLifecycle:
         order.assign_technician(assignment)
         assert order.status == RepairOrderStatus.ASSIGNED
 
+    def test_start_work_from_workshop_assigned(self) -> None:
+        from apps.repair.domain.entities import WorkshopType
+
+        order = _make_order()
+        order.approve()
+        order.assign_workshop(WorkshopType.INTERNAL)
+        order.start_work()
+        assert order.status == RepairOrderStatus.IN_PROGRESS
+
     def test_start_work(self) -> None:
         order = _make_order(status=RepairOrderStatus.ASSIGNED)
         order.start_work()

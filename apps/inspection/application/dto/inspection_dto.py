@@ -102,6 +102,14 @@ class SubmitInspectionDTO:
 
 
 @dataclass(frozen=True)
+class InspectionDriverSummaryDTO:
+    """Driver summary nested under inspection history responses."""
+
+    id: uuid.UUID
+    name: str
+
+
+@dataclass(frozen=True)
 class InspectionItemResponseDTO:
     """Output DTO for a single inspection checklist item.
 
@@ -139,6 +147,9 @@ class InspectionResponseDTO:
         reviewed_by_id: Optional reviewer UUID.
         review_notes: Optional reviewer notes.
         has_failures: Whether any checklist item failed.
+        overall_result: PASS when no failures, FAIL otherwise.
+        related_fault_ids: Faults raised from this inspection, if any.
+        driver: Resolved driver summary when ``driver_id`` is set.
     """
 
     id: uuid.UUID
@@ -155,3 +166,6 @@ class InspectionResponseDTO:
     reviewed_by_id: uuid.UUID | None = field(default=None)
     review_notes: str | None = field(default=None)
     has_failures: bool = field(default=False)
+    overall_result: str = field(default="PASS")
+    related_fault_ids: list[uuid.UUID] = field(default_factory=list)
+    driver: InspectionDriverSummaryDTO | None = field(default=None)
