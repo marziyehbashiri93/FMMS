@@ -11,7 +11,7 @@
 |-------------------------|--------------------------------------------------------------------|
 | **Current Phase**       | Implementation — Phase 1                                           |
 | **Current Milestone**   | M9 — Testing Completeness & Production Hardening (Complete)        |
-| **Last Commit**         | `fix(database): improve postgres configuration and add database bootstrap` |
+| **Last Commit**         | `fd351d0` — fix(database): improve postgres configuration and add database bootstrap |
 | **Completed**           | M0 ✓ … M9 ✓ — 10 / 10 implementation milestones (M10 deferred)     |
 | **In Progress**         | — (M10 not started; DB config fix applied post-M9)                  |
 | **Blocked**             | —                                                                  |
