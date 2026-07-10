@@ -1,5 +1,6 @@
 """FMMS root URL configuration."""
 
+from django.conf import settings
 from django.contrib import admin
 from django.urls import include, path
 from drf_spectacular.views import (
@@ -23,3 +24,8 @@ urlpatterns = [
         name="redoc",
     ),
 ]
+
+if settings.DEBUG:
+    urlpatterns += [
+        path("__debug__/", include("debug_toolbar.urls")),
+    ]
