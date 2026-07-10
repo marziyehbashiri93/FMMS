@@ -46,6 +46,7 @@ DJANGO_APPS = [
 ]
 
 THIRD_PARTY_APPS = [
+    "corsheaders",
     "rest_framework",
     "rest_framework_simplejwt",
     "drf_spectacular",
@@ -90,6 +91,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # ──────────────────────────────────────────────────────────────────────────────
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -314,6 +316,12 @@ SAP_SYSTEM_ID = env("SAP_SYSTEM_ID", default="")
 SAP_MAX_RETRIES = env.int("SAP_MAX_RETRIES", default=3)
 SAP_RETRY_BACKOFF_FACTOR = env.float("SAP_RETRY_BACKOFF_FACTOR", default=2.0)
 SAP_REQUEST_TIMEOUT = env.int("SAP_REQUEST_TIMEOUT", default=30)
+
+# ──────────────────────────────────────────────────────────────────────────────
+# CORS — overridden per environment (development allows all local origins)
+# ──────────────────────────────────────────────────────────────────────────────
+CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[])
+CORS_ALLOW_CREDENTIALS = False
 
 # ──────────────────────────────────────────────────────────────────────────────
 # FMMS Application Settings

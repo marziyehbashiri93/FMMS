@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>نمایش عملیاتی نگهداری ناوگان</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css"
+      rel="stylesheet"
+      integrity="sha384-dpuaG1suU0eT09tx5plTaGMLBsfDLzUCCUXOY2j/LSvXYuG6Bqs43ALlhIqAJVRb"
+      crossorigin="anonymous"
+    />
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="container d-flex justify-content-between align-items-center">
+        <div class="brand">سامانه نگهداری و تعمیرات ناوگان</div>
+        <div class="d-flex align-items-center gap-2">
+          <span id="nav-user" class="small text-white-50 d-none"></span>
+          <button id="btn-logout" class="btn btn-sm btn-outline-light d-none" type="button">
+            خروج
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container py-4">
+      <!-- ورود -->
+      <section id="screen-login" class="card-panel login-card">
+        <div class="card-body p-4">
+          <h1 class="h4 mb-3">ورود به سامانه</h1>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label" for="login-email">ایمیل</label>
+              <input
+                id="login-email"
+                class="form-control ltr-field"
+                type="email"
+                autocomplete="username"
+              />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="login-password">رمز عبور</label>
+              <input
+                id="login-password"
+                class="form-control ltr-field"
+                type="password"
+                autocomplete="current-password"
+              />
+            </div>
+            <div class="col-12">
+              <button id="btn-login" class="btn btn-primary-gs" type="button">
+                ورود
+              </button>
+            </div>
+          </div>
+          <div id="login-alert" class="alert alert-danger-gs mt-3 d-none" role="alert"></div>
+        </div>
+      </section>
+
+      <!-- گردش کار -->
+      <section id="screen-workflow" class="d-none">
+        <div class="row g-3 mb-3">
+          <div class="col-md-4">
+            <div class="status-tile">
+              <div class="label">مرحله جاری</div>
+              <div class="value" id="ops-stage">—</div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="status-tile">
+              <div class="label">خودرو انتخاب‌شده</div>
+              <div class="value" id="ops-vehicle">—</div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="status-tile">
+              <div class="label">نتیجه بازرسی</div>
+              <div class="value" id="ops-inspection-result">—</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-panel mb-3">
+          <div class="card-header">مسیر گردش کار</div>
+          <div class="card-body">
+            <ol id="workflow-stages" class="workflow-track"></ol>
+          </div>
+        </div>
+
+        <div id="ops-message" class="d-none"></div>
+        <div id="ops-error" class="d-none"></div>
+
+        <div class="card-panel mb-3">
+          <div class="card-header">صفحات گردش کار</div>
+          <div class="card-body d-flex flex-wrap gap-2">
+            <button class="btn btn-outline-dark active" type="button" data-page-nav="driver">
+              پنل راننده
+            </button>
+            <button class="btn btn-outline-dark" type="button" data-page-nav="distribution">
+              پنل واحد توزیع
+            </button>
+            <button class="btn btn-outline-dark" type="button" data-page-nav="transport">
+              پنل واحد ترابری
+            </button>
+          </div>
+        </div>
+
+        <!-- پنل راننده -->
+        <section class="card-panel mb-3" id="panel-driver">
+          <div class="card-header">انتخاب خودرو و ثبت چک‌لیست بازرسی</div>
+          <div class="card-body">
+            <div class="row g-3 mb-3">
+              <div class="col-md-5">
+                <label class="form-label" for="vehicle-select">انتخاب خودرو</label>
+                <select id="vehicle-select" class="form-select"></select>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label" for="insp-odometer">کیلومترشمار</label>
+                <input id="insp-odometer" class="form-control" type="number" value="12500" />
+              </div>
+              <div class="col-md-4 d-flex align-items-end gap-2 flex-wrap">
+                <button id="btn-reload-data" class="btn btn-outline-secondary" type="button">
+                  بارگذاری مجدد
+                </button>
+                <button id="btn-select-vehicle" class="btn btn-outline-dark" type="button">
+                  تأیید خودرو
+                </button>
+              </div>
+            </div>
+
+            <div id="checklist-host"></div>
+
+            <div class="d-flex flex-wrap gap-2 mt-2">
+              <button id="btn-create-inspection" class="btn btn-outline-dark" type="button">
+                ایجاد بازرسی
+              </button>
+              <button id="btn-submit-inspection" class="btn btn-primary-gs" type="button" disabled>
+                ارسال بازرسی
+              </button>
+              <button id="btn-go-distribution" class="btn btn-outline-secondary d-none" type="button">
+                ادامه در پنل توزیع
+              </button>
+            </div>
+
+            <div id="driver-message" class="alert alert-success-gs mt-3 d-none" role="alert"></div>
+            <div id="driver-error" class="alert alert-danger-gs mt-3 d-none" role="alert"></div>
+          </div>
+        </section>
+
+        <!-- واحد توزیع -->
+        <section class="card-panel mb-3 d-none" id="panel-distribution">
+          <div class="card-header">پنل واحد توزیع</div>
+          <div class="card-body">
+            <div class="d-flex gap-2 mb-3">
+              <button id="btn-refresh-faults" class="btn btn-outline-secondary" type="button">
+                بارگذاری خرابی‌های باز
+              </button>
+            </div>
+            <div id="faults-host" class="mb-3"></div>
+            <div id="fault-detail-host" class="mb-3"></div>
+            <div class="d-flex flex-wrap gap-2">
+              <button id="btn-close-fault" class="btn btn-primary-gs" type="button">
+                خودرو قابل استفاده است
+              </button>
+              <button id="btn-deactivate-vehicle" class="btn btn-danger-gs" type="button">
+                خودرو قابل استفاده نیست
+              </button>
+            </div>
+            <div id="distribution-message" class="alert alert-success-gs mt-3 d-none" role="alert"></div>
+            <div id="distribution-error" class="alert alert-danger-gs mt-3 d-none" role="alert"></div>
+          </div>
+        </section>
+
+        <!-- واحد ترابری -->
+        <section class="card-panel mb-3 d-none" id="panel-transport">
+          <div class="card-header">پنل واحد ترابری</div>
+          <div class="card-body">
+            <div id="repair-detail-host" class="mb-3"></div>
+            <div class="d-flex flex-wrap gap-2 mb-3">
+              <button id="btn-refresh-repair" class="btn btn-outline-secondary" type="button">
+                بارگذاری دستور تعمیر
+              </button>
+              <button id="btn-approve-repair" class="btn btn-primary-gs" type="button">
+                تایید تعمیر
+              </button>
+            </div>
+            <div class="row g-2">
+              <div class="col-md-6">
+                <button
+                  id="btn-workshop-internal"
+                  class="btn btn-outline-dark w-100"
+                  type="button"
+                >
+                  تعمیرگاه داخلی
+                </button>
+              </div>
+              <div class="col-md-6">
+                <button
+                  id="btn-workshop-external"
+                  class="btn btn-outline-dark w-100"
+                  type="button"
+                >
+                  تعمیرگاه بیرونی
+                </button>
+              </div>
+            </div>
+            <div id="transport-message" class="alert alert-success-gs mt-3 d-none" role="alert"></div>
+            <div id="transport-error" class="alert alert-danger-gs mt-3 d-none" role="alert"></div>
+          </div>
+        </section>
+
+        <!-- وضعیت API -->
+        <section class="card-panel mb-3">
+          <div class="card-header">وضعیت API</div>
+          <div class="card-body">
+            <div class="debug-panel">
+              <div>وضعیت ورود: <span id="dbg-auth">—</span></div>
+              <div>آدرس سرویس: <span id="dbg-url" class="ltr-field">—</span></div>
+              <div>آخرین درخواست: <span id="dbg-request">—</span></div>
+              <div>آخرین وضعیت: <span id="dbg-status">—</span></div>
+              <div>آخرین خطا: <span id="dbg-error">—</span></div>
+              <div>آخرین پاسخ:</div>
+              <pre id="dbg-response">—</pre>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+      crossorigin="anonymous"
+    ></script>
+    <script src="config/env.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/workflow.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>
