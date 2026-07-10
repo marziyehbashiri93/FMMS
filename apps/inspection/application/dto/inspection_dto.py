@@ -17,6 +17,23 @@ from apps.inspection.domain.value_objects import ChecklistResult, OdometerUnit
 
 
 @dataclass(frozen=True)
+class CreateInspectionItemInputDTO:
+    """One checklist result supplied when creating an inspection.
+
+    Attributes:
+        category: Category label (often from an inspection template).
+        description: Human-readable description of the item being checked.
+        result: The outcome of this checklist item.
+        notes: Optional technician notes or observations.
+    """
+
+    category: str
+    description: str
+    result: ChecklistResult
+    notes: str | None = field(default=None)
+
+
+@dataclass(frozen=True)
 class CreateInspectionDTO:
     """Input DTO for creating a new inspection (starts in DRAFT).
 
@@ -29,6 +46,7 @@ class CreateInspectionDTO:
         request_id: Correlation ID for tracing.
         created_by: UUID of the authenticated user creating the inspection.
         driver_id: Optional UUID of the driver conducting the inspection.
+        items: Optional checklist results (typically from SAP templates).
     """
 
     vehicle_id: uuid.UUID
@@ -39,6 +57,7 @@ class CreateInspectionDTO:
     request_id: str
     created_by: uuid.UUID
     driver_id: uuid.UUID | None = field(default=None)
+    items: list[CreateInspectionItemInputDTO] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

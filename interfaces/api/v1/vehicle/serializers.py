@@ -47,6 +47,15 @@ class SAPEquipmentSyncSerializer(serializers.Serializer):
     sap_equipment_number = serializers.CharField()
 
 
+class VehicleSAPSyncResultSerializer(serializers.Serializer):
+    """Serialize bulk SAP vehicle sync result counts."""
+
+    total_received = serializers.IntegerField()
+    created = serializers.IntegerField()
+    updated = serializers.IntegerField()
+    failed = serializers.IntegerField()
+
+
 class VehicleResponseSerializer(serializers.Serializer):
     """Serialize application vehicle response DTOs."""
 

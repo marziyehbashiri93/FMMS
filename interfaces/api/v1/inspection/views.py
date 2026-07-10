@@ -15,6 +15,7 @@ from rest_framework.viewsets import GenericViewSet
 from apps.inspection.application.dto.inspection_dto import (
     AddInspectionItemDTO,
     CreateInspectionDTO,
+    CreateInspectionItemInputDTO,
     SubmitInspectionDTO,
 )
 from apps.inspection.domain.entities import InspectionType
@@ -79,11 +80,22 @@ class InspectionViewSet(GenericViewSet):
         data = dict(serializer.validated_data)
         inspection_type = InspectionType(data.pop("inspection_type"))
         odometer_unit = OdometerUnit(data.pop("odometer_unit"))
+        raw_items = data.pop("items", []) or []
+        items = [
+            CreateInspectionItemInputDTO(
+                category=item["category"],
+                description=item["description"],
+                result=ChecklistResult(item["result"]),
+                notes=item.get("notes"),
+            )
+            for item in raw_items
+        ]
         result = deps.get_create_inspection_service().execute(
             CreateInspectionDTO(
                 **data,
                 inspection_type=inspection_type,
                 odometer_unit=odometer_unit,
+                items=items,
                 request_id=request_id_from(request),
                 created_by=user_id_from(request),
             )

@@ -10,13 +10,13 @@
 | Field                   | Value                                                              |
 |-------------------------|--------------------------------------------------------------------|
 | **Current Phase**       | Implementation — Phase 1                                           |
-| **Current Milestone**   | M9 — Testing Completeness & Production Hardening (Complete)        |
-| **Last Commit**         | `fd351d0` — fix(database): improve postgres configuration and add database bootstrap |
-| **Completed**           | M0 ✓ … M9 ✓ — 10 / 10 implementation milestones (M10 deferred)     |
-| **In Progress**         | — (M10 not started; DB config fix applied post-M9)                  |
+| **Current Milestone**   | Demo Backend Workflow Prep (Complete)                              |
+| **Last Commit**         | `feat(demo): prepare backend workflow APIs for FMMS demonstration` |
+| **Completed**           | M0 ✓ … M9 ✓ + demo backend workflow APIs                           |
+| **In Progress**         | — (demo-frontend deferred until backend APIs approved)             |
 | **Blocked**             | —                                                                  |
 | **Last Updated**        | 2026-07-10                                                         |
-| **Validation Status**   | Post-M9 DB bootstrap — 576/576 tests; black/isort/ruff PASS; mypy baseline |
+| **Validation Status**   | 593/593 tests; black/isort/ruff PASS; mypy on changed modules PASS |
 
 ---
 
@@ -1240,4 +1240,58 @@ N+1 query audit, final security hardening, complete README, and Phase 1 release 
 
 ---
 
-*Last updated: 2026-07-10 | Updated by: Lead Backend Architect | Validation: DB bootstrap fix — 576/576; M10 not started*
+### ADR-023 — Standalone Removable Demo Frontend
+
+| Field        | Detail |
+|--------------|--------|
+| **Decision** | Ship a Vanilla HTML/CSS/JS + Bootstrap CDN demo under `demo-frontend/`. It is not part of the backend architecture and must remain deletable without backend changes. |
+| **Reason**   | Stakeholder workflow demonstration without coupling a production SPA to Phase 1. |
+| **Impact**   | No Python imports of demo-frontend; API base URL only in `demo-frontend/config/env.js`. |
+| **Date**     | 2026-07-10 |
+
+---
+
+### ADR-024 — Bulk SAP Vehicle Sync + Local Inspection Templates
+
+| Field        | Detail |
+|--------------|--------|
+| **Decision** | Add collection `POST /api/v1/vehicles/sync-sap/` (`SyncVehiclesFromSAPService`) that creates/updates FMMS vehicles from SAP equipment master by `sap_equipment_number`. Add `InspectionTemplate` local cache synced via `POST /api/v1/inspection-templates/sync-sap/` from `ISAPObjectPartCatalogPort`, readable at `GET /api/v1/inspection-templates/`. |
+| **Reason**   | Demo/frontend must not hardcode vehicles or checklist items; SAP remains master data owner while FMMS stores synced local copies for offline-capable reads. |
+| **Impact**   | Detail `POST /vehicles/{id}/sync-sap/` remains for single-equipment refresh. Deterministic plate/VIN generated on create when SAP lacks those fields. |
+| **Date**     | 2026-07-10 |
+
+---
+
+### ADR-025 — Inspection FAIL Auto-Orchestrates Fault, Repair, OUT_OF_SERVICE
+
+| Field        | Detail |
+|--------------|--------|
+| **Decision** | Extend `SubmitInspectionService` so each FAIL item creates Fault + RepairOrder, and the vehicle transitions to new status `OUT_OF_SERVICE`. All PASS leaves vehicle `ACTIVE`. Frontend must not orchestrate these side-effects. |
+| **Reason**   | Operational demo requires a single submit action to open the maintenance case. |
+| **Impact**   | `VehicleStatus.OUT_OF_SERVICE` added with domain transitions; create inspection accepts optional `items` from templates. |
+| **Date**     | 2026-07-10 |
+
+---
+
+## Demo Backend Workflow Prep (2026-07-10)
+
+| Field         | Value |
+|---------------|-------|
+| **Status**    | `Complete` |
+| **Scope**     | Backend APIs only — `demo-frontend` not modified |
+
+**Delivered:**
+- [x] `POST /api/v1/vehicles/sync-sap/` — bulk SAP equipment → vehicle create/update (idempotent)
+- [x] `POST /api/v1/inspection-templates/sync-sap/` — SAP object-part catalog → local templates
+- [x] `GET /api/v1/inspection-templates/` — list active checklist templates
+- [x] `POST /api/v1/inspections/` accepts optional `items` (template-driven checklist results)
+- [x] `POST /api/v1/inspections/{id}/submit/` FAIL → Fault + RepairOrder + `OUT_OF_SERVICE`
+- [x] PASS submit leaves vehicle `ACTIVE`
+- [x] Unit + integration tests (`test_demo_workflow_api.py`, template/vehicle sync services)
+- [x] Migration `inspection.0002_inspection_template`
+
+**Validation:** 593 tests PASS; black/isort/ruff PASS; mypy on changed modules PASS.
+
+---
+
+*Last updated: 2026-07-10 | Updated by: Lead Backend Architect | Validation: demo backend workflow APIs complete; frontend deferred*

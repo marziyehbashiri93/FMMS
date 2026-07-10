@@ -130,6 +130,27 @@ class DjangoVehicleRepository(IVehicleRepository):
             raise VehicleNotFoundError(plate_number.value) from None
         return _to_domain(orm)
 
+    def get_by_sap_equipment_number(
+        self, sap_equipment_number: SAPEquipmentNumber
+    ) -> Vehicle | None:
+        """Retrieve a vehicle by SAP equipment number, if linked.
+
+        Args:
+            sap_equipment_number: Validated SAP PM equipment number.
+
+        Returns:
+            The matching ``Vehicle`` domain entity, or ``None``.
+        """
+        logger.debug(
+            "get_by_sap_equipment_number",
+            extra={"sap_equipment_number": sap_equipment_number.value},
+        )
+        orm = VehicleModel.objects.filter(
+            sap_equipment_number=sap_equipment_number.value,
+            is_deleted=False,
+        ).first()
+        return _to_domain(orm) if orm else None
+
     def list_active(self) -> list[Vehicle]:
         """Return all ACTIVE vehicles.
 

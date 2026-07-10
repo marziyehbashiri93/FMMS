@@ -3,19 +3,13 @@
 Multi-step workflow (designed for future transaction boundary addition):
   Step 1: Load and validate the inspection (must be DRAFT with ≥1 item).
   Step 2: Call ``inspection.submit()`` — transitions DRAFT → SUBMITTED.
-  Step 3: For each FAIL checklist item, create a ``Fault`` entity and persist it.
-  Step 4: Save the updated inspection.
-
-Transaction boundary note:
-    Steps 2–4 are logically atomic. The service method is written so that
-    wrapping the body in ``django.db.transaction.atomic()`` at a later stage
-    requires no rewrite of business logic — only a decorator or context manager
-    around the call to ``execute()``.
+  Step 3: For each FAIL checklist item, create a ``Fault`` and ``RepairOrder``.
+  Step 4: If any FAIL items exist, mark the vehicle OUT_OF_SERVICE.
+  Step 5: Save the updated inspection.
 
 Cross-domain:
-    Fault creation happens here because it is a workflow policy ("failed
-    inspection items become faults"), not a rule owned by Inspection or Fault
-    entities.  Both repository ports are injected as abstractions.
+    Fault/repair/vehicle side-effects are workflow policy owned by this
+    service, not by Inspection, Fault, Repair, or Vehicle entities alone.
 """
 
 from __future__ import annotations
@@ -37,6 +31,9 @@ from apps.inspection.domain.interfaces.inspection_repository import (
     IInspectionRepository,
 )
 from apps.inspection.domain.value_objects import ChecklistResult
+from apps.repair.domain.entities import RepairOrder, RepairOrderStatus
+from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
+from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
 from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
 
@@ -47,30 +44,35 @@ _DEFAULT_FAULT_SEVERITY = FaultSeverity.MEDIUM
 
 
 class SubmitInspectionService:
-    """Orchestrates inspection submission and automatic fault generation.
+    """Orchestrates inspection submission and automatic fault/repair generation.
 
     When an inspection is submitted, any checklist items with a FAIL result
-    automatically produce a new ``Fault`` entity in OPEN status.  This
-    workflow policy is owned by this service, not by either domain entity.
+    automatically produce:
+      - a new ``Fault`` in OPEN status
+      - a new ``RepairOrder`` in CREATED status
+    and the vehicle is transitioned to ``OUT_OF_SERVICE``.
 
     Args:
         inspection_repository: Concrete ``IInspectionRepository``.
         fault_repository: Concrete ``IFaultRepository`` for auto-fault creation.
+        repair_order_repository: Concrete ``IRepairOrderRepository``.
+        vehicle_repository: Concrete ``IVehicleRepository``.
     """
 
     def __init__(
         self,
         inspection_repository: IInspectionRepository,
         fault_repository: IFaultRepository,
+        repair_order_repository: IRepairOrderRepository,
+        vehicle_repository: IVehicleRepository,
     ) -> None:
         self._inspection_repo = inspection_repository
         self._fault_repo = fault_repository
+        self._repair_repo = repair_order_repository
+        self._vehicle_repo = vehicle_repository
 
     def execute(self, dto: SubmitInspectionDTO) -> InspectionResponseDTO:
-        """Submit a DRAFT inspection and auto-create faults for FAIL items.
-
-        All mutations (inspection status update + fault creation) are designed
-        to be wrapped in a single database transaction without logic changes.
+        """Submit a DRAFT inspection and apply FAIL-side workflow effects.
 
         Args:
             dto: Submission request.
@@ -79,11 +81,9 @@ class SubmitInspectionService:
             ``InspectionResponseDTO`` with ``status == SUBMITTED``.
 
         Raises:
-            FMMSNotFoundError: If no inspection with ``dto.inspection_id`` exists.
-            InspectionItemRequiredError: If the inspection has no items
-                (raised by ``Inspection.submit()``).
-            InspectionInvalidStateTransitionError: If not in DRAFT status
-                (raised by ``Inspection.submit()``).
+            FMMSNotFoundError: If inspection or vehicle does not exist.
+            InspectionItemRequiredError: If the inspection has no items.
+            InspectionInvalidStateTransitionError: If not in DRAFT status.
         """
         logger.info(
             "Submitting inspection",
@@ -107,18 +107,42 @@ class SubmitInspectionService:
         inspection.updated_at = now
 
         faults_created = 0
+        repairs_created = 0
         for item in inspection.items:
-            if item.result == ChecklistResult.FAIL:
-                fault = _build_fault_from_item(
-                    inspection_id=inspection.id,
-                    vehicle_id=inspection.vehicle_id,
-                    item_category=item.category,
-                    item_description=item.description,
-                    reported_by_id=dto.submitted_by,
-                    now=now,
-                )
-                self._fault_repo.save(fault)
-                faults_created += 1
+            if item.result != ChecklistResult.FAIL:
+                continue
+            fault = _build_fault_from_item(
+                inspection_id=inspection.id,
+                vehicle_id=inspection.vehicle_id,
+                item_category=item.category,
+                item_description=item.description,
+                reported_by_id=dto.submitted_by,
+                now=now,
+            )
+            self._fault_repo.save(fault)
+            faults_created += 1
+
+            repair = RepairOrder(
+                id=uuid.uuid4(),
+                vehicle_id=inspection.vehicle_id,
+                fault_id=fault.id,
+                status=RepairOrderStatus.CREATED,
+                created_by_id=dto.submitted_by,
+                created_at=now,
+                updated_at=now,
+            )
+            self._repair_repo.save(repair)
+            repairs_created += 1
+
+        if faults_created > 0:
+            vehicle = load_or_not_found(
+                lambda: self._vehicle_repo.get_by_id(inspection.vehicle_id),
+                message=f"Vehicle '{inspection.vehicle_id}' not found.",
+                details={"vehicle_id": str(inspection.vehicle_id)},
+            )
+            vehicle.mark_out_of_service()
+            vehicle.updated_at = now
+            self._vehicle_repo.save(vehicle)
 
         saved = self._inspection_repo.save(inspection)
 
@@ -132,6 +156,8 @@ class SubmitInspectionService:
                 "entity_id": str(saved.id),
                 "result": "success",
                 "faults_created": faults_created,
+                "repairs_created": repairs_created,
+                "vehicle_out_of_service": faults_created > 0,
             },
         )
 

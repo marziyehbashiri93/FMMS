@@ -96,6 +96,11 @@ class TestVehicleEntity:
         v = _make_vehicle()
         v.mark_under_repair()
         assert v.status == VehicleStatus.UNDER_REPAIR
+
+    def test_mark_out_of_service(self) -> None:
+        v = _make_vehicle()
+        v.mark_out_of_service()
+        assert v.status == VehicleStatus.OUT_OF_SERVICE
         assert v.is_available is False
 
     def test_complete_repair_returns_active(self) -> None:

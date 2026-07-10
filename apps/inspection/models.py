@@ -1,5 +1,9 @@
 """Model shim — re-exports ORM models for Django auto-discovery."""
 
-from apps.inspection.infrastructure.models import InspectionItemModel, InspectionModel
+from apps.inspection.infrastructure.models import (
+    InspectionItemModel,
+    InspectionModel,
+    InspectionTemplateModel,
+)
 
-__all__ = ["InspectionModel", "InspectionItemModel"]
+__all__ = ["InspectionModel", "InspectionItemModel", "InspectionTemplateModel"]

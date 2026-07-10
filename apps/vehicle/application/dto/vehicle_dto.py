@@ -125,3 +125,20 @@ class VehicleResponseDTO:
     updated_at: datetime
     chassis_number: str | None = field(default=None)
     sap_equipment_number: str | None = field(default=None)
+
+
+@dataclass(frozen=True)
+class VehicleSAPSyncResultDTO:
+    """Summary of a bulk SAP equipment → FMMS vehicle synchronisation.
+
+    Attributes:
+        total_received: Number of equipment records returned by SAP.
+        created: Number of new FMMS vehicles created.
+        updated: Number of existing FMMS vehicles updated.
+        failed: Number of records that could not be synced.
+    """
+
+    total_received: int
+    created: int
+    updated: int
+    failed: int

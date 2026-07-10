@@ -39,7 +39,14 @@ from apps.inspection.application.services.get_inspection_service import (
 from apps.inspection.application.services.submit_inspection_service import (
     SubmitInspectionService,
 )
+from apps.inspection.application.services.sync_inspection_templates_from_sap_service import (
+    ListInspectionTemplatesService,
+    SyncInspectionTemplatesFromSAPService,
+)
 from apps.inspection.infrastructure.repositories import DjangoInspectionRepository
+from apps.inspection.infrastructure.template_repositories import (
+    DjangoInspectionTemplateRepository,
+)
 from apps.integration.application.services.retry_failed_sap_transactions_service import (
     RetryFailedSAPTransactionsService,
 )
@@ -122,6 +129,9 @@ from apps.vehicle.application.services.get_vehicle_service import (
 from apps.vehicle.application.services.sync_sap_equipment_service import (
     SyncSAPEquipmentService,
 )
+from apps.vehicle.application.services.sync_vehicles_from_sap_service import (
+    SyncVehiclesFromSAPService,
+)
 from apps.vehicle.application.services.update_vehicle_service import (
     UpdateVehicleService,
 )
@@ -135,6 +145,9 @@ from infrastructure.sap.adapters.bapi.purchase_requisition_bapi_adapter import (
 )
 from infrastructure.sap.adapters.odata.equipment_odata_adapter import (
     EquipmentODataAdapter,
+)
+from infrastructure.sap.adapters.odata.object_part_catalog_odata_adapter import (
+    ObjectPartCatalogODataAdapter,
 )
 from infrastructure.sap.client.mock.mock_client import MockSAPClient
 from infrastructure.sap.config import SAPConfig
@@ -171,6 +184,11 @@ def get_driver_repository() -> DjangoDriverRepository:
 def get_inspection_repository() -> DjangoInspectionRepository:
     """Return the inspection repository."""
     return DjangoInspectionRepository()
+
+
+def get_inspection_template_repository() -> DjangoInspectionTemplateRepository:
+    """Return the inspection template repository."""
+    return DjangoInspectionTemplateRepository()
 
 
 def get_fault_repository() -> DjangoFaultRepository:
@@ -234,6 +252,14 @@ def get_deactivate_vehicle_service() -> DeactivateVehicleService:
 def get_sync_sap_equipment_service() -> SyncSAPEquipmentService:
     """Return SyncSAPEquipmentService."""
     return SyncSAPEquipmentService(
+        get_vehicle_repository(),
+        EquipmentODataAdapter(_sap_client()),
+    )
+
+
+def get_sync_vehicles_from_sap_service() -> SyncVehiclesFromSAPService:
+    """Return SyncVehiclesFromSAPService for bulk equipment import."""
+    return SyncVehiclesFromSAPService(
         get_vehicle_repository(),
         EquipmentODataAdapter(_sap_client()),
     )
@@ -305,6 +331,23 @@ def get_submit_inspection_service() -> SubmitInspectionService:
     return SubmitInspectionService(
         get_inspection_repository(),
         get_fault_repository(),
+        get_repair_order_repository(),
+        get_vehicle_repository(),
+    )
+
+
+def get_list_inspection_templates_service() -> ListInspectionTemplatesService:
+    """Return ListInspectionTemplatesService."""
+    return ListInspectionTemplatesService(get_inspection_template_repository())
+
+
+def get_sync_inspection_templates_from_sap_service() -> (
+    SyncInspectionTemplatesFromSAPService
+):
+    """Return SyncInspectionTemplatesFromSAPService."""
+    return SyncInspectionTemplatesFromSAPService(
+        get_inspection_template_repository(),
+        ObjectPartCatalogODataAdapter(_sap_client()),
     )
 
 

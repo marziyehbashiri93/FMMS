@@ -24,6 +24,7 @@ from interfaces.api.v1.vehicle.serializers import (
     SAPEquipmentSyncSerializer,
     VehicleCreateSerializer,
     VehicleResponseSerializer,
+    VehicleSAPSyncResultSerializer,
     VehicleUpdateSerializer,
 )
 
@@ -110,6 +111,18 @@ class VehicleViewSet(GenericViewSet):
             )
         )
         return Response(VehicleResponseSerializer(result).data)
+
+    @extend_schema(
+        request=None,
+        responses=VehicleSAPSyncResultSerializer,
+    )
+    @action(detail=False, methods=["post"], url_path="sync-sap")
+    def sync_sap_bulk(self, request: Request) -> Response:
+        """Import/create/update vehicles from SAP equipment master data."""
+        result = deps.get_sync_vehicles_from_sap_service().execute(
+            request_id_from(request)
+        )
+        return Response(VehicleSAPSyncResultSerializer(result).data)
 
     @extend_schema(
         request=SAPEquipmentSyncSerializer, responses=VehicleResponseSerializer

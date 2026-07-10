@@ -77,3 +77,36 @@ class InspectionItemModel(models.Model):
 
     def __str__(self) -> str:
         return f"Item {self.item_id} [{self.result}]"
+
+
+class InspectionTemplateModel(BaseModel):
+    """Local cache of SAP object-part catalog entries for driver checklists."""
+
+    sap_code = models.CharField(max_length=40, db_index=True)
+    code_group = models.CharField(max_length=40, db_index=True)
+    category = models.CharField(max_length=100)
+    description = models.CharField(max_length=500)
+    catalog_type = models.CharField(max_length=10, default="B")
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        app_label = "inspection"
+        db_table = "inspection_template"
+        verbose_name = "Inspection Template"
+        verbose_name_plural = "Inspection Templates"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["sap_code", "code_group", "catalog_type"],
+                condition=models.Q(is_deleted=False),
+                name="unique_active_inspection_template_sap_key",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["is_active", "is_deleted"],
+                name="insp_tmpl_active_deleted_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.sap_code}/{self.code_group}: {self.description}"

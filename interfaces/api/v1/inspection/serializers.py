@@ -8,6 +8,15 @@ from apps.inspection.domain.entities import InspectionStatus, InspectionType
 from apps.inspection.domain.value_objects import ChecklistResult, OdometerUnit
 
 
+class InspectionItemCreateSerializer(serializers.Serializer):
+    """Validate checklist item creation input."""
+
+    category = serializers.CharField(max_length=100)
+    description = serializers.CharField(max_length=500)
+    result = serializers.ChoiceField(choices=[item.value for item in ChecklistResult])
+    notes = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+
+
 class InspectionCreateSerializer(serializers.Serializer):
     """Validate inspection creation input."""
 
@@ -21,15 +30,7 @@ class InspectionCreateSerializer(serializers.Serializer):
     )
     inspected_at = serializers.DateTimeField()
     driver_id = serializers.UUIDField(required=False, allow_null=True)
-
-
-class InspectionItemCreateSerializer(serializers.Serializer):
-    """Validate checklist item creation input."""
-
-    category = serializers.CharField(max_length=100)
-    description = serializers.CharField(max_length=500)
-    result = serializers.ChoiceField(choices=[item.value for item in ChecklistResult])
-    notes = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    items = InspectionItemCreateSerializer(many=True, required=False)
 
 
 class InspectionItemResponseSerializer(serializers.Serializer):

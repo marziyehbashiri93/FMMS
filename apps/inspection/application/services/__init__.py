@@ -13,6 +13,10 @@ from apps.inspection.application.services.get_inspection_service import (
 from apps.inspection.application.services.submit_inspection_service import (
     SubmitInspectionService,
 )
+from apps.inspection.application.services.sync_inspection_templates_from_sap_service import (
+    ListInspectionTemplatesService,
+    SyncInspectionTemplatesFromSAPService,
+)
 
 __all__ = [
     "CreateInspectionService",
@@ -20,4 +24,6 @@ __all__ = [
     "SubmitInspectionService",
     "GetInspectionService",
     "ListInspectionsService",
+    "ListInspectionTemplatesService",
+    "SyncInspectionTemplatesFromSAPService",
 ]

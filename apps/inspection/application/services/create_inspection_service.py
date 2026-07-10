@@ -16,7 +16,7 @@ from apps.inspection.application.dto.inspection_dto import (
     CreateInspectionDTO,
     InspectionResponseDTO,
 )
-from apps.inspection.domain.entities import Inspection, InspectionStatus
+from apps.inspection.domain.entities import Inspection, InspectionItem, InspectionStatus
 from apps.inspection.domain.interfaces.inspection_repository import (
     IInspectionRepository,
 )
@@ -81,11 +81,15 @@ class CreateInspectionService:
     def execute(self, dto: CreateInspectionDTO) -> InspectionResponseDTO:
         """Create and persist a new DRAFT inspection.
 
+        Optional ``dto.items`` are attached immediately so a driver can
+        create + fill checklist results in one request after loading
+        SAP-synced templates.
+
         Args:
             dto: Input data for the inspection to create.
 
         Returns:
-            ``InspectionResponseDTO`` in DRAFT status with no items.
+            ``InspectionResponseDTO`` in DRAFT status.
 
         Raises:
             FMMSNotFoundError: If no vehicle with ``dto.vehicle_id`` exists.
@@ -122,6 +126,16 @@ class CreateInspectionService:
             created_at=now,
             updated_at=now,
         )
+        for item_dto in dto.items:
+            inspection.add_item(
+                InspectionItem(
+                    id=uuid.uuid4(),
+                    category=item_dto.category,
+                    description=item_dto.description,
+                    result=item_dto.result,
+                    notes=item_dto.notes,
+                )
+            )
 
         saved = self._inspection_repo.save(inspection)
 
@@ -134,6 +148,7 @@ class CreateInspectionService:
                 "request_id": dto.request_id,
                 "entity_id": str(saved.id),
                 "result": "success",
+                "item_count": len(saved.items),
             },
         )
 

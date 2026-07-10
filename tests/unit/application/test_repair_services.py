@@ -246,6 +246,19 @@ class FakeVehicleRepository(IVehicleRepository):
     def get_by_plate(self, plate_number: PlateNumber) -> Vehicle | None:
         return None
 
+    def get_by_sap_equipment_number(
+        self, sap_equipment_number: SAPEquipmentNumber
+    ) -> Vehicle | None:
+        return next(
+            (
+                v
+                for v in self._store.values()
+                if v.sap_equipment_number is not None
+                and v.sap_equipment_number == sap_equipment_number
+            ),
+            None,
+        )
+
     def exists_by_plate(self, plate_number: PlateNumber) -> bool:
         return False
 

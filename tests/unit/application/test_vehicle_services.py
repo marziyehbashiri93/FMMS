@@ -37,6 +37,9 @@ from apps.vehicle.application.services.get_vehicle_service import (
 from apps.vehicle.application.services.sync_sap_equipment_service import (
     SyncSAPEquipmentService,
 )
+from apps.vehicle.application.services.sync_vehicles_from_sap_service import (
+    SyncVehiclesFromSAPService,
+)
 from apps.vehicle.application.services.update_vehicle_service import (
     UpdateVehicleService,
 )
@@ -89,6 +92,19 @@ class FakeVehicleRepository(IVehicleRepository):
             None,
         )
 
+    def get_by_sap_equipment_number(
+        self, sap_equipment_number: SAPEquipmentNumber
+    ) -> Vehicle | None:
+        return next(
+            (
+                v
+                for v in self._store.values()
+                if v.sap_equipment_number is not None
+                and v.sap_equipment_number == sap_equipment_number
+            ),
+            None,
+        )
+
     def exists_by_plate(self, plate_number: PlateNumber) -> bool:
         return self.get_by_plate(plate_number) is not None
 
@@ -134,16 +150,26 @@ class FakeRepairOrderRepository(IRepairOrderRepository):
 
 
 class FakeSAPEquipmentPort(ISAPEquipmentPort):
-    """Returns a canned SAP equipment DTO."""
+    """Returns canned SAP equipment DTO(s)."""
 
-    def __init__(self, dto: SAPEquipmentDTO) -> None:
+    def __init__(
+        self,
+        dto: SAPEquipmentDTO | None = None,
+        equipment: list[SAPEquipmentDTO] | None = None,
+    ) -> None:
         self._dto = dto
+        self._equipment = equipment or ([dto] if dto is not None else [])
 
     def get_equipment(self, equipment_number: str) -> SAPEquipmentDTO:
-        return self._dto
+        if self._dto is not None and self._dto.equipment_number == equipment_number:
+            return self._dto
+        for item in self._equipment:
+            if item.equipment_number == equipment_number:
+                return item
+        return self._equipment[0]
 
     def list_equipment(self, plant: str | None = None) -> list[SAPEquipmentDTO]:
-        return [self._dto]
+        return list(self._equipment)
 
 
 # ---------------------------------------------------------------------------
@@ -433,3 +459,84 @@ class TestSyncSAPEquipmentService:
 
         with pytest.raises(FMMSNotFoundError):
             SyncSAPEquipmentService(repo, sap_port).execute("999999")
+
+
+# ---------------------------------------------------------------------------
+# SyncVehiclesFromSAPService (bulk)
+# ---------------------------------------------------------------------------
+
+
+class TestSyncVehiclesFromSAPService:
+    def test_creates_vehicles_from_sap_equipment(self) -> None:
+        repo = FakeVehicleRepository()
+        sap_port = FakeSAPEquipmentPort(
+            equipment=[
+                SAPEquipmentDTO(
+                    equipment_number="10000001",
+                    description="Fleet Vehicle — Toyota Land Cruiser",
+                    plant="P001",
+                    serial_number="SN-LC-001",
+                    category="F",
+                ),
+                SAPEquipmentDTO(
+                    equipment_number="10000002",
+                    description="Fleet Vehicle — Isuzu D-Max",
+                    plant="P001",
+                    category="F",
+                ),
+            ]
+        )
+
+        result = SyncVehiclesFromSAPService(repo, sap_port).execute(
+            request_id="req-bulk"
+        )
+
+        assert result.total_received == 2
+        assert result.created == 2
+        assert result.updated == 0
+        assert result.failed == 0
+        assert len(repo.list_active()) == 2
+
+    def test_updates_existing_vehicle_by_sap_equipment_number(self) -> None:
+        vehicle = _make_vehicle(plate="EQ10000001", sap_eq="10000001")
+        vehicle.model = "Old"
+        repo = FakeVehicleRepository(initial=[vehicle])
+        sap_port = FakeSAPEquipmentPort(
+            equipment=[
+                SAPEquipmentDTO(
+                    equipment_number="10000001",
+                    description="Fleet Vehicle — Toyota Land Cruiser",
+                    plant="P001",
+                    category="F",
+                )
+            ]
+        )
+
+        result = SyncVehiclesFromSAPService(repo, sap_port).execute()
+
+        assert result.created == 0
+        assert result.updated == 1
+        assert result.failed == 0
+        assert repo.get_by_id(vehicle.id).model == "Land Cruiser"
+
+    def test_sync_is_idempotent(self) -> None:
+        repo = FakeVehicleRepository()
+        sap_port = FakeSAPEquipmentPort(
+            equipment=[
+                SAPEquipmentDTO(
+                    equipment_number="10000001",
+                    description="Fleet Vehicle — Toyota Land Cruiser",
+                    plant="P001",
+                    category="F",
+                )
+            ]
+        )
+        service = SyncVehiclesFromSAPService(repo, sap_port)
+
+        first = service.execute()
+        second = service.execute()
+
+        assert first.created == 1
+        assert second.created == 0
+        assert second.updated == 1
+        assert len(repo.list_active()) == 1

@@ -14,9 +14,8 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from apps.vehicle.application.dto.vehicle_dto import VehicleResponseDTO
-from apps.vehicle.domain.entities import VehicleStatus
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
-from apps.vehicle.domain.value_objects import SAPEquipmentNumber
+from apps.vehicle.domain.value_objects import ChassisNumber, SAPEquipmentNumber
 from core.exceptions.base_exception import FMMSNotFoundError
 from core.logging.structured_logger import get_structured_logger
 from core.sap.ports.equipment_port import ISAPEquipmentPort
@@ -51,8 +50,7 @@ class SyncSAPEquipmentService:
         The vehicle is looked up by its SAP equipment number via the repository.
         If no matching vehicle exists, ``FMMSNotFoundError`` is raised.
         The only fields updated are those that can be sourced directly from the
-        SAP ``SAPEquipmentDTO`` (description → model, functional_location logged
-        for audit).  No other business rules are applied here.
+        SAP ``SAPEquipmentDTO`` (description → model, serial → chassis).
 
         Args:
             sap_equipment_number: SAP PM equipment number to sync.
@@ -77,19 +75,8 @@ class SyncSAPEquipmentService:
         )
 
         sap_dto = self._sap.get_equipment(sap_equipment_number)
-
-        all_vehicles: list = []
-        for status in VehicleStatus:
-            all_vehicles.extend(self._repo.list_by_status(status))
-
-        matched_vehicle = next(
-            (
-                v
-                for v in all_vehicles
-                if v.sap_equipment_number is not None
-                and v.sap_equipment_number.value == sap_equipment_number
-            ),
-            None,
+        matched_vehicle = self._repo.get_by_sap_equipment_number(
+            SAPEquipmentNumber(sap_equipment_number)
         )
 
         if matched_vehicle is None:
@@ -100,11 +87,9 @@ class SyncSAPEquipmentService:
 
         if sap_dto.description:
             matched_vehicle.model = sap_dto.description
-        if sap_dto.serial_number and matched_vehicle.sap_equipment_number is None:
-            matched_vehicle.sap_equipment_number = SAPEquipmentNumber(
-                sap_equipment_number
-            )
-
+        if sap_dto.serial_number:
+            matched_vehicle.chassis_number = ChassisNumber(sap_dto.serial_number[:50])
+        matched_vehicle.sap_equipment_number = SAPEquipmentNumber(sap_equipment_number)
         matched_vehicle.updated_at = datetime.now(tz=UTC)
         saved = self._repo.save(matched_vehicle)
 

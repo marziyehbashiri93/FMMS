@@ -30,12 +30,14 @@ class VehicleStatus(StrEnum):
         INACTIVE: Vehicle has been decommissioned or removed from service.
         UNDER_REPAIR: Vehicle is currently being repaired and unavailable.
         SUSPENDED: Vehicle is temporarily suspended (e.g. pending inspection).
+        OUT_OF_SERVICE: Vehicle failed inspection and is not operational.
     """
 
     ACTIVE = "ACTIVE"
     INACTIVE = "INACTIVE"
     UNDER_REPAIR = "UNDER_REPAIR"
     SUSPENDED = "SUSPENDED"
+    OUT_OF_SERVICE = "OUT_OF_SERVICE"
 
 
 class VehicleCategory(StrEnum):
@@ -57,13 +59,36 @@ class VehicleCategory(StrEnum):
 # Permitted status transitions for the Vehicle aggregate.
 _ALLOWED_TRANSITIONS: dict[VehicleStatus, frozenset[VehicleStatus]] = {
     VehicleStatus.ACTIVE: frozenset(
-        {VehicleStatus.INACTIVE, VehicleStatus.UNDER_REPAIR, VehicleStatus.SUSPENDED}
+        {
+            VehicleStatus.INACTIVE,
+            VehicleStatus.UNDER_REPAIR,
+            VehicleStatus.SUSPENDED,
+            VehicleStatus.OUT_OF_SERVICE,
+        }
     ),
     VehicleStatus.UNDER_REPAIR: frozenset(
-        {VehicleStatus.ACTIVE, VehicleStatus.INACTIVE, VehicleStatus.SUSPENDED}
+        {
+            VehicleStatus.ACTIVE,
+            VehicleStatus.INACTIVE,
+            VehicleStatus.SUSPENDED,
+            VehicleStatus.OUT_OF_SERVICE,
+        }
     ),
     VehicleStatus.SUSPENDED: frozenset(
-        {VehicleStatus.ACTIVE, VehicleStatus.INACTIVE, VehicleStatus.UNDER_REPAIR}
+        {
+            VehicleStatus.ACTIVE,
+            VehicleStatus.INACTIVE,
+            VehicleStatus.UNDER_REPAIR,
+            VehicleStatus.OUT_OF_SERVICE,
+        }
+    ),
+    VehicleStatus.OUT_OF_SERVICE: frozenset(
+        {
+            VehicleStatus.ACTIVE,
+            VehicleStatus.UNDER_REPAIR,
+            VehicleStatus.INACTIVE,
+            VehicleStatus.SUSPENDED,
+        }
     ),
     VehicleStatus.INACTIVE: frozenset(),
 }
@@ -132,6 +157,15 @@ class Vehicle:
                 current status.
         """
         self.transition_to(VehicleStatus.UNDER_REPAIR)
+
+    def mark_out_of_service(self) -> None:
+        """Transition the vehicle to OUT_OF_SERVICE after a failed inspection.
+
+        Raises:
+            VehicleInvalidStateTransitionError: If not permitted from the
+                current status.
+        """
+        self.transition_to(VehicleStatus.OUT_OF_SERVICE)
 
     def complete_repair(self) -> None:
         """Transition the vehicle back to ACTIVE after repair completion.

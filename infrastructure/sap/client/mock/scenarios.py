@@ -130,6 +130,30 @@ ODATA_OBJECT_PART_LIST: dict = {
     "d": {
         "results": [
             {
+                "Code": "SEAT",
+                "CodeGroup": "SAFETY",
+                "CodeText": "Seat belt",
+                "CatalogType": "B",
+            },
+            {
+                "Code": "FLIGHT",
+                "CodeGroup": "LIGHTS",
+                "CodeText": "Front light",
+                "CatalogType": "B",
+            },
+            {
+                "Code": "FRIDGE",
+                "CodeGroup": "CARGO",
+                "CodeText": "Refrigerator",
+                "CatalogType": "B",
+            },
+            {
+                "Code": "SAFE",
+                "CodeGroup": "SAFETY",
+                "CodeText": "Safety equipment",
+                "CatalogType": "B",
+            },
+            {
                 "Code": "ENG",
                 "CodeGroup": "POWERTRAIN",
                 "CodeText": "Engine assembly",

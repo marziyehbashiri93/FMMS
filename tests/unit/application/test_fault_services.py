@@ -32,7 +32,7 @@ from apps.fault.domain.interfaces.fault_repository import IFaultRepository
 from apps.fault.domain.value_objects import FaultCode, FaultDescription, FaultSeverity
 from apps.vehicle.domain.entities import Vehicle, VehicleCategory, VehicleStatus
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
-from apps.vehicle.domain.value_objects import VIN, PlateNumber
+from apps.vehicle.domain.value_objects import VIN, PlateNumber, SAPEquipmentNumber
 from core.exceptions.base_exception import FMMSNotFoundError
 
 # ---------------------------------------------------------------------------
@@ -117,6 +117,19 @@ class FakeVehicleRepository(IVehicleRepository):
 
     def get_by_plate(self, plate_number: PlateNumber) -> Vehicle | None:
         return None
+
+    def get_by_sap_equipment_number(
+        self, sap_equipment_number: SAPEquipmentNumber
+    ) -> Vehicle | None:
+        return next(
+            (
+                v
+                for v in self._store.values()
+                if v.sap_equipment_number is not None
+                and v.sap_equipment_number == sap_equipment_number
+            ),
+            None,
+        )
 
     def exists_by_plate(self, plate_number: PlateNumber) -> bool:
         return False

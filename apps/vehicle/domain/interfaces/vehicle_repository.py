@@ -11,7 +11,7 @@ import uuid
 from abc import ABC, abstractmethod
 
 from apps.vehicle.domain.entities import Vehicle, VehicleStatus
-from apps.vehicle.domain.value_objects import PlateNumber
+from apps.vehicle.domain.value_objects import PlateNumber, SAPEquipmentNumber
 
 
 class IVehicleRepository(ABC):
@@ -48,6 +48,19 @@ class IVehicleRepository(ABC):
 
         Raises:
             VehicleNotFoundError: If no vehicle exists with this plate number.
+        """
+
+    @abstractmethod
+    def get_by_sap_equipment_number(
+        self, sap_equipment_number: SAPEquipmentNumber
+    ) -> Vehicle | None:
+        """Retrieve a vehicle by its SAP equipment number, if linked.
+
+        Args:
+            sap_equipment_number: Validated SAP PM equipment number.
+
+        Returns:
+            The matching ``Vehicle`` aggregate, or ``None`` if not linked.
         """
 
     @abstractmethod
