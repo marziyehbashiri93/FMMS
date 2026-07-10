@@ -75,6 +75,7 @@ class AddInspectionItemService:
             description=dto.description,
             result=dto.result,
             notes=dto.notes,
+            severity=dto.severity,
         )
 
         inspection.add_item(item)

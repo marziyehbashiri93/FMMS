@@ -19,7 +19,7 @@ from apps.inspection.application.dto.inspection_dto import (
     SubmitInspectionDTO,
 )
 from apps.inspection.domain.entities import InspectionType
-from apps.inspection.domain.value_objects import ChecklistResult, OdometerUnit
+from apps.inspection.domain.value_objects import ChecklistResult, FailureSeverity, OdometerUnit
 from core.permissions import IsReadOnlyOrTechnicianOrAbove
 from interfaces.api.v1 import deps
 from interfaces.api.v1.inspection.serializers import (
@@ -87,6 +87,9 @@ class InspectionViewSet(GenericViewSet):
                 description=item["description"],
                 result=ChecklistResult(item["result"]),
                 notes=item.get("notes"),
+                severity=FailureSeverity(item["severity"])
+                if item.get("severity")
+                else None,
             )
             for item in raw_items
         ]
@@ -115,11 +118,14 @@ class InspectionViewSet(GenericViewSet):
         serializer.is_valid(raise_exception=True)
         data = dict(serializer.validated_data)
         result_value = ChecklistResult(data.pop("result"))
+        severity_raw = data.pop("severity", None)
+        severity = FailureSeverity(severity_raw) if severity_raw else None
         result = deps.get_add_inspection_item_service().execute(
             AddInspectionItemDTO(
                 inspection_id=uuid.UUID(str(pk)),
                 **data,
                 result=result_value,
+                severity=severity,
                 request_id=request_id_from(request),
             )
         )

@@ -44,6 +44,24 @@ logger = get_structured_logger("inspection", __name__)
 _DEFAULT_FAULT_CODE = "INSP-FAIL"
 _DEFAULT_FAULT_SEVERITY = FaultSeverity.MEDIUM
 _MULTI_FAILURE_DESCRIPTION = "Multiple inspection failures"
+_SEVERITY_RANK: dict[FaultSeverity, int] = {
+    FaultSeverity.LOW: 0,
+    FaultSeverity.MEDIUM: 1,
+    FaultSeverity.HIGH: 2,
+    FaultSeverity.CRITICAL: 3,
+}
+
+
+def _item_fault_severity(item: InspectionItem) -> FaultSeverity:
+    """Map a failed inspection item to fault severity."""
+    if item.severity is None:
+        return _DEFAULT_FAULT_SEVERITY
+    return FaultSeverity(item.severity.value)
+
+
+def _max_fault_severity(severities: list[FaultSeverity]) -> FaultSeverity:
+    """Return the highest severity from a non-empty list."""
+    return max(severities, key=lambda level: _SEVERITY_RANK[level])
 
 
 class SubmitInspectionService:
@@ -168,12 +186,15 @@ def _build_fault_from_failed_items(
     else:
         summary = _MULTI_FAILURE_DESCRIPTION
 
+    item_severities = [_item_fault_severity(item) for item in failed_items]
+    overall_severity = _max_fault_severity(item_severities)
+
     fault = Fault(
         id=fault_id,
         vehicle_id=vehicle_id,
         code=FaultCode(_DEFAULT_FAULT_CODE),
         description=FaultDescription(summary),
-        severity=_DEFAULT_FAULT_SEVERITY,
+        severity=overall_severity,
         status=FaultStatus.OPEN,
         reported_by_id=reported_by_id,
         reported_at=now,
@@ -205,7 +226,7 @@ def _build_fault_item(
         inspection_item_id=item.id,
         component=item.description,
         description=detail[:500],
-        severity=_DEFAULT_FAULT_SEVERITY,
+        severity=_item_fault_severity(item),
         created_at=now,
         updated_at=now,
     )

@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from apps.inspection.domain.entities import InspectionStatus, InspectionType
-from apps.inspection.domain.value_objects import ChecklistResult, OdometerUnit
+from apps.inspection.domain.value_objects import ChecklistResult, FailureSeverity, OdometerUnit
 
 
 @dataclass(frozen=True)
@@ -25,12 +25,14 @@ class CreateInspectionItemInputDTO:
         description: Human-readable description of the item being checked.
         result: The outcome of this checklist item.
         notes: Optional technician notes or observations.
+        severity: Required when ``result`` is FAIL; driver-assigned fault severity.
     """
 
     category: str
     description: str
     result: ChecklistResult
     notes: str | None = field(default=None)
+    severity: FailureSeverity | None = field(default=None)
 
 
 @dataclass(frozen=True)
@@ -71,6 +73,7 @@ class AddInspectionItemDTO:
         result: The outcome of this checklist item.
         request_id: Correlation ID for tracing.
         notes: Optional technician notes or observations.
+        severity: Required when ``result`` is FAIL.
     """
 
     inspection_id: uuid.UUID
@@ -79,6 +82,7 @@ class AddInspectionItemDTO:
     result: ChecklistResult
     request_id: str
     notes: str | None = field(default=None)
+    severity: FailureSeverity | None = field(default=None)
 
 
 @dataclass(frozen=True)
@@ -119,6 +123,7 @@ class InspectionItemResponseDTO:
         description: Human-readable description.
         result: Checklist outcome.
         notes: Optional technician notes.
+        severity: Driver-assigned severity when the item failed.
     """
 
     id: uuid.UUID
@@ -126,6 +131,7 @@ class InspectionItemResponseDTO:
     description: str
     result: ChecklistResult
     notes: str | None = field(default=None)
+    severity: FailureSeverity | None = field(default=None)
 
 
 @dataclass(frozen=True)

@@ -19,6 +19,7 @@ from apps.inspection.domain.interfaces.inspection_repository import (
 )
 from apps.inspection.domain.value_objects import (
     ChecklistResult,
+    FailureSeverity,
     OdometerReading,
     OdometerUnit,
 )
@@ -37,6 +38,9 @@ def _items_to_domain(orm_items: list[InspectionItemModel]) -> list[InspectionIte
             description=item.description,
             result=ChecklistResult(item.result),
             notes=item.notes or None,
+            severity=FailureSeverity(item.severity)
+            if item.severity
+            else None,
         )
         for item in orm_items
     ]
@@ -132,6 +136,7 @@ class DjangoInspectionRepository(IInspectionRepository):
                         description=item.description,
                         result=item.result.value,
                         notes=item.notes or "",
+                        severity=item.severity.value if item.severity else "",
                     )
                     for item in inspection.items
                 ]

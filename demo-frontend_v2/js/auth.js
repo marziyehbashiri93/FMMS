@@ -125,12 +125,13 @@ window.FMMS = window.FMMS || {};
     return entry ? entry[0] : code || "—";
   }
 
-  function renderSeveritySelect(selected, fieldId) {
+  function renderSeveritySelect(selected, fieldId, disabled = false) {
     const levels = FMMS.api?.capabilities?.severityLevels || ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
     const options = levels
       .map((s) => `<option value="${s}" ${s === selected ? "selected" : ""}>${severityLabel(s)} (${s})</option>`)
       .join("");
-    return `<select id="${fieldId}" class="form-control form-control-sm" disabled>${options}</select>`;
+    const disabledAttr = disabled ? " disabled" : "";
+    return `<select id="${fieldId}" class="form-control form-control-sm checklist-severity-select"${disabledAttr}>${options}</select>`;
   }
 
   function renderFaultSeverityBlock(fault) {
@@ -142,7 +143,7 @@ window.FMMS = window.FMMS || {};
     }
     if (!caps.faultSeverityEdit) {
       html += `<div class="demo-only-msg">ویرایش شدت خرابی در API فعلی موجود نیست.</div>`;
-      html += renderSeveritySelect(overall || "MEDIUM", "fault-severity-disabled");
+      html += renderSeveritySelect(overall || "MEDIUM", "fault-severity-disabled", true);
     }
     html += `</div>`;
     return html;
@@ -186,6 +187,7 @@ window.FMMS = window.FMMS || {};
     vehicleLabel,
     categoryLabel,
     severityLabel,
+    renderSeveritySelect,
     createdByLabel,
     renderDl,
     renderTable,

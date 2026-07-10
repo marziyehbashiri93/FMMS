@@ -20,6 +20,25 @@ class ChecklistResult(StrEnum):
     NOT_APPLICABLE = "NOT_APPLICABLE"
 
 
+class FailureSeverity(StrEnum):
+    """Driver-assigned severity for a failed checklist item.
+
+    Values align with ``FaultSeverity`` so submit workflow can raise faults
+    without the inspection domain depending on the fault bounded context.
+
+    Attributes:
+        CRITICAL: Immediate attention required.
+        HIGH: Significant issue; repair at earliest opportunity.
+        MEDIUM: Moderate issue; schedule within normal cycle.
+        LOW: Minor issue; note and monitor.
+    """
+
+    CRITICAL = "CRITICAL"
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+
+
 class OdometerUnit(StrEnum):
     """Unit of measurement for odometer readings.
 

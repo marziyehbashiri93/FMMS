@@ -305,6 +305,7 @@ window.FMMS = window.FMMS || {};
           description: item.description,
           result: item.result,
           notes: item.notes || null,
+          severity: item.result === "FAIL" ? item.severity || "MEDIUM" : null,
         })),
         driver_id: body.driver_id || null,
         reviewed_by_id: null,
@@ -318,7 +319,14 @@ window.FMMS = window.FMMS || {};
     if (m && method === "POST") {
       const insp = DB.inspections.find((x) => x.id === m[0]);
       if (!insp) throw new ApiError("بازرسی یافت نشد.", 404);
-      const item = { id: uid("item"), category: body.category, description: body.description, result: body.result, notes: body.notes || null };
+      const item = {
+        id: uid("item"),
+        category: body.category,
+        description: body.description,
+        result: body.result,
+        notes: body.notes || null,
+        severity: body.result === "FAIL" ? body.severity || "MEDIUM" : null,
+      };
       insp.items.push(item);
       if (body.result === "FAIL") insp.has_failures = true;
       insp.updated_at = now();
@@ -336,12 +344,13 @@ window.FMMS = window.FMMS || {};
       if (insp.has_failures) {
         const failed = insp.items.filter((i) => i.result === "FAIL");
         failed.forEach((fi) => {
+          const itemSeverity = fi.severity || "MEDIUM";
           const fault = {
             id: uid("fault"),
             vehicle_id: insp.vehicle_id,
             code: "INSP-FAIL",
             description: fi.description,
-            severity: "MEDIUM",
+            severity: itemSeverity,
             status: "OPEN",
             reported_by_id: insp.driver_id || "driver-demo",
             reported_at: now(),
@@ -355,7 +364,15 @@ window.FMMS = window.FMMS || {};
               name: "مدیر سیستم",
               role: "ADMIN",
             },
-            items: [{ id: uid("fitem"), component: fi.category, description: fi.description, severity: "MEDIUM", inspection_item_id: fi.id }],
+            items: [
+              {
+                id: uid("fitem"),
+                component: fi.category,
+                description: fi.description,
+                severity: itemSeverity,
+                inspection_item_id: fi.id,
+              },
+            ],
           };
           DB.faults.push(fault);
 

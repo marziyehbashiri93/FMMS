@@ -15,6 +15,7 @@ import pytest
 
 from apps.fault.domain.entities import Fault, FaultStatus
 from apps.fault.domain.interfaces.fault_repository import IFaultRepository
+from apps.fault.domain.value_objects import FaultSeverity
 from apps.inspection.application.dto.inspection_dto import (
     AddInspectionItemDTO,
     CreateInspectionDTO,
@@ -44,6 +45,7 @@ from apps.inspection.domain.interfaces.inspection_repository import (
 )
 from apps.inspection.domain.value_objects import (
     ChecklistResult,
+    FailureSeverity,
     OdometerReading,
     OdometerUnit,
 )
@@ -435,6 +437,26 @@ class TestSubmitInspectionService:
         assert len(fault.items) == 1
         assert fault.items[0].component == "Oil level critical"
 
+    def test_submit_propagates_item_severity_to_fault(self) -> None:
+        vehicle = _make_vehicle()
+        inspection = _make_inspection(vehicle_id=vehicle.id)
+        inspection.items.append(
+            _make_fail_item("Brakes", "Pad worn", FailureSeverity.LOW)
+        )
+        inspection.items.append(
+            _make_fail_item("Engine", "Oil leak", FailureSeverity.CRITICAL)
+        )
+        service, fault_repo, _, _ = self._service(
+            inspections=[inspection], vehicles=[vehicle]
+        )
+
+        service.execute(self._dto(inspection.id))
+
+        fault = fault_repo.saved[0]
+        assert fault.severity == FaultSeverity.CRITICAL
+        severities = {item.severity for item in fault.items}
+        assert severities == {FaultSeverity.LOW, FaultSeverity.CRITICAL}
+
     def test_raises_not_found_for_missing_inspection(self) -> None:
         service, _, _, _ = self._service()
 
@@ -539,7 +561,11 @@ def _make_pass_item() -> object:
     )
 
 
-def _make_fail_item(category: str, description: str) -> object:
+def _make_fail_item(
+    category: str,
+    description: str,
+    severity: FailureSeverity | None = None,
+) -> object:
     from apps.inspection.domain.entities import InspectionItem  # noqa: PLC0415
 
     return InspectionItem(
@@ -547,4 +573,5 @@ def _make_fail_item(category: str, description: str) -> object:
         category=category,
         description=description,
         result=ChecklistResult.FAIL,
+        severity=severity,
     )

@@ -64,7 +64,10 @@ FMMS.pages = FMMS.pages || {};
     for (const t of templates) {
       const entry = itemResults[t.id];
       if (!entry?.result) return false;
-      if (entry.result === "FAIL" && !entry.notes?.trim()) return false;
+      if (entry.result === "FAIL") {
+        if (!entry.notes?.trim()) return false;
+        if (!entry.severity) return false;
+      }
     }
     return true;
   }
@@ -141,6 +144,10 @@ FMMS.pages = FMMS.pages || {};
             rows="2"
             placeholder="شرح خرابی را بنویسید…"
           ></textarea>
+          <div class="checklist-severity-wrap">
+            <label class="checklist-notes-label required" for="severity-${t.id}">شدت خرابی</label>
+            ${FMMS.ui.renderSeveritySelect("MEDIUM", `severity-${t.id}`)}
+          </div>
         </div>
       </div>`
       )
@@ -150,6 +157,7 @@ FMMS.pages = FMMS.pages || {};
       const templateId = row.dataset.template;
       const notesWrap = row.querySelector(".checklist-notes-wrap");
       const notesInput = row.querySelector(".checklist-notes-input");
+      const severitySelect = row.querySelector(".checklist-severity-select");
 
       row.querySelectorAll(".result-toggle button").forEach((btn) => {
         btn.addEventListener("click", () => {
@@ -157,12 +165,16 @@ FMMS.pages = FMMS.pages || {};
           itemResults[templateId] = {
             result: result,
             notes: result === "FAIL" ? notesInput.value.trim() : "",
+            severity: result === "FAIL" ? severitySelect.value : null,
           };
           row.querySelectorAll("button").forEach((b) => b.classList.remove("selected"));
           btn.classList.add("selected");
           row.classList.toggle("has-fail", result === "FAIL");
           notesWrap.hidden = result !== "FAIL";
-          if (result !== "FAIL") notesInput.value = "";
+          if (result !== "FAIL") {
+            notesInput.value = "";
+            severitySelect.value = "MEDIUM";
+          }
           updateSubmitButtonState();
         });
       });
@@ -170,6 +182,13 @@ FMMS.pages = FMMS.pages || {};
       notesInput.addEventListener("input", () => {
         if (itemResults[templateId]?.result === "FAIL") {
           itemResults[templateId].notes = notesInput.value.trim();
+          updateSubmitButtonState();
+        }
+      });
+
+      severitySelect.addEventListener("change", () => {
+        if (itemResults[templateId]?.result === "FAIL") {
+          itemResults[templateId].severity = severitySelect.value;
           updateSubmitButtonState();
         }
       });
@@ -217,6 +236,7 @@ FMMS.pages = FMMS.pages || {};
           description: t.description,
           result: entry.result,
           notes: isFail ? entry.notes.trim() : null,
+          severity: isFail ? entry.severity : null,
         };
       });
 
@@ -256,7 +276,10 @@ FMMS.pages = FMMS.pages || {};
       const failedList = failedItems
         .map((i) => {
           const note = i.notes ? ` — <span class="text-muted">${FMMS.ui.escapeHtml(i.notes)}</span>` : "";
-          return `<li>${FMMS.ui.escapeHtml(i.description)}${note}</li>`;
+          const severity = i.severity
+            ? ` ${FMMS.ui.badge(i.severity)}`
+            : "";
+          return `<li>${FMMS.ui.escapeHtml(i.description)}${severity}${note}</li>`;
         })
         .join("");
       host.innerHTML = `

@@ -17,6 +17,7 @@ from apps.inspection.domain.exceptions import (
 )
 from apps.inspection.domain.value_objects import (
     ChecklistResult,
+    FailureSeverity,
     InspectionScore,
     OdometerReading,
 )
@@ -74,6 +75,7 @@ class InspectionItem:
         description: Human-readable description of what is being checked.
         result: The outcome of the check.
         notes: Optional technician notes or observations.
+        severity: Driver-assigned severity when ``result`` is FAIL.
     """
 
     id: uuid.UUID
@@ -81,6 +83,7 @@ class InspectionItem:
     description: str
     result: ChecklistResult
     notes: str | None = field(default=None)
+    severity: FailureSeverity | None = field(default=None)
 
     @property
     def passed(self) -> bool:

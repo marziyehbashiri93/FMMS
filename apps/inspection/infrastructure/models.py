@@ -62,6 +62,7 @@ class InspectionItemModel(models.Model):
     description = models.CharField(max_length=500)
     result = models.CharField(max_length=20)
     notes = models.TextField(blank=True, default="")
+    severity = models.CharField(max_length=10, blank=True, default="")
 
     class Meta:
         app_label = "inspection"

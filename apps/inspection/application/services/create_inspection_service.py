@@ -55,6 +55,7 @@ def _to_response_dto(inspection: Inspection) -> InspectionResponseDTO:
                 description=item.description,
                 result=item.result,
                 notes=item.notes,
+                severity=item.severity,
             )
             for item in inspection.items
         ],
@@ -134,6 +135,7 @@ class CreateInspectionService:
                     description=item_dto.description,
                     result=item_dto.result,
                     notes=item_dto.notes,
+                    severity=item_dto.severity,
                 )
             )
 
