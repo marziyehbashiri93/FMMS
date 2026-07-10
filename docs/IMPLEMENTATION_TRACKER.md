@@ -527,7 +527,7 @@ concrete infrastructure classes imported. Each service has one responsibility (S
 - [x] Create `apps/vehicle/application/services/__init__.py`
 - [x] Create `apps/vehicle/application/services/create_vehicle_service.py` — `CreateVehicleService`
 - [x] Create `apps/vehicle/application/services/update_vehicle_service.py` — `UpdateVehicleService`
-- [x] Create `apps/vehicle/application/services/deactivate_vehicle_service.py` — `DeactivateVehicleService` (cross-domain guard via `IRepairOrderRepository`)
+- [x] Create `apps/vehicle/application/services/deactivate_vehicle_service.py` — `DeactivateVehicleService` (distribution supervisor decision)
 - [x] Create `apps/vehicle/application/services/get_vehicle_service.py` — `GetVehicleService`, `ListVehiclesService`
 - [x] Create `apps/vehicle/application/services/sync_sap_equipment_service.py` — `SyncSAPEquipmentService`
 - [x] Create `tests/unit/application/test_vehicle_services.py` — 19 unit tests, all passing
@@ -1264,13 +1264,13 @@ N+1 query audit, final security hardening, complete README, and Phase 1 release 
 
 ---
 
-### ADR-025 — Inspection FAIL Auto-Orchestrates Fault, Repair, OUT_OF_SERVICE
+### ADR-025 — Inspection FAIL Auto-Orchestrates Fault + Repair (Distribution Decides Availability)
 
 | Field        | Detail |
 |--------------|--------|
-| **Decision** | Extend `SubmitInspectionService` so each FAIL item creates Fault + RepairOrder, and the vehicle transitions to new status `OUT_OF_SERVICE`. All PASS leaves vehicle `ACTIVE`. Frontend must not orchestrate these side-effects. |
-| **Reason**   | Operational demo requires a single submit action to open the maintenance case. |
-| **Impact**   | `VehicleStatus.OUT_OF_SERVICE` added with domain transitions; create inspection accepts optional `items` from templates. |
+| **Decision** | `SubmitInspectionService` aggregates FAIL items into one Fault with FaultItems and one RepairOrder. Vehicle status stays unchanged (`ACTIVE`). Distribution supervisors close faults or call `POST /vehicles/{id}/deactivate/` when the vehicle is not usable. |
+| **Reason**   | Drivers report inspection problems; operational availability is a supervisor decision, not a driver-side effect. |
+| **Impact**   | `VehicleStatus.OUT_OF_SERVICE` remains available for future use; deactivate transitions to `INACTIVE`. |
 | **Date**     | 2026-07-10 |
 
 ---
@@ -1287,7 +1287,7 @@ N+1 query audit, final security hardening, complete README, and Phase 1 release 
 - [x] `POST /api/v1/inspection-templates/sync-sap/` — SAP object-part catalog → local templates
 - [x] `GET /api/v1/inspection-templates/` — list active checklist templates
 - [x] `POST /api/v1/inspections/` accepts optional `items` (template-driven checklist results)
-- [x] `POST /api/v1/inspections/{id}/submit/` FAIL → Fault + RepairOrder + `OUT_OF_SERVICE`
+- [x] `POST /api/v1/inspections/{id}/submit/` FAIL → one Fault (with items) + one RepairOrder; vehicle stays `ACTIVE`
 - [x] PASS submit leaves vehicle `ACTIVE`
 - [x] `POST /api/v1/repair-orders/{id}/approve/` — transport supervisor approval (`APPROVED`)
 - [x] `POST /api/v1/repair-orders/{id}/assign-workshop/` — INTERNAL/EXTERNAL → `WORKSHOP_ASSIGNED`

@@ -342,7 +342,6 @@ class TestSubmitInspectionService:
             inspection_repository=FakeInspectionRepository(initial=inspections or []),
             fault_repository=fault_repo,
             repair_order_repository=repair_repo,
-            vehicle_repository=vehicle_repo,
         )
         return service, fault_repo, repair_repo, vehicle_repo
 
@@ -393,7 +392,7 @@ class TestSubmitInspectionService:
         assert repair_repo.saved[0].status == RepairOrderStatus.CREATED
         assert repair_repo.saved[0].fault_id == fault_repo.saved[0].id
 
-    def test_marks_vehicle_out_of_service_on_fail(self) -> None:
+    def test_keeps_vehicle_active_on_fail(self) -> None:
         vehicle = _make_vehicle()
         inspection = _make_inspection(vehicle_id=vehicle.id)
         inspection.items.append(_make_fail_item("Brakes", "Brake fluid low"))
@@ -403,7 +402,7 @@ class TestSubmitInspectionService:
 
         service.execute(self._dto(inspection.id))
 
-        assert vehicle_repo.get_by_id(vehicle.id).status == VehicleStatus.OUT_OF_SERVICE
+        assert vehicle_repo.get_by_id(vehicle.id).status == VehicleStatus.ACTIVE
 
     def test_no_faults_or_status_change_when_all_items_pass(self) -> None:
         vehicle = _make_vehicle()

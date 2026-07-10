@@ -164,7 +164,50 @@ class TestDriverInspectionWorkflowAPI:
         assert RepairOrderModel.objects.filter(vehicle_id=vehicle["id"]).count() == 1
 
         orm = VehicleModel.objects.get(id=vehicle["id"])
-        assert orm.status == VehicleStatus.OUT_OF_SERVICE.value
+        assert orm.status == VehicleStatus.ACTIVE.value
+
+    def test_distribution_supervisor_can_deactivate_after_failed_inspection(
+        self, authenticated_client: APIClient
+    ) -> None:
+        vehicle = create_vehicle(
+            authenticated_client, plate="12DIST01", vin="1HGCM82633A004364"
+        )
+        created = authenticated_client.post(
+            "/api/v1/inspections/",
+            {
+                "vehicle_id": vehicle["id"],
+                "inspection_type": "PRE_TRIP",
+                "odometer_value": 1000,
+                "odometer_unit": "KM",
+                "inspected_at": datetime.now(tz=UTC).isoformat(),
+                "items": [
+                    {
+                        "category": "LIGHTS",
+                        "description": "Front light",
+                        "result": "FAIL",
+                        "notes": "Broken",
+                    }
+                ],
+            },
+            format="json",
+        )
+        assert created.status_code == 201, created.data
+
+        submitted = authenticated_client.post(
+            f"/api/v1/inspections/{created.data['id']}/submit/", {}, format="json"
+        )
+        assert submitted.status_code == 200, submitted.data
+
+        detail = authenticated_client.get(f"/api/v1/vehicles/{vehicle['id']}/")
+        assert detail.data["status"] == VehicleStatus.ACTIVE.value
+
+        deactivated = authenticated_client.post(
+            f"/api/v1/vehicles/{vehicle['id']}/deactivate/",
+            {},
+            format="json",
+        )
+        assert deactivated.status_code == 200, deactivated.data
+        assert deactivated.data["status"] == VehicleStatus.INACTIVE.value
 
     def test_submit_multiple_failures_create_one_fault_with_items(
         self, authenticated_client: APIClient

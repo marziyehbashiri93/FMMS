@@ -247,10 +247,7 @@ def get_update_vehicle_service() -> UpdateVehicleService:
 
 def get_deactivate_vehicle_service() -> DeactivateVehicleService:
     """Return DeactivateVehicleService."""
-    return DeactivateVehicleService(
-        get_vehicle_repository(),
-        get_repair_order_repository(),
-    )
+    return DeactivateVehicleService(get_vehicle_repository())
 
 
 def get_sync_sap_equipment_service() -> SyncSAPEquipmentService:
@@ -336,7 +333,6 @@ def get_submit_inspection_service() -> SubmitInspectionService:
         get_inspection_repository(),
         get_fault_repository(),
         get_repair_order_repository(),
-        get_vehicle_repository(),
     )
 
 

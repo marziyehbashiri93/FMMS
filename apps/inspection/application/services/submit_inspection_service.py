@@ -5,12 +5,14 @@ Multi-step workflow (designed for future transaction boundary addition):
   Step 2: Call ``inspection.submit()`` — transitions DRAFT → SUBMITTED.
   Step 3: If any FAIL items exist, create one ``Fault`` with ``FaultItem`` children
           and one ``RepairOrder``.
-  Step 4: If any FAIL items exist, mark the vehicle OUT_OF_SERVICE.
-  Step 5: Save the updated inspection.
+  Step 4: Save the updated inspection.
+
+Vehicle operational availability is NOT decided at submit time.
+Distribution supervisors close faults or deactivate vehicles separately.
 
 Cross-domain:
-    Fault/repair/vehicle side-effects are workflow policy owned by this
-    service, not by Inspection, Fault, Repair, or Vehicle entities alone.
+    Fault/repair side-effects are workflow policy owned by this service,
+    not by Inspection, Fault, or Repair entities alone.
 """
 
 from __future__ import annotations
@@ -34,7 +36,6 @@ from apps.inspection.domain.interfaces.inspection_repository import (
 )
 from apps.repair.domain.entities import RepairOrder, RepairOrderStatus
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
-from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
 from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
 
@@ -48,14 +49,14 @@ _MULTI_FAILURE_DESCRIPTION = "Multiple inspection failures"
 class SubmitInspectionService:
     """Orchestrates inspection submission and automatic fault/repair generation.
 
-      When an inspection is submitted, failed checklist items are aggregated into
+    When an inspection is submitted, failed checklist items are aggregated into
     a single operational fault with child fault items and one repair order.
+    The vehicle status remains unchanged so distribution can decide usability.
 
-      Args:
-          inspection_repository: Concrete ``IInspectionRepository``.
-          fault_repository: Concrete ``IFaultRepository`` for auto-fault creation.
-          repair_order_repository: Concrete ``IRepairOrderRepository``.
-          vehicle_repository: Concrete ``IVehicleRepository``.
+    Args:
+        inspection_repository: Concrete ``IInspectionRepository``.
+        fault_repository: Concrete ``IFaultRepository`` for auto-fault creation.
+        repair_order_repository: Concrete ``IRepairOrderRepository``.
     """
 
     def __init__(
@@ -63,12 +64,10 @@ class SubmitInspectionService:
         inspection_repository: IInspectionRepository,
         fault_repository: IFaultRepository,
         repair_order_repository: IRepairOrderRepository,
-        vehicle_repository: IVehicleRepository,
     ) -> None:
         self._inspection_repo = inspection_repository
         self._fault_repo = fault_repository
         self._repair_repo = repair_order_repository
-        self._vehicle_repo = vehicle_repository
 
     def execute(self, dto: SubmitInspectionDTO) -> InspectionResponseDTO:
         """Submit a DRAFT inspection and apply FAIL-side workflow effects.
@@ -80,7 +79,7 @@ class SubmitInspectionService:
             ``InspectionResponseDTO`` with ``status == SUBMITTED``.
 
         Raises:
-            FMMSNotFoundError: If inspection or vehicle does not exist.
+            FMMSNotFoundError: If inspection does not exist.
             InspectionItemRequiredError: If the inspection has no items.
             InspectionInvalidStateTransitionError: If not in DRAFT status.
         """
@@ -134,15 +133,6 @@ class SubmitInspectionService:
             self._repair_repo.save(repair)
             repairs_created = 1
 
-            vehicle = load_or_not_found(
-                lambda: self._vehicle_repo.get_by_id(inspection.vehicle_id),
-                message=f"Vehicle '{inspection.vehicle_id}' not found.",
-                details={"vehicle_id": str(inspection.vehicle_id)},
-            )
-            vehicle.mark_out_of_service()
-            vehicle.updated_at = now
-            self._vehicle_repo.save(vehicle)
-
         saved = self._inspection_repo.save(inspection)
 
         logger.info(
@@ -157,7 +147,6 @@ class SubmitInspectionService:
                 "faults_created": faults_created,
                 "fault_items_created": fault_items_created,
                 "repairs_created": repairs_created,
-                "vehicle_out_of_service": faults_created > 0,
             },
         )
 

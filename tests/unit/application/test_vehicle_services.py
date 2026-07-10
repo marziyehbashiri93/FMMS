@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -306,48 +305,28 @@ class TestDeactivateVehicleService:
     def _make_service(
         self,
         vehicle: Vehicle,
-        active_orders: list | None = None,
     ) -> DeactivateVehicleService:
         return DeactivateVehicleService(
             vehicle_repository=FakeVehicleRepository(initial=[vehicle]),
-            repair_order_repository=FakeRepairOrderRepository(active_orders or []),
         )
 
-    def test_deactivates_vehicle_with_no_active_orders(self) -> None:
+    def test_deactivates_vehicle(self) -> None:
         vehicle = _make_vehicle()
         service = self._make_service(vehicle)
 
         result = service.execute(
             DeactivateVehicleDTO(
                 vehicle_id=vehicle.id,
-                request_id="req-deact",
+                request_id="req-deact-repair",
                 requested_by=uuid.uuid4(),
             )
         )
 
         assert result.status == VehicleStatus.INACTIVE
 
-    def test_raises_conflict_when_active_orders_exist(self) -> None:
-        vehicle = _make_vehicle()
-        mock_order = MagicMock()
-        mock_order.vehicle_id = vehicle.id
-        service = self._make_service(vehicle, active_orders=[mock_order])
-
-        with pytest.raises(FMMSConflictError):
-            service.execute(
-                DeactivateVehicleDTO(
-                    vehicle_id=vehicle.id,
-                    request_id="req-blocked",
-                    requested_by=uuid.uuid4(),
-                )
-            )
-
     def test_raises_not_found_for_missing_vehicle(self) -> None:
         repo = FakeVehicleRepository()
-        service = DeactivateVehicleService(
-            vehicle_repository=repo,
-            repair_order_repository=FakeRepairOrderRepository(),
-        )
+        service = DeactivateVehicleService(vehicle_repository=repo)
 
         with pytest.raises(FMMSNotFoundError):
             service.execute(
