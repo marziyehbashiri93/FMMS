@@ -44,3 +44,28 @@ class FaultModel(BaseModel):
 
     def __str__(self) -> str:
         return f"Fault {self.id} [{self.severity}/{self.status}]"
+
+
+class FaultItemModel(BaseModel):
+    """Persistence model for a failed component within a fault incident."""
+
+    fault_id = models.UUIDField(db_index=True)
+    inspection_item_id = models.UUIDField(null=True, blank=True, default=None)
+    component = models.CharField(max_length=100)
+    description = models.CharField(max_length=500)
+    severity = models.CharField(max_length=10, db_index=True)
+
+    class Meta:
+        app_label = "fault"
+        db_table = "fault_item"
+        verbose_name = "Fault Item"
+        verbose_name_plural = "Fault Items"
+        indexes = [
+            models.Index(
+                fields=["fault_id", "is_deleted"],
+                name="fault_item_fault_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"FaultItem {self.id} [{self.component}]"

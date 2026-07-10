@@ -224,3 +224,7 @@ class Inspection:
     def has_failures(self) -> bool:
         """Return True if any checklist item has a FAIL result."""
         return any(i.result == ChecklistResult.FAIL for i in self.items)
+
+    def failed_items(self) -> list[InspectionItem]:
+        """Return checklist items that failed inspection."""
+        return [item for item in self.items if item.result == ChecklistResult.FAIL]

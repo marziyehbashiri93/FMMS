@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 import pytest
 from rest_framework.test import APIClient
 
-from apps.fault.infrastructure.models import FaultModel
+from apps.fault.infrastructure.models import FaultItemModel, FaultModel
 from apps.repair.infrastructure.models import RepairOrderModel
 from apps.vehicle.domain.entities import VehicleStatus
 from apps.vehicle.infrastructure.models import VehicleModel
@@ -165,3 +165,58 @@ class TestDriverInspectionWorkflowAPI:
 
         orm = VehicleModel.objects.get(id=vehicle["id"])
         assert orm.status == VehicleStatus.OUT_OF_SERVICE.value
+
+    def test_submit_multiple_failures_create_one_fault_with_items(
+        self, authenticated_client: APIClient
+    ) -> None:
+        vehicle = create_vehicle(
+            authenticated_client, plate="12FAIL02", vin="1HGCM82633A004363"
+        )
+        created = authenticated_client.post(
+            "/api/v1/inspections/",
+            {
+                "vehicle_id": vehicle["id"],
+                "inspection_type": "PRE_TRIP",
+                "odometer_value": 1000,
+                "odometer_unit": "KM",
+                "inspected_at": datetime.now(tz=UTC).isoformat(),
+                "items": [
+                    {
+                        "category": "LIGHTS",
+                        "description": "Front light",
+                        "result": "FAIL",
+                        "notes": "Broken",
+                    },
+                    {
+                        "category": "COOLING",
+                        "description": "Refrigerator",
+                        "result": "FAIL",
+                        "notes": "Cooling failure",
+                    },
+                ],
+            },
+            format="json",
+        )
+        assert created.status_code == 201, created.data
+
+        submitted = authenticated_client.post(
+            f"/api/v1/inspections/{created.data['id']}/submit/", {}, format="json"
+        )
+        assert submitted.status_code == 200, submitted.data
+        assert submitted.data["has_failures"] is True
+
+        faults = FaultModel.objects.filter(
+            vehicle_id=vehicle["id"], inspection_id=created.data["id"]
+        )
+        assert faults.count() == 1
+        fault = faults.first()
+        assert fault is not None
+        assert fault.description == "Multiple inspection failures"
+        assert FaultItemModel.objects.filter(fault_id=fault.id).count() == 2
+        assert RepairOrderModel.objects.filter(vehicle_id=vehicle["id"]).count() == 1
+
+        retrieved = authenticated_client.get(f"/api/v1/faults/{fault.id}/")
+        assert retrieved.status_code == 200
+        assert len(retrieved.data["items"]) == 2
+        components = {item["component"] for item in retrieved.data["items"]}
+        assert components == {"Front light", "Refrigerator"}

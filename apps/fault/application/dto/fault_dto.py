@@ -72,6 +72,17 @@ class CloseFaultDTO:
 
 
 @dataclass(frozen=True)
+class FaultItemResponseDTO:
+    """Output DTO for a single fault item."""
+
+    id: uuid.UUID
+    component: str
+    description: str
+    severity: FaultSeverity
+    inspection_item_id: uuid.UUID | None = field(default=None)
+
+
+@dataclass(frozen=True)
 class FaultResponseDTO:
     """Output DTO returned by all fault read and write operations.
 
@@ -91,6 +102,7 @@ class FaultResponseDTO:
         inspection_id: Optional originating inspection UUID.
         assigned_to_id: Optional assigned technician UUID.
         sap_notification_number: Optional SAP PM notification number.
+        items: Child fault items linked to this incident.
     """
 
     id: uuid.UUID
@@ -106,3 +118,4 @@ class FaultResponseDTO:
     inspection_id: uuid.UUID | None = field(default=None)
     assigned_to_id: uuid.UUID | None = field(default=None)
     sap_notification_number: str | None = field(default=None)
+    items: list[FaultItemResponseDTO] = field(default_factory=list)

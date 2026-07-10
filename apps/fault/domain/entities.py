@@ -47,6 +47,31 @@ _ALLOWED_TRANSITIONS: dict[FaultStatus, frozenset[FaultStatus]] = {
 
 
 @dataclass
+class FaultItem:
+    """A single failed component within a fault incident.
+
+    Attributes:
+        id: Unique identifier for this fault item.
+        fault_id: Parent fault aggregate identifier.
+        inspection_item_id: Optional originating inspection checklist item ID.
+        component: Component or checklist label (e.g. "Front light").
+        description: Human-readable failure detail.
+        severity: Severity assigned to this item.
+        created_at: UTC timestamp when the record was created.
+        updated_at: UTC timestamp of the last update.
+    """
+
+    id: uuid.UUID
+    fault_id: uuid.UUID
+    component: str
+    description: str
+    severity: FaultSeverity
+    created_at: datetime
+    updated_at: datetime
+    inspection_item_id: uuid.UUID | None = field(default=None)
+
+
+@dataclass
 class Fault:
     """Aggregate root for the Fault bounded context.
 
@@ -69,6 +94,7 @@ class Fault:
         reported_at: UTC timestamp when the fault was reported.
         created_at: UTC timestamp when the record was created.
         updated_at: UTC timestamp of the last update.
+        items: Child fault items when the incident has multiple failed components.
     """
 
     id: uuid.UUID
@@ -85,6 +111,7 @@ class Fault:
     sap_defect_code: SAPDefectCode | None = field(default=None)
     sap_notification_number: str | None = field(default=None)
     assigned_to_id: uuid.UUID | None = field(default=None)
+    items: list[FaultItem] = field(default_factory=list)
 
     def transition_to(self, target: FaultStatus) -> None:
         """Guard and apply a status transition.

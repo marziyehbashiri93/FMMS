@@ -24,6 +24,16 @@ class FaultAssignSerializer(serializers.Serializer):
     technician_id = serializers.UUIDField()
 
 
+class FaultItemResponseSerializer(serializers.Serializer):
+    """Serialize fault item DTOs nested under a fault response."""
+
+    id = serializers.UUIDField()
+    component = serializers.CharField()
+    description = serializers.CharField()
+    severity = serializers.ChoiceField(choices=[item.value for item in FaultSeverity])
+    inspection_item_id = serializers.UUIDField(allow_null=True)
+
+
 class FaultResponseSerializer(serializers.Serializer):
     """Serialize application fault response DTOs."""
 
@@ -40,3 +50,4 @@ class FaultResponseSerializer(serializers.Serializer):
     inspection_id = serializers.UUIDField(allow_null=True)
     assigned_to_id = serializers.UUIDField(allow_null=True)
     sap_notification_number = serializers.CharField(allow_null=True)
+    items = FaultItemResponseSerializer(many=True)

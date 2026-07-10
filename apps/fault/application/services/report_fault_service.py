@@ -12,7 +12,11 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from apps.fault.application.dto.fault_dto import FaultResponseDTO, ReportFaultDTO
+from apps.fault.application.dto.fault_dto import (
+    FaultItemResponseDTO,
+    FaultResponseDTO,
+    ReportFaultDTO,
+)
 from apps.fault.domain.entities import Fault, FaultStatus
 from apps.fault.domain.interfaces.fault_repository import IFaultRepository
 from apps.fault.domain.value_objects import FaultCode, FaultDescription
@@ -39,6 +43,16 @@ def _to_response_dto(fault: Fault) -> FaultResponseDTO:
         inspection_id=fault.inspection_id,
         assigned_to_id=fault.assigned_to_id,
         sap_notification_number=fault.sap_notification_number,
+        items=[
+            FaultItemResponseDTO(
+                id=item.id,
+                component=item.component,
+                description=item.description,
+                severity=item.severity,
+                inspection_item_id=item.inspection_item_id,
+            )
+            for item in fault.items
+        ],
     )
 
 

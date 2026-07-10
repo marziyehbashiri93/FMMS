@@ -3,7 +3,8 @@
 Multi-step workflow (designed for future transaction boundary addition):
   Step 1: Load and validate the inspection (must be DRAFT with ≥1 item).
   Step 2: Call ``inspection.submit()`` — transitions DRAFT → SUBMITTED.
-  Step 3: For each FAIL checklist item, create a ``Fault`` and ``RepairOrder``.
+  Step 3: If any FAIL items exist, create one ``Fault`` with ``FaultItem`` children
+          and one ``RepairOrder``.
   Step 4: If any FAIL items exist, mark the vehicle OUT_OF_SERVICE.
   Step 5: Save the updated inspection.
 
@@ -17,7 +18,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from apps.fault.domain.entities import Fault, FaultStatus
+from apps.fault.domain.entities import Fault, FaultItem, FaultStatus
 from apps.fault.domain.interfaces.fault_repository import IFaultRepository
 from apps.fault.domain.value_objects import FaultCode, FaultDescription, FaultSeverity
 from apps.inspection.application.dto.inspection_dto import (
@@ -27,10 +28,10 @@ from apps.inspection.application.dto.inspection_dto import (
 from apps.inspection.application.services.create_inspection_service import (
     _to_response_dto,
 )
+from apps.inspection.domain.entities import InspectionItem
 from apps.inspection.domain.interfaces.inspection_repository import (
     IInspectionRepository,
 )
-from apps.inspection.domain.value_objects import ChecklistResult
 from apps.repair.domain.entities import RepairOrder, RepairOrderStatus
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
@@ -41,22 +42,20 @@ logger = get_structured_logger("inspection", __name__)
 
 _DEFAULT_FAULT_CODE = "INSP-FAIL"
 _DEFAULT_FAULT_SEVERITY = FaultSeverity.MEDIUM
+_MULTI_FAILURE_DESCRIPTION = "Multiple inspection failures"
 
 
 class SubmitInspectionService:
     """Orchestrates inspection submission and automatic fault/repair generation.
 
-    When an inspection is submitted, any checklist items with a FAIL result
-    automatically produce:
-      - a new ``Fault`` in OPEN status
-      - a new ``RepairOrder`` in CREATED status
-    and the vehicle is transitioned to ``OUT_OF_SERVICE``.
+      When an inspection is submitted, failed checklist items are aggregated into
+    a single operational fault with child fault items and one repair order.
 
-    Args:
-        inspection_repository: Concrete ``IInspectionRepository``.
-        fault_repository: Concrete ``IFaultRepository`` for auto-fault creation.
-        repair_order_repository: Concrete ``IRepairOrderRepository``.
-        vehicle_repository: Concrete ``IVehicleRepository``.
+      Args:
+          inspection_repository: Concrete ``IInspectionRepository``.
+          fault_repository: Concrete ``IFaultRepository`` for auto-fault creation.
+          repair_order_repository: Concrete ``IRepairOrderRepository``.
+          vehicle_repository: Concrete ``IVehicleRepository``.
     """
 
     def __init__(
@@ -106,21 +105,22 @@ class SubmitInspectionService:
         now = datetime.now(tz=UTC)
         inspection.updated_at = now
 
+        failed_items = inspection.failed_items()
         faults_created = 0
+        fault_items_created = 0
         repairs_created = 0
-        for item in inspection.items:
-            if item.result != ChecklistResult.FAIL:
-                continue
-            fault = _build_fault_from_item(
+
+        if failed_items:
+            fault = _build_fault_from_failed_items(
                 inspection_id=inspection.id,
                 vehicle_id=inspection.vehicle_id,
-                item_category=item.category,
-                item_description=item.description,
+                failed_items=failed_items,
                 reported_by_id=dto.submitted_by,
                 now=now,
             )
+            fault_items_created = len(fault.items)
             self._fault_repo.save(fault)
-            faults_created += 1
+            faults_created = 1
 
             repair = RepairOrder(
                 id=uuid.uuid4(),
@@ -132,9 +132,8 @@ class SubmitInspectionService:
                 updated_at=now,
             )
             self._repair_repo.save(repair)
-            repairs_created += 1
+            repairs_created = 1
 
-        if faults_created > 0:
             vehicle = load_or_not_found(
                 lambda: self._vehicle_repo.get_by_id(inspection.vehicle_id),
                 message=f"Vehicle '{inspection.vehicle_id}' not found.",
@@ -156,6 +155,7 @@ class SubmitInspectionService:
                 "entity_id": str(saved.id),
                 "result": "success",
                 "faults_created": faults_created,
+                "fault_items_created": fault_items_created,
                 "repairs_created": repairs_created,
                 "vehicle_out_of_service": faults_created > 0,
             },
@@ -164,38 +164,59 @@ class SubmitInspectionService:
         return _to_response_dto(saved)
 
 
-def _build_fault_from_item(
+def _build_fault_from_failed_items(
     inspection_id: uuid.UUID,
     vehicle_id: uuid.UUID,
-    item_category: str,
-    item_description: str,
+    failed_items: list[InspectionItem],
     reported_by_id: uuid.UUID,
     now: datetime,
 ) -> Fault:
-    """Construct a ``Fault`` entity from a failed inspection checklist item.
+    """Construct one fault aggregate from failed inspection checklist items."""
+    fault_id = uuid.uuid4()
+    if len(failed_items) == 1:
+        item = failed_items[0]
+        summary = f"[{item.category}] {item.description}"[:500]
+    else:
+        summary = _MULTI_FAILURE_DESCRIPTION
 
-    Args:
-        inspection_id: UUID of the originating inspection.
-        vehicle_id: UUID of the vehicle being inspected.
-        item_category: Category of the failed checklist item.
-        item_description: Description of the failed item.
-        reported_by_id: UUID of the user who submitted the inspection.
-        now: Current UTC datetime for timestamps.
-
-    Returns:
-        A new ``Fault`` entity in OPEN status.
-    """
-    description_text = f"[{item_category}] {item_description}"[:500]
-    return Fault(
-        id=uuid.uuid4(),
+    fault = Fault(
+        id=fault_id,
         vehicle_id=vehicle_id,
         code=FaultCode(_DEFAULT_FAULT_CODE),
-        description=FaultDescription(description_text),
+        description=FaultDescription(summary),
         severity=_DEFAULT_FAULT_SEVERITY,
         status=FaultStatus.OPEN,
         reported_by_id=reported_by_id,
         reported_at=now,
         inspection_id=inspection_id,
+        created_at=now,
+        updated_at=now,
+        items=[
+            _build_fault_item(
+                fault_id=fault_id,
+                item=item,
+                now=now,
+            )
+            for item in failed_items
+        ],
+    )
+    return fault
+
+
+def _build_fault_item(
+    fault_id: uuid.UUID,
+    item: InspectionItem,
+    now: datetime,
+) -> FaultItem:
+    """Construct a ``FaultItem`` from a failed inspection checklist item."""
+    detail = (item.notes or item.description or "").strip() or item.description
+    return FaultItem(
+        id=uuid.uuid4(),
+        fault_id=fault_id,
+        inspection_item_id=item.id,
+        component=item.description,
+        description=detail[:500],
+        severity=_DEFAULT_FAULT_SEVERITY,
         created_at=now,
         updated_at=now,
     )

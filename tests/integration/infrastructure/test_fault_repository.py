@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from apps.fault.domain.entities import Fault, FaultStatus
+from apps.fault.domain.entities import Fault, FaultItem, FaultStatus
 from apps.fault.domain.exceptions import FaultNotFoundError
 from apps.fault.domain.interfaces.fault_repository import IFaultRepository
 from apps.fault.domain.value_objects import (
@@ -82,6 +82,50 @@ class TestSaveAndRetrieve:
         assert fetched.sap_defect_code is not None
         assert fetched.sap_defect_code.value == "AB001"
         assert fetched.sap_notification_number == "40001234"
+
+    def test_save_and_load_fault_items(self) -> None:
+        repo = DjangoFaultRepository()
+        now = datetime.now(tz=UTC)
+        fault_id = uuid.uuid4()
+        fault = Fault(
+            id=fault_id,
+            vehicle_id=uuid.uuid4(),
+            code=FaultCode("INSP-FAIL"),
+            description=FaultDescription("Multiple inspection failures"),
+            severity=FaultSeverity.MEDIUM,
+            status=FaultStatus.OPEN,
+            reported_by_id=uuid.uuid4(),
+            reported_at=now,
+            created_at=now,
+            updated_at=now,
+            items=[
+                FaultItem(
+                    id=uuid.uuid4(),
+                    fault_id=fault_id,
+                    inspection_item_id=uuid.uuid4(),
+                    component="Front light",
+                    description="Broken",
+                    severity=FaultSeverity.MEDIUM,
+                    created_at=now,
+                    updated_at=now,
+                ),
+                FaultItem(
+                    id=uuid.uuid4(),
+                    fault_id=fault_id,
+                    inspection_item_id=uuid.uuid4(),
+                    component="Refrigerator",
+                    description="Cooling failure",
+                    severity=FaultSeverity.MEDIUM,
+                    created_at=now,
+                    updated_at=now,
+                ),
+            ],
+        )
+        repo.save(fault)
+        fetched = repo.get_by_id(fault.id)
+        assert len(fetched.items) == 2
+        assert fetched.items[0].component == "Front light"
+        assert fetched.items[1].component == "Refrigerator"
 
 
 class TestListOperations:

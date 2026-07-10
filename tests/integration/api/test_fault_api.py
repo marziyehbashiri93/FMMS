@@ -39,6 +39,7 @@ class TestFaultAPI:
         retrieved = authenticated_client.get(f"/api/v1/faults/{fault_id}/")
         assert retrieved.status_code == 200
         assert retrieved.data["code"] == "BRK-01"
+        assert retrieved.data["items"] == []
 
         closed = authenticated_client.post(
             f"/api/v1/faults/{fault_id}/close/",

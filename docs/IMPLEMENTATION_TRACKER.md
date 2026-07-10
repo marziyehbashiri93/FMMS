@@ -250,7 +250,7 @@ Reporting domain is defined as a boundary placeholder only (Phase 2).
 
 **Fault Domain**
 - [ ] Create `apps/fault/domain/__init__.py`
-- [ ] Create `apps/fault/domain/entities.py` — `Fault`, `FaultStatus` (enum: OPEN, ASSIGNED, IN_REPAIR, CLOSED), `FaultSeverity` (enum: LOW, MEDIUM, HIGH, CRITICAL)
+- [ ] Create `apps/fault/domain/entities.py` — `Fault`, `FaultItem`, `FaultStatus` (enum: OPEN, ASSIGNED, IN_REPAIR, CLOSED), `FaultSeverity` (enum: LOW, MEDIUM, HIGH, CRITICAL)
 - [ ] Create `apps/fault/domain/value_objects.py` — `FaultCode`, `FaultDescription`, `SAPDefectCode`
 - [ ] Create `apps/fault/domain/exceptions.py` — `FaultNotFoundError`, `FaultAlreadyClosedError`, `InvalidFaultTransitionError`
 - [ ] Create `apps/fault/domain/interfaces/__init__.py`
@@ -354,10 +354,12 @@ initial migrations per app. No business logic in this layer. Reporting ORM is Ph
 
 **Fault Infrastructure** — commit `d3601c5`
 - [x] `apps/fault/infrastructure/models.py` — `FaultModel(BaseModel)`, composite indexes on `(vehicle_id, status)` and `(severity, status)`
+- [x] `apps/fault/infrastructure/models.py` — `FaultItemModel(BaseModel)` child rows for aggregated inspection failures
 - [x] `apps/fault/infrastructure/repositories.py` — `DjangoFaultRepository(IFaultRepository)`
 - [x] `apps/fault/models.py` — shim
 - [x] `apps/fault/infrastructure/migrations/0001_initial.py`
-- [x] `tests/integration/infrastructure/test_fault_repository.py` — 11 tests
+- [x] `apps/fault/infrastructure/migrations/0002_faultitem.py`
+- [x] `tests/integration/infrastructure/test_fault_repository.py` — 12 tests
 
 **Repair Infrastructure** — commit `1d05fa6`
 - [x] `apps/repair/infrastructure/models.py` — `RepairOrderModel(BaseModel)`, `RepairActivityModel`, `RepairPartModel` (child tables), TechnicianAssignment denormalized, `initiator_id` (avoids BaseModel FK clash)
@@ -542,7 +544,7 @@ concrete infrastructure classes imported. Each service has one responsibility (S
 - [x] Create `apps/inspection/application/dto/inspection_dto.py` — `CreateInspectionDTO`, `AddInspectionItemDTO`, `SubmitInspectionDTO`, `InspectionResponseDTO`, `InspectionItemResponseDTO`
 - [x] Create `apps/inspection/application/services/create_inspection_service.py` — `CreateInspectionService` (cross-domain: vehicle existence check)
 - [x] Create `apps/inspection/application/services/add_inspection_item_service.py` — `AddInspectionItemService`
-- [x] Create `apps/inspection/application/services/submit_inspection_service.py` — `SubmitInspectionService` (multi-step: DRAFT→SUBMITTED + auto-create Fault per FAIL item)
+- [x] Create `apps/inspection/application/services/submit_inspection_service.py` — `SubmitInspectionService` (multi-step: DRAFT→SUBMITTED + aggregate FAIL items into one Fault with FaultItems + one RepairOrder)
 - [x] Create `apps/inspection/application/services/get_inspection_service.py` — `GetInspectionService`, `ListInspectionsService`
 - [x] Create `tests/unit/application/test_inspection_services.py` — 16 unit tests, all passing
 

@@ -3,7 +3,7 @@
 All repository dependencies are replaced with in-memory fakes — no DB, no network.
 
 Key workflow tested:
-- SubmitInspectionService: FAIL items → auto-create Fault entities.
+- SubmitInspectionService: FAIL items → one Fault with FaultItem children.
 """
 
 from __future__ import annotations
@@ -363,7 +363,7 @@ class TestSubmitInspectionService:
 
         assert result.status == InspectionStatus.SUBMITTED
 
-    def test_creates_fault_for_each_fail_item(self) -> None:
+    def test_creates_one_fault_with_item_per_fail(self) -> None:
         vehicle = _make_vehicle()
         inspection = _make_inspection(vehicle_id=vehicle.id)
         inspection.items.append(_make_fail_item("Brakes", "Brake fluid low"))
@@ -375,12 +375,14 @@ class TestSubmitInspectionService:
 
         service.execute(self._dto(inspection.id))
 
-        assert len(fault_repo.saved) == 2
+        assert len(fault_repo.saved) == 1
+        assert len(fault_repo.saved[0].items) == 2
 
-    def test_creates_repair_order_for_each_fail_item(self) -> None:
+    def test_creates_one_repair_order_for_failed_inspection(self) -> None:
         vehicle = _make_vehicle()
         inspection = _make_inspection(vehicle_id=vehicle.id)
         inspection.items.append(_make_fail_item("Brakes", "Brake fluid low"))
+        inspection.items.append(_make_fail_item("Lights", "Left headlight broken"))
         service, fault_repo, repair_repo, _ = self._service(
             inspections=[inspection], vehicles=[vehicle]
         )
@@ -431,6 +433,8 @@ class TestSubmitInspectionService:
         assert fault.status == FaultStatus.OPEN
         assert fault.inspection_id == inspection.id
         assert fault.vehicle_id == inspection.vehicle_id
+        assert len(fault.items) == 1
+        assert fault.items[0].component == "Oil level critical"
 
     def test_raises_not_found_for_missing_inspection(self) -> None:
         service, _, _, _ = self._service()

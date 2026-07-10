@@ -149,6 +149,13 @@ class TestInspectionLifecycle:
         insp.add_item(_make_item(ChecklistResult.FAIL))
         assert insp.has_failures is True
 
+    def test_failed_items_returns_only_fail_results(self) -> None:
+        insp = _make_inspection()
+        failed = _make_item(ChecklistResult.FAIL)
+        insp.add_item(_make_item(ChecklistResult.PASS))
+        insp.add_item(failed)
+        assert insp.failed_items() == [failed]
+
     def test_score_excludes_na_items(self) -> None:
         insp = _make_inspection()
         insp.add_item(_make_item(ChecklistResult.PASS))
