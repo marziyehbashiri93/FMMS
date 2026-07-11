@@ -287,41 +287,91 @@ window.FMMS = window.FMMS || {};
 
   FMMS.pages = FMMS.pages || {};
 
+  const DASHBOARD_WORKFLOW_STEPS = [
+    "خودرو",
+    "بازرسی راننده",
+    "ثبت خرابی",
+    "تصمیم توزیع",
+    "تایید ترابری",
+    "تعمیرگاه و تعمیر",
+    "یکپارچه‌سازی SAP",
+  ];
+
+  const KPI_ICONS = {
+    vehicles: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h11v8H3z"/><path d="M14 10h3l3 3v3h-6V10Z"/><circle cx="7" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg>`,
+    active: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 10.5 10.5 16 7"/></svg>`,
+    faults: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/></svg>`,
+    repair: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76Z"/></svg>`,
+    sap: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v6c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 11v6c0 1.66 4.03 3 9 3s9-1.34 9-3v-6"/></svg>`,
+  };
+
+  function renderKpiCard(label, value, foot, iconKey, tone, valueClass) {
+    return `<div class="kpi-card">
+      <div class="kpi-card-head">
+        <div class="kpi-card-label">${label}</div>
+        <span class="kpi-card-icon tone-${tone}" aria-hidden="true">${KPI_ICONS[iconKey]}</span>
+      </div>
+      <div class="kpi-card-value${valueClass ? ` ${valueClass}` : ""}">${value}</div>
+      <div class="kpi-card-foot">${foot}</div>
+    </div>`;
+  }
+
+  function deriveDashboardWorkflowStep(metrics) {
+    if (metrics.inProgressRepairs > 0) return 6;
+    if (metrics.pendingApproval > 0) return 5;
+    if (metrics.openFaults > 0) return 4;
+    if (metrics.activeVehicles > 0) return 2;
+    return 1;
+  }
+
+  function renderDashboardWorkflowTimeline(currentStep) {
+    return DASHBOARD_WORKFLOW_STEPS.map((label, i) => {
+      const n = i + 1;
+      const cls = n < currentStep ? "done" : n === currentStep ? "current" : "";
+      const dot = n < currentStep ? "✓" : String(n);
+      return `<div class="dashboard-wf-step ${cls}">
+        <span class="dashboard-wf-dot">${dot}</span>
+        <span class="dashboard-wf-label">${label}</span>
+      </div>`;
+    }).join("");
+  }
+
+  function summarizeSapStatus(transactions) {
+    if (!transactions.length) {
+      return { value: "—", foot: "تراکنشی ثبت نشده", tone: "blue", text: true };
+    }
+    const failed = transactions.filter((t) => ["FAILED", "EXHAUSTED"].includes(t.status)).length;
+    const retrying = transactions.filter((t) => t.status === "RETRYING").length;
+    const pending = transactions.filter((t) => t.status === "PENDING").length;
+    if (failed > 0) {
+      return { value: String(failed), foot: "تراکنش ناموفق", tone: "red", text: false };
+    }
+    if (retrying > 0 || pending > 0) {
+      return { value: String(retrying + pending), foot: "در انتظار / تلاش مجدد", tone: "amber", text: false };
+    }
+    return { value: "سالم", foot: "همه تراکنش‌ها موفق", tone: "green", text: true };
+  }
+
   async function renderDashboard() {
     const statsEl = document.getElementById("dashboard-stats");
-    const overviewEl = document.getElementById("dashboard-workflow-overview");
+    const timelineEl = document.getElementById("dashboard-workflow-timeline");
     const workflowsEl = document.getElementById("dashboard-workflows");
     const faultsEl = document.getElementById("dashboard-recent-faults");
     const repairsEl = document.getElementById("dashboard-recent-repairs");
-    const statusEl = document.getElementById("dashboard-status-changes");
     if (!statsEl) return;
-    statsEl.innerHTML = `<div class="stat-card"><div class="stat-label">در حال بارگذاری…</div></div>`;
-
-    const WORKFLOW_OVERVIEW = [
-      { label: "Inspection", fa: "بازرسی" },
-      { label: "Fault", fa: "خرابی" },
-      { label: "Distribution", fa: "توزیع" },
-      { label: "Transport", fa: "ترابری" },
-      { label: "Workshop", fa: "تعمیرگاه" },
-      { label: "Parts", fa: "قطعه" },
-      { label: "Handover", fa: "تحویل" },
-    ];
-    if (overviewEl) {
-      overviewEl.innerHTML = WORKFLOW_OVERVIEW.map(
-        (s, i) =>
-          `${i > 0 ? '<span class="workflow-overview-arrow">↓</span>' : ""}<span class="workflow-overview-step"><span class="workflow-overview-en">${s.label}</span><span class="workflow-overview-fa">${s.fa}</span></span>`
-      ).join("");
-    }
+    statsEl.innerHTML = renderKpiCard("در حال بارگذاری…", "…", "", "vehicles", "neutral", false);
 
     try {
-      const [vehiclesRaw, faultsRaw, repairOrdersRaw] = await Promise.all([
+      const [vehiclesRaw, faultsRaw, repairOrdersRaw, sapRaw] = await Promise.all([
         FMMS.api.listAllVehicles(),
         FMMS.api.listFaultsFiltered("all"),
         FMMS.api.listAllRepairOrders(),
+        FMMS.api.listSapTransactions(),
       ]);
       const vehicles = vehiclesRaw;
       const faults = faultsRaw;
       const repairOrders = FMMS.api.asPage(repairOrdersRaw);
+      const sapTransactions = FMMS.api.asPage(sapRaw);
 
       const vehiclesById = Object.fromEntries(vehicles.results.map((v) => [v.id, v]));
       const faultsByVehicle = {};
@@ -340,34 +390,31 @@ window.FMMS = window.FMMS || {};
       const pendingApproval = repairOrders.results.filter((r) =>
         ["CREATED", "APPROVED"].includes(r.status)
       ).length;
+      const sapSummary = summarizeSapStatus(sapTransactions.results);
 
-      statsEl.innerHTML = `
-        <div class="stat-card">
-          <div class="stat-label">کل خودروها</div>
-          <div class="stat-value">${totalVehicles}</div>
-          <div class="stat-foot">کل ناوگان ثبت‌شده</div>
-        </div>
-        <div class="stat-card accent-green">
-          <div class="stat-label">خودروهای فعال</div>
-          <div class="stat-value">${activeVehicles}</div>
-          <div class="stat-foot">آماده بهره‌برداری</div>
-        </div>
-        <div class="stat-card accent-red">
-          <div class="stat-label">خرابی‌های باز</div>
-          <div class="stat-value">${openFaults}</div>
-          <div class="stat-foot">در انتظار تصمیم یا تعمیر</div>
-        </div>
-        <div class="stat-card accent-amber">
-          <div class="stat-label">تعمیرات جاری</div>
-          <div class="stat-value">${inProgressRepairs}</div>
-          <div class="stat-foot">در تعمیرگاه</div>
-        </div>
-        <div class="stat-card accent-blue">
-          <div class="stat-label">انتظار تایید</div>
-          <div class="stat-value">${pendingApproval}</div>
-          <div class="stat-foot">ترابری / تعمیرگاه</div>
-        </div>
-      `;
+      statsEl.innerHTML =
+        renderKpiCard("تعداد خودروها", totalVehicles, "کل ناوگان ثبت‌شده", "vehicles", "neutral", false) +
+        renderKpiCard("خودروهای فعال", activeVehicles, "آماده بهره‌برداری", "active", "green", false) +
+        renderKpiCard("خرابی‌های باز", openFaults, "در انتظار تصمیم یا تعمیر", "faults", "red", false) +
+        renderKpiCard("تعمیرات جاری", inProgressRepairs, "در تعمیرگاه", "repair", "amber", false) +
+        renderKpiCard(
+          "وضعیت SAP",
+          sapSummary.value,
+          sapSummary.foot,
+          "sap",
+          sapSummary.tone,
+          sapSummary.text ? "is-text" : false
+        );
+
+      if (timelineEl) {
+        const currentStep = deriveDashboardWorkflowStep({
+          inProgressRepairs,
+          pendingApproval,
+          openFaults,
+          activeVehicles,
+        });
+        timelineEl.innerHTML = renderDashboardWorkflowTimeline(currentStep);
+      }
 
       const activeOrders = repairOrders.results
         .filter((r) => r.status !== "CANCELLED")
@@ -434,26 +481,6 @@ window.FMMS = window.FMMS || {};
                 })
                 .join("")
             : `<div class="empty-state"><div class="title">تعمیری ثبت نشده</div></div>`;
-      }
-
-      const statusChanges = vehicles.results
-        .slice()
-        .sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at))
-        .slice(0, 5);
-      if (statusEl) {
-        statusEl.innerHTML = statusChanges.length
-            ? statusChanges
-                .map(
-                  (v) => `<div class="checklist-row">
-                <div>
-                  <div class="item-name">${FMMS.ui.vehicleLabel(v)}</div>
-                  <div class="item-cat">${FMMS.ui.formatDateTime(v.updated_at || v.created_at)}</div>
-                </div>
-                ${FMMS.ui.badge(v.status)}
-              </div>`
-                )
-                .join("")
-            : `<div class="empty-state"><div class="title">تغییری ثبت نشده</div></div>`;
       }
     } catch (err) {
       statsEl.innerHTML = `<div class="empty-state" style="grid-column:1/-1;"><div class="title">خطا در بارگذاری داشبورد</div><div>${FMMS.ui.escapeHtml(err.message)}</div></div>`;
