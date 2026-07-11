@@ -603,6 +603,12 @@ window.FMMS = window.FMMS || {};
     if (m && method === "POST") {
       const ro = DB.repairOrders.find((x) => x.id === m[0]);
       if (!ro) throw new ApiError("دستور تعمیر یافت نشد.", 404);
+      if (ro.workshop_type !== "EXTERNAL") {
+        throw new ApiError("ثبت فاکتور فقط برای تعمیرگاه خارجی مجاز است.", 422);
+      }
+      if (ro.status !== "WAITING_TRANSPORT_FINAL_APPROVAL") {
+        throw new ApiError(`Cannot upload external invoice from '${ro.status}'.`, 422);
+      }
       if (!DB.externalInvoices) DB.externalInvoices = [];
       const inv = {
         id: uid("inv"),
@@ -663,11 +669,16 @@ window.FMMS = window.FMMS || {};
     if (m && method === "POST") {
       const ro = DB.repairOrders.find((x) => x.id === m[0]);
       if (!ro) throw new ApiError("دستور تعمیر یافت نشد.", 404);
-      if (ro.status !== "ACCEPTED_BY_DRIVER") {
+      if (ro.status !== "WAITING_TRANSPORT_FINAL_APPROVAL") {
         throw new ApiError(`Cannot approve transport handover from '${ro.status}'.`, 422);
       }
       ro.status = "COMPLETED";
       ro.updated_at = now();
+      const v = DB.vehicles.find((x) => x.id === ro.vehicle_id);
+      if (v) {
+        v.status = "ACTIVE";
+        v.updated_at = now();
+      }
       const fault = DB.faults.find((x) => x.id === ro.fault_id);
       if (fault && fault.status !== "CLOSED") {
         fault.status = "CLOSED";
@@ -680,7 +691,7 @@ window.FMMS = window.FMMS || {};
     if (m && method === "POST") {
       const ro = DB.repairOrders.find((x) => x.id === m[0]);
       if (!ro) throw new ApiError("دستور تعمیر یافت نشد.", 404);
-      if (ro.status !== "ACCEPTED_BY_DRIVER") {
+      if (ro.status !== "WAITING_TRANSPORT_FINAL_APPROVAL") {
         throw new ApiError(`Cannot reject transport handover from '${ro.status}'.`, 422);
       }
       ro.status = "COMPLETED";
@@ -782,7 +793,22 @@ window.FMMS = window.FMMS || {};
       if (!inv) throw new ApiError("فاکتور یافت نشد.", 404);
       inv.status = "APPROVED";
       inv.updated_at = now();
-      recordMockEvent(inv.repair_order_id, "INVOICE_APPROVED", "فاکتور تایید شد.");
+      const ro = DB.repairOrders.find((x) => x.id === inv.repair_order_id);
+      if (ro) {
+        ro.status = "COMPLETED";
+        ro.updated_at = now();
+        const fault = DB.faults.find((x) => x.id === ro.fault_id);
+        if (fault && fault.status !== "CLOSED") {
+          fault.status = "CLOSED";
+          fault.updated_at = now();
+        }
+        const v = DB.vehicles.find((x) => x.id === ro.vehicle_id);
+        if (v) {
+          v.status = "ACTIVE";
+          v.updated_at = now();
+        }
+      }
+      recordMockEvent(inv.repair_order_id, "EXTERNAL_INVOICE_APPROVED", "فاکتور خارجی تایید و تعمیر نهایی شد.");
       return inv;
     }
 
@@ -804,14 +830,15 @@ window.FMMS = window.FMMS || {};
       const v = DB.vehicles.find((x) => x.id === ho.vehicle_id);
       if (body.accepted) {
         if (ro) {
-          ro.status = "ACCEPTED_BY_DRIVER";
+          ro.status = "WAITING_TRANSPORT_FINAL_APPROVAL";
           ro.updated_at = now();
         }
         if (v) {
-          v.status = "ACTIVE";
+          v.status = "WAITING_TRANSPORT_FINAL_APPROVAL";
           v.updated_at = now();
         }
         recordMockEvent(ho.repair_order_id, "DRIVER_ACCEPTED", "راننده تحویل را تایید کرد.");
+        recordMockEvent(ho.repair_order_id, "WAITING_TRANSPORT_FINAL_APPROVAL", "منتظر تایید نهایی ترابری.");
       } else {
         if (ro) {
           ro.status = "REJECTED_BY_DRIVER";
@@ -912,6 +939,7 @@ window.FMMS = window.FMMS || {};
     "INACTIVE",
     "UNDER_REPAIR",
     "WAITING_DRIVER_CONFIRMATION",
+    "WAITING_TRANSPORT_FINAL_APPROVAL",
     "SUSPENDED",
     "OUT_OF_SERVICE",
   ];

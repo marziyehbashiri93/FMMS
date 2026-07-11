@@ -39,14 +39,14 @@ window.FMMS = window.FMMS || {};
       breadcrumb: ["داشبورد", "توزیع", "درخواست‌های تعمیر"],
     },
     "transport-repairs": {
-      title: "تایید درخواست تعمیر",
-      breadcrumb: ["داشبورد", "ترابری", "تایید درخواست تعمیر"],
+      title: "درخواست‌های تعمیر",
+      breadcrumb: ["داشبورد", "ترابری", "درخواست‌های تعمیر"],
       wizard: ["بررسی درخواست", "تصمیم", "تخصیص"],
       wizardStep: 1,
     },
     "transport-handover": {
-      title: "تایید تحویل خودرو",
-      breadcrumb: ["داشبورد", "ترابری", "تایید تحویل خودرو"],
+      title: "تایید نهایی تعمیرات",
+      breadcrumb: ["داشبورد", "ترابری", "تایید نهایی تعمیرات"],
       wizard: ["تایید راننده", "بررسی ترابری", "بازگشت به ناوگان"],
       wizardStep: 2,
     },
@@ -371,6 +371,7 @@ window.FMMS = window.FMMS || {};
         return "در حال تعمیر";
       }
       if (repairOrder.status === "WAITING_DRIVER_CONFIRMATION") return "منتظر تایید راننده";
+      if (repairOrder.status === "WAITING_TRANSPORT_FINAL_APPROVAL") return "منتظر تایید نهایی ترابری";
       if (repairOrder.status === "ACCEPTED_BY_DRIVER") return "تحویل تایید شد";
       if (repairOrder.status === "REJECTED_BY_DRIVER") return "رد راننده";
       if (repairOrder.status === "CANCELLED") return "تعمیر لغو شد";
@@ -379,12 +380,16 @@ window.FMMS = window.FMMS || {};
     if (fault && fault.status === "OPEN") return "انتظار تصمیم توزیع";
     if (vehicle?.status === "INACTIVE") return "خودرو غیرفعال";
     if (vehicle?.status === "WAITING_DRIVER_CONFIRMATION") return "منتظر تایید راننده";
+    if (vehicle?.status === "WAITING_TRANSPORT_FINAL_APPROVAL") return "منتظر تایید نهایی ترابری";
     if (vehicle?.status === "UNDER_REPAIR") return "در حال تعمیر";
     return "در جریان";
   }
 
   function vehicleStatusSummary(vehicle, repairOrder) {
     if (vehicle?.status === "WAITING_DRIVER_CONFIRMATION") return "منتظر تایید راننده";
+    if (repairOrder?.status === "WAITING_TRANSPORT_FINAL_APPROVAL" || vehicle?.status === "WAITING_TRANSPORT_FINAL_APPROVAL") {
+      return "منتظر تایید نهایی ترابری";
+    }
     if (repairOrder?.status === "IN_PROGRESS" || vehicle?.status === "UNDER_REPAIR") return "در حال تعمیر";
     if (vehicle?.status === "ACTIVE") return "فعال";
     if (vehicle?.status === "INACTIVE") return "غیرفعال";
@@ -403,6 +408,7 @@ window.FMMS = window.FMMS || {};
       IN_PROGRESS: 3,
       WAITING_PARTS: 3,
       WAITING_DRIVER_CONFIRMATION: 4,
+      WAITING_TRANSPORT_FINAL_APPROVAL: 4,
       COMPLETED: 4,
       ACCEPTED_BY_DRIVER: 4,
       REJECTED_BY_DRIVER: 4,

@@ -212,7 +212,7 @@
     id: "ro-completed-1025",
     vehicle_id: "veh-1025",
     fault_id: "fault-closed-1025",
-    status: "ACCEPTED_BY_DRIVER",
+    status: "WAITING_TRANSPORT_FINAL_APPROVAL",
     created_by_id: "user-manager",
     created_at: new Date(Date.now() - 86400000 * 14).toISOString(),
     updated_at: new Date(Date.now() - 86400000 * 7).toISOString(),
@@ -230,6 +230,11 @@
   DB.vehicleHandovers = [];
   DB.externalInvoices = [];
   DB.purchaseRequisitions = [];
+
+  const finalApprovalVehicle = DB.vehicles.find((v) => v.id === "veh-1025");
+  if (finalApprovalVehicle) {
+    finalApprovalVehicle.status = "WAITING_TRANSPORT_FINAL_APPROVAL";
+  }
 
   DB.materialRequests.push({
     id: "mr-demo-1",
@@ -290,6 +295,67 @@
     comment: null,
     driver_id: null,
     confirmed_at: null,
+  });
+
+  const externalVehicle = DB.vehicles.find((v) => v.id === "veh-1031");
+  if (externalVehicle) {
+    externalVehicle.status = "WAITING_TRANSPORT_FINAL_APPROVAL";
+  }
+  DB.faults.push({
+    id: "fault-external-1031",
+    vehicle_id: "veh-1031",
+    code: "F-1031-EXT",
+    description: "تعمیر بدنه در تعمیرگاه خارجی",
+    severity: "MEDIUM",
+    status: "IN_REPAIR",
+    reported_by_id: "driver-demo",
+    reported_at: now(),
+    created_at: now(),
+    updated_at: now(),
+    inspection_id: null,
+    assigned_to_id: "vendor-1",
+    sap_notification_number: "NOTIF-400313",
+    items: [{ id: "item-ext-1", component: "بدنه", description: "آسیب بدنه", severity: "MEDIUM", inspection_item_id: null }],
+  });
+  DB.repairOrders.push({
+    id: "ro-external-1031",
+    vehicle_id: "veh-1031",
+    fault_id: "fault-external-1031",
+    status: "WAITING_TRANSPORT_FINAL_APPROVAL",
+    created_by_id: "user-manager",
+    created_at: now(),
+    updated_at: now(),
+    activities: [{ id: "act-ext-1", description: "تعمیر بدنه توسط پیمانکار", labor_hours: "4", performed_by_id: "vendor-1", performed_at: now(), notes: null }],
+    parts: [],
+    technician_id: "vendor-1",
+    assigned_at: now(),
+    sap_order_number: "PM-900103",
+    workshop_type: "EXTERNAL",
+    workshop_id: "vendor-body-shop",
+    completed_at: now(),
+  });
+  DB.vehicleHandovers.push({
+    id: "ho-external-1031",
+    repair_order_id: "ro-external-1031",
+    vehicle_id: "veh-1031",
+    status: "ACCEPTED",
+    created_at: now(),
+    updated_at: now(),
+    comment: "تحویل شد",
+    driver_id: "driver-demo",
+    confirmed_at: now(),
+  });
+  DB.externalInvoices.push({
+    id: "inv-external-1031",
+    repair_order_id: "ro-external-1031",
+    amount: "8500000",
+    currency: "IRR",
+    status: "UPLOADED",
+    created_by_id: "driver-demo",
+    created_at: now(),
+    updated_at: now(),
+    vendor_id: "vendor-body-shop",
+    document: "INV-1031-001",
   });
 
   window.FMMS_MOCK_DB = DB;

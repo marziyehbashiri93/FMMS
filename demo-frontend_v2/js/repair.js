@@ -32,9 +32,12 @@ FMMS.pages = FMMS.pages || {};
     REPAIR_COMPLETED: "پایان تعمیر",
     WAITING_DRIVER_CONFIRMATION: "منتظر تایید راننده",
     DRIVER_ACCEPTED: "تایید راننده",
+    WAITING_TRANSPORT_FINAL_APPROVAL: "منتظر تایید نهایی ترابری",
+    TRANSPORT_HANDOVER_APPROVED: "تایید نهایی ترابری",
     DRIVER_REJECTED: "رد راننده",
     INVOICE_UPLOADED: "ثبت فاکتور",
     INVOICE_APPROVED: "تایید فاکتور",
+    EXTERNAL_INVOICE_APPROVED: "تایید فاکتور خارجی",
   };
 
   const WORKFLOW_STEPS = [
@@ -46,6 +49,7 @@ FMMS.pages = FMMS.pages || {};
     { key: "MATERIAL_REQUESTED", label: "درخواست قطعه", optional: true },
     { key: "REPAIR_COMPLETED", label: "پایان تعمیر" },
     { key: "DRIVER_ACCEPTED", label: "تایید راننده", alt: ["DRIVER_REJECTED"] },
+    { key: "TRANSPORT_HANDOVER_APPROVED", label: "تایید نهایی ترابری", alt: ["INVOICE_APPROVED", "EXTERNAL_INVOICE_APPROVED"] },
     { key: "VEHICLE_ACTIVE", label: "فعال‌سازی خودرو", derived: true },
   ];
 
@@ -59,8 +63,9 @@ FMMS.pages = FMMS.pages || {};
     IN_PROGRESS: 4,
     WAITING_PARTS: 4,
     WAITING_DRIVER_CONFIRMATION: 6,
-    COMPLETED: 6,
-    ACCEPTED_BY_DRIVER: 8,
+    WAITING_TRANSPORT_FINAL_APPROVAL: 7,
+    COMPLETED: 8,
+    ACCEPTED_BY_DRIVER: 7,
     REJECTED_BY_DRIVER: 7,
     CANCELLED: -1,
   };
@@ -75,7 +80,7 @@ FMMS.pages = FMMS.pages || {};
         stepIndex <= doneThrough ||
         eventSet.has(step.key) ||
         (step.alt || []).some((k) => eventSet.has(k)) ||
-        (step.key === "VEHICLE_ACTIVE" && status === "ACCEPTED_BY_DRIVER");
+        (step.key === "VEHICLE_ACTIVE" && status === "COMPLETED");
       let icon = "○";
       let cls = "pending";
       if (done) {
@@ -618,22 +623,36 @@ FMMS.pages = FMMS.pages || {};
       return;
     }
     try {
-      const page = FMMS.api.asPage(await FMMS.api.listExternalInvoices());
-      const pending = page.results.filter((inv) => inv.status === "UPLOADED");
+      await ensureVehicles();
+      const [invoicePage, repairPage] = await Promise.all([
+        FMMS.api.listExternalInvoices(),
+        FMMS.api.listAllRepairOrders(),
+      ]);
+      const ordersById = Object.fromEntries(FMMS.api.asPage(repairPage).results.map((order) => [order.id, order]));
+      const pending = FMMS.api
+        .asPage(invoicePage)
+        .results.filter((inv) => {
+          const order = ordersById[inv.repair_order_id];
+          return inv.status === "UPLOADED" && order?.workshop_type === "EXTERNAL";
+        });
       if (!pending.length) {
         host.innerHTML = `<div class="empty-state"><div class="title">فاکتور تاییدنشده‌ای وجود ندارد</div></div>`;
         return;
       }
       host.innerHTML = pending
-        .map(
-          (inv) => `<div class="d-flex flex-wrap justify-content-between gap-2 align-items-center mb-2 p-2 border rounded" data-inv-id="${inv.id}">
+        .map((inv) => {
+          const order = ordersById[inv.repair_order_id];
+          const vehicle = vehiclesById[order?.vehicle_id];
+          return `<div class="d-flex flex-wrap justify-content-between gap-2 align-items-center mb-2 p-2 border rounded" data-inv-id="${inv.id}">
             <div>
               <div>${FMMS.ui.badge(inv.status)} مبلغ: <span class="mono">${FMMS.ui.escapeHtml(inv.amount)} ${FMMS.ui.escapeHtml(inv.currency)}</span></div>
+              <div class="small text-muted">خودرو: ${vehicle ? FMMS.ui.vehicleLabel(vehicle) : "—"}</div>
+              <div class="small text-muted">تعمیرگاه: <span class="mono">${FMMS.ui.escapeHtml(order?.workshop_id || "—")}</span></div>
               <div class="small text-muted mono">Repair: ${FMMS.ui.escapeHtml(inv.repair_order_id)}</div>
             </div>
             <button type="button" class="btn btn-fmms-success btn-sm" data-action="approve-inv">تایید فاکتور</button>
-          </div>`
-        )
+          </div>`;
+        })
         .join("");
       host.querySelectorAll("[data-inv-id]").forEach((row) => {
         row.querySelector('[data-action="approve-inv"]')?.addEventListener("click", async (e) => {
@@ -794,10 +813,10 @@ FMMS.pages = FMMS.pages || {};
 
   const ALREADY_COMPLETED_STATUSES = new Set([
     "WAITING_DRIVER_CONFIRMATION",
-    "ACCEPTED_BY_DRIVER",
+    "WAITING_TRANSPORT_FINAL_APPROVAL",
     "CANCELLED",
   ]);
-  const ALREADY_COMPLETED_MESSAGE = "این تعمیر قبلاً تکمیل شده و منتظر تایید راننده است.";
+  const ALREADY_COMPLETED_MESSAGE = "این تعمیر قبلاً تکمیل شده و منتظر مرحله بعدی workflow است.";
 
   async function complete(order, btn) {
     if (btn.disabled) return;
@@ -884,7 +903,7 @@ FMMS.pages = FMMS.pages || {};
       );
     }
     if (
-      (order.status === "WAITING_DRIVER_CONFIRMATION" || order.status === "ACCEPTED_BY_DRIVER") &&
+      order.status === "WAITING_TRANSPORT_FINAL_APPROVAL" &&
       isExternal
     ) {
       actions.push(`<button class="btn btn-fmms-outline btn-sm" data-action="invoice">ثبت فاکتور</button>`);
@@ -892,8 +911,11 @@ FMMS.pages = FMMS.pages || {};
     if (order.status === "WAITING_DRIVER_CONFIRMATION") {
       actions.push(`<span class="reviewed-notice">منتظر تایید راننده</span>`);
     }
+    if (order.status === "WAITING_TRANSPORT_FINAL_APPROVAL") {
+      actions.push(`<span class="reviewed-notice">منتظر تایید نهایی ترابری</span>`);
+    }
     if (order.status === "ACCEPTED_BY_DRIVER") {
-      actions.push(`<span class="reviewed-notice">تایید راننده — خودرو فعال</span>`);
+      actions.push(`<span class="reviewed-notice">تایید راننده</span>`);
     }
     if (order.status === "CANCELLED") {
       return `<div class="alert-fmms alert-fmms-warn mb-0 py-2 px-3"><strong>تعمیر رد شد</strong><div class="small">خودرو آماده فعال‌سازی است</div></div>`;
@@ -1012,6 +1034,7 @@ FMMS.pages = FMMS.pages || {};
             "IN_PROGRESS",
             "WAITING_PARTS",
             "WAITING_DRIVER_CONFIRMATION",
+            "WAITING_TRANSPORT_FINAL_APPROVAL",
             "ACCEPTED_BY_DRIVER",
             "REJECTED_BY_DRIVER",
             "CANCELLED",

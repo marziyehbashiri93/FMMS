@@ -29,6 +29,7 @@ window.FMMS = window.FMMS || {};
     WAITING_PARTS: ["منتظر قطعه", "amber"],
     IN_PROGRESS: ["در حال انجام", "orange"],
     WAITING_DRIVER_CONFIRMATION: ["منتظر تایید راننده", "blue"],
+    WAITING_TRANSPORT_FINAL_APPROVAL: ["منتظر تایید نهایی ترابری", "amber"],
     ACCEPTED_BY_DRIVER: ["تایید راننده", "green"],
     REJECTED_BY_DRIVER: ["رد راننده", "red"],
     COMPLETED: ["تکمیل‌شده", "green"],

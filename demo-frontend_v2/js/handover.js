@@ -56,7 +56,7 @@ FMMS.pages = FMMS.pages || {};
           e.currentTarget.disabled = true;
           try {
             await FMMS.api.confirmVehicleHandover(id, { accepted: true, comment: "OK" });
-            FMMS.ui.toast("تحویل تایید شد — خودرو فعال شد.");
+            FMMS.ui.toast("تحویل تایید شد — منتظر تایید نهایی واحد ترابری.");
             await render();
           } catch (err) {
             FMMS.ui.toast(err.message, "error");

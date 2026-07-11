@@ -1,7 +1,7 @@
 /**
- * Page: تایید تحویل خودرو (Transport final handover validation)
+ * Page: تایید نهایی تعمیرات (Transport final repair approval)
  *
- * Lists repair orders where the driver accepted handover (ACCEPTED_BY_DRIVER).
+ * Lists repair orders waiting for final transport approval.
  * Approve/reject: POST /repair-orders/{id}/transport-handover-approve|reject/
  */
 window.FMMS = window.FMMS || {};
@@ -18,7 +18,7 @@ FMMS.pages = FMMS.pages || {};
   }
 
   function isPendingTransportReview(order) {
-    return order.status === "ACCEPTED_BY_DRIVER";
+    return order.status === "WAITING_TRANSPORT_FINAL_APPROVAL" && order.workshop_type !== "EXTERNAL";
   }
 
   async function ensureVehicles() {
@@ -39,7 +39,7 @@ FMMS.pages = FMMS.pages || {};
   async function loadPendingOrders() {
     await ensureVehicles();
     await loadHandoversIndex();
-    const page = await FMMS.api.listAllRepairOrders("ACCEPTED_BY_DRIVER");
+    const page = await FMMS.api.listAllRepairOrders("WAITING_TRANSPORT_FINAL_APPROVAL");
     return page.results.filter(isPendingTransportReview);
   }
 
@@ -95,7 +95,7 @@ FMMS.pages = FMMS.pages || {};
   async function approveOrder(orderId) {
     if (FMMS.api.capabilities.transportHandoverApproval) {
       await FMMS.api.transportHandoverApprove(orderId);
-      FMMS.ui.toast("تایید صحت تعمیر ثبت شد.");
+      FMMS.ui.toast("تایید نهایی تعمیر ثبت شد.");
       return true;
     }
     FMMS.ui.toast("API تایید ترابری در دسترس نیست.", "error");
@@ -113,7 +113,7 @@ FMMS.pages = FMMS.pages || {};
   }
 
   async function showDetail(order) {
-    FMMS.ui.openDetailModalLoading("جزئیات تایید تحویل خودرو");
+    FMMS.ui.openDetailModalLoading("جزئیات تایید نهایی تعمیرات");
     try {
       await ensureVehicles();
       const [fullOrder, timeline, handover] = await Promise.all([
@@ -163,15 +163,15 @@ FMMS.pages = FMMS.pages || {};
         `<div class="modal-section"><div class="modal-section-title">قطعات مصرفی</div>${renderPartsTable(fullOrder.parts)}</div>` +
         `<div class="modal-section"><div class="modal-section-title">تاریخچه</div>${FMMS.ui.renderTimeline(labeledTimeline)}</div>` +
         `<div class="transport-detail-actions">
-          <p class="small text-muted mb-2">پس از بررسی، تایید نهایی ترابری را ثبت کنید.</p>
+          <p class="small text-muted mb-2">پس از بررسی تعمیر و تایید راننده، تایید نهایی ترابری را ثبت کنید.</p>
           <div class="d-flex flex-wrap gap-2">
-            <button type="button" class="btn btn-fmms-success btn-sm" id="transport-ho-approve">تایید صحت تعمیر</button>
+            <button type="button" class="btn btn-fmms-success btn-sm" id="transport-ho-approve">تایید نهایی تعمیر</button>
             <button type="button" class="btn btn-fmms-danger btn-sm" id="transport-ho-reject">رد تعمیر</button>
           </div>
         </div>`;
 
       const titlePlate = vehicle?.plate_number || fullOrder.id.slice(0, 8);
-      FMMS.ui.openDetailModal(`تایید تحویل خودرو · ${titlePlate}`, body);
+      FMMS.ui.openDetailModal(`تایید نهایی تعمیرات · ${titlePlate}`, body);
 
       document.getElementById("transport-ho-approve")?.addEventListener("click", async (e) => {
         const btn = e.currentTarget;
@@ -220,7 +220,7 @@ FMMS.pages = FMMS.pages || {};
       <td>
         <div class="d-flex flex-wrap gap-1 align-items-center">
           <button type="button" class="btn btn-fmms-outline btn-sm" data-action="detail">مشاهده جزئیات</button>
-          <button type="button" class="btn btn-fmms-success btn-sm" data-action="approve">تایید صحت تعمیر</button>
+          <button type="button" class="btn btn-fmms-success btn-sm" data-action="approve">تایید نهایی تعمیر</button>
           <button type="button" class="btn btn-fmms-danger btn-sm" data-action="reject">رد تعمیر</button>
         </div>
       </td>
@@ -272,13 +272,13 @@ FMMS.pages = FMMS.pages || {};
     tbody.innerHTML = `<tr><td colspan="6" class="text-muted py-4 text-center">در حال بارگذاری…</td></tr>`;
     if (hint) {
       hint.textContent =
-        "صف خودروهایی که راننده تحویل را تایید کرده و منتظر تایید نهایی ترابری هستند — GET /repair-orders/?status=ACCEPTED_BY_DRIVER";
+        "صف خودروهایی که راننده تحویل را تایید کرده و منتظر تایید نهایی ترابری هستند — GET /repair-orders/?status=WAITING_TRANSPORT_FINAL_APPROVAL";
     }
 
     try {
       const orders = await loadPendingOrders();
       if (!orders.length) {
-        tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state py-4"><div class="title">خودرویی منتظر تایید تحویل ترابری نیست</div><div>پس از تایید راننده، دستورات «تایید راننده» اینجا نمایش داده می‌شوند.</div></div></td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state py-4"><div class="title">خودرویی منتظر تایید نهایی تعمیرات نیست</div><div>پس از تایید راننده، دستورات «منتظر تایید نهایی ترابری» اینجا نمایش داده می‌شوند.</div></div></td></tr>`;
         return;
       }
 
