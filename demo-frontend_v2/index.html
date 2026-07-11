@@ -76,6 +76,13 @@
                     <span class="nav-label">داشبورد</span>
                 </a>
 
+                <a class="nav-link" data-page="vehicles">
+                    <span class="nav-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h11v8H3z"/><path d="M14 10h3l3 3v3h-6V10Z"/><circle cx="7" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg>
+                    </span>
+                    <span class="nav-label">خودروها</span>
+                </a>
+
                 <div class="nav-group" data-group="driver">
                     <button type="button" class="nav-group-toggle" aria-expanded="false">
                         <span class="nav-group-label">
@@ -121,7 +128,7 @@
                             <span class="nav-sublink-icon" aria-hidden="true">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/></svg>
                             </span>
-                            <span class="nav-label">بررسی خرابی‌ها و تصمیم استفاده از خودرو</span>
+                            <span class="nav-label">درخواست‌های تعمیر</span>
                         </a>
                     </div>
                 </div>
@@ -274,6 +281,7 @@
                         <option value="OUT_OF_SERVICE">خارج از سرویس</option>
                     </select>
                 </div>
+                <div class="table-summary" id="vehicles-summary" aria-live="polite"></div>
                 <div class="table-fmms-wrap">
                     <table class="table-fmms">
                         <thead>
@@ -281,6 +289,7 @@
                             <th>شماره خودرو</th>
                             <th>پلاک</th>
                             <th>مدل</th>
+                            <th>سال</th>
                             <th>وضعیت</th>
                             <th>SAP Equipment</th>
                             <th>عملیات</th>
@@ -289,6 +298,7 @@
                         <tbody id="vehicles-tbody"></tbody>
                     </table>
                 </div>
+                <nav class="table-pagination" id="vehicles-pagination" aria-label="صفحه‌بندی خودروها"></nav>
             </section>
 
             <!-- ---------------- DRIVER INSPECTION ---------------- -->

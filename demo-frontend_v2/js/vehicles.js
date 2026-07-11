@@ -5,8 +5,14 @@ window.FMMS = window.FMMS || {};
 FMMS.pages = FMMS.pages || {};
 
 (function (FMMS) {
+  const PAGE_SIZE = 15;
+  const COLSPAN = 7;
+
   let allVehicles = [];
+  let filteredVehicles = [];
+  let currentPage = 1;
   let detailWired = false;
+  let paginationWired = false;
 
   const OPEN_REPAIR_STATUSES = new Set([
     "CREATED",
@@ -25,6 +31,7 @@ FMMS.pages = FMMS.pages || {};
       <td class="mono">${FMMS.ui.escapeHtml(vehicleNumber)}</td>
       <td class="mono">${FMMS.ui.escapeHtml(v.plate_number)}</td>
       <td>${FMMS.ui.escapeHtml(v.make)} ${FMMS.ui.escapeHtml(v.model)}</td>
+      <td>${FMMS.ui.escapeHtml(String(v.year || "—"))}</td>
       <td>${FMMS.ui.badge(v.status)}</td>
       <td class="mono">${FMMS.ui.escapeHtml(v.sap_equipment_number || "—")}</td>
       <td><button type="button" class="btn btn-fmms-outline btn-sm" data-action="detail">مشاهده جزئیات</button></td>
@@ -134,7 +141,7 @@ FMMS.pages = FMMS.pages || {};
         ["VIN", `<span class="mono">${FMMS.ui.escapeHtml(vehicle.vin)}</span>`],
         ["کد تجهیز SAP", `<span class="mono">${FMMS.ui.escapeHtml(vehicle.sap_equipment_number || "—")}</span>`],
         ["وضعیت خودرو", FMMS.ui.badge(vehicle.status)],
-        ["سازنده / مدل", `${FMMS.ui.escapeHtml(vehicle.make)} ${FMMS.ui.escapeHtml(vehicle.model)}`],
+        ["سازنده / مدل", `${FMMS.ui.escapeHtml(vehicle.make)} ${FMMS.ui.escapeHtml(vehicle.model)} (${vehicle.year || "—"})`],
         ["وضعیت تعمیرگاهی", `<strong>${workshop.label}</strong><br>${workshop.detail}`],
         ...summarizeVehicleContext(vehicle, faults, repairOrders),
       ];
@@ -149,10 +156,10 @@ FMMS.pages = FMMS.pages || {};
     }
   }
 
-  function applyFilters() {
+  function getFilteredVehicles() {
     const q = document.getElementById("vehicles-search").value.trim().toLowerCase();
     const status = document.getElementById("vehicles-status-filter").value;
-    const filtered = allVehicles.filter((v) => {
+    return allVehicles.filter((v) => {
       const haystack = [v.plate_number, v.vin, v.model, v.make, v.sap_equipment_number, v.id]
         .filter(Boolean)
         .join(" ")
@@ -161,15 +168,109 @@ FMMS.pages = FMMS.pages || {};
       const matchesStatus = !status || v.status === status;
       return matchesQ && matchesStatus;
     });
+  }
+
+  function renderSummary(totalFiltered) {
+    const summaryEl = document.getElementById("vehicles-summary");
+    if (!summaryEl) return;
+    if (!allVehicles.length) {
+      summaryEl.textContent = "";
+      return;
+    }
+    const q = document.getElementById("vehicles-search").value.trim();
+    const status = document.getElementById("vehicles-status-filter").value;
+    const hasFilter = Boolean(q || status);
+    if (!hasFilter) {
+      summaryEl.textContent = `${allVehicles.length.toLocaleString("fa-IR")} خودرو ثبت‌شده`;
+      return;
+    }
+    summaryEl.textContent = `${totalFiltered.toLocaleString("fa-IR")} نتیجه از ${allVehicles.length.toLocaleString("fa-IR")} خودرو`;
+  }
+
+  function renderPagination(totalItems) {
+    const paginationEl = document.getElementById("vehicles-pagination");
+    if (!paginationEl) return;
+
+    const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+    if (currentPage > totalPages) currentPage = totalPages;
+
+    if (totalItems <= PAGE_SIZE) {
+      paginationEl.innerHTML = "";
+      return;
+    }
+
+    const start = (currentPage - 1) * PAGE_SIZE + 1;
+    const end = Math.min(currentPage * PAGE_SIZE, totalItems);
+
+    paginationEl.innerHTML = `<div class="table-pagination-info">${start.toLocaleString("fa-IR")}–${end.toLocaleString("fa-IR")} از ${totalItems.toLocaleString("fa-IR")}</div>
+      <div class="table-pagination-controls">
+        <button type="button" class="btn btn-fmms-outline btn-sm" data-page-nav="prev"${currentPage <= 1 ? " disabled" : ""}>قبلی</button>
+        <span class="table-pagination-current">صفحه ${currentPage.toLocaleString("fa-IR")} از ${totalPages.toLocaleString("fa-IR")}</span>
+        <button type="button" class="btn btn-fmms-outline btn-sm" data-page-nav="next"${currentPage >= totalPages ? " disabled" : ""}>بعدی</button>
+      </div>`;
+  }
+
+  function renderTableBody() {
     const tbody = document.getElementById("vehicles-tbody");
-    tbody.innerHTML = filtered.length
-      ? filtered.map(rowHtml).join("")
-      : `<tr><td colspan="6"><div class="empty-state"><div class="title">نتیجه‌ای یافت نشد</div></div></td></tr>`;
+    if (!tbody) return;
+
+    filteredVehicles = getFilteredVehicles();
+    renderSummary(filteredVehicles.length);
+
+    if (!allVehicles.length) {
+      tbody.innerHTML = `<tr><td colspan="${COLSPAN}"><div class="empty-state"><div class="title">خودرویی ثبت نشده است</div><div class="subtitle">پس از ثبت یا همگام‌سازی SAP، خودروها اینجا نمایش داده می‌شوند.</div></div></td></tr>`;
+      renderPagination(0);
+      return;
+    }
+
+    if (!filteredVehicles.length) {
+      tbody.innerHTML = `<tr><td colspan="${COLSPAN}"><div class="empty-state"><div class="title">نتیجه‌ای یافت نشد</div><div class="subtitle">فیلتر یا عبارت جستجو را تغییر دهید.</div></div></td></tr>`;
+      renderPagination(0);
+      return;
+    }
+
+    const totalPages = Math.max(1, Math.ceil(filteredVehicles.length / PAGE_SIZE));
+    if (currentPage > totalPages) currentPage = totalPages;
+
+    const start = (currentPage - 1) * PAGE_SIZE;
+    const pageItems = filteredVehicles.slice(start, start + PAGE_SIZE);
+    tbody.innerHTML = pageItems.map(rowHtml).join("");
+    renderPagination(filteredVehicles.length);
+  }
+
+  function applyFilters(resetPage) {
+    if (resetPage !== false) currentPage = 1;
+    renderTableBody();
+  }
+
+  function wirePagination() {
+    if (paginationWired) return;
+    const paginationEl = document.getElementById("vehicles-pagination");
+    if (!paginationEl) return;
+    paginationEl.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-page-nav]");
+      if (!btn || btn.disabled) return;
+      const totalPages = Math.max(1, Math.ceil(filteredVehicles.length / PAGE_SIZE));
+      if (btn.dataset.pageNav === "prev" && currentPage > 1) {
+        currentPage -= 1;
+        renderTableBody();
+      } else if (btn.dataset.pageNav === "next" && currentPage < totalPages) {
+        currentPage += 1;
+        renderTableBody();
+      }
+    });
+    paginationWired = true;
   }
 
   async function render() {
     const tbody = document.getElementById("vehicles-tbody");
-    tbody.innerHTML = `<tr><td colspan="6">در حال بارگذاری…</td></tr>`;
+    if (!tbody) return;
+
+    currentPage = 1;
+    tbody.innerHTML = `<tr><td colspan="${COLSPAN}">در حال بارگذاری…</td></tr>`;
+    document.getElementById("vehicles-summary").textContent = "";
+    document.getElementById("vehicles-pagination").innerHTML = "";
+
     try {
       const res = await FMMS.api.listAllVehicles();
       allVehicles = res.results.slice().sort((a, b) => {
@@ -177,16 +278,16 @@ FMMS.pages = FMMS.pages || {};
         const bKey = b.plate_number || b.id;
         return aKey.localeCompare(bKey, "fa");
       });
-      applyFilters();
+      applyFilters(false);
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="6">${FMMS.ui.escapeHtml(err.message)}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="${COLSPAN}"><div class="text-danger">${FMMS.ui.escapeHtml(err.message)}</div></td></tr>`;
       FMMS.ui.toast(err.message, "error");
       return;
     }
 
     if (!detailWired) {
-      document.getElementById("vehicles-search").addEventListener("input", applyFilters);
-      document.getElementById("vehicles-status-filter").addEventListener("change", applyFilters);
+      document.getElementById("vehicles-search").addEventListener("input", () => applyFilters());
+      document.getElementById("vehicles-status-filter").addEventListener("change", () => applyFilters());
       tbody.addEventListener("click", (e) => {
         const btn = e.target.closest('[data-action="detail"]');
         if (!btn) return;
@@ -195,6 +296,8 @@ FMMS.pages = FMMS.pages || {};
       });
       detailWired = true;
     }
+
+    wirePagination();
   }
 
   FMMS.pages.vehicles = { render };

@@ -34,8 +34,8 @@ window.FMMS = window.FMMS || {};
     handover: { title: "تایید تحویل خودرو", breadcrumb: ["داشبورد", "راننده", "تایید تحویل خودرو"] },
     faults: { title: "خرابی‌ها", breadcrumb: ["داشبورد", "خرابی‌ها"] },
     distribution: {
-      title: "بررسی خرابی‌ها و تصمیم استفاده از خودرو",
-      breadcrumb: ["داشبورد", "توزیع", "بررسی خرابی‌ها و تصمیم استفاده از خودرو"],
+      title: "درخواست‌های تعمیر",
+      breadcrumb: ["داشبورد", "توزیع", "درخواست‌های تعمیر"],
     },
     "transport-repairs": {
       title: "درخواست‌های تعمیر",
@@ -221,10 +221,11 @@ window.FMMS = window.FMMS || {};
 
   function applyRoleVisibility() {
     const role = FMMS.session.getRole();
-    const dashboardLink = document.querySelector('.sidebar-nav .nav-link[data-page="dashboard"]');
-    if (dashboardLink) {
-      dashboardLink.style.display = isPageAllowedForRole("dashboard", role) ? "" : "none";
-    }
+    document.querySelectorAll(".sidebar-nav .nav-link, .sidebar-nav .nav-sublink").forEach((link) => {
+      const pageId = link.dataset.page;
+      if (!pageId) return;
+      link.style.display = isPageAllowedForRole(pageId, role) ? "" : "none";
+    });
     document.querySelectorAll(".nav-group").forEach((group) => {
       group.style.display = isGroupVisibleForRole(group.dataset.group, role) ? "" : "none";
     });
