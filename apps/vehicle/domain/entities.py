@@ -103,7 +103,12 @@ _ALLOWED_TRANSITIONS: dict[VehicleStatus, frozenset[VehicleStatus]] = {
             VehicleStatus.SUSPENDED,
         }
     ),
-    VehicleStatus.INACTIVE: frozenset({VehicleStatus.ACTIVE}),
+    VehicleStatus.INACTIVE: frozenset(
+        {
+            VehicleStatus.ACTIVE,
+            VehicleStatus.UNDER_REPAIR,
+        }
+    ),
 }
 
 

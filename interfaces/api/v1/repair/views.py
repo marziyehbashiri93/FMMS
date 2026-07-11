@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 
+from django.db import transaction
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.decorators import action
@@ -187,6 +188,7 @@ class RepairOrderViewSet(
 
     @extend_schema(request=None, responses=RepairOrderResponseSerializer)
     @action(detail=True, methods=["post"])
+    @transaction.atomic
     def start(self, request: Request, pk: str | None = None) -> Response:
         """Start work on an assigned repair order."""
         result = deps.get_start_repair_service().execute(
@@ -210,6 +212,7 @@ class RepairOrderViewSet(
         request=RepairCompleteSerializer, responses=RepairOrderResponseSerializer
     )
     @action(detail=True, methods=["post"])
+    @transaction.atomic
     def complete(self, request: Request, pk: str | None = None) -> Response:
         """Complete a repair order."""
         serializer = RepairCompleteSerializer(data=request.data)

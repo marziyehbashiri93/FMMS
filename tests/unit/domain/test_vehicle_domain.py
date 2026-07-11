@@ -123,6 +123,19 @@ class TestVehicleEntity:
         v.activate()
         assert v.status == VehicleStatus.ACTIVE
 
+    def test_inactive_to_under_repair_for_maintenance_workflow(self) -> None:
+        v = _make_vehicle(status=VehicleStatus.INACTIVE)
+        v.mark_under_repair()
+        assert v.status == VehicleStatus.UNDER_REPAIR
+
+    def test_inactive_maintenance_workflow_to_driver_handover(self) -> None:
+        v = _make_vehicle(status=VehicleStatus.INACTIVE)
+        v.mark_under_repair()
+        v.mark_waiting_driver_confirmation()
+        assert v.status == VehicleStatus.WAITING_DRIVER_CONFIRMATION
+        v.activate()
+        assert v.status == VehicleStatus.ACTIVE
+
     def test_inactive_is_terminal(self) -> None:
         v = _make_vehicle(status=VehicleStatus.INACTIVE)
         with pytest.raises(VehicleInvalidStateTransitionError):

@@ -424,3 +424,109 @@ class TestMaintenanceWorkflowV2API:
         assert repair.data["status"] == "ACCEPTED_BY_DRIVER"
         vehicle = authenticated_client.get(f"/api/v1/vehicles/{vehicle_id}/")
         assert vehicle.data["status"] == "ACTIVE"
+
+    def test_inactive_vehicle_full_workflow_creates_handover(
+        self, technician_client: APIClient, authenticated_client: APIClient
+    ) -> None:
+        """Failed inspection → deactivate → repair → complete must create handover."""
+        vehicle = create_vehicle(
+            authenticated_client, plate="12MWF301", vin="1HGCM82633A008301"
+        )
+        inspection = authenticated_client.post(
+            "/api/v1/inspections/",
+            {
+                "vehicle_id": vehicle["id"],
+                "inspection_type": "PRE_TRIP",
+                "odometer_value": 1200,
+                "odometer_unit": "KM",
+                "inspected_at": datetime.now(tz=UTC).isoformat(),
+                "items": [
+                    {
+                        "category": "LIGHTS",
+                        "description": "Front light",
+                        "result": "FAIL",
+                        "notes": "Broken",
+                        "severity": "MEDIUM",
+                    }
+                ],
+            },
+            format="json",
+        )
+        assert inspection.status_code == 201, inspection.data
+
+        submitted = authenticated_client.post(
+            f"/api/v1/inspections/{inspection.data['id']}/submit/", {}, format="json"
+        )
+        assert submitted.status_code == 200, submitted.data
+        assert submitted.data["has_failures"] is True
+
+        deactivated = authenticated_client.post(
+            f"/api/v1/vehicles/{vehicle['id']}/deactivate/", {}, format="json"
+        )
+        assert deactivated.status_code == 200, deactivated.data
+        assert deactivated.data["status"] == "INACTIVE"
+
+        orders = authenticated_client.get(
+            f"/api/v1/repair-orders/?vehicle_id={vehicle['id']}"
+        )
+        assert orders.status_code == 200, orders.data
+        assert orders.data["count"] == 1
+        order = orders.data["results"][0]
+
+        approved = authenticated_client.post(
+            f"/api/v1/repair-orders/{order['id']}/approve/", {}, format="json"
+        )
+        assert approved.status_code == 200, approved.data
+
+        assigned = authenticated_client.post(
+            f"/api/v1/repair-orders/{order['id']}/assign-workshop/",
+            {"workshop_type": "INTERNAL", "workshop_id": "WS-001"},
+            format="json",
+        )
+        assert assigned.status_code == 200, assigned.data
+
+        accepted = technician_client.post(
+            f"/api/v1/repair-orders/{order['id']}/accept/", {}, format="json"
+        )
+        assert accepted.status_code == 200, accepted.data
+        assert accepted.data["status"] == "WAITING_WORKSHOP_CONFIRMATION"
+
+        started = technician_client.post(
+            f"/api/v1/repair-orders/{order['id']}/start/", {}, format="json"
+        )
+        assert started.status_code == 200, started.data
+        assert started.data["status"] == "IN_PROGRESS"
+
+        vehicle_after_start = authenticated_client.get(
+            f"/api/v1/vehicles/{vehicle['id']}/"
+        )
+        assert vehicle_after_start.data["status"] == "UNDER_REPAIR"
+
+        completed = technician_client.post(
+            f"/api/v1/repair-orders/{order['id']}/complete/",
+            {"completed_at": datetime.now(tz=UTC).isoformat()},
+            format="json",
+        )
+        assert completed.status_code == 200, completed.data
+        assert completed.data["status"] == "WAITING_DRIVER_CONFIRMATION"
+
+        vehicle_after_complete = authenticated_client.get(
+            f"/api/v1/vehicles/{vehicle['id']}/"
+        )
+        assert vehicle_after_complete.data["status"] == "WAITING_DRIVER_CONFIRMATION"
+
+        handovers = technician_client.get("/api/v1/vehicle-handovers/")
+        assert handovers.status_code == 200, handovers.data
+        target = next(
+            item for item in handovers.data if item["repair_order_id"] == order["id"]
+        )
+        assert target["status"] == "WAITING_DRIVER_CONFIRMATION"
+
+        timeline = technician_client.get(
+            f"/api/v1/repair-orders/{order['id']}/timeline/"
+        )
+        assert timeline.status_code == 200, timeline.data
+        event_types = {item["event"] for item in timeline.data}
+        assert "REPAIR_STARTED" in event_types
+        assert "REPAIR_COMPLETED" in event_types
+        assert "WAITING_DRIVER_CONFIRMATION" in event_types

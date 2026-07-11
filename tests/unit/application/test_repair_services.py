@@ -511,6 +511,19 @@ class TestStartRepairService:
 
         assert result.status == RepairOrderStatus.IN_PROGRESS
 
+    def test_starts_inactive_vehicle_under_repair(self) -> None:
+        vehicle = _make_vehicle()
+        vehicle.status = VehicleStatus.INACTIVE
+        order = _make_order(vehicle_id=vehicle.id)
+        order.status = RepairOrderStatus.WAITING_WORKSHOP_CONFIRMATION
+        result = StartRepairService(
+            FakeRepairRepository([order]),
+            FakeVehicleRepository([vehicle]),
+        ).execute(order.id)
+
+        assert result.status == RepairOrderStatus.IN_PROGRESS
+        assert vehicle.status == VehicleStatus.UNDER_REPAIR
+
     def test_raises_when_not_assigned(self) -> None:
         vehicle = _make_vehicle()
         order = _make_order(status=RepairOrderStatus.CREATED, vehicle_id=vehicle.id)
@@ -545,6 +558,30 @@ class TestCompleteRepairOrderService:
 
         assert result.status == RepairOrderStatus.WAITING_DRIVER_CONFIRMATION
         assert result.completed_at == completed_at
+        assert handover.repair_order_id == order.id
+
+    def test_completes_inactive_vehicle_waiting_driver_confirmation(self) -> None:
+        vehicle = _make_vehicle()
+        vehicle.status = VehicleStatus.UNDER_REPAIR
+        order = _make_order(status=RepairOrderStatus.IN_PROGRESS, vehicle_id=vehicle.id)
+        handover = FakeCreateVehicleHandover()
+
+        result = CompleteRepairOrderService(
+            FakeRepairRepository([order]),
+            FakeVehicleRepository([vehicle]),
+            FakeMaterialRequestRepository(),
+            handover,
+        ).execute(
+            CompleteRepairOrderDTO(
+                repair_order_id=order.id,
+                completed_at=datetime.now(tz=UTC),
+                request_id="req-inactive-complete",
+                completed_by=uuid.uuid4(),
+            )
+        )
+
+        assert result.status == RepairOrderStatus.WAITING_DRIVER_CONFIRMATION
+        assert vehicle.status == VehicleStatus.WAITING_DRIVER_CONFIRMATION
         assert handover.repair_order_id == order.id
 
     def test_raises_when_not_in_progress(self) -> None:
