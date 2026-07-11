@@ -233,7 +233,7 @@
 
   const finalApprovalVehicle = DB.vehicles.find((v) => v.id === "veh-1025");
   if (finalApprovalVehicle) {
-    finalApprovalVehicle.status = "WAITING_TRANSPORT_FINAL_APPROVAL";
+    finalApprovalVehicle.status = "WAITING_DRIVER_CONFIRMATION";
   }
 
   DB.materialRequests.push({
@@ -299,7 +299,7 @@
 
   const externalVehicle = DB.vehicles.find((v) => v.id === "veh-1031");
   if (externalVehicle) {
-    externalVehicle.status = "WAITING_TRANSPORT_FINAL_APPROVAL";
+    externalVehicle.status = "WAITING_DRIVER_CONFIRMATION";
   }
   DB.faults.push({
     id: "fault-external-1031",

@@ -112,13 +112,12 @@ window.FMMS = window.FMMS || {};
     if (fault && fault.status === "OPEN") return "انتظار تصمیم توزیع";
     if (vehicle?.status === "INACTIVE") return "خودرو غیرفعال";
     if (vehicle?.status === "WAITING_DRIVER_CONFIRMATION") return "منتظر تایید راننده";
-    if (vehicle?.status === "WAITING_TRANSPORT_FINAL_APPROVAL") return "منتظر تایید نهایی ترابری";
     if (vehicle?.status === "UNDER_REPAIR") return "در حال تعمیر";
     return "در جریان";
   }
   function vehicleStatusSummary(vehicle, repairOrder) {
     if (vehicle?.status === "WAITING_DRIVER_CONFIRMATION") return "منتظر تایید راننده";
-    if (repairOrder?.status === "WAITING_TRANSPORT_FINAL_APPROVAL" || vehicle?.status === "WAITING_TRANSPORT_FINAL_APPROVAL") return "منتظر تایید نهایی ترابری";
+    if (repairOrder?.status === "WAITING_TRANSPORT_FINAL_APPROVAL") return "منتظر تایید نهایی ترابری";
     if (repairOrder?.status === "IN_PROGRESS" || vehicle?.status === "UNDER_REPAIR") return "در حال تعمیر";
     if (vehicle?.status === "ACTIVE") return "فعال";
     if (vehicle?.status === "INACTIVE") return "غیرفعال";

@@ -834,7 +834,7 @@ window.FMMS = window.FMMS || {};
           ro.updated_at = now();
         }
         if (v) {
-          v.status = "WAITING_TRANSPORT_FINAL_APPROVAL";
+          v.status = "WAITING_DRIVER_CONFIRMATION";
           v.updated_at = now();
         }
         recordMockEvent(ho.repair_order_id, "DRIVER_ACCEPTED", "راننده تحویل را تایید کرد.");
@@ -939,7 +939,6 @@ window.FMMS = window.FMMS || {};
     "INACTIVE",
     "UNDER_REPAIR",
     "WAITING_DRIVER_CONFIRMATION",
-    "WAITING_TRANSPORT_FINAL_APPROVAL",
     "SUSPENDED",
     "OUT_OF_SERVICE",
   ];
