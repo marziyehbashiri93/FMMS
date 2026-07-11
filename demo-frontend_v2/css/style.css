@@ -435,13 +435,35 @@ select.form-control:hover,
 }
 
 .role-select {
-  background-color: var(--gray-soft);
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-color: #fff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2373829C' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 12px center;
+  background-size: 14px;
   height: var(--btn-h);
   min-height: var(--btn-h);
+  min-width: 190px;
+  padding: 0 14px 0 34px;
   font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  cursor: pointer;
+  transition: border-color var(--transition-base), box-shadow var(--transition-base), background-color var(--transition-base);
 }
 .role-select:hover {
   background-color: #fff;
+  border-color: #C9D4E4;
+}
+.role-select:focus {
+  outline: none;
+  border-color: var(--success);
+  box-shadow: 0 0 0 3px rgba(47, 166, 106, 0.14);
 }
 
 .topbar-user {
@@ -460,57 +482,6 @@ select.form-control:hover,
   display: flex;
   align-items: flex-start;
   background: var(--main-bg);
-}
-
-.sidebar {
-  width: var(--sidebar-w);
-  flex: 0 0 var(--sidebar-w);
-  background: var(--sidebar-bg);
-  min-height: calc(100vh - var(--header-h));
-  padding: var(--space-3);
-  position: sticky;
-  top: var(--header-h);
-  transition: background var(--transition-base);
-}
-
-.sidebar-nav a {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  height: 46px;
-  padding: 0 var(--space-2);
-  color: rgba(255, 255, 255, 0.82) !important;
-  font-size: 14px;
-  font-weight: 600;
-  border-radius: var(--radius-md);
-  margin-bottom: var(--space-1);
-  cursor: pointer;
-  transition: background var(--transition-base), color var(--transition-base), box-shadow var(--transition-base), transform var(--transition-base);
-}
-.sidebar-nav a:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #fff !important;
-}
-.sidebar-nav a:focus-visible {
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18);
-  outline: none;
-}
-.sidebar-nav a.active {
-  background: var(--primary);
-  color: #fff !important;
-  box-shadow: var(--shadow-sidebar-active);
-}
-.sidebar-nav .nav-icon {
-  width: 22px;
-  text-align: center;
-  font-size: 15px;
-  opacity: 0.62;
-  flex: 0 0 22px;
-  transition: opacity var(--transition-base);
-}
-.sidebar-nav a:hover .nav-icon,
-.sidebar-nav a.active .nav-icon {
-  opacity: 0.88;
 }
 
 .main {
@@ -844,6 +815,11 @@ table.table-fmms td .empty-state {
   color: var(--warning);
   border-color: #F5E4C4;
 }
+.badge-orange {
+  background: #FFF0E0;
+  color: #C45C1A;
+  border-color: #F5D5B8;
+}
 .badge-red {
   background: var(--red-soft);
   color: var(--red);
@@ -861,6 +837,46 @@ table.table-fmms td .empty-state {
 }
 .badge-fmms:hover {
   box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+}
+
+.stat-grid-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.workflow-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.workflow-checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.workflow-checklist-item.done {
+  color: var(--success);
+  font-weight: 600;
+}
+.workflow-checklist-item.current {
+  color: var(--ink);
+  font-weight: 600;
+}
+.wf-check-icon {
+  width: 1.5rem;
+  text-align: center;
+  font-family: "JetBrains Mono", monospace;
+}
+.material-flow-hint {
+  line-height: 1.6;
+  padding: 8px 10px;
+  background: var(--gray-soft);
+  border-radius: 6px;
+}
+.driver-handover-card {
+  border: 1px solid var(--border);
 }
 
 /* ---- generic bits ------------------------------------------------------*/
@@ -1254,17 +1270,6 @@ table.table-fmms td .empty-state {
 }
 
 @media (max-width: 860px) {
-  .sidebar {
-    position: static;
-    width: 100%;
-    flex: 1 1 100%;
-    min-height: auto;
-    display: flex;
-    overflow-x: auto;
-    padding: var(--space-2);
-  }
-  .sidebar-nav { display: flex; gap: var(--space-1); }
-  .sidebar-nav a { margin-bottom: 0; white-space: nowrap; }
   .shell-body { flex-direction: column; }
   .main {
     padding: var(--space-2);

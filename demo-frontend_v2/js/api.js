@@ -213,12 +213,13 @@ window.FMMS = window.FMMS || {};
   }
 
   function recordMockEvent(repairOrderId, eventType, description) {
+    const DB = window.FMMS_MOCK_DB;
     if (!DB.repairOrderEvents) DB.repairOrderEvents = [];
     DB.repairOrderEvents.push({
       repair_order_id: repairOrderId,
       event: eventType,
       description,
-      created_at: now(),
+      created_at: new Date().toISOString(),
       created_by_id: null,
     });
   }
@@ -271,7 +272,9 @@ window.FMMS = window.FMMS || {};
       const v = DB.vehicles.find((x) => x.id === m[0]);
       if (!v) throw new ApiError("خودرو یافت نشد.", 404);
       const open = DB.repairOrders.filter(
-        (ro) => ro.vehicle_id === m[0] && ro.status !== "COMPLETED" && ro.status !== "CANCELLED"
+        (ro) =>
+          ro.vehicle_id === m[0] &&
+          !["COMPLETED", "CANCELLED", "ACCEPTED_BY_DRIVER", "REJECTED_BY_DRIVER"].includes(ro.status)
       );
       if (open.length) {
         throw new ApiError("Vehicle cannot be activated while repair orders are still open.", 409);
@@ -451,11 +454,47 @@ window.FMMS = window.FMMS || {};
       const ro = DB.repairOrders.find((x) => x.id === m[0]);
       if (!ro) throw new ApiError("دستور تعمیر یافت نشد.", 404);
       ro.workshop_type = body.workshop_type;
+      ro.workshop_id = body.workshop_id || null;
       ro.status = "WORKSHOP_ASSIGNED";
       ro.sap_order_number = ro.sap_order_number || "PM-" + Math.floor(700000 + Math.random() * 90000);
       ro.updated_at = now();
       recordMockEvent(ro.id, "WORKSHOP_ASSIGNED", "تعمیرگاه انتخاب شد.");
-      return { id: ro.id, status: ro.status, message: "تعمیرگاه تخصیص یافت.", workshop_type: ro.workshop_type };
+      return {
+        id: ro.id,
+        status: ro.status,
+        message: "تعمیرگاه تخصیص یافت.",
+        workshop_type: ro.workshop_type,
+        workshop_id: ro.workshop_id,
+      };
+    }
+    m = match("/repair-orders/:id/accept/");
+    if (m && method === "POST") {
+      const ro = DB.repairOrders.find((x) => x.id === m[0]);
+      if (!ro) throw new ApiError("دستور تعمیر یافت نشد.", 404);
+      if (ro.workshop_type !== "INTERNAL" || ro.status !== "WORKSHOP_ASSIGNED") {
+        throw new ApiError(`Cannot accept repair from '${ro.status}'.`, 422);
+      }
+      ro.status = "WAITING_WORKSHOP_CONFIRMATION";
+      ro.updated_at = now();
+      recordMockEvent(ro.id, "TECHNICIAN_ACCEPTED", "تعمیرکار تعمیر را پذیرفت.");
+      return { id: ro.id, status: ro.status, message: "تعمیر پذیرفته شد.", workshop_type: ro.workshop_type };
+    }
+    m = match("/repair-orders/:id/reject/");
+    if (m && method === "POST") {
+      const ro = DB.repairOrders.find((x) => x.id === m[0]);
+      if (!ro) throw new ApiError("دستور تعمیر یافت نشد.", 404);
+      if (ro.status !== "WORKSHOP_ASSIGNED") {
+        throw new ApiError(`Cannot reject repair from '${ro.status}'.`, 422);
+      }
+      ro.status = "CANCELLED";
+      ro.updated_at = now();
+      const v = DB.vehicles.find((x) => x.id === ro.vehicle_id);
+      if (v) {
+        v.status = "ACTIVE";
+        v.updated_at = now();
+      }
+      recordMockEvent(ro.id, "REPAIR_REJECTED", "تعمیر رد شد.");
+      return { id: ro.id, status: ro.status, message: "تعمیر رد شد.", workshop_type: ro.workshop_type };
     }
     m = match("/repair-orders/:id/assign/");
     if (m && method === "POST") {
@@ -477,7 +516,9 @@ window.FMMS = window.FMMS || {};
     if (m && method === "POST") {
       const ro = DB.repairOrders.find((x) => x.id === m[0]);
       if (!ro) throw new ApiError("دستور تعمیر یافت نشد.", 404);
-      if (ro.status !== "ASSIGNED" && ro.status !== "WORKSHOP_ASSIGNED") {
+      if (
+        !["ASSIGNED", "WORKSHOP_ASSIGNED", "WAITING_WORKSHOP_CONFIRMATION"].includes(ro.status)
+      ) {
         throw new ApiError(
           `Cannot transition repair order from '${ro.status}' to 'IN_PROGRESS'.`,
           422
@@ -485,6 +526,11 @@ window.FMMS = window.FMMS || {};
       }
       ro.status = "IN_PROGRESS";
       ro.updated_at = now();
+      const v = DB.vehicles.find((x) => x.id === ro.vehicle_id);
+      if (v) {
+        v.status = "UNDER_REPAIR";
+        v.updated_at = now();
+      }
       recordMockEvent(ro.id, "REPAIR_STARTED", "تعمیر شروع شد.");
       return ro;
     }
@@ -504,7 +550,14 @@ window.FMMS = window.FMMS || {};
     if (m && method === "POST") {
       const ro = DB.repairOrders.find((x) => x.id === m[0]);
       if (!ro) throw new ApiError("دستور تعمیر یافت نشد.", 404);
-      ro.activities.push({ id: uid("act"), description: body.description, labor_hours: body.labor_hours, performed_by_id: body.performed_by_id || "tech-demo", performed_at: body.performed_at || now(), notes: body.notes || null });
+      ro.activities.push({
+        id: uid("act"),
+        description: body.description,
+        labor_hours: body.labor_hours,
+        performed_by_id: body.performed_by_id || "tech-demo",
+        performed_at: body.performed_at || now(),
+        notes: body.notes || null,
+      });
       ro.updated_at = now();
       return ro;
     }
@@ -512,23 +565,98 @@ window.FMMS = window.FMMS || {};
     if (m && method === "POST") {
       const ro = DB.repairOrders.find((x) => x.id === m[0]);
       if (!ro) throw new ApiError("دستور تعمیر یافت نشد.", 404);
-      ro.parts.push({ id: uid("part"), material_number: body.material_number, quantity: body.quantity, unit_of_measure: body.unit_of_measure, goods_issue_id: null, posted_at: null });
+      ro.parts.push({
+        id: uid("part"),
+        material_number: body.material_number,
+        quantity: body.quantity,
+        unit_of_measure: body.unit_of_measure,
+        goods_issue_id: null,
+        posted_at: null,
+      });
       ro.updated_at = now();
       return ro;
+    }
+    m = match("/repair-orders/:id/material-requests/");
+    if (m && method === "POST") {
+      const ro = DB.repairOrders.find((x) => x.id === m[0]);
+      if (!ro) throw new ApiError("دستور تعمیر یافت نشد.", 404);
+      if (!DB.materialRequests) DB.materialRequests = [];
+      const mr = {
+        id: uid("mr"),
+        repair_order_id: ro.id,
+        status: "REQUESTED",
+        created_by_id: "tech-demo",
+        created_at: now(),
+        updated_at: now(),
+        items: (body.items || []).map((item) => ({
+          id: uid("mri"),
+          material_number: item.material_number,
+          quantity: String(item.quantity),
+          unit_of_measure: item.unit_of_measure,
+        })),
+      };
+      DB.materialRequests.push(mr);
+      recordMockEvent(ro.id, "MATERIAL_REQUESTED", "درخواست قطعه ثبت شد.");
+      return mr;
+    }
+    m = match("/repair-orders/:id/invoice/");
+    if (m && method === "POST") {
+      const ro = DB.repairOrders.find((x) => x.id === m[0]);
+      if (!ro) throw new ApiError("دستور تعمیر یافت نشد.", 404);
+      if (!DB.externalInvoices) DB.externalInvoices = [];
+      const inv = {
+        id: uid("inv"),
+        repair_order_id: ro.id,
+        amount: body.amount,
+        currency: body.currency || "IRR",
+        status: "UPLOADED",
+        created_by_id: "tech-demo",
+        created_at: now(),
+        updated_at: now(),
+        vendor_id: body.vendor_id || null,
+        document: body.document || null,
+      };
+      DB.externalInvoices.push(inv);
+      recordMockEvent(ro.id, "INVOICE_UPLOADED", "فاکتور خارجی بارگذاری شد.");
+      return inv;
     }
     m = match("/repair-orders/:id/complete/");
     if (m && method === "POST") {
       const ro = DB.repairOrders.find((x) => x.id === m[0]);
       if (!ro) throw new ApiError("دستور تعمیر یافت نشد.", 404);
-      ro.status = "COMPLETED";
+      if (ro.status !== "IN_PROGRESS" && ro.status !== "WAITING_PARTS") {
+        throw new ApiError(`Cannot complete repair from '${ro.status}'.`, 422);
+      }
+      const pendingMr = (DB.materialRequests || []).filter(
+        (mr) =>
+          mr.repair_order_id === ro.id &&
+          !["REJECTED", "STOCK_ISSUED", "RECEIVED"].includes(mr.status)
+      );
+      if (pendingMr.length) {
+        throw new ApiError("Cannot complete repair order with pending material requests.", 409);
+      }
+      ro.status = "WAITING_DRIVER_CONFIRMATION";
       ro.completed_at = body?.completed_at || now();
       ro.updated_at = now();
-      recordMockEvent(ro.id, "REPAIR_COMPLETED", "تعمیر تکمیل شد.");
-      const f = DB.faults.find((x) => x.id === ro.fault_id);
-      if (f) {
-        f.status = "CLOSED";
-        f.updated_at = now();
+      const v = DB.vehicles.find((x) => x.id === ro.vehicle_id);
+      if (v) {
+        v.status = "WAITING_DRIVER_CONFIRMATION";
+        v.updated_at = now();
       }
+      if (!DB.vehicleHandovers) DB.vehicleHandovers = [];
+      DB.vehicleHandovers.push({
+        id: uid("ho"),
+        repair_order_id: ro.id,
+        vehicle_id: ro.vehicle_id,
+        status: "WAITING_DRIVER_CONFIRMATION",
+        created_at: now(),
+        updated_at: now(),
+        comment: null,
+        driver_id: null,
+        confirmed_at: null,
+      });
+      recordMockEvent(ro.id, "REPAIR_COMPLETED", "تعمیر فنی تکمیل شد.");
+      recordMockEvent(ro.id, "WAITING_DRIVER_CONFIRMATION", "منتظر تایید راننده.");
       return ro;
     }
     m = match("/repair-orders/:id/sync-sap/");
@@ -538,6 +666,127 @@ window.FMMS = window.FMMS || {};
       ro.sap_order_number = ro.sap_order_number || "PM-" + Math.floor(700000 + Math.random() * 90000);
       ro.updated_at = now();
       return ro;
+    }
+
+    // ---- material requests ----
+    if (path === "/material-requests/" && method === "GET") {
+      if (!DB.materialRequests) DB.materialRequests = [];
+      return paginated(DB.materialRequests.slice());
+    }
+    m = match("/material-requests/:id/approve/");
+    if (m && method === "POST") {
+      if (!DB.materialRequests) DB.materialRequests = [];
+      const mr = DB.materialRequests.find((x) => x.id === m[0]);
+      if (!mr) throw new ApiError("درخواست قطعه یافت نشد.", 404);
+      mr.status = "APPROVED";
+      mr.updated_at = now();
+      recordMockEvent(mr.repair_order_id, "MATERIAL_APPROVED", "درخواست قطعه تایید شد.");
+      const available = window.FMMS_CONFIG?.MOCK_INVENTORY_AVAILABLE !== false;
+      if (available) {
+        mr.status = "STOCK_ISSUED";
+        recordMockEvent(mr.repair_order_id, "STOCK_ISSUED", "قطعات از انبار صادر شد.");
+      } else {
+        mr.status = "PURCHASE_REQUIRED";
+        if (!DB.purchaseRequisitions) DB.purchaseRequisitions = [];
+        DB.purchaseRequisitions.push({
+          id: uid("pr"),
+          repair_order_id: mr.repair_order_id,
+          material_request_id: mr.id,
+          status: "DRAFT",
+          requested_by_id: "supervisor-demo",
+          created_at: now(),
+          updated_at: now(),
+          line_items: mr.items.map((item) => ({
+            id: uid("prli"),
+            material_number: item.material_number,
+            quantity: item.quantity,
+            unit_of_measure: item.unit_of_measure,
+            description: "Material request auto-generated line item.",
+          })),
+        });
+        recordMockEvent(mr.repair_order_id, "PURCHASE_REQUIRED", "نیاز به خرید قطعات.");
+      }
+      mr.updated_at = now();
+      return mr;
+    }
+    m = match("/material-requests/:id/reject/");
+    if (m && method === "POST") {
+      if (!DB.materialRequests) DB.materialRequests = [];
+      const mr = DB.materialRequests.find((x) => x.id === m[0]);
+      if (!mr) throw new ApiError("درخواست قطعه یافت نشد.", 404);
+      mr.status = "REJECTED";
+      mr.updated_at = now();
+      recordMockEvent(mr.repair_order_id, "MATERIAL_REJECTED", "درخواست قطعه رد شد.");
+      return mr;
+    }
+
+    // ---- external invoices ----
+    if (path === "/external-invoices/" && method === "GET") {
+      if (!DB.externalInvoices) DB.externalInvoices = [];
+      return paginated(DB.externalInvoices.slice());
+    }
+    m = match("/external-invoices/:id/approve/");
+    if (m && method === "POST") {
+      if (!DB.externalInvoices) DB.externalInvoices = [];
+      const inv = DB.externalInvoices.find((x) => x.id === m[0]);
+      if (!inv) throw new ApiError("فاکتور یافت نشد.", 404);
+      inv.status = "APPROVED";
+      inv.updated_at = now();
+      recordMockEvent(inv.repair_order_id, "INVOICE_APPROVED", "فاکتور تایید شد.");
+      return inv;
+    }
+
+    // ---- vehicle handovers ----
+    if (path === "/vehicle-handovers/" && method === "GET") {
+      if (!DB.vehicleHandovers) DB.vehicleHandovers = [];
+      return paginated(DB.vehicleHandovers.slice());
+    }
+    m = match("/vehicle-handovers/:id/confirm/");
+    if (m && method === "POST") {
+      if (!DB.vehicleHandovers) DB.vehicleHandovers = [];
+      const ho = DB.vehicleHandovers.find((x) => x.id === m[0]);
+      if (!ho) throw new ApiError("تحویل خودرو یافت نشد.", 404);
+      ho.status = body.accepted ? "ACCEPTED" : "REJECTED";
+      ho.comment = body.comment || null;
+      ho.confirmed_at = now();
+      ho.updated_at = now();
+      const ro = DB.repairOrders.find((x) => x.id === ho.repair_order_id);
+      const v = DB.vehicles.find((x) => x.id === ho.vehicle_id);
+      if (body.accepted) {
+        if (ro) {
+          ro.status = "ACCEPTED_BY_DRIVER";
+          ro.updated_at = now();
+        }
+        if (v) {
+          v.status = "ACTIVE";
+          v.updated_at = now();
+        }
+        recordMockEvent(ho.repair_order_id, "DRIVER_ACCEPTED", "راننده تحویل را تایید کرد.");
+      } else {
+        if (ro) {
+          ro.status = "REJECTED_BY_DRIVER";
+          ro.updated_at = now();
+          DB.repairOrders.push({
+            id: uid("ro"),
+            vehicle_id: ro.vehicle_id,
+            fault_id: ro.fault_id,
+            status: "CREATED",
+            created_by_id: "driver-demo",
+            created_at: now(),
+            updated_at: now(),
+            activities: [],
+            parts: [],
+            technician_id: null,
+            assigned_at: null,
+            sap_order_number: null,
+            workshop_type: null,
+            workshop_id: null,
+            completed_at: null,
+          });
+        }
+        recordMockEvent(ho.repair_order_id, "DRIVER_REJECTED", "راننده تحویل را رد کرد.");
+      }
+      return ho;
     }
 
     // ---- purchase requisitions ----
@@ -608,7 +857,14 @@ window.FMMS = window.FMMS || {};
     return { count: all.length, next: null, previous: null, results: all };
   }
 
-  const VEHICLE_STATUSES = ["ACTIVE", "INACTIVE", "UNDER_REPAIR", "SUSPENDED", "OUT_OF_SERVICE"];
+  const VEHICLE_STATUSES = [
+    "ACTIVE",
+    "INACTIVE",
+    "UNDER_REPAIR",
+    "WAITING_DRIVER_CONFIRMATION",
+    "SUSPENDED",
+    "OUT_OF_SERVICE",
+  ];
 
   async function listAllVehicles(status) {
     if (status) {
@@ -881,6 +1137,10 @@ window.FMMS = window.FMMS || {};
     pmOrderCreate: false,
     pmOrderSyncSap: true,
     purchaseRequisition: true,
+    materialRequest: true,
+    vehicleHandover: true,
+    externalInvoice: true,
+    workshopAcceptReject: true,
     faultReporterName: true,
     vehicleOdometer: false,
     severityLevels: ["CRITICAL", "HIGH", "MEDIUM", "LOW"],
@@ -923,8 +1183,16 @@ window.FMMS = window.FMMS || {};
     listRepairOrdersAfterDistribution,
     getRepairOrder: (id) => request(`/repair-orders/${id}/`),
     approveRepair: (id) => request(`/repair-orders/${id}/approve/`, { method: "POST" }),
-    assignWorkshop: (id, workshopType) =>
-      request(`/repair-orders/${id}/assign-workshop/`, { method: "POST", body: { workshop_type: workshopType } }),
+    assignWorkshop: (id, workshopType, workshopId) =>
+      request(`/repair-orders/${id}/assign-workshop/`, {
+        method: "POST",
+        body: {
+          workshop_type: workshopType,
+          ...(workshopId ? { workshop_id: workshopId } : {}),
+        },
+      }),
+    acceptRepair: (id) => request(`/repair-orders/${id}/accept/`, { method: "POST" }),
+    rejectRepair: (id) => request(`/repair-orders/${id}/reject/`, { method: "POST" }),
     assignTechnician: (id, technicianId) =>
       request(`/repair-orders/${id}/assign/`, { method: "POST", body: { technician_id: technicianId } }),
     startRepair: (id) => request(`/repair-orders/${id}/start/`, { method: "POST" }),
@@ -938,6 +1206,24 @@ window.FMMS = window.FMMS || {};
       }),
     syncRepairSap: (id, payload) =>
       request(`/repair-orders/${id}/sync-sap/`, { method: "POST", body: payload }),
+
+    createMaterialRequest: (repairOrderId, items) =>
+      request(`/repair-orders/${repairOrderId}/material-requests/`, {
+        method: "POST",
+        body: { items },
+      }),
+    listMaterialRequests: (query) => request("/material-requests/", { query: query || {} }),
+    approveMaterialRequest: (id) => request(`/material-requests/${id}/approve/`, { method: "POST" }),
+    rejectMaterialRequest: (id) => request(`/material-requests/${id}/reject/`, { method: "POST" }),
+
+    uploadExternalInvoice: (repairOrderId, payload) =>
+      request(`/repair-orders/${repairOrderId}/invoice/`, { method: "POST", body: payload }),
+    listExternalInvoices: (query) => request("/external-invoices/", { query: query || {} }),
+    approveExternalInvoice: (id) => request(`/external-invoices/${id}/approve/`, { method: "POST" }),
+
+    listVehicleHandovers: (query) => request("/vehicle-handovers/", { query: query || {} }),
+    confirmVehicleHandover: (id, payload) =>
+      request(`/vehicle-handovers/${id}/confirm/`, { method: "POST", body: payload }),
 
     createPurchaseRequisition: (repairOrderId) =>
       request("/purchase-requisitions/", { method: "POST", body: { repair_order_id: repairOrderId } }),

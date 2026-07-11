@@ -11,22 +11,40 @@ window.FMMS = window.FMMS || {};
   const STATUS_LABELS = {
     // vehicle
     ACTIVE: ["فعال", "green"],
-    UNDER_REPAIR: ["در حال تعمیر", "amber"],
+    UNDER_REPAIR: ["در حال تعمیر", "orange"],
+    WAITING_DRIVER_CONFIRMATION: ["منتظر تایید راننده", "blue"],
     SUSPENDED: ["غیرفعال‌شده", "red"],
     OUT_OF_SERVICE: ["خارج از سرویس", "red"],
-    INACTIVE: ["غیرفعال", "gray"],
+    INACTIVE: ["غیرفعال", "red"],
     // fault
     OPEN: ["باز", "amber"],
     ASSIGNED: ["ارجاع‌شده", "blue"],
     IN_REPAIR: ["در حال تعمیر", "amber"],
     CLOSED: ["بسته‌شده", "green"],
-    // repair order (StatusAc9Enum)
+    // repair order
     CREATED: ["ایجادشده", "gray"],
     APPROVED: ["تاییدشده", "blue"],
     WORKSHOP_ASSIGNED: ["تعمیرگاه تخصیص یافته", "blue"],
-    IN_PROGRESS: ["در حال انجام", "amber"],
+    WAITING_WORKSHOP_CONFIRMATION: ["منتظر تایید تعمیرگاه", "amber"],
+    WAITING_PARTS: ["منتظر قطعه", "amber"],
+    IN_PROGRESS: ["در حال انجام", "orange"],
+    WAITING_DRIVER_CONFIRMATION: ["منتظر تایید راننده", "blue"],
+    ACCEPTED_BY_DRIVER: ["تایید راننده", "green"],
+    REJECTED_BY_DRIVER: ["رد راننده", "red"],
     COMPLETED: ["تکمیل‌شده", "green"],
     CANCELLED: ["لغوشده", "red"],
+    // material request
+    REQUESTED: ["درخواست‌شده", "gray"],
+    APPROVED: ["تاییدشده", "blue"],
+    REJECTED: ["ردشده", "red"],
+    WAITING_STOCK: ["منتظر موجودی", "amber"],
+    STOCK_ISSUED: ["صادر از انبار", "green"],
+    PURCHASE_REQUIRED: ["نیاز به خرید", "amber"],
+    RECEIVED: ["دریافت‌شده", "green"],
+    // handover / invoice
+    ACCEPTED: ["تایید شده", "green"],
+    UPLOADED: ["بارگذاری‌شده", "blue"],
+    PAID: ["پرداخت‌شده", "green"],
     // severity
     CRITICAL: ["بحرانی", "red"],
     HIGH: ["زیاد", "red"],
@@ -327,6 +345,7 @@ window.FMMS = window.FMMS || {};
       FMMS.session.setRole(e.target.value);
       FMMS.ui.toast(`نمای شبیه‌سازی به «${FMMS.session.roleLabel(e.target.value)}» تغییر کرد.`);
       FMMS.shell.applyRoleVisibility();
+      FMMS.shell.navigate(FMMS.shell.getCurrentPage());
     });
   }
 

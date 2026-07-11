@@ -101,7 +101,7 @@
         id: "ro-9001",
         vehicle_id: "veh-1042",
         fault_id: "fault-seed-1",
-        status: "CREATED",
+        status: "WORKSHOP_ASSIGNED",
         created_by_id: "user-manager",
         created_at: now(),
         updated_at: now(),
@@ -109,17 +109,37 @@
         parts: [],
         technician_id: null,
         assigned_at: null,
-        sap_order_number: null,
-        workshop_type: null,
+        sap_order_number: "PM-800213",
+        workshop_type: "INTERNAL",
+        workshop_id: "central-workshop",
         completed_at: null,
       },
     ],
+
+    materialRequests: [],
+    vehicleHandovers: [],
+    externalInvoices: [],
+    purchaseRequisitions: [],
 
     repairOrderEvents: [
       {
         repair_order_id: "ro-9001",
         event: "FAULT_CREATED",
-        description: "خرابی از بازرسی ثبت شد.",
+        description: "خرابی ثبت شد.",
+        created_at: now(),
+        created_by_id: null,
+      },
+      {
+        repair_order_id: "ro-9001",
+        event: "TRANSPORT_APPROVED",
+        description: "تایید ترابری انجام شد.",
+        created_at: now(),
+        created_by_id: null,
+      },
+      {
+        repair_order_id: "ro-9001",
+        event: "WORKSHOP_ASSIGNED",
+        description: "تعمیرگاه داخلی تخصیص یافت.",
         created_at: now(),
         created_by_id: null,
       },
@@ -192,7 +212,7 @@
     id: "ro-completed-1025",
     vehicle_id: "veh-1025",
     fault_id: "fault-closed-1025",
-    status: "COMPLETED",
+    status: "ACCEPTED_BY_DRIVER",
     created_by_id: "user-manager",
     created_at: new Date(Date.now() - 86400000 * 14).toISOString(),
     updated_at: new Date(Date.now() - 86400000 * 7).toISOString(),
@@ -202,10 +222,64 @@
     assigned_at: new Date(Date.now() - 86400000 * 10).toISOString(),
     sap_order_number: "PM-700102",
     workshop_type: "INTERNAL",
+    workshop_id: "central-workshop",
     completed_at: new Date(Date.now() - 86400000 * 7).toISOString(),
   });
 
+  DB.materialRequests = [];
+  DB.vehicleHandovers = [];
+  DB.externalInvoices = [];
   DB.purchaseRequisitions = [];
+
+  DB.materialRequests.push({
+    id: "mr-demo-1",
+    repair_order_id: "ro-9001",
+    status: "REQUESTED",
+    created_by_id: "tech-demo",
+    created_at: now(),
+    updated_at: now(),
+    items: [
+      {
+        id: "mri-1",
+        material_number: "000000012345",
+        quantity: "2",
+        unit_of_measure: "EA",
+      },
+    ],
+  });
+
+  const waitingVehicle = DB.vehicles.find((v) => v.id === "veh-1050");
+  if (waitingVehicle) {
+    waitingVehicle.status = "WAITING_DRIVER_CONFIRMATION";
+  }
+  DB.repairOrders.push({
+    id: "ro-handover-1050",
+    vehicle_id: "veh-1050",
+    fault_id: "fault-closed-1025",
+    status: "WAITING_DRIVER_CONFIRMATION",
+    created_by_id: "user-manager",
+    created_at: now(),
+    updated_at: now(),
+    activities: [],
+    parts: [],
+    technician_id: "tech-1",
+    assigned_at: now(),
+    sap_order_number: "PM-900050",
+    workshop_type: "INTERNAL",
+    workshop_id: "central-workshop",
+    completed_at: now(),
+  });
+  DB.vehicleHandovers.push({
+    id: "ho-1050",
+    repair_order_id: "ro-handover-1050",
+    vehicle_id: "veh-1050",
+    status: "WAITING_DRIVER_CONFIRMATION",
+    created_at: now(),
+    updated_at: now(),
+    comment: null,
+    driver_id: null,
+    confirmed_at: null,
+  });
 
   window.FMMS_MOCK_DB = DB;
   window.FMMS_MOCK_UID = uid;

@@ -11,6 +11,7 @@
           rel="stylesheet" onerror="this.remove()"/>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet"/>
     <link href="css/style.css" rel="stylesheet"/>
+    <link href="css/sidebar.css" rel="stylesheet"/>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%235b8fd4'/%3E%3Ctext x='16' y='22' font-size='14' font-family='sans-serif' fill='white' text-anchor='middle' font-weight='700'%3EFM%3C/text%3E%3C/svg%3E"/>
 </head>
 <body>
@@ -64,14 +65,152 @@
     <div class="shell-body">
         <aside class="sidebar">
             <nav class="sidebar-nav" id="sidebar-nav">
-                <a data-page="dashboard"><span class="nav-icon">◫</span> داشبورد</a>
-                <a data-page="vehicles"><span class="nav-icon">⛟</span> خودروها</a>
-                <a data-page="inspection"><span class="nav-icon">☑</span> شبیه‌سازی راننده</a>
-                <a data-page="faults"><span class="nav-icon">⚠</span> خرابی‌ها</a>
-                <a data-page="distribution"><span class="nav-icon">✓</span> تایید توزیع</a>
-                <a data-page="transport"><span class="nav-icon">→</span> تایید ترابری</a>
-                <a data-page="workshop"><span class="nav-icon">⚙</span> تعمیرات</a>
-                <a data-page="sap"><span class="nav-icon">⎘</span> SAP</a>
+                <a class="nav-link" data-page="dashboard">
+                    <span class="nav-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 4l9 6.5V19a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-8.5Z"/></svg>
+                    </span>
+                    <span class="nav-label">داشبورد</span>
+                </a>
+
+                <div class="nav-group" data-group="driver">
+                    <button type="button" class="nav-group-toggle" aria-expanded="false">
+                        <span class="nav-group-label">
+                            <span class="nav-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="3.5"/><path d="M5 20v-1.2c0-2.8 3.1-4.3 7-4.3s7 1.5 7 4.3V20"/><path d="M16 12h4l1.5 2.5H18"/></svg>
+                            </span>
+                            <span class="nav-label">راننده</span>
+                        </span>
+                        <span class="nav-chevron" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                        </span>
+                    </button>
+                    <div class="nav-group-items">
+                        <a class="nav-sublink" data-page="inspection">
+                            <span class="nav-sublink-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>
+                            </span>
+                            <span class="nav-label">بازرسی روزانه خودرو</span>
+                        </a>
+                        <a class="nav-sublink" data-page="handover">
+                            <span class="nav-sublink-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 7.5 18 10l-6 6-3-3 2.5-2.5"/><path d="M6 18h12"/><path d="M7 14l-2 2v2h2l2-2"/></svg>
+                            </span>
+                            <span class="nav-label">تایید تحویل خودرو</span>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="nav-group" data-group="distribution">
+                    <button type="button" class="nav-group-toggle" aria-expanded="false">
+                        <span class="nav-group-label">
+                            <span class="nav-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s7-4.5 7-11a4 4 0 0 0-7-2 4 4 0 0 0-7 2c0 6.5 7 11 7 11Z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+                            </span>
+                            <span class="nav-label">توزیع</span>
+                        </span>
+                        <span class="nav-chevron" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                        </span>
+                    </button>
+                    <div class="nav-group-items">
+                        <a class="nav-sublink" data-page="distribution">
+                            <span class="nav-sublink-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/></svg>
+                            </span>
+                            <span class="nav-label">بررسی خرابی‌ها و تصمیم استفاده از خودرو</span>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="nav-group" data-group="transport">
+                    <button type="button" class="nav-group-toggle" aria-expanded="false">
+                        <span class="nav-group-label">
+                            <span class="nav-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h11v8H3z"/><path d="M14 10h3l3 3v3h-6V10Z"/><circle cx="7" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg>
+                            </span>
+                            <span class="nav-label">ترابری</span>
+                        </span>
+                        <span class="nav-chevron" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                        </span>
+                    </button>
+                    <div class="nav-group-items">
+                        <a class="nav-sublink" data-page="transport-repairs">
+                            <span class="nav-sublink-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h4"/></svg>
+                            </span>
+                            <span class="nav-label">درخواست‌های تعمیر</span>
+                        </a>
+                        <a class="nav-sublink" data-page="transport-materials">
+                            <span class="nav-sublink-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="M3.3 7.7 12 12l8.7-4.3M12 22V12"/></svg>
+                            </span>
+                            <span class="nav-label">درخواست‌های قطعه</span>
+                        </a>
+                        <a class="nav-sublink" data-page="transport-invoices">
+                            <span class="nav-sublink-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></svg>
+                            </span>
+                            <span class="nav-label">فاکتورهای خارجی</span>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="nav-group" data-group="workshop">
+                    <button type="button" class="nav-group-toggle" aria-expanded="false">
+                        <span class="nav-group-label">
+                            <span class="nav-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76Z"/></svg>
+                            </span>
+                            <span class="nav-label">تعمیرات</span>
+                        </span>
+                        <span class="nav-chevron" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                        </span>
+                    </button>
+                    <div class="nav-group-items">
+                        <a class="nav-sublink" data-page="workshop-orders">
+                            <span class="nav-sublink-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76Z"/></svg>
+                            </span>
+                            <span class="nav-label">دستورات تعمیر</span>
+                        </a>
+                        <a class="nav-sublink" data-page="workshop-materials">
+                            <span class="nav-sublink-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 9.4 7.55 4.24"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l2.45-1.4"/><path d="m10 12 10.5-6"/><path d="M3.27 6.96 12 12.01l8.73-5.05M12 22.08V12"/></svg>
+                            </span>
+                            <span class="nav-label">درخواست قطعه</span>
+                        </a>
+                        <a class="nav-sublink" data-page="workshop-history">
+                            <span class="nav-sublink-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                            </span>
+                            <span class="nav-label">تاریخچه تعمیرات</span>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="nav-group" data-group="sap">
+                    <button type="button" class="nav-group-toggle" aria-expanded="false">
+                        <span class="nav-group-label">
+                            <span class="nav-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v6c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 11v6c0 1.66 4.03 3 9 3s9-1.34 9-3v-6"/><path d="M7 19v2M12 19v2M17 19v2"/></svg>
+                            </span>
+                            <span class="nav-label">SAP</span>
+                        </span>
+                        <span class="nav-chevron" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                        </span>
+                    </button>
+                    <div class="nav-group-items">
+                        <a class="nav-sublink" data-page="sap">
+                            <span class="nav-sublink-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-5V7l-5 8h5v3l5-8Z"/><path d="M4 19h16"/></svg>
+                            </span>
+                            <span class="nav-label">وضعیت یکپارچه‌سازی</span>
+                        </a>
+                    </div>
+                </div>
             </nav>
         </aside>
 
@@ -129,9 +268,10 @@
                         <option value="">همه وضعیت‌ها</option>
                         <option value="ACTIVE">فعال</option>
                         <option value="UNDER_REPAIR">در حال تعمیر</option>
+                        <option value="WAITING_DRIVER_CONFIRMATION">منتظر تایید راننده</option>
+                        <option value="INACTIVE">غیرفعال</option>
                         <option value="SUSPENDED">غیرفعال‌شده</option>
                         <option value="OUT_OF_SERVICE">خارج از سرویس</option>
-                        <option value="INACTIVE">غیرفعال</option>
                     </select>
                 </div>
                 <div class="table-fmms-wrap">
@@ -151,10 +291,10 @@
                 </div>
             </section>
 
-            <!-- ---------------- DRIVER SIMULATION ---------------- -->
+            <!-- ---------------- DRIVER INSPECTION ---------------- -->
             <section class="page" id="page-inspection">
                 <div class="page-header">
-                    <h1>شبیه‌سازی راننده — بازرسی روزانه</h1>
+                    <h1>بازرسی روزانه خودرو</h1>
                     <div class="sub">انتخاب خودرو، تکمیل چک‌لیست بازرسی و ثبت نتیجه</div>
                 </div>
 
@@ -194,8 +334,17 @@
 
                 <div id="driver-step-3" style="display:none;">
                     <div id="inspection-result"></div>
-                    <button class="btn btn-fmms-outline mt-3" id="inspection-restart-btn">شبیه‌سازی بازرسی جدید</button>
+                    <button class="btn btn-fmms-outline mt-3" id="inspection-restart-btn">بازرسی جدید</button>
                 </div>
+            </section>
+
+            <!-- ---------------- DRIVER HANDOVER ---------------- -->
+            <section class="page" id="page-handover">
+                <div class="page-header">
+                    <h1>تایید تحویل خودرو</h1>
+                    <div class="sub">تایید یا رد خودرو پس از اتمام تعمیر</div>
+                </div>
+                <div id="handover-list"></div>
             </section>
 
             <!-- ---------------- FAULTS / DISTRIBUTION ---------------- -->
@@ -250,7 +399,7 @@
 
             <section class="page" id="page-distribution">
                 <div class="page-header">
-                    <h1>تایید توزیع</h1>
+                    <h1>بررسی خرابی‌ها و تصمیم استفاده از خودرو</h1>
                     <div class="sub">تصمیم سرپرست توزیع درباره قابل‌استفاده بودن خودرو دارای خرابی</div>
                 </div>
                 <div class="table-fmms-wrap">
@@ -271,74 +420,114 @@
 
             <!-- ---------------- TRANSPORT ---------------- -->
             <section class="page" id="page-transport">
-                <div class="page-header">
-                    <h1>تایید ترابری</h1>
-                    <div class="sub">تایید سرپرست ترابری و انتخاب نوع تعمیرگاه — همه خودروها</div>
-                </div>
-                <div class="faults-toolbar card-fmms p-3 mb-3">
-                    <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
-                        <span class="small text-muted me-1">نمایش:</span>
-                        <button type="button" class="btn btn-fmms-outline btn-sm transport-filter-btn active"
-                                data-transport-filter="pending">در انتظار تایید
-                        </button>
-                        <button type="button" class="btn btn-fmms-outline btn-sm transport-filter-btn"
-                                data-transport-filter="all">همه دستورات تعمیر
-                        </button>
-                        <button type="button" class="btn btn-fmms-outline btn-sm transport-filter-btn"
-                                data-transport-filter="vehicle">دستورات این خودرو
-                        </button>
+                <div class="transport-view" data-transport-view="repairs">
+                    <div class="page-header">
+                        <h1>درخواست‌های تعمیر</h1>
+                        <div class="sub">تایید سرپرست ترابری و انتخاب نوع تعمیرگاه — همه خودروها</div>
                     </div>
-                    <div id="transport-vehicle-filter-wrap" class="row g-2 align-items-end" style="display:none;">
-                        <div class="col-md-6">
-                            <label class="form-label small mb-1">خودرو</label>
-                            <select id="transport-vehicle-filter" class="form-control form-control-sm"></select>
+                    <div class="faults-toolbar card-fmms p-3 mb-3">
+                        <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+                            <span class="small text-muted me-1">نمایش:</span>
+                            <button type="button" class="btn btn-fmms-outline btn-sm transport-filter-btn active"
+                                    data-transport-filter="pending">در انتظار تایید
+                            </button>
+                            <button type="button" class="btn btn-fmms-outline btn-sm transport-filter-btn"
+                                    data-transport-filter="all">همه دستورات تعمیر
+                            </button>
+                            <button type="button" class="btn btn-fmms-outline btn-sm transport-filter-btn"
+                                    data-transport-filter="vehicle">دستورات این خودرو
+                            </button>
                         </div>
-                        <div class="col-md-6">
-                            <div id="transport-filter-hint" class="small text-muted">صف «در انتظار تایید»: خرابی‌هایی که توزیع روی آن‌ها تصمیم گرفته + دستور CREATED/APPROVED — API: GET /repair-orders/?vehicle_id=… (به ازای هر خودرو)
+                        <div id="transport-vehicle-filter-wrap" class="row g-2 align-items-end" style="display:none;">
+                            <div class="col-md-6">
+                                <label class="form-label small mb-1">خودرو</label>
+                                <select id="transport-vehicle-filter" class="form-control form-control-sm"></select>
+                            </div>
+                            <div class="col-md-6">
+                                <div id="transport-filter-hint" class="small text-muted">صف «در انتظار تایید»: خرابی‌هایی که توزیع روی آن‌ها تصمیم گرفته + دستور CREATED/APPROVED — API: GET /repair-orders/?vehicle_id=… (به ازای هر خودرو)
+                                </div>
                             </div>
                         </div>
                     </div>
+                    <div class="table-fmms-wrap mb-3">
+                        <table class="table-fmms">
+                            <thead>
+                            <tr>
+                                <th>خودرو</th>
+                                <th>دستور تعمیر</th>
+                                <th>وضعیت</th>
+                                <th>تعمیرگاه</th>
+                                <th>عملیات</th>
+                            </tr>
+                            </thead>
+                            <tbody id="transport-tbody"></tbody>
+                        </table>
+                    </div>
                 </div>
-                <div class="table-fmms-wrap">
-                    <table class="table-fmms">
-                        <thead>
-                        <tr>
-                            <th>خودرو</th>
-                            <th>دستور تعمیر</th>
-                            <th>وضعیت</th>
-                            <th>تعمیرگاه</th>
-                            <th>عملیات</th>
-                        </tr>
-                        </thead>
-                        <tbody id="transport-tbody"></tbody>
-                    </table>
+
+                <div class="transport-view" data-transport-view="materials" style="display:none;">
+                    <div class="page-header">
+                        <h1>درخواست‌های قطعه</h1>
+                        <div class="sub">بررسی و تایید درخواست‌های قطعه ثبت‌شده توسط تعمیرگاه</div>
+                    </div>
+                    <div class="card-fmms p-3">
+                        <div id="transport-material-requests"></div>
+                    </div>
+                </div>
+
+                <div class="transport-view" data-transport-view="invoices" style="display:none;">
+                    <div class="page-header">
+                        <h1>فاکتورهای خارجی</h1>
+                        <div class="sub">تایید فاکتورهای تعمیرگاه‌های خارجی</div>
+                    </div>
+                    <div class="card-fmms p-3">
+                        <div id="transport-external-invoices"></div>
+                    </div>
                 </div>
             </section>
 
             <!-- ---------------- WORKSHOP ---------------- -->
             <section class="page" id="page-workshop">
-                <div class="page-header">
-                    <h1>تعمیرات — تعمیرگاه</h1>
-                    <div class="sub">شروع تعمیر، ثبت فعالیت، درخواست خرید قطعه (جدا از مصرف انبار)، و تکمیل دستور
-                        تعمیر
+                <div class="workshop-view" data-workshop-view="orders">
+                    <div class="page-header">
+                        <h1>دستورات تعمیر</h1>
+                        <div class="sub">پذیرش/رد تعمیر، شروع کار، درخواست قطعه، تکمیل و فاکتور خارجی</div>
+                    </div>
+                    <div class="table-fmms-wrap">
+                        <table class="table-fmms">
+                            <thead>
+                            <tr>
+                                <th>خودرو</th>
+                                <th>دستور تعمیر</th>
+                                <th>تعمیرگاه</th>
+                                <th>وضعیت</th>
+                                <th>درخواست قطعه</th>
+                                <th>عملیات</th>
+                            </tr>
+                            </thead>
+                            <tbody id="workshop-tbody"></tbody>
+                        </table>
                     </div>
                 </div>
-                <div class="table-fmms-wrap">
-                    <table class="table-fmms">
-                        <thead>
-                        <tr>
-                            <th>خودرو</th>
-                            <th>دستور تعمیر</th>
-                            <th>تعمیرگاه</th>
-                            <th>وضعیت</th>
-                            <th>فعالیت‌ها</th>
-                            <th>مصرف قطعه</th>
-                            <th>درخواست خرید</th>
-                            <th>عملیات</th>
-                        </tr>
-                        </thead>
-                        <tbody id="workshop-tbody"></tbody>
-                    </table>
+
+                <div class="workshop-view" data-workshop-view="materials" style="display:none;">
+                    <div class="page-header">
+                        <h1>درخواست قطعه</h1>
+                        <div class="sub">فهرست درخواست‌های قطعه ثبت‌شده برای دستورات تعمیر</div>
+                    </div>
+                    <div class="card-fmms p-3">
+                        <div id="workshop-material-requests"></div>
+                    </div>
+                </div>
+
+                <div class="workshop-view" data-workshop-view="history" style="display:none;">
+                    <div class="page-header">
+                        <h1>تاریخچه تعمیرات</h1>
+                        <div class="sub">مرور رویدادها و مراحل جریان برای هر دستور تعمیر</div>
+                    </div>
+                    <div class="card-fmms p-3">
+                        <div id="workshop-history-list"></div>
+                    </div>
                 </div>
             </section>
 
@@ -479,6 +668,7 @@
 <script src="js/dashboard.js"></script>
 <script src="js/vehicles.js"></script>
 <script src="js/inspection.js"></script>
+<script src="js/handover.js"></script>
 <script src="js/faults.js"></script>
 <script src="js/repair.js"></script>
 <script src="js/sap.js"></script>

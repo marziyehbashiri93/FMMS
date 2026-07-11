@@ -6,16 +6,39 @@
 window.FMMS = window.FMMS || {};
 
 (function (FMMS) {
-  const PAGES = [
-    { id: "dashboard", stage: null },
-    { id: "vehicles", stage: 1 },
-    { id: "inspection", stage: 2 },
-    { id: "faults", stage: 3 },
-    { id: "distribution", stage: 4 },
-    { id: "transport", stage: 5 },
-    { id: "workshop", stage: 6 },
-    { id: "sap", stage: 7 },
-  ];
+  const PAGE_META = {
+    dashboard: { domPage: "dashboard", stage: null, group: null },
+    vehicles: { domPage: "vehicles", stage: 1, group: null },
+    inspection: { domPage: "inspection", stage: 2, group: "driver" },
+    handover: { domPage: "handover", stage: 7, group: "driver" },
+    faults: { domPage: "faults", stage: 3, group: null },
+    distribution: { domPage: "distribution", stage: 4, group: "distribution" },
+    "transport-repairs": { domPage: "transport", stage: 5, group: "transport", transportView: "repairs" },
+    "transport-materials": { domPage: "transport", stage: 5, group: "transport", transportView: "materials" },
+    "transport-invoices": { domPage: "transport", stage: 5, group: "transport", transportView: "invoices" },
+    transport: { domPage: "transport", stage: 5, group: "transport", transportView: "repairs" },
+    "workshop-orders": { domPage: "workshop", stage: 6, group: "workshop", workshopView: "orders" },
+    "workshop-materials": { domPage: "workshop", stage: 6, group: "workshop", workshopView: "materials" },
+    "workshop-history": { domPage: "workshop", stage: 6, group: "workshop", workshopView: "history" },
+    workshop: { domPage: "workshop", stage: 6, group: "workshop", workshopView: "orders" },
+    sap: { domPage: "sap", stage: null, group: "sap" },
+  };
+
+  const GROUP_PAGES = {
+    driver: ["inspection", "handover"],
+    distribution: ["distribution"],
+    transport: ["transport-repairs", "transport-materials", "transport-invoices"],
+    workshop: ["workshop-orders", "workshop-materials", "workshop-history"],
+    sap: ["sap"],
+  };
+
+  const ROLE_PAGES = {
+    MANAGER: null,
+    DRIVER: ["dashboard", "inspection", "handover"],
+    DISTRIBUTION: ["dashboard", "distribution"],
+    TRANSPORT: ["dashboard", "transport-repairs", "transport-materials", "transport-invoices"],
+    WORKSHOP: ["dashboard", "workshop-orders", "workshop-materials", "workshop-history"],
+  };
 
   const WORKFLOW_STAGES = [
     "خودرو",
@@ -23,22 +46,37 @@ window.FMMS = window.FMMS || {};
     "ثبت خرابی",
     "تصمیم توزیع",
     "تایید ترابری",
-    "تعمیرگاه و تعمیر",
-    "یکپارچه‌سازی SAP",
+    "تعمیرگاه و قطعه",
+    "تحویل و تایید راننده",
   ];
 
-  const ROLE_PAGES = {
-    MANAGER: null,
-    DRIVER: ["dashboard", "inspection"],
-    DISTRIBUTION: ["dashboard", "faults", "distribution"],
-    TRANSPORT: ["dashboard", "transport"],
-    WORKSHOP: ["dashboard", "workshop"],
-  };
-
   let currentPage = "dashboard";
+  let expandedGroups = new Set();
+
+  function defaultExpandedGroupsForRole(role) {
+    const map = {
+      DRIVER: ["driver"],
+      DISTRIBUTION: ["distribution"],
+      TRANSPORT: ["transport"],
+      WORKSHOP: ["workshop"],
+      MANAGER: [],
+    };
+    return map[role] || [];
+  }
+
+  function pageMeta(pageId) {
+    return PAGE_META[pageId] || PAGE_META.dashboard;
+  }
+
+  function normalizePageId(pageId) {
+    if (PAGE_META[pageId]) return pageId;
+    if (pageId === "transport") return "transport-repairs";
+    if (pageId === "workshop") return "workshop-orders";
+    return "dashboard";
+  }
 
   function renderWorkflowRail(pageId) {
-    const stageIndex = PAGES.find((p) => p.id === pageId)?.stage;
+    const stageIndex = pageMeta(pageId).stage;
     const rail = document.getElementById("workflow-rail");
     if (!rail) return;
     if (stageIndex == null) {
@@ -53,28 +91,110 @@ window.FMMS = window.FMMS || {};
     }).join("");
   }
 
+  function applyTransportView(view) {
+    document.querySelectorAll("[data-transport-view]").forEach((el) => {
+      el.style.display = el.dataset.transportView === view ? "block" : "none";
+    });
+  }
+
+  function applyWorkshopView(view) {
+    document.querySelectorAll("[data-workshop-view]").forEach((el) => {
+      el.style.display = el.dataset.workshopView === view ? "block" : "none";
+    });
+  }
+
+  function setGroupExpanded(groupId, expanded) {
+    const group = document.querySelector(`.nav-group[data-group="${groupId}"]`);
+    if (!group) return;
+    group.classList.toggle("expanded", expanded);
+    const toggle = group.querySelector(".nav-group-toggle");
+    if (toggle) toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+    if (expanded) expandedGroups.add(groupId);
+    else expandedGroups.delete(groupId);
+  }
+
+  function expandGroupForPage(pageId) {
+    const group = pageMeta(pageId).group;
+    if (group) setGroupExpanded(group, true);
+  }
+
+  function updateNavActiveState(pageId) {
+    document.querySelectorAll(".sidebar-nav .nav-link, .sidebar-nav .nav-sublink").forEach((link) => {
+      link.classList.toggle("active", link.dataset.page === pageId);
+    });
+    document.querySelectorAll(".nav-group").forEach((group) => {
+      const groupId = group.dataset.group;
+      const pages = GROUP_PAGES[groupId] || [];
+      group.classList.toggle("has-active", pages.includes(pageId));
+    });
+  }
+
+  function isPageAllowedForRole(pageId, role) {
+    const allowed = ROLE_PAGES[role];
+    if (!allowed) return true;
+    return allowed.includes(pageId);
+  }
+
+  function isGroupVisibleForRole(groupId, role) {
+    const allowed = ROLE_PAGES[role];
+    if (!allowed) return true;
+    const pages = GROUP_PAGES[groupId] || [];
+    return pages.some((pageId) => allowed.includes(pageId));
+  }
+
+  function applyRoleVisibility() {
+    const role = FMMS.session.getRole();
+    const dashboardLink = document.querySelector('.sidebar-nav .nav-link[data-page="dashboard"]');
+    if (dashboardLink) {
+      dashboardLink.style.display = isPageAllowedForRole("dashboard", role) ? "" : "none";
+    }
+    document.querySelectorAll(".nav-group").forEach((group) => {
+      group.style.display = isGroupVisibleForRole(group.dataset.group, role) ? "" : "none";
+    });
+    document.querySelectorAll(".nav-group").forEach((group) => setGroupExpanded(group.dataset.group, false));
+    defaultExpandedGroupsForRole(role).forEach((groupId) => setGroupExpanded(groupId, true));
+    expandGroupForPage(currentPage);
+  }
+
   function navigate(pageId) {
-    if (!PAGES.find((p) => p.id === pageId)) pageId = "dashboard";
+    pageId = normalizePageId(pageId);
+    if (!isPageAllowedForRole(pageId, FMMS.session.getRole())) {
+      pageId = "dashboard";
+    }
+    const meta = pageMeta(pageId);
     currentPage = pageId;
     location.hash = pageId;
 
     document.querySelectorAll(".page").forEach((el) => (el.style.display = "none"));
-    document.getElementById("page-" + pageId).style.display = "block";
+    const pageEl = document.getElementById("page-" + meta.domPage);
+    if (pageEl) pageEl.style.display = "block";
 
-    document.querySelectorAll(".sidebar-nav a").forEach((a) => {
-      a.classList.toggle("active", a.dataset.page === pageId);
-    });
+    if (meta.domPage === "transport" && meta.transportView) {
+      applyTransportView(meta.transportView);
+    }
+    if (meta.domPage === "workshop" && meta.workshopView) {
+      applyWorkshopView(meta.workshopView);
+    }
 
+    updateNavActiveState(pageId);
+    expandGroupForPage(pageId);
     renderWorkflowRail(pageId);
 
     const loaders = {
       dashboard: FMMS.pages.dashboard.render,
       vehicles: FMMS.pages.vehicles?.render,
       inspection: FMMS.pages.inspection?.render,
+      handover: FMMS.pages.handover?.render,
       faults: FMMS.pages.faults?.render,
       distribution: FMMS.pages.faults?.renderDistribution,
-      transport: FMMS.pages.repair?.renderTransport,
-      workshop: FMMS.pages.repair?.renderWorkshop,
+      "transport-repairs": () => FMMS.pages.repair?.renderTransport("repairs"),
+      "transport-materials": () => FMMS.pages.repair?.renderTransport("materials"),
+      "transport-invoices": () => FMMS.pages.repair?.renderTransport("invoices"),
+      transport: () => FMMS.pages.repair?.renderTransport("repairs"),
+      "workshop-orders": () => FMMS.pages.repair?.renderWorkshop("orders"),
+      "workshop-materials": () => FMMS.pages.repair?.renderWorkshop("materials"),
+      "workshop-history": () => FMMS.pages.repair?.renderWorkshop("history"),
+      workshop: () => FMMS.pages.repair?.renderWorkshop("orders"),
       sap: FMMS.pages.sap?.render,
     };
     const fn = loaders[pageId];
@@ -86,12 +206,22 @@ window.FMMS = window.FMMS || {};
     }
   }
 
-  function applyRoleVisibility() {
-    const role = FMMS.session.getRole();
-    const relevant = ROLE_PAGES[role];
-    document.querySelectorAll(".sidebar-nav a").forEach((a) => {
-      const isRelevant = !relevant || relevant.includes(a.dataset.page);
-      a.style.opacity = isRelevant ? "1" : "0.5";
+  function wireSidebar() {
+    document.querySelectorAll(".sidebar-nav .nav-link, .sidebar-nav .nav-sublink").forEach((link) => {
+      link.addEventListener("click", (e) => {
+        e.preventDefault();
+        navigate(link.dataset.page);
+      });
+    });
+
+    document.querySelectorAll(".nav-group-toggle").forEach((toggle) => {
+      toggle.addEventListener("click", () => {
+        const group = toggle.closest(".nav-group");
+        const groupId = group?.dataset.group;
+        if (!groupId) return;
+        const isExpanded = group.classList.contains("expanded");
+        setGroupExpanded(groupId, !isExpanded);
+      });
     });
   }
 
@@ -99,46 +229,54 @@ window.FMMS = window.FMMS || {};
 
   function init() {
     if (shellInitialized) {
-      const pageId = (location.hash || "").replace("#", "") || "dashboard";
+      applyRoleVisibility();
+      const pageId = normalizePageId((location.hash || "").replace("#", "") || "dashboard");
       navigate(pageId);
       return;
     }
     shellInitialized = true;
-    document.querySelectorAll(".sidebar-nav a").forEach((a) => {
-      a.addEventListener("click", () => navigate(a.dataset.page));
-    });
+    wireSidebar();
     window.addEventListener("hashchange", () => {
-      const pageId = (location.hash || "").replace("#", "") || "dashboard";
+      const pageId = normalizePageId((location.hash || "").replace("#", "") || "dashboard");
       if (pageId !== currentPage) navigate(pageId);
     });
     applyRoleVisibility();
-    const initial = (location.hash || "").replace("#", "") || "dashboard";
+    defaultExpandedGroupsForRole(FMMS.session.getRole()).forEach((groupId) => setGroupExpanded(groupId, true));
+    expandedGroups.forEach((groupId) => setGroupExpanded(groupId, true));
+    const initial = normalizePageId((location.hash || "").replace("#", "") || "dashboard");
     navigate(initial);
   }
 
-  FMMS.shell = { init, navigate, applyRoleVisibility };
+  FMMS.shell = { init, navigate, applyRoleVisibility, getCurrentPage: () => currentPage };
 
   /** Derive human-readable workflow stage for dashboard cards. */
   function workflowStageLabel(vehicle, fault, repairOrder) {
     if (repairOrder) {
       if (repairOrder.status === "CREATED") return "انتظار تایید ترابری";
       if (repairOrder.status === "APPROVED") return "انتخاب تعمیرگاه";
-      if (repairOrder.status === "WORKSHOP_ASSIGNED" || repairOrder.status === "ASSIGNED") {
+      if (repairOrder.status === "WORKSHOP_ASSIGNED") return "پذیرش تعمیرگاه";
+      if (repairOrder.status === "WAITING_WORKSHOP_CONFIRMATION" || repairOrder.status === "ASSIGNED") {
         return "آماده شروع تعمیر";
       }
-      if (repairOrder.status === "IN_PROGRESS") return "در حال تعمیر";
-      if (repairOrder.status === "COMPLETED") {
-        if (vehicle && vehicle.status !== "ACTIVE") return "آماده فعال‌سازی خودرو";
-        return "تعمیر تکمیل‌شده";
+      if (repairOrder.status === "IN_PROGRESS" || repairOrder.status === "WAITING_PARTS") {
+        return "در حال تعمیر";
       }
+      if (repairOrder.status === "WAITING_DRIVER_CONFIRMATION") return "منتظر تایید راننده";
+      if (repairOrder.status === "ACCEPTED_BY_DRIVER") return "تحویل تایید شد";
+      if (repairOrder.status === "REJECTED_BY_DRIVER") return "رد راننده";
+      if (repairOrder.status === "CANCELLED") return "تعمیر لغو شد";
+      if (repairOrder.status === "COMPLETED") return "تعمیر تکمیل‌شده";
     }
     if (fault && fault.status === "OPEN") return "انتظار تصمیم توزیع";
     if (vehicle?.status === "INACTIVE") return "خودرو غیرفعال";
+    if (vehicle?.status === "WAITING_DRIVER_CONFIRMATION") return "منتظر تایید راننده";
+    if (vehicle?.status === "UNDER_REPAIR") return "در حال تعمیر";
     return "در جریان";
   }
 
   function vehicleStatusSummary(vehicle, repairOrder) {
-    if (repairOrder?.status === "IN_PROGRESS") return "در حال تعمیر";
+    if (vehicle?.status === "WAITING_DRIVER_CONFIRMATION") return "منتظر تایید راننده";
+    if (repairOrder?.status === "IN_PROGRESS" || vehicle?.status === "UNDER_REPAIR") return "در حال تعمیر";
     if (vehicle?.status === "ACTIVE") return "فعال";
     if (vehicle?.status === "INACTIVE") return "غیرفعال";
     if (vehicle?.status === "OUT_OF_SERVICE") return "خارج از سرویس";
@@ -164,8 +302,9 @@ window.FMMS = window.FMMS || {};
       { label: "Fault", fa: "خرابی" },
       { label: "Distribution", fa: "توزیع" },
       { label: "Transport", fa: "ترابری" },
-      { label: "Repair", fa: "تعمیر" },
-      { label: "SAP", fa: "SAP" },
+      { label: "Workshop", fa: "تعمیرگاه" },
+      { label: "Parts", fa: "قطعه" },
+      { label: "Handover", fa: "تحویل" },
     ];
     if (overviewEl) {
       overviewEl.innerHTML = WORKFLOW_OVERVIEW.map(
@@ -252,7 +391,7 @@ window.FMMS = window.FMMS || {};
               </div>`;
                 })
                 .join("")
-            : `<div class="empty-state"><div class="title">جریان کاری فعالی نیست</div><div>با «شبیه‌سازی راننده» یک بازرسی شروع کنید.</div></div>`;
+            : `<div class="empty-state"><div class="title">جریان کاری فعالی نیست</div><div>از منوی «راننده → بازرسی روزانه خودرو» یک بازرسی شروع کنید.</div></div>`;
       }
 
       const recentFaults = faults.results

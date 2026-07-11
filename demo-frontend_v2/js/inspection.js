@@ -1,5 +1,5 @@
 /**
- * Page: شبیه‌سازی راننده (Driver simulation — daily inspection)
+ * Page: بازرسی روزانه خودرو (Driver daily inspection)
  */
 window.FMMS = window.FMMS || {};
 FMMS.pages = FMMS.pages || {};
@@ -105,8 +105,7 @@ FMMS.pages = FMMS.pages || {};
         selectedVehicleId = btn.dataset.pick;
         updateSelectedVehicleSummary();
         updateStartButtonState();
-        vehiclePickerModal.hide();
-        FMMS.ui.toast("خودرو انتخاب شد.");
+        vehiclePickerModal?.hide();
       });
     });
   }
@@ -193,6 +192,7 @@ FMMS.pages = FMMS.pages || {};
         }
       });
     });
+
     updateSubmitButtonState();
   }
 
@@ -267,8 +267,8 @@ FMMS.pages = FMMS.pages || {};
       host.innerHTML = `
         <div class="result-banner pass">
           <div>
-            <h3>بازرسی موفق بود</h3>
-            <p>خودرو ${FMMS.ui.vehicleLabel(v)} تمام موارد چک‌لیست را با موفقیت پشت سر گذاشت.</p>
+            <h3>خودرو آماده استفاده است</h3>
+            <p>بازرسی خودرو ${FMMS.ui.vehicleLabel(v)} با موفقیت انجام شد.</p>
           </div>
         </div>`;
     } else {
@@ -276,16 +276,14 @@ FMMS.pages = FMMS.pages || {};
       const failedList = failedItems
         .map((i) => {
           const note = i.notes ? ` — <span class="text-muted">${FMMS.ui.escapeHtml(i.notes)}</span>` : "";
-          const severity = i.severity
-            ? ` ${FMMS.ui.badge(i.severity)}`
-            : "";
+          const severity = i.severity ? ` ${FMMS.ui.badge(i.severity)}` : "";
           return `<li>${FMMS.ui.escapeHtml(i.description)}${severity}${note}</li>`;
         })
         .join("");
       host.innerHTML = `
         <div class="result-banner fail">
           <div>
-            <h3>خرابی ایجاد شد · دستور تعمیر ایجاد شد</h3>
+            <h3>خرابی ثبت شد و درخواست تعمیر ایجاد شد</h3>
             <p>موارد زیر در بازرسی خودرو ${FMMS.ui.vehicleLabel(v)} ناموفق بودند:</p>
             <ul>${failedList}</ul>
           </div>

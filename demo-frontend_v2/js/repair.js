@@ -16,13 +16,65 @@ FMMS.pages = FMMS.pages || {};
   const TRANSPORT_PENDING = new Set(["CREATED", "APPROVED"]);
 
   const EVENT_LABELS = {
-    FAULT_CREATED: "ثبت خرابی",
+    FAULT_CREATED: "خرابی ثبت شد",
     DISTRIBUTION_APPROVED: "تایید توزیع",
     TRANSPORT_APPROVED: "تایید ترابری",
-    WORKSHOP_ASSIGNED: "انتخاب تعمیرگاه",
+    WORKSHOP_ASSIGNED: "تخصیص تعمیرگاه",
+    TECHNICIAN_ACCEPTED: "تایید تعمیرکار",
+    TECHNICIAN_REJECTED: "رد تعمیرکار",
+    REPAIR_REJECTED: "رد تعمیر",
     REPAIR_STARTED: "شروع تعمیر",
-    REPAIR_COMPLETED: "اتمام تعمیر",
+    MATERIAL_REQUESTED: "درخواست قطعه",
+    MATERIAL_APPROVED: "تایید درخواست قطعه",
+    STOCK_ISSUED: "صدور از انبار",
+    PURCHASE_REQUIRED: "نیاز به خرید",
+    PART_RECEIVED: "دریافت قطعه",
+    REPAIR_COMPLETED: "پایان تعمیر",
+    WAITING_DRIVER_CONFIRMATION: "منتظر تایید راننده",
+    DRIVER_ACCEPTED: "تایید راننده",
+    DRIVER_REJECTED: "رد راننده",
+    INVOICE_UPLOADED: "ثبت فاکتور",
+    INVOICE_APPROVED: "تایید فاکتور",
   };
+
+  const WORKFLOW_STEPS = [
+    { key: "FAULT_CREATED", label: "خرابی ثبت شد" },
+    { key: "TRANSPORT_APPROVED", label: "تایید ترابری" },
+    { key: "WORKSHOP_ASSIGNED", label: "تخصیص تعمیرگاه" },
+    { key: "TECHNICIAN_ACCEPTED", label: "تایید تعمیرکار", alt: ["REPAIR_STARTED"] },
+    { key: "REPAIR_STARTED", label: "شروع تعمیر" },
+    { key: "MATERIAL_REQUESTED", label: "درخواست قطعه", optional: true },
+    { key: "REPAIR_COMPLETED", label: "پایان تعمیر" },
+    { key: "DRIVER_ACCEPTED", label: "تایید راننده", alt: ["DRIVER_REJECTED"] },
+    { key: "VEHICLE_ACTIVE", label: "فعال‌سازی خودرو", derived: true },
+  ];
+
+  function renderWorkflowChecklist(events, order) {
+    const eventSet = new Set((events || []).map((e) => e.event));
+    if (order?.status === "ACCEPTED_BY_DRIVER") eventSet.add("VEHICLE_ACTIVE");
+    let currentFound = false;
+    return `<div class="workflow-checklist">${WORKFLOW_STEPS.map((step) => {
+      const done =
+        eventSet.has(step.key) ||
+        (step.alt || []).some((k) => eventSet.has(k)) ||
+        (step.key === "VEHICLE_ACTIVE" && order?.status === "ACCEPTED_BY_DRIVER");
+      let icon = "○";
+      let cls = "pending";
+      if (done) {
+        icon = "✓";
+        cls = "done";
+      } else if (!currentFound && !step.optional) {
+        icon = "⏳";
+        cls = "current";
+        currentFound = true;
+      } else if (!currentFound && step.optional && eventSet.has("REPAIR_STARTED") && !eventSet.has("REPAIR_COMPLETED")) {
+        icon = "⏳";
+        cls = "current";
+        currentFound = true;
+      }
+      return `<div class="workflow-checklist-item ${cls}"><span class="wf-check-icon">${icon}</span>${FMMS.ui.escapeHtml(step.label)}</div>`;
+    }).join("")}</div>`;
+  }
 
   async function ensureVehicles() {
     const res = await FMMS.api.listAllVehicles();
@@ -66,7 +118,7 @@ FMMS.pages = FMMS.pages || {};
   }
 
   async function showTimeline(order) {
-    document.getElementById("timeline-modal-title").textContent = "تاریخچه تعمیر";
+    document.getElementById("timeline-modal-title").textContent = "تاریخچه و مراحل تعمیر";
     document.getElementById("timeline-modal-body").innerHTML = `<div class="text-muted">در حال بارگذاری…</div>`;
     getTimelineModal().show();
     try {
@@ -75,7 +127,9 @@ FMMS.pages = FMMS.pages || {};
         ...e,
         event: EVENT_LABELS[e.event] || e.event,
       }));
-      document.getElementById("timeline-modal-body").innerHTML = FMMS.ui.renderTimeline(labeled);
+      document.getElementById("timeline-modal-body").innerHTML =
+        `<div class="mb-3"><div class="modal-section-title">مراحل جریان</div>${renderWorkflowChecklist(events, order)}</div>` +
+        `<div class="modal-section-title">رویدادهای ثبت‌شده</div>${FMMS.ui.renderTimeline(labeled)}`;
     } catch (err) {
       document.getElementById("timeline-modal-body").innerHTML = `<div class="text-danger">${FMMS.ui.escapeHtml(err.message)}</div>`;
     }
@@ -245,7 +299,7 @@ FMMS.pages = FMMS.pages || {};
           await FMMS.api.approveRepair(fullOrder.id);
           FMMS.ui.toast("تعمیر تایید شد.");
           hideDetailModal();
-          renderTransport();
+          renderTransport("repairs");
         } catch (err) {
           FMMS.ui.toast(err.message, "error");
           btn.disabled = false;
@@ -285,7 +339,7 @@ FMMS.pages = FMMS.pages || {};
     try {
       await FMMS.api.approveRepair(order.id);
       FMMS.ui.toast("تعمیر تایید شد.");
-      renderTransport();
+      renderTransport("repairs");
     } catch (err) {
       FMMS.ui.toast(err.message, "error");
       btn.disabled = false;
@@ -296,16 +350,21 @@ FMMS.pages = FMMS.pages || {};
   function assignWorkshop(order) {
     openActionModal(
       "تخصیص نوع تعمیرگاه",
-      `<label class="form-label">نوع تعمیرگاه</label>
-       <select class="form-control" id="workshop-type-select">
-         <option value="INTERNAL">تعمیرگاه داخلی</option>
-         <option value="EXTERNAL">تعمیرگاه خارجی</option>
-       </select>`,
+      `<div class="mb-3">
+         <div class="form-label mb-2">نوع تعمیرگاه:</div>
+         <label class="d-block mb-2"><input type="radio" name="workshop-type" value="INTERNAL" checked /> داخلی</label>
+         <label class="d-block"><input type="radio" name="workshop-type" value="EXTERNAL" /> خارجی</label>
+       </div>
+       <div class="mb-2">
+         <label class="form-label">شناسه تعمیرگاه (اختیاری)</label>
+         <input class="form-control mono" id="workshop-id-input" placeholder="مثلاً central-workshop" />
+       </div>`,
       async () => {
-        const type = document.getElementById("workshop-type-select").value;
-        await FMMS.api.assignWorkshop(order.id, type);
+        const type = document.querySelector('input[name="workshop-type"]:checked')?.value || "INTERNAL";
+        const workshopId = document.getElementById("workshop-id-input").value.trim() || undefined;
+        await FMMS.api.assignWorkshop(order.id, type, workshopId);
         FMMS.ui.toast("تعمیرگاه تخصیص یافت.");
-        renderTransport();
+        renderTransport("repairs");
       }
     );
   }
@@ -392,13 +451,13 @@ FMMS.pages = FMMS.pages || {};
         btn.classList.add("active");
         transportFilter = btn.dataset.transportFilter;
         vehicleWrap.style.display = transportFilter === "vehicle" ? "flex" : "none";
-        renderTransport();
+        renderTransport("repairs");
       });
     });
 
     vehicleSelect.addEventListener("change", () => {
       transportVehicleId = vehicleSelect.value;
-      if (transportFilter === "vehicle") renderTransport();
+      if (transportFilter === "vehicle") renderTransport("repairs");
     });
 
     transportToolbarWired = true;
@@ -422,50 +481,180 @@ FMMS.pages = FMMS.pages || {};
     if (vehicles.length) transportVehicleId = vehicles[0].id;
   }
 
-  async function renderTransport() {
+  async function renderTransport(view) {
+    const activeView = view || "repairs";
     const tbody = document.getElementById("transport-tbody");
-    if (!tbody) return;
+    if (activeView === "repairs" && tbody) {
+      wireTransportToolbar();
+      tbody.innerHTML = `<tr><td colspan="5">در حال بارگذاری…</td></tr>`;
+      try {
+        await ensureVehicles();
+        await populateTransportVehicleFilter();
+        const { orders, totalCount, pendingAfterDistribution } = await loadTransportOrders();
 
-    wireTransportToolbar();
-    tbody.innerHTML = `<tr><td colspan="5">در حال بارگذاری…</td></tr>`;
+        tbody.innerHTML = orders.length ? orders.map(transportRow).join("") : transportEmptyState(totalCount, pendingAfterDistribution);
+
+        tbody.querySelectorAll("tr[data-id]").forEach((tr) => {
+          const order = orders.find((r) => r.id === tr.dataset.id);
+          tr.querySelector('[data-action="detail"]')?.addEventListener("click", () => showTransportDetail(order));
+          tr.querySelector('[data-action="approve"]')?.addEventListener("click", (e) => approve(order, e.currentTarget));
+          tr.querySelector('[data-action="assign-workshop"]')?.addEventListener("click", () => assignWorkshop(order));
+        });
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="5">${FMMS.ui.escapeHtml(err.message)}</td></tr>`;
+        FMMS.ui.toast(err.message, "error");
+      }
+    }
+    if (activeView === "materials") {
+      await renderTransportMaterialRequests();
+    }
+    if (activeView === "invoices") {
+      await renderTransportExternalInvoices();
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // Transport — material requests & invoices
+  // ---------------------------------------------------------------------
+  async function renderTransportMaterialRequests() {
+    const host = document.getElementById("transport-material-requests");
+    if (!host) return;
+    if (!FMMS.api.capabilities.materialRequest) {
+      host.innerHTML = `<div class="demo-only-msg">API درخواست قطعه در این نسخه موجود نیست.</div>`;
+      return;
+    }
     try {
-      await ensureVehicles();
-      await populateTransportVehicleFilter();
-      const { orders, totalCount, pendingAfterDistribution } = await loadTransportOrders();
-
-      tbody.innerHTML = orders.length ? orders.map(transportRow).join("") : transportEmptyState(totalCount, pendingAfterDistribution);
-
-      tbody.querySelectorAll("tr[data-id]").forEach((tr) => {
-        const order = orders.find((r) => r.id === tr.dataset.id);
-        tr.querySelector('[data-action="detail"]')?.addEventListener("click", () => showTransportDetail(order));
-        tr.querySelector('[data-action="approve"]')?.addEventListener("click", (e) => approve(order, e.currentTarget));
-        tr.querySelector('[data-action="assign-workshop"]')?.addEventListener("click", () => assignWorkshop(order));
+      const page = FMMS.api.asPage(await FMMS.api.listMaterialRequests());
+      const pending = page.results.filter((mr) => mr.status === "REQUESTED");
+      if (!pending.length) {
+        host.innerHTML = `<div class="empty-state"><div class="title">درخواست قطعه‌ای در انتظار تایید نیست</div></div>`;
+        return;
+      }
+      host.innerHTML = pending
+        .map(
+          (mr) => `<div class="card-fmms p-3 mb-2" data-mr-id="${mr.id}">
+            <div class="d-flex flex-wrap justify-content-between gap-2 align-items-start">
+              <div>
+                <div class="fw-semibold mb-1">درخواست قطعه ${FMMS.ui.badge(mr.status)}</div>
+                <div class="small text-muted mono mb-2">Repair: ${FMMS.ui.escapeHtml(mr.repair_order_id)}</div>
+                <ul class="mb-0 small">${(mr.items || [])
+                  .map(
+                    (item) =>
+                      `<li><span class="mono">${FMMS.ui.escapeHtml(item.material_number)}</span> — ${FMMS.ui.escapeHtml(item.quantity)} ${FMMS.ui.escapeHtml(item.unit_of_measure)}</li>`
+                  )
+                  .join("")}</ul>
+                <div class="material-flow-hint mt-2 small text-muted">درخواست قطعه ← بررسی ترابری ← موجودی انبار ← تحویل قطعه</div>
+              </div>
+              <div class="d-flex flex-wrap gap-1">
+                <button type="button" class="btn btn-fmms-success btn-sm" data-action="approve-mr">تایید</button>
+                <button type="button" class="btn btn-fmms-danger btn-sm" data-action="reject-mr">رد</button>
+              </div>
+            </div>
+          </div>`
+        )
+        .join("");
+      host.querySelectorAll("[data-mr-id]").forEach((card) => {
+        const id = card.dataset.mrId;
+        card.querySelector('[data-action="approve-mr"]')?.addEventListener("click", async (e) => {
+          e.currentTarget.disabled = true;
+          try {
+            const result = await FMMS.api.approveMaterialRequest(id);
+            const msg =
+              result.status === "PURCHASE_REQUIRED"
+                ? "موجودی کافی نیست — درخواست خرید ثبت شد."
+                : "قطعه از انبار صادر شد.";
+            FMMS.ui.toast(msg);
+            renderTransport("materials");
+          } catch (err) {
+            FMMS.ui.toast(err.message, "error");
+            e.currentTarget.disabled = false;
+          }
+        });
+        card.querySelector('[data-action="reject-mr"]')?.addEventListener("click", async (e) => {
+          e.currentTarget.disabled = true;
+          try {
+            await FMMS.api.rejectMaterialRequest(id);
+            FMMS.ui.toast("درخواست قطعه رد شد.");
+            renderTransport("materials");
+          } catch (err) {
+            FMMS.ui.toast(err.message, "error");
+            e.currentTarget.disabled = false;
+          }
+        });
       });
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="5">${FMMS.ui.escapeHtml(err.message)}</td></tr>`;
-      FMMS.ui.toast(err.message, "error");
+      host.innerHTML = `<div class="text-danger">${FMMS.ui.escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  async function renderTransportExternalInvoices() {
+    const host = document.getElementById("transport-external-invoices");
+    if (!host) return;
+    if (!FMMS.api.capabilities.externalInvoice) {
+      host.innerHTML = `<div class="demo-only-msg">API فاکتور خارجی در این نسخه موجود نیست.</div>`;
+      return;
+    }
+    try {
+      const page = FMMS.api.asPage(await FMMS.api.listExternalInvoices());
+      const pending = page.results.filter((inv) => inv.status === "UPLOADED");
+      if (!pending.length) {
+        host.innerHTML = `<div class="empty-state"><div class="title">فاکتور تاییدنشده‌ای وجود ندارد</div></div>`;
+        return;
+      }
+      host.innerHTML = pending
+        .map(
+          (inv) => `<div class="d-flex flex-wrap justify-content-between gap-2 align-items-center mb-2 p-2 border rounded" data-inv-id="${inv.id}">
+            <div>
+              <div>${FMMS.ui.badge(inv.status)} مبلغ: <span class="mono">${FMMS.ui.escapeHtml(inv.amount)} ${FMMS.ui.escapeHtml(inv.currency)}</span></div>
+              <div class="small text-muted mono">Repair: ${FMMS.ui.escapeHtml(inv.repair_order_id)}</div>
+            </div>
+            <button type="button" class="btn btn-fmms-success btn-sm" data-action="approve-inv">تایید فاکتور</button>
+          </div>`
+        )
+        .join("");
+      host.querySelectorAll("[data-inv-id]").forEach((row) => {
+        row.querySelector('[data-action="approve-inv"]')?.addEventListener("click", async (e) => {
+          e.currentTarget.disabled = true;
+          try {
+            await FMMS.api.approveExternalInvoice(row.dataset.invId);
+            FMMS.ui.toast("فاکتور تایید شد.");
+            renderTransport("invoices");
+          } catch (err) {
+            FMMS.ui.toast(err.message, "error");
+            e.currentTarget.disabled = false;
+          }
+        });
+      });
+    } catch (err) {
+      host.innerHTML = `<div class="text-danger">${FMMS.ui.escapeHtml(err.message)}</div>`;
     }
   }
 
   // ---------------------------------------------------------------------
   // Workshop
   // ---------------------------------------------------------------------
-  function assignTechnician(order) {
-    const preset = defaultTechnicianId();
-    openActionModal(
-      "تخصیص تعمیرکار",
-      `<p class="small text-muted mb-2">پس از تخصیص تعمیرگاه، ابتدا باید تعمیرکار به دستور تعمیر اختصاص داده شود.</p>
-       <label class="form-label">شناسه تعمیرکار (UUID)</label>
-       <input class="form-control mono ltr-field" id="technician-id-input" value="${FMMS.ui.escapeHtml(preset)}" />`,
-      async () => {
-        const technicianId = document.getElementById("technician-id-input").value.trim();
-        if (!technicianId) throw new FMMS.ApiError("شناسه تعمیرکار الزامی است.", 400);
-        await FMMS.api.assignTechnician(order.id, technicianId);
-        FMMS.session.setTechnicianId(technicianId);
-        FMMS.ui.toast("تعمیرکار تخصیص یافت.");
-        renderWorkshop();
-      }
-    );
+  async function acceptRepair(order, btn) {
+    btn.disabled = true;
+    try {
+      await FMMS.api.acceptRepair(order.id);
+      FMMS.ui.toast("تعمیر پذیرفته شد.");
+      renderWorkshop("orders");
+    } catch (err) {
+      FMMS.ui.toast(err.message, "error");
+      btn.disabled = false;
+    }
+  }
+
+  async function rejectRepair(order, btn) {
+    btn.disabled = true;
+    try {
+      await FMMS.api.rejectRepair(order.id);
+      FMMS.ui.toast("تعمیر رد شد — خودرو آماده فعال‌سازی است.");
+      renderWorkshop("orders");
+    } catch (err) {
+      FMMS.ui.toast(err.message, "error");
+      btn.disabled = false;
+    }
   }
 
   async function start(order, btn) {
@@ -475,22 +664,7 @@ FMMS.pages = FMMS.pages || {};
     try {
       await FMMS.api.startRepair(order.id);
       FMMS.ui.toast("تعمیر آغاز شد.");
-      renderWorkshop();
-    } catch (err) {
-      FMMS.ui.toast(err.message, "error");
-      btn.disabled = false;
-      btn.textContent = prev;
-    }
-  }
-
-  async function activateVehicle(order, btn) {
-    btn.disabled = true;
-    const prev = btn.textContent;
-    btn.textContent = "در حال فعال‌سازی…";
-    try {
-      await FMMS.api.activateVehicle(order.vehicle_id);
-      FMMS.ui.toast("خودرو فعال شد.");
-      renderWorkshop();
+      renderWorkshop("orders");
     } catch (err) {
       FMMS.ui.toast(err.message, "error");
       btn.disabled = false;
@@ -515,117 +689,73 @@ FMMS.pages = FMMS.pages || {};
           performed_at: new Date().toISOString(),
         });
         FMMS.ui.toast("فعالیت تعمیر ثبت شد.");
-        renderWorkshop();
+        renderWorkshop("orders");
       }
     );
   }
 
-  function addPart(order) {
-    openActionModal(
-      "ثبت مصرف قطعه",
-      `<p class="small text-muted mb-3">قطعه‌ای که از <strong>انبار موجود</strong> روی این دستور تعمیر مصرف شده است.</p>
-       <div class="mb-2"><label class="form-label">کد قطعه (Material Number)</label>
-        <input class="form-control mono" id="part-material" placeholder="مثلاً 4500123456" /></div>
-       <div class="row g-2">
-         <div class="col-6"><label class="form-label">تعداد مصرف</label>
-           <input class="form-control" id="part-qty" type="number" min="1" value="1" /></div>
-         <div class="col-6"><label class="form-label">واحد</label>
-           <input class="form-control" id="part-unit" value="EA" /></div>
-       </div>`,
-      async () => {
-        const material = document.getElementById("part-material").value.trim();
-        if (!material) throw new FMMS.ApiError("کد قطعه الزامی است.", 400);
-        await FMMS.api.addRepairPart(order.id, {
-          material_number: material,
-          quantity: Number(document.getElementById("part-qty").value || 1),
-          unit_of_measure: document.getElementById("part-unit").value.trim() || "EA",
-        });
-        FMMS.ui.toast("مصرف قطعه از انبار ثبت شد.");
-        renderWorkshop();
-      },
-      "ثبت مصرف"
-    );
-  }
-
-  function addPurchaseRequisition(order) {
-    if (!FMMS.api.capabilities.purchaseRequisition) {
-      FMMS.ui.toast("API ثبت درخواست خرید قطعه در نسخه فعلی موجود نیست.", "error");
+  function requestMaterial(order) {
+    if (!FMMS.api.capabilities.materialRequest) {
+      FMMS.ui.toast("API درخواست قطعه در نسخه فعلی موجود نیست.", "error");
       return;
     }
     openActionModal(
-      "درخواست خرید قطعه",
-      `<p class="small text-muted mb-3">برای قطعه‌ای که در انبار <strong>موجود نیست</strong> و باید از طریق فرآیند خرید تامین شود — جدا از مصرف انبار.</p>
-       <div class="mb-2"><label class="form-label">کد قطعه</label>
-         <input class="form-control mono" id="pr-material" placeholder="کد ماده" /></div>
-       <div class="mb-2"><label class="form-label">نام / توضیح قطعه</label>
-         <input class="form-control" id="pr-desc" placeholder="توضیح قطعه" /></div>
-       <div class="row g-2 mb-2">
-         <div class="col-4"><label class="form-label">تعداد</label>
-           <input class="form-control" id="pr-qty" value="1" /></div>
-         <div class="col-4"><label class="form-label">واحد</label>
-           <input class="form-control" id="pr-unit" value="EA" /></div>
-         <div class="col-4"><label class="form-label">وضعیت PR</label>
-           <input class="form-control" value="پیش‌نویس" disabled /></div>
+      "درخواست قطعه",
+      `<div class="material-flow-hint small text-muted mb-3">درخواست قطعه ← بررسی ترابری ← موجودی انبار ← تحویل قطعه<br/>یا: عدم موجودی ← ثبت سفارش خرید ← دریافت قطعه</div>
+       <div class="mb-2"><label class="form-label">کد قطعه (Material Number)</label>
+        <input class="form-control mono" id="mr-material" placeholder="مثلاً 000000012345" /></div>
+       <div class="row g-2">
+         <div class="col-6"><label class="form-label">تعداد</label>
+           <input class="form-control" id="mr-qty" type="number" min="1" value="1" /></div>
+         <div class="col-6"><label class="form-label">واحد</label>
+           <input class="form-control" id="mr-unit" value="EA" /></div>
        </div>`,
       async () => {
-        const material = document.getElementById("pr-material").value.trim();
-        const description = document.getElementById("pr-desc").value.trim();
-        const quantity = document.getElementById("pr-qty").value.trim();
-        const unit = document.getElementById("pr-unit").value.trim() || "EA";
-        if (!material || !description || !quantity) {
-          throw new FMMS.ApiError("کد قطعه، توضیح و تعداد الزامی است.", 400);
-        }
-        const pr = await FMMS.api.createPurchaseRequisition(order.id);
-        await FMMS.api.addPurchaseRequisitionLineItem(pr.id, {
-          material_number: material,
-          description,
-          quantity,
-          unit_of_measure: unit,
-        });
-        FMMS.ui.toast("درخواست خرید قطعه ثبت شد.");
-        renderWorkshop();
+        const material = document.getElementById("mr-material").value.trim();
+        const quantity = document.getElementById("mr-qty").value.trim() || "1";
+        const unit = document.getElementById("mr-unit").value.trim() || "EA";
+        if (!material) throw new FMMS.ApiError("کد قطعه الزامی است.", 400);
+        await FMMS.api.createMaterialRequest(order.id, [
+          { material_number: material, quantity, unit_of_measure: unit },
+        ]);
+        FMMS.ui.toast("درخواست قطعه ثبت شد.");
+        renderWorkshop("orders");
       },
-      "ثبت درخواست خرید"
+      "ثبت درخواست"
     );
   }
 
-  function syncSapPm(order) {
+  function uploadInvoice(order) {
+    if (!FMMS.api.capabilities.externalInvoice) {
+      FMMS.ui.toast("API فاکتور خارجی در نسخه فعلی موجود نیست.", "error");
+      return;
+    }
     openActionModal(
-      "همگام‌سازی PM با SAP",
-      `<div class="mb-2"><label class="form-label">نوع سفارش (order_type)</label>
-        <input class="form-control" id="sap-order-type" value="PM01" maxlength="10" /></div>
-       <div class="mb-2"><label class="form-label">توضیحات</label>
-        <input class="form-control" id="sap-desc" placeholder="توضیح PM" /></div>
-       <div class="mb-2"><label class="form-label">تاریخ شروع برنامه‌ریزی‌شده</label>
-        <input class="form-control" id="sap-planned" type="datetime-local" /></div>`,
+      "ثبت فاکتور تعمیرگاه خارجی",
+      `<div class="small text-muted mb-3">ارسال به تعمیرگاه خارجی ← تعمیر ← تحویل خودرو ← ثبت فاکتور ← تایید ترابری</div>
+       <div class="mb-2"><label class="form-label">مبلغ</label>
+         <input class="form-control mono" id="inv-amount" placeholder="500000.00" /></div>
+       <div class="mb-2"><label class="form-label">ارز</label>
+         <input class="form-control" id="inv-currency" value="IRR" maxlength="3" /></div>
+       <div class="mb-2"><label class="form-label">شناسه فروشنده (اختیاری)</label>
+         <input class="form-control" id="inv-vendor" /></div>
+       <div class="mb-2"><label class="form-label">مرجع سند (اختیاری)</label>
+         <input class="form-control" id="inv-document" placeholder="URL یا شماره سند" /></div>`,
       async () => {
-        const order_type = document.getElementById("sap-order-type").value.trim();
-        const description = document.getElementById("sap-desc").value.trim();
-        const plannedRaw = document.getElementById("sap-planned").value;
-        if (!order_type || !description || !plannedRaw) {
-          throw new FMMS.ApiError("نوع سفارش، توضیح و تاریخ الزامی است.", 400);
-        }
-        await FMMS.api.syncRepairSap(order.id, {
-          order_type,
-          description,
-          planned_start: new Date(plannedRaw).toISOString(),
+        const amount = document.getElementById("inv-amount").value.trim();
+        const currency = document.getElementById("inv-currency").value.trim() || "IRR";
+        if (!amount) throw new FMMS.ApiError("مبلغ الزامی است.", 400);
+        await FMMS.api.uploadExternalInvoice(order.id, {
+          amount,
+          currency,
+          vendor_id: document.getElementById("inv-vendor").value.trim() || null,
+          document: document.getElementById("inv-document").value.trim() || null,
         });
-        FMMS.ui.toast("همگام‌سازی PM با SAP انجام شد.");
-        renderWorkshop();
+        FMMS.ui.toast("فاکتور ثبت شد.");
+        renderWorkshop("orders");
       },
-      "همگام‌سازی"
+      "ثبت فاکتور"
     );
-  }
-
-  function showWorkshopOps(order) {
-    const body = `<div class="small text-muted mb-2">دستور تعمیر: <span class="mono">${FMMS.ui.escapeHtml(order.id)}</span></div>${pmOrderSection(order)}`;
-    FMMS.ui.openDetailModal("عملیات تعمیرگاه / PM", body);
-    setTimeout(() => {
-      document.querySelector("#detail-modal-body [data-action='sync-sap']")?.addEventListener("click", () => {
-        bootstrap.Modal.getInstance(document.getElementById("detail-modal"))?.hide();
-        syncSapPm(order);
-      });
-    }, 0);
   }
 
   async function complete(order, btn) {
@@ -634,8 +764,8 @@ FMMS.pages = FMMS.pages || {};
     btn.textContent = "در حال اتمام…";
     try {
       await FMMS.api.completeRepair(order.id);
-      FMMS.ui.toast("تعمیر پایان یافت.");
-      renderWorkshop();
+      FMMS.ui.toast("تعمیر فنی پایان یافت — منتظر تایید راننده.");
+      renderWorkshop("orders");
     } catch (err) {
       FMMS.ui.toast(err.message, "error");
       btn.disabled = false;
@@ -643,10 +773,10 @@ FMMS.pages = FMMS.pages || {};
     }
   }
 
-  async function countPurchaseLineItems(repairOrderId) {
+  async function countMaterialRequests(repairOrderId) {
     try {
-      const page = FMMS.api.asPage(await FMMS.api.listPurchaseRequisitions(repairOrderId));
-      return page.results.reduce((sum, pr) => sum + (pr.line_items?.length || 0), 0);
+      const page = FMMS.api.asPage(await FMMS.api.listMaterialRequests());
+      return page.results.filter((mr) => mr.repair_order_id === repairOrderId).length;
     } catch (_) {
       return 0;
     }
@@ -656,91 +786,196 @@ FMMS.pages = FMMS.pages || {};
     return Promise.all(
       orders.map(async (order) => ({
         ...order,
-        purchaseLineCount: await countPurchaseLineItems(order.id),
+        materialRequestCount: await countMaterialRequests(order.id),
       }))
     );
   }
 
   function workshopActions(order) {
     const actions = [];
-    if (order.status === "WORKSHOP_ASSIGNED") {
-      actions.push(`<button class="btn btn-fmms-primary btn-sm" data-action="start">شروع تعمیر</button>`);
+    const isInternal = order.workshop_type === "INTERNAL";
+    const isExternal = order.workshop_type === "EXTERNAL";
+
+    if (order.status === "WORKSHOP_ASSIGNED" && isInternal) {
+      actions.push(
+        `<button class="btn btn-fmms-success btn-sm" data-action="accept">تایید تعمیر</button>`,
+        `<button class="btn btn-fmms-danger btn-sm" data-action="reject">رد تعمیر</button>`
+      );
     }
-    if (order.status === "ASSIGNED") {
+    if (order.status === "WORKSHOP_ASSIGNED" && isExternal) {
+      actions.push(`<button class="btn btn-fmms-primary btn-sm" data-action="start">شروع تعمیر خارجی</button>`);
+    }
+    if (order.status === "WAITING_WORKSHOP_CONFIRMATION" || order.status === "ASSIGNED") {
       actions.push(`<button class="btn btn-fmms-primary btn-sm" data-action="start">شروع تعمیر</button>`);
     }
     if (order.status === "IN_PROGRESS") {
       actions.push(
-        `<button class="btn btn-fmms-danger btn-sm" data-action="buy-part">درخواست خرید قطعه</button>`,
-        `<button class="btn btn-fmms-outline btn-sm" data-action="use-part">ثبت مصرف قطعه</button>`,
+        `<button class="btn btn-fmms-outline btn-sm" data-action="request-material">درخواست قطعه</button>`,
+        `<button class="btn btn-fmms-outline btn-sm" data-action="activity">ثبت فعالیت</button>`,
         `<button class="btn btn-fmms-success btn-sm" data-action="complete">اتمام تعمیر</button>`
       );
     }
-    if (order.status === "COMPLETED") {
-      const v = vehiclesById[order.vehicle_id];
-      if (v && v.status !== "ACTIVE" && FMMS.api.capabilities.vehicleActivate) {
-        actions.push(`<button class="btn btn-fmms-success btn-sm" data-action="activate">فعال‌سازی خودرو</button>`);
-      }
-      if (!actions.length) {
-        return `<span class="reviewed-notice">این تعمیر تکمیل شده است.</span>`;
-      }
+    if (
+      (order.status === "WAITING_DRIVER_CONFIRMATION" || order.status === "ACCEPTED_BY_DRIVER") &&
+      isExternal
+    ) {
+      actions.push(`<button class="btn btn-fmms-outline btn-sm" data-action="invoice">ثبت فاکتور</button>`);
+    }
+    if (order.status === "WAITING_DRIVER_CONFIRMATION") {
+      actions.push(`<span class="reviewed-notice">منتظر تایید راننده</span>`);
+    }
+    if (order.status === "ACCEPTED_BY_DRIVER") {
+      actions.push(`<span class="reviewed-notice">تایید راننده — خودرو فعال</span>`);
     }
     if (order.status === "CANCELLED") {
-      return `<span class="reviewed-notice">این تعمیر لغو شده است.</span>`;
+      return `<div class="alert-fmms alert-fmms-warn mb-0 py-2 px-3"><strong>تعمیر رد شد</strong><div class="small">خودرو آماده فعال‌سازی است</div></div>`;
+    }
+    if (order.status === "REJECTED_BY_DRIVER") {
+      return `<span class="reviewed-notice">رد راننده — دستور جدید ایجاد شد</span>`;
     }
     actions.push(`<button class="btn btn-fmms-outline btn-sm" data-action="timeline">تاریخچه</button>`);
-    return actions.join("");
+    return actions.join(" ");
   }
 
   function workshopRow(order) {
     const v = vehiclesById[order.vehicle_id];
-    const activityCount = order.activities?.length || 0;
-    const partCount = order.parts?.length || 0;
-    const purchaseCount = order.purchaseLineCount ?? 0;
+    const mrCount = order.materialRequestCount ?? 0;
     return `<tr data-id="${order.id}">
       <td>${FMMS.ui.vehicleLabel(v)}</td>
       <td class="mono">${order.sap_order_number || order.id}</td>
       <td>${order.workshop_type ? workshopTypeLabel(order.workshop_type) : "—"}</td>
       <td>${FMMS.ui.badge(order.status)}</td>
-      <td>${activityCount || "—"}</td>
-      <td>${partCount ? `<span class="mono">${partCount}</span> مورد` : "—"}</td>
-      <td>${purchaseCount ? `<span class="mono">${purchaseCount}</span> قلم` : "—"}</td>
+      <td>${mrCount ? `<span class="mono">${mrCount}</span> مورد` : "—"}</td>
       <td class="workshop-actions-cell">${workshopActions(order)}</td>
     </tr>`;
   }
 
-  async function renderWorkshop() {
-    const tbody = document.getElementById("workshop-tbody");
-    tbody.innerHTML = `<tr><td colspan="8">در حال بارگذاری…</td></tr>`;
+  async function renderWorkshopMaterialsList() {
+    const host = document.getElementById("workshop-material-requests");
+    if (!host) return;
+    if (!FMMS.api.capabilities.materialRequest) {
+      host.innerHTML = `<div class="demo-only-msg">API درخواست قطعه در این نسخه موجود نیست.</div>`;
+      return;
+    }
+    host.innerHTML = `<div class="text-muted">در حال بارگذاری…</div>`;
+    try {
+      await ensureVehicles();
+      const page = FMMS.api.asPage(await FMMS.api.listMaterialRequests());
+      if (!page.results.length) {
+        host.innerHTML = `<div class="empty-state"><div class="title">درخواست قطعه‌ای ثبت نشده است</div><div>از «دستورات تعمیر» می‌توانید درخواست قطعه ثبت کنید.</div></div>`;
+        return;
+      }
+      host.innerHTML = page.results
+        .map((mr) => `<div class="card-fmms p-3 mb-2">
+            <div class="d-flex flex-wrap justify-content-between gap-2 align-items-start">
+              <div>
+                <div class="fw-semibold mb-1">درخواست قطعه ${FMMS.ui.badge(mr.status)}</div>
+                <div class="small text-muted mb-1">دستور تعمیر: <span class="mono">${FMMS.ui.escapeHtml(mr.repair_order_id)}</span></div>
+                <ul class="mb-0 small">${(mr.items || [])
+                  .map(
+                    (item) =>
+                      `<li><span class="mono">${FMMS.ui.escapeHtml(item.material_number)}</span> — ${FMMS.ui.escapeHtml(item.quantity)} ${FMMS.ui.escapeHtml(item.unit_of_measure)}</li>`
+                  )
+                  .join("")}</ul>
+              </div>
+              <button type="button" class="btn btn-fmms-outline btn-sm" data-action="goto-orders">مشاهده دستور</button>
+            </div>
+          </div>`)
+        .join("");
+      host.querySelectorAll('[data-action="goto-orders"]').forEach((btn) => {
+        btn.addEventListener("click", () => FMMS.shell.navigate("workshop-orders"));
+      });
+    } catch (err) {
+      host.innerHTML = `<div class="text-danger">${FMMS.ui.escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  async function renderWorkshopHistoryList() {
+    const host = document.getElementById("workshop-history-list");
+    if (!host) return;
+    host.innerHTML = `<div class="text-muted">در حال بارگذاری…</div>`;
     try {
       await ensureVehicles();
       const res = await FMMS.api.listAllRepairOrders();
-      const filtered = res.results.filter(
-        (r) =>
-          r.status === "WORKSHOP_ASSIGNED" ||
-          r.status === "ASSIGNED" ||
-          r.status === "IN_PROGRESS" ||
-          r.status === "COMPLETED" ||
-          r.status === "CANCELLED"
-      );
-      const relevant = await enrichWorkshopOrders(filtered);
-
-      tbody.innerHTML = relevant.length
-        ? relevant.map(workshopRow).join("")
-        : `<tr><td colspan="8"><div class="empty-state"><div class="title">کاری در تعمیرگاه در جریان نیست</div></div></td></tr>`;
-
-      tbody.querySelectorAll("tr[data-id]").forEach((tr) => {
-        const order = relevant.find((r) => r.id === tr.dataset.id);
-        tr.querySelector('[data-action="start"]')?.addEventListener("click", (e) => start(order, e.currentTarget));
-        tr.querySelector('[data-action="buy-part"]')?.addEventListener("click", () => addPurchaseRequisition(order));
-        tr.querySelector('[data-action="use-part"]')?.addEventListener("click", () => addPart(order));
-        tr.querySelector('[data-action="complete"]')?.addEventListener("click", (e) => complete(order, e.currentTarget));
-        tr.querySelector('[data-action="activate"]')?.addEventListener("click", (e) => activateVehicle(order, e.currentTarget));
+      const orders = res.results
+        .slice()
+        .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+      if (!orders.length) {
+        host.innerHTML = `<div class="empty-state"><div class="title">تاریخچه‌ای یافت نشد</div></div>`;
+        return;
+      }
+      host.innerHTML = `<div class="table-fmms-wrap"><table class="table-fmms"><thead><tr>
+        <th>خودرو</th><th>دستور تعمیر</th><th>وضعیت</th><th>آخرین به‌روزرسانی</th><th>عملیات</th>
+      </tr></thead><tbody>${orders
+        .map((order) => {
+          const v = vehiclesById[order.vehicle_id];
+          return `<tr data-id="${order.id}">
+            <td>${FMMS.ui.vehicleLabel(v)}</td>
+            <td class="mono">${FMMS.ui.escapeHtml(order.id)}</td>
+            <td>${FMMS.ui.badge(order.status)}</td>
+            <td>${FMMS.ui.formatDateTime(order.updated_at)}</td>
+            <td><button type="button" class="btn btn-fmms-outline btn-sm" data-action="timeline">تاریخچه</button></td>
+          </tr>`;
+        })
+        .join("")}</tbody></table></div>`;
+      host.querySelectorAll("tr[data-id]").forEach((tr) => {
+        const order = orders.find((r) => r.id === tr.dataset.id);
         tr.querySelector('[data-action="timeline"]')?.addEventListener("click", () => showTimeline(order));
       });
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="8">${FMMS.ui.escapeHtml(err.message)}</td></tr>`;
-      FMMS.ui.toast(err.message, "error");
+      host.innerHTML = `<div class="text-danger">${FMMS.ui.escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  async function renderWorkshop(view) {
+    const activeView = view || "orders";
+    if (activeView === "orders") {
+      const tbody = document.getElementById("workshop-tbody");
+      if (!tbody) return;
+      tbody.innerHTML = `<tr><td colspan="6">در حال بارگذاری…</td></tr>`;
+      try {
+        await ensureVehicles();
+        const res = await FMMS.api.listAllRepairOrders();
+        const filtered = res.results.filter((r) =>
+          [
+            "WORKSHOP_ASSIGNED",
+            "WAITING_WORKSHOP_CONFIRMATION",
+            "ASSIGNED",
+            "IN_PROGRESS",
+            "WAITING_PARTS",
+            "WAITING_DRIVER_CONFIRMATION",
+            "ACCEPTED_BY_DRIVER",
+            "REJECTED_BY_DRIVER",
+            "CANCELLED",
+          ].includes(r.status)
+        );
+        const relevant = await enrichWorkshopOrders(filtered);
+
+        tbody.innerHTML = relevant.length
+          ? relevant.map(workshopRow).join("")
+          : `<tr><td colspan="6"><div class="empty-state"><div class="title">کاری در تعمیرگاه در جریان نیست</div></div></td></tr>`;
+
+        tbody.querySelectorAll("tr[data-id]").forEach((tr) => {
+          const order = relevant.find((r) => r.id === tr.dataset.id);
+          tr.querySelector('[data-action="accept"]')?.addEventListener("click", (e) => acceptRepair(order, e.currentTarget));
+          tr.querySelector('[data-action="reject"]')?.addEventListener("click", (e) => rejectRepair(order, e.currentTarget));
+          tr.querySelector('[data-action="start"]')?.addEventListener("click", (e) => start(order, e.currentTarget));
+          tr.querySelector('[data-action="request-material"]')?.addEventListener("click", () => requestMaterial(order));
+          tr.querySelector('[data-action="activity"]')?.addEventListener("click", () => addActivity(order));
+          tr.querySelector('[data-action="complete"]')?.addEventListener("click", (e) => complete(order, e.currentTarget));
+          tr.querySelector('[data-action="invoice"]')?.addEventListener("click", () => uploadInvoice(order));
+          tr.querySelector('[data-action="timeline"]')?.addEventListener("click", () => showTimeline(order));
+        });
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="6">${FMMS.ui.escapeHtml(err.message)}</td></tr>`;
+        FMMS.ui.toast(err.message, "error");
+      }
+    }
+    if (activeView === "materials") {
+      await renderWorkshopMaterialsList();
+    }
+    if (activeView === "history") {
+      await renderWorkshopHistoryList();
     }
   }
 

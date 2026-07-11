@@ -12,8 +12,11 @@ FMMS.pages = FMMS.pages || {};
     "CREATED",
     "APPROVED",
     "WORKSHOP_ASSIGNED",
+    "WAITING_WORKSHOP_CONFIRMATION",
+    "WAITING_PARTS",
     "ASSIGNED",
     "IN_PROGRESS",
+    "WAITING_DRIVER_CONFIRMATION",
   ]);
 
   function rowHtml(v) {
