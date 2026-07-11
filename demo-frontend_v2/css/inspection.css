@@ -1,0 +1,339 @@
+/* =========================================================================
+   FMMS — Inspection page (UX polish, CSS-only)
+   Scoped to #page-inspection; preserves IDs, classes, and JS behavior.
+   ========================================================================= */
+
+.main:has(#page-inspection[style*="block"]) {
+  background: #f7f9fc;
+}
+
+/* ---- compact page chrome (inspection only) --------------------------- */
+
+.main:has(#page-inspection[style*="block"]) #app-page-chrome .page-hero {
+  background: var(--surface);
+  border: none;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.main:has(#page-inspection[style*="block"]) #app-page-chrome .page-hero-content {
+  padding: 14px 24px 12px;
+  border-inline-start: 3px solid var(--success);
+}
+
+.main:has(#page-inspection[style*="block"]) #app-page-chrome .page-hero-title {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.main:has(#page-inspection[style*="block"]) #app-page-chrome .page-breadcrumb {
+  margin: 12px 0 20px;
+  padding: 0 6px;
+  font-size: 12px;
+}
+
+.main:has(#page-inspection[style*="block"]) #app-page-chrome .page-chrome-block {
+  margin-bottom: 20px;
+}
+
+/* ---- stepper -------------------------------------------------------- */
+
+#page-inspection #inspection-wizard {
+  max-width: 720px;
+  margin-inline: auto;
+  margin-bottom: 24px;
+  padding: 20px 28px;
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+#page-inspection #inspection-wizard:hover {
+  transform: none;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+#page-inspection #inspection-wizard .page-wizard-step:not(:last-child)::after {
+  top: 18px;
+  height: 3px;
+  background: #e2e8f0;
+  inset-inline-start: calc(50% + 20px);
+  width: calc(100% - 40px);
+}
+
+#page-inspection #inspection-wizard .page-wizard-step.done:not(:last-child)::after {
+  background: #c6e9d4;
+}
+
+#page-inspection #inspection-wizard .page-wizard-dot {
+  width: 34px;
+  height: 34px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  border-width: 2px;
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #94a3b8;
+}
+
+#page-inspection #inspection-wizard .page-wizard-step.current .page-wizard-dot {
+  width: 38px;
+  height: 38px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  box-shadow: 0 4px 12px rgba(47, 166, 106, 0.28), 0 0 0 4px rgba(47, 166, 106, 0.1);
+}
+
+#page-inspection #inspection-wizard .page-wizard-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+  max-width: 120px;
+}
+
+#page-inspection #inspection-wizard .page-wizard-step.current .page-wizard-label {
+  color: var(--success-dark);
+  font-weight: 700;
+}
+
+#page-inspection #inspection-wizard .page-wizard-step.done .page-wizard-label {
+  color: var(--ink-soft);
+}
+
+/* ---- step panels ---------------------------------------------------- */
+
+#page-inspection #driver-step-1,
+#page-inspection #driver-step-2,
+#page-inspection #driver-step-3 {
+  max-width: 700px;
+  margin-inline: auto;
+}
+
+/* ---- main vehicle card ---------------------------------------------- */
+
+#page-inspection .driver-vehicle-card {
+  max-width: 700px;
+  width: 100%;
+  margin-inline: auto;
+  padding: 32px !important;
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 4px 16px rgba(15, 23, 42, 0.04);
+}
+
+#page-inspection .driver-vehicle-card:hover {
+  transform: none;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 4px 16px rgba(15, 23, 42, 0.04);
+}
+
+#page-inspection .inspection-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+#page-inspection .inspection-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: var(--ink-soft);
+  flex-shrink: 0;
+}
+
+#page-inspection .inspection-card-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+#page-inspection .inspection-card-header .form-label {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.3;
+}
+
+/* ---- empty state / selected vehicle --------------------------------- */
+
+#page-inspection .inspection-vehicle-body {
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 8px 0 24px;
+}
+
+#page-inspection #inspection-selected-vehicle.text-muted {
+  display: none;
+}
+
+#page-inspection #inspection-selected-vehicle:not(.text-muted) {
+  display: block;
+  width: 100%;
+  margin: 0 0 24px;
+  padding: 16px 20px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  text-align: center;
+}
+
+#page-inspection .inspection-empty-state {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  width: 100%;
+  padding: 16px 24px 8px;
+}
+
+#page-inspection #inspection-selected-vehicle.text-muted + .inspection-empty-state {
+  display: flex;
+}
+
+#page-inspection .inspection-empty-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  margin-bottom: 20px;
+  border-radius: 50%;
+  background: #f1f5f9;
+  color: #94a3b8;
+}
+
+#page-inspection .inspection-empty-icon svg {
+  width: 36px;
+  height: 36px;
+}
+
+#page-inspection .inspection-empty-title {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.4;
+}
+
+#page-inspection .inspection-empty-sub {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 400;
+  color: var(--muted);
+  line-height: 1.6;
+  max-width: 320px;
+}
+
+/* ---- actions -------------------------------------------------------- */
+
+#page-inspection .inspection-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 8px;
+  padding-top: 24px;
+  border-top: 1px solid #f1f5f9;
+}
+
+#page-inspection .inspection-actions .btn {
+  min-height: 44px;
+  padding: 10px 24px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background-color var(--transition-base), border-color var(--transition-base),
+    box-shadow var(--transition-base), opacity var(--transition-base);
+}
+
+#page-inspection .inspection-actions .btn-fmms-primary {
+  background: var(--success);
+  border-color: var(--success);
+}
+
+#page-inspection .inspection-actions .btn-fmms-primary:hover:not(:disabled) {
+  background: var(--success-dark);
+  border-color: var(--success-dark);
+  box-shadow: 0 4px 12px rgba(47, 166, 106, 0.22);
+}
+
+#page-inspection .inspection-actions .btn-fmms-outline:disabled {
+  opacity: 0.42;
+  background: #fafbfc;
+  border-color: #e2e8f0;
+  color: var(--muted);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+#page-inspection #inspection-no-vehicle-msg {
+  margin-top: 16px;
+  border: none;
+  border-radius: 10px;
+  background: #fffbeb;
+  box-shadow: inset 0 0 0 1px #fde68a;
+}
+
+/* ---- checklist & result steps --------------------------------------- */
+
+#page-inspection #driver-step-2 .checklist-row {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+  margin-bottom: 12px;
+}
+
+#page-inspection #inspection-submit-btn {
+  min-height: 44px;
+  padding: 10px 24px;
+  border-radius: 10px;
+  margin-top: 16px;
+  width: 100%;
+}
+
+#page-inspection #driver-step-3 .result-banner {
+  border: none;
+  border-radius: 14px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+}
+
+#page-inspection #inspection-restart-btn {
+  min-height: 44px;
+  padding: 10px 24px;
+  border-radius: 10px;
+}
+
+@media (max-width: 640px) {
+  #page-inspection .driver-vehicle-card {
+    padding: 24px !important;
+  }
+
+  #page-inspection .inspection-actions {
+    flex-direction: column;
+  }
+
+  #page-inspection .inspection-actions .btn {
+    width: 100%;
+  }
+
+  .main:has(#page-inspection[style*="block"]) #app-page-chrome .page-hero-title {
+    font-size: 24px;
+  }
+}

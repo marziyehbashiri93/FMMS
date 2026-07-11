@@ -16,10 +16,12 @@ FMMS.pages = FMMS.pages || {};
     document.getElementById("driver-step-1").style.display = step === 1 ? "block" : "none";
     document.getElementById("driver-step-2").style.display = step === 2 ? "block" : "none";
     document.getElementById("driver-step-3").style.display = step === 3 ? "block" : "none";
-    document.querySelectorAll(".driver-step-pill").forEach((pill) => {
-      const n = Number(pill.dataset.step);
-      pill.classList.toggle("active", n === step);
-      pill.classList.toggle("done", n < step);
+    document.querySelectorAll("#inspection-wizard .page-wizard-step").forEach((stepEl) => {
+      const n = Number(stepEl.dataset.step);
+      stepEl.classList.toggle("current", n === step);
+      stepEl.classList.toggle("done", n < step);
+      const dot = stepEl.querySelector(".page-wizard-dot");
+      if (dot) dot.textContent = n < step ? "✓" : String(n);
     });
   }
 

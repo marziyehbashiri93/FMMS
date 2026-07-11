@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8"/>
+  <title>FMMS Page Chrome Preview</title>
+  <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet"/>
+  <link href="css/style.css" rel="stylesheet"/>
+  <link href="css/page-chrome.css" rel="stylesheet"/>
+  <style>
+    body { margin: 0; background: #f3f4f6; font-family: Vazirmatn, Tahoma, sans-serif; }
+    .panel { background: #fff; margin: 16px; border-radius: 12px; box-shadow: 0 8px 24px rgba(15,23,42,.08); overflow: hidden; }
+    .panel-title { padding: 10px 14px; font-size: 13px; font-weight: 700; color: #64748b; background: #f8fafd; border-bottom: 1px solid #e7edf5; }
+    .panel-body { padding: 20px; background: #f3f4f6; }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 20px; max-width: 920px; margin: 0 auto; padding: 16px; }
+    .card-fmms.p-3 { padding: 16px; }
+  </style>
+</head>
+<body>
+  <div class="grid">
+    <div class="panel" id="shot-inspection">
+      <div class="panel-title">بازرسی روزانه خودرو</div>
+      <div class="panel-body">
+        <div class="page-chrome-block">
+          <div class="page-hero card-fmms"><div class="page-hero-content"><h1 class="page-hero-title">بازرسی روزانه خودرو</h1></div></div>
+          <nav class="page-breadcrumb"><a href="#">داشبورد</a><span class="bc-sep">/</span><span>راننده</span><span class="bc-sep">/</span><span class="bc-current">بازرسی روزانه خودرو</span></nav>
+        </div>
+        <div class="page-wizard card-fmms">
+          <div class="page-wizard-inner">
+            <div class="page-wizard-step current"><span class="page-wizard-dot">1</span><span class="page-wizard-label">انتخاب خودرو</span></div>
+            <div class="page-wizard-step"><span class="page-wizard-dot">2</span><span class="page-wizard-label">تکمیل چک‌لیست</span></div>
+            <div class="page-wizard-step"><span class="page-wizard-dot">3</span><span class="page-wizard-label">ثبت نتیجه</span></div>
+          </div>
+        </div>
+        <div class="card-fmms p-3"><label class="form-label">انتخاب خودرو</label><div class="text-muted mb-2">هنوز خودرویی انتخاب نشده است.</div><button class="btn btn-fmms-outline btn-sm">انتخاب خودرو</button></div>
+      </div>
+    </div>
+
+    <div class="panel" id="shot-repair">
+      <div class="panel-title">دستورات تعمیر</div>
+      <div class="panel-body">
+        <div class="page-chrome-block">
+          <div class="page-hero card-fmms"><div class="page-hero-content"><h1 class="page-hero-title">دستورات تعمیر</h1></div></div>
+          <nav class="page-breadcrumb"><a href="#">داشبورد</a><span class="bc-sep">/</span><span>تعمیرات</span><span class="bc-sep">/</span><span class="bc-current">دستورات تعمیر</span></nav>
+          <div class="page-wizard card-fmms">
+            <div class="page-wizard-inner">
+              <div class="page-wizard-step current"><span class="page-wizard-dot">1</span><span class="page-wizard-label">تایید تعمیرگاه</span></div>
+              <div class="page-wizard-step"><span class="page-wizard-dot">2</span><span class="page-wizard-label">شروع تعمیر</span></div>
+              <div class="page-wizard-step"><span class="page-wizard-dot">3</span><span class="page-wizard-label">قطعات</span></div>
+              <div class="page-wizard-step"><span class="page-wizard-dot">4</span><span class="page-wizard-label">پایان تعمیر</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="table-fmms-wrap"><table class="table-fmms"><thead><tr><th>خودرو</th><th>دستور تعمیر</th><th>وضعیت</th></tr></thead><tbody><tr><td>پژو 405 · 12ب345</td><td class="mono">RO-001</td><td>WORKSHOP_ASSIGNED</td></tr></tbody></table></div>
+      </div>
+    </div>
+
+    <div class="panel" id="shot-transport">
+      <div class="panel-title">درخواست‌های تعمیر — ترابری</div>
+      <div class="panel-body">
+        <div class="page-chrome-block">
+          <div class="page-hero card-fmms"><div class="page-hero-content"><h1 class="page-hero-title">درخواست‌های تعمیر</h1></div></div>
+          <nav class="page-breadcrumb"><a href="#">داشبورد</a><span class="bc-sep">/</span><span>ترابری</span><span class="bc-sep">/</span><span class="bc-current">درخواست‌های تعمیر</span></nav>
+          <div class="page-wizard card-fmms">
+            <div class="page-wizard-inner">
+              <div class="page-wizard-step current"><span class="page-wizard-dot">1</span><span class="page-wizard-label">بررسی درخواست</span></div>
+              <div class="page-wizard-step"><span class="page-wizard-dot">2</span><span class="page-wizard-label">تصمیم</span></div>
+              <div class="page-wizard-step"><span class="page-wizard-dot">3</span><span class="page-wizard-label">تخصیص</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="table-fmms-wrap"><table class="table-fmms"><thead><tr><th>خودرو</th><th>دستور تعمیر</th><th>وضعیت</th></tr></thead><tbody><tr><td>سمند · 45ج678</td><td class="mono">RO-002</td><td>CREATED</td></tr></tbody></table></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

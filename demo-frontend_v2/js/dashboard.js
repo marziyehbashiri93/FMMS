@@ -1,27 +1,70 @@
 /**
- * FMMS.shell — router + nav + workflow rail (shared chrome)
+ * FMMS.shell — router + page chrome + nav
  * FMMS.pages.dashboard — the dashboard page itself
- * FMMS.workflow — stage labels for manager demo views
+ * FMMS.workflow — stage labels for dashboard cards
  */
 window.FMMS = window.FMMS || {};
 
 (function (FMMS) {
   const PAGE_META = {
-    dashboard: { domPage: "dashboard", stage: null, group: null },
-    vehicles: { domPage: "vehicles", stage: 1, group: null },
-    inspection: { domPage: "inspection", stage: 2, group: "driver" },
-    handover: { domPage: "handover", stage: 7, group: "driver" },
-    faults: { domPage: "faults", stage: 3, group: null },
-    distribution: { domPage: "distribution", stage: 4, group: "distribution" },
-    "transport-repairs": { domPage: "transport", stage: 5, group: "transport", transportView: "repairs" },
-    "transport-materials": { domPage: "transport", stage: 5, group: "transport", transportView: "materials" },
-    "transport-invoices": { domPage: "transport", stage: 5, group: "transport", transportView: "invoices" },
-    transport: { domPage: "transport", stage: 5, group: "transport", transportView: "repairs" },
-    "workshop-orders": { domPage: "workshop", stage: 6, group: "workshop", workshopView: "orders" },
-    "workshop-materials": { domPage: "workshop", stage: 6, group: "workshop", workshopView: "materials" },
-    "workshop-history": { domPage: "workshop", stage: 6, group: "workshop", workshopView: "history" },
-    workshop: { domPage: "workshop", stage: 6, group: "workshop", workshopView: "orders" },
-    sap: { domPage: "sap", stage: null, group: "sap" },
+    dashboard: { domPage: "dashboard", group: null },
+    vehicles: { domPage: "vehicles", group: null },
+    inspection: { domPage: "inspection", group: "driver" },
+    handover: { domPage: "handover", group: "driver" },
+    faults: { domPage: "faults", group: null },
+    distribution: { domPage: "distribution", group: "distribution" },
+    "transport-repairs": { domPage: "transport", group: "transport", transportView: "repairs" },
+    "transport-materials": { domPage: "transport", group: "transport", transportView: "materials" },
+    "transport-invoices": { domPage: "transport", group: "transport", transportView: "invoices" },
+    transport: { domPage: "transport", group: "transport", transportView: "repairs" },
+    "workshop-orders": { domPage: "workshop", group: "workshop", workshopView: "orders" },
+    "workshop-materials": { domPage: "workshop", group: "workshop", workshopView: "materials" },
+    "workshop-history": { domPage: "workshop", group: "workshop", workshopView: "history" },
+    workshop: { domPage: "workshop", group: "workshop", workshopView: "orders" },
+    sap: { domPage: "sap", group: "sap" },
+  };
+
+  const PAGE_CHROME = {
+    vehicles: { title: "خودروها", breadcrumb: ["داشبورد", "خودروها"] },
+    inspection: { title: "بازرسی روزانه خودرو", breadcrumb: ["داشبورد", "راننده", "بازرسی روزانه خودرو"] },
+    handover: { title: "تایید تحویل خودرو", breadcrumb: ["داشبورد", "راننده", "تایید تحویل خودرو"] },
+    faults: { title: "خرابی‌ها", breadcrumb: ["داشبورد", "خرابی‌ها"] },
+    distribution: {
+      title: "بررسی خرابی‌ها و تصمیم استفاده از خودرو",
+      breadcrumb: ["داشبورد", "توزیع", "بررسی خرابی‌ها و تصمیم استفاده از خودرو"],
+    },
+    "transport-repairs": {
+      title: "درخواست‌های تعمیر",
+      breadcrumb: ["داشبورد", "ترابری", "درخواست‌های تعمیر"],
+      wizard: ["بررسی درخواست", "تصمیم", "تخصیص"],
+      wizardStep: 1,
+    },
+    "transport-materials": {
+      title: "درخواست‌های قطعه",
+      breadcrumb: ["داشبورد", "ترابری", "درخواست‌های قطعه"],
+    },
+    "transport-invoices": {
+      title: "فاکتورهای خارجی",
+      breadcrumb: ["داشبورد", "ترابری", "فاکتورهای خارجی"],
+    },
+    "workshop-orders": {
+      title: "دستورات تعمیر",
+      breadcrumb: ["داشبورد", "تعمیرات", "دستورات تعمیر"],
+      wizard: ["تایید تعمیرگاه", "شروع تعمیر", "قطعات", "پایان تعمیر"],
+      wizardStep: 1,
+    },
+    "workshop-materials": {
+      title: "درخواست قطعه",
+      breadcrumb: ["داشبورد", "تعمیرات", "درخواست قطعه"],
+    },
+    "workshop-history": {
+      title: "تاریخچه تعمیرات",
+      breadcrumb: ["داشبورد", "تعمیرات", "تاریخچه تعمیرات"],
+    },
+    sap: {
+      title: "وضعیت یکپارچه‌سازی SAP",
+      breadcrumb: ["داشبورد", "SAP", "وضعیت یکپارچه‌سازی"],
+    },
   };
 
   const GROUP_PAGES = {
@@ -39,16 +82,6 @@ window.FMMS = window.FMMS || {};
     TRANSPORT: ["dashboard", "transport-repairs", "transport-materials", "transport-invoices"],
     WORKSHOP: ["dashboard", "workshop-orders", "workshop-materials", "workshop-history"],
   };
-
-  const WORKFLOW_STAGES = [
-    "خودرو",
-    "بازرسی راننده",
-    "ثبت خرابی",
-    "تصمیم توزیع",
-    "تایید ترابری",
-    "تعمیرگاه و قطعه",
-    "تحویل و تایید راننده",
-  ];
 
   let currentPage = "dashboard";
   let expandedGroups = new Set();
@@ -75,20 +108,57 @@ window.FMMS = window.FMMS || {};
     return "dashboard";
   }
 
-  function renderWorkflowRail(pageId) {
-    const stageIndex = pageMeta(pageId).stage;
-    const rail = document.getElementById("workflow-rail");
-    if (!rail) return;
-    if (stageIndex == null) {
-      rail.innerHTML = `<span class="wf-step current"><span class="wf-num">•</span>نمای کلی جریان نگهداری و تعمیرات</span>`;
+  function renderLocalWizardHtml(steps, currentStep) {
+    return `<div class="page-wizard-inner">${steps
+      .map((label, i) => {
+        const n = i + 1;
+        const cls = n < currentStep ? "done" : n === currentStep ? "current" : "";
+        const dot = n < currentStep ? "✓" : String(n);
+        return `<div class="page-wizard-step ${cls}"><span class="page-wizard-dot">${dot}</span><span class="page-wizard-label">${label}</span></div>`;
+      })
+      .join("")}</div>`;
+  }
+
+  function renderPageChrome(pageId) {
+    const chrome = document.getElementById("app-page-chrome");
+    if (!chrome) return;
+    if (pageId === "dashboard") {
+      chrome.style.display = "none";
       return;
     }
-    rail.innerHTML = WORKFLOW_STAGES.map((label, i) => {
-      const n = i + 1;
-      const cls = n < stageIndex ? "done" : n === stageIndex ? "current" : "";
-      const sep = i > 0 ? `<span class="wf-sep"></span>` : "";
-      return `${sep}<span class="wf-step ${cls}"><span class="wf-num">${n < stageIndex ? "✓" : n}</span>${label}</span>`;
-    }).join("");
+    const cfg = PAGE_CHROME[pageId];
+    if (!cfg) {
+      chrome.style.display = "none";
+      return;
+    }
+    chrome.style.display = "block";
+    const titleEl = document.getElementById("page-chrome-title");
+    if (titleEl) titleEl.textContent = cfg.title;
+    const bcEl = document.getElementById("page-breadcrumb");
+    if (bcEl) {
+      bcEl.innerHTML = cfg.breadcrumb
+        .map((part, i) => {
+          const sep = i > 0 ? '<span class="bc-sep">/</span>' : "";
+          if (i === cfg.breadcrumb.length - 1) {
+            return `${sep}<span class="bc-current">${part}</span>`;
+          }
+          if (i === 0) {
+            return `${sep}<a href="#dashboard" data-bc-page="dashboard">${part}</a>`;
+          }
+          return `${sep}<span>${part}</span>`;
+        })
+        .join("");
+    }
+    const wizardEl = document.getElementById("page-chrome-wizard");
+    if (wizardEl) {
+      if (cfg.wizard?.length) {
+        wizardEl.style.display = "block";
+        wizardEl.innerHTML = renderLocalWizardHtml(cfg.wizard, cfg.wizardStep || 1);
+      } else {
+        wizardEl.style.display = "none";
+        wizardEl.innerHTML = "";
+      }
+    }
   }
 
   function applyTransportView(view) {
@@ -178,7 +248,7 @@ window.FMMS = window.FMMS || {};
 
     updateNavActiveState(pageId);
     expandGroupForPage(pageId);
-    renderWorkflowRail(pageId);
+    renderPageChrome(pageId);
 
     const loaders = {
       dashboard: FMMS.pages.dashboard.render,
@@ -222,6 +292,13 @@ window.FMMS = window.FMMS || {};
         const isExpanded = group.classList.contains("expanded");
         setGroupExpanded(groupId, !isExpanded);
       });
+    });
+
+    document.getElementById("page-breadcrumb")?.addEventListener("click", (e) => {
+      const link = e.target.closest("[data-bc-page]");
+      if (!link) return;
+      e.preventDefault();
+      navigate(link.dataset.bcPage);
     });
   }
 
@@ -438,7 +515,7 @@ window.FMMS = window.FMMS || {};
               </div>`;
                 })
                 .join("")
-            : `<div class="empty-state"><div class="title">جریان کاری فعالی نیست</div><div>از منوی «راننده → بازرسی روزانه خودرو» یک بازرسی شروع کنید.</div></div>`;
+            : `<div class="empty-state"><div class="title">جریان کاری فعالی نیست</div><div>از منوی «راننده - بازرسی روزانه خودرو» یک بازرسی شروع کنید.</div></div>`;
       }
 
       const recentFaults = faults.results
@@ -459,7 +536,27 @@ window.FMMS = window.FMMS || {};
               </div>`;
                 })
                 .join("")
-            : `<div class="empty-state"><div class="title">خرابی‌ای ثبت نشده</div></div>`;
+            : `<div class="empty-state">
+                <div class="empty-icon">
+                <svg xmlns="http://www.w3.org/2000/svg"
+                     width="56"
+                     height="56"
+                     viewBox="0 0 24 24"
+                     fill="none"
+                     stroke="currentColor"
+                     stroke-width="1.6"
+                     stroke-linecap="round"
+                     stroke-linejoin="round">
+                    <path d="M8 3h6l4 4v13a1 1 0 0 1-1 1H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/>
+                    <path d="M14 3v4h4"/>
+                    <path d="M9 11h6"/>
+                    <path d="M9 15h4"/>
+                </svg>
+                </div>
+                <div class="subtitle">
+                    در حال حاضر موردی برای نمایش وجود ندارد.
+                </div>
+            </div>`;
       }
 
       const recentRepairs = repairOrders.results
@@ -480,7 +577,27 @@ window.FMMS = window.FMMS || {};
               </div>`;
                 })
                 .join("")
-            : `<div class="empty-state"><div class="title">تعمیری ثبت نشده</div></div>`;
+            : `<div class="empty-state">
+                <div class="empty-icon">
+                <svg xmlns="http://www.w3.org/2000/svg"
+                     width="56"
+                     height="56"
+                     viewBox="0 0 24 24"
+                     fill="none"
+                     stroke="currentColor"
+                     stroke-width="1.6"
+                     stroke-linecap="round"
+                     stroke-linejoin="round">
+                    <path d="M8 3h6l4 4v13a1 1 0 0 1-1 1H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/>
+                    <path d="M14 3v4h4"/>
+                    <path d="M9 11h6"/>
+                    <path d="M9 15h4"/>
+                </svg>
+                </div>
+                <div class="subtitle">
+                    در حال حاضر موردی برای نمایش وجود ندارد.
+                </div>
+            </div>`;
       }
     } catch (err) {
       statsEl.innerHTML = `<div class="empty-state" style="grid-column:1/-1;"><div class="title">خطا در بارگذاری داشبورد</div><div>${FMMS.ui.escapeHtml(err.message)}</div></div>`;

@@ -13,6 +13,8 @@
     <link href="css/style.css" rel="stylesheet"/>
     <link href="css/sidebar.css" rel="stylesheet"/>
     <link href="css/dashboard.css" rel="stylesheet"/>
+    <link href="css/page-chrome.css" rel="stylesheet"/>
+    <link href="css/inspection.css" rel="stylesheet"/>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%235b8fd4'/%3E%3Ctext x='16' y='22' font-size='14' font-family='sans-serif' fill='white' text-anchor='middle' font-weight='700'%3EFM%3C/text%3E%3C/svg%3E"/>
 </head>
 <body>
@@ -217,8 +219,15 @@
 
         <main class="main">
 
-            <!-- WORKFLOW RAIL (signature element, shown on every page) -->
-            <div class="workflow-rail" id="workflow-rail"></div>
+            <div id="app-page-chrome" class="page-chrome-block" style="display:none;">
+                <div class="page-hero card-fmms">
+                    <div class="page-hero-content">
+                        <h1 class="page-hero-title" id="page-chrome-title"></h1>
+                    </div>
+                </div>
+                <nav class="page-breadcrumb" id="page-breadcrumb" aria-label="مسیر صفحه"></nav>
+                <div class="page-wizard card-fmms" id="page-chrome-wizard" style="display:none;"></div>
+            </div>
 
             <!-- ---------------- DASHBOARD ---------------- -->
             <section class="page" id="page-dashboard">
@@ -228,6 +237,7 @@
                         <p class="dashboard-hero-sub">نمای کلی وضعیت خودروها، خرابی‌ها و تعمیرات جاری</p>
                     </div>
                 </div>
+                <nav class="page-breadcrumb" aria-label="مسیر صفحه"><span class="bc-current">داشبورد</span></nav>
 
                 <div class="kpi-grid" id="dashboard-stats"></div>
 
@@ -259,10 +269,6 @@
 
             <!-- ---------------- VEHICLES ---------------- -->
             <section class="page" id="page-vehicles">
-                <div class="page-header">
-                    <h1>خودروها</h1>
-                    <div class="sub">فهرست ناوگان و وضعیت هر خودرو در سامانه SAP</div>
-                </div>
                 <div class="table-toolbar">
                     <input type="search" id="vehicles-search" placeholder="جستجوی پلاک، VIN یا مدل…"/>
                     <select id="vehicles-status-filter">
@@ -294,28 +300,56 @@
 
             <!-- ---------------- DRIVER INSPECTION ---------------- -->
             <section class="page" id="page-inspection">
-                <div class="page-header">
-                    <h1>بازرسی روزانه خودرو</h1>
-                    <div class="sub">انتخاب خودرو، تکمیل چک‌لیست بازرسی و ثبت نتیجه</div>
-                </div>
-
-                <div class="driver-steps" id="driver-steps">
-                    <span class="driver-step-pill active" data-step="1">۱. انتخاب خودرو</span>
-                    <span class="driver-step-pill" data-step="2">۲. تکمیل چک‌لیست</span>
-                    <span class="driver-step-pill" data-step="3">۳. نتیجه</span>
+                <div class="page-wizard card-fmms" id="inspection-wizard">
+                    <div class="page-wizard-inner">
+                        <div class="page-wizard-step current" data-step="1">
+                            <span class="page-wizard-dot">1</span>
+                            <span class="page-wizard-label">انتخاب خودرو</span>
+                        </div>
+                        <div class="page-wizard-step" data-step="2">
+                            <span class="page-wizard-dot">2</span>
+                            <span class="page-wizard-label">تکمیل چک‌لیست</span>
+                        </div>
+                        <div class="page-wizard-step" data-step="3">
+                            <span class="page-wizard-dot">3</span>
+                            <span class="page-wizard-label">ثبت نتیجه</span>
+                        </div>
+                    </div>
                 </div>
 
                 <div id="driver-step-1">
                     <div class="card-fmms p-3 driver-vehicle-card">
-                        <label class="form-label">انتخاب خودرو</label>
-                        <div id="inspection-selected-vehicle" class="selected-vehicle-summary mb-3 text-muted">هنوز
-                            خودرویی انتخاب نشده است.
+                        <div class="inspection-card-header">
+                            <span class="inspection-card-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9L18 10l-2.7-3.6a1 1 0 0 0-.8-.4H9.5a1 1 0 0 0-.8.4L6 10l-2.5 1.1C2.7 11.3 2 12.1 2 13v3c0 .6.4 1 1 1h2"/>
+                                    <circle cx="7" cy="17" r="2"/>
+                                    <circle cx="17" cy="17" r="2"/>
+                                </svg>
+                            </span>
+                            <label class="form-label">انتخاب خودرو</label>
                         </div>
-                        <div class="d-flex flex-wrap gap-2 mb-2">
-                            <button class="btn btn-fmms-outline" type="button" id="inspection-open-vehicle-modal">انتخاب
+                        <div class="inspection-vehicle-body">
+                            <div id="inspection-selected-vehicle" class="selected-vehicle-summary text-muted">هنوز
+                                خودرویی انتخاب نشده است.
+                            </div>
+                            <div class="inspection-empty-state" aria-hidden="true">
+                                <div class="inspection-empty-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9L18 10l-2.7-3.6a1 1 0 0 0-.8-.4H9.5a1 1 0 0 0-.8.4L6 10l-2.5 1.1C2.7 11.3 2 12.1 2 13v3c0 .6.4 1 1 1h2"/>
+                                        <circle cx="7" cy="17" r="2"/>
+                                        <circle cx="17" cy="17" r="2"/>
+                                    </svg>
+                                </div>
+                                <h2 class="inspection-empty-title">خودرویی انتخاب نشده است</h2>
+                                <p class="inspection-empty-sub">برای شروع بازرسی، ابتدا یک خودرو را انتخاب کنید.</p>
+                            </div>
+                        </div>
+                        <div class="inspection-actions d-flex flex-wrap gap-2">
+                            <button class="btn btn-fmms-primary" type="button" id="inspection-open-vehicle-modal">انتخاب
                                 خودرو
                             </button>
-                            <button class="btn btn-fmms-primary" type="button" id="inspection-start-btn" disabled>شروع
+                            <button class="btn btn-fmms-outline" type="button" id="inspection-start-btn" disabled>شروع
                                 بازرسی
                             </button>
                         </div>
@@ -341,19 +375,11 @@
 
             <!-- ---------------- DRIVER HANDOVER ---------------- -->
             <section class="page" id="page-handover">
-                <div class="page-header">
-                    <h1>تایید تحویل خودرو</h1>
-                    <div class="sub">تایید یا رد خودرو پس از اتمام تعمیر</div>
-                </div>
                 <div id="handover-list"></div>
             </section>
 
             <!-- ---------------- FAULTS / DISTRIBUTION ---------------- -->
             <section class="page" id="page-faults">
-                <div class="page-header">
-                    <h1>خرابی‌ها</h1>
-                    <div class="sub">فهرست خرابی‌های ثبت‌شده — باز، بسته‌شده و تاریخچه خودرو</div>
-                </div>
                 <div class="faults-toolbar card-fmms p-3 mb-3">
                     <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
                         <span class="small text-muted me-1">نمایش:</span>
@@ -399,10 +425,6 @@
             </section>
 
             <section class="page" id="page-distribution">
-                <div class="page-header">
-                    <h1>بررسی خرابی‌ها و تصمیم استفاده از خودرو</h1>
-                    <div class="sub">تصمیم سرپرست توزیع درباره قابل‌استفاده بودن خودرو دارای خرابی</div>
-                </div>
                 <div class="table-fmms-wrap">
                     <table class="table-fmms">
                         <thead>
@@ -422,10 +444,6 @@
             <!-- ---------------- TRANSPORT ---------------- -->
             <section class="page" id="page-transport">
                 <div class="transport-view" data-transport-view="repairs">
-                    <div class="page-header">
-                        <h1>درخواست‌های تعمیر</h1>
-                        <div class="sub">تایید سرپرست ترابری و انتخاب نوع تعمیرگاه — همه خودروها</div>
-                    </div>
                     <div class="faults-toolbar card-fmms p-3 mb-3">
                         <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
                             <span class="small text-muted me-1">نمایش:</span>
@@ -467,20 +485,12 @@
                 </div>
 
                 <div class="transport-view" data-transport-view="materials" style="display:none;">
-                    <div class="page-header">
-                        <h1>درخواست‌های قطعه</h1>
-                        <div class="sub">بررسی و تایید درخواست‌های قطعه ثبت‌شده توسط تعمیرگاه</div>
-                    </div>
                     <div class="card-fmms p-3">
                         <div id="transport-material-requests"></div>
                     </div>
                 </div>
 
                 <div class="transport-view" data-transport-view="invoices" style="display:none;">
-                    <div class="page-header">
-                        <h1>فاکتورهای خارجی</h1>
-                        <div class="sub">تایید فاکتورهای تعمیرگاه‌های خارجی</div>
-                    </div>
                     <div class="card-fmms p-3">
                         <div id="transport-external-invoices"></div>
                     </div>
@@ -490,10 +500,6 @@
             <!-- ---------------- WORKSHOP ---------------- -->
             <section class="page" id="page-workshop">
                 <div class="workshop-view" data-workshop-view="orders">
-                    <div class="page-header">
-                        <h1>دستورات تعمیر</h1>
-                        <div class="sub">پذیرش/رد تعمیر، شروع کار، درخواست قطعه، تکمیل و فاکتور خارجی</div>
-                    </div>
                     <div class="table-fmms-wrap">
                         <table class="table-fmms">
                             <thead>
@@ -512,20 +518,12 @@
                 </div>
 
                 <div class="workshop-view" data-workshop-view="materials" style="display:none;">
-                    <div class="page-header">
-                        <h1>درخواست قطعه</h1>
-                        <div class="sub">فهرست درخواست‌های قطعه ثبت‌شده برای دستورات تعمیر</div>
-                    </div>
                     <div class="card-fmms p-3">
                         <div id="workshop-material-requests"></div>
                     </div>
                 </div>
 
                 <div class="workshop-view" data-workshop-view="history" style="display:none;">
-                    <div class="page-header">
-                        <h1>تاریخچه تعمیرات</h1>
-                        <div class="sub">مرور رویدادها و مراحل جریان برای هر دستور تعمیر</div>
-                    </div>
                     <div class="card-fmms p-3">
                         <div id="workshop-history-list"></div>
                     </div>
@@ -534,10 +532,6 @@
 
             <!-- ---------------- SAP ---------------- -->
             <section class="page" id="page-sap">
-                <div class="page-header">
-                    <h1>یکپارچه‌سازی SAP</h1>
-                    <div class="sub">وضعیت تراکنش‌های ارسال‌شده به SAP</div>
-                </div>
                 <div class="table-fmms-wrap">
                     <table class="table-fmms">
                         <thead>

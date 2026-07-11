@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Inspection Preview</title>
+  <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet"/>
+  <link href="css/style.css" rel="stylesheet"/>
+  <link href="css/page-chrome.css" rel="stylesheet"/>
+  <link href="css/inspection.css" rel="stylesheet"/>
+  <style>
+    body { margin: 0; font-family: Vazirmatn, Tahoma, sans-serif; }
+    .main { background: #f7f9fc; padding: 32px; max-width: 960px; margin: 0 auto; }
+    #app-page-chrome .page-hero { background: #fff; border: none; box-shadow: 0 1px 3px rgba(15,23,42,.06); }
+    #app-page-chrome .page-hero-content { padding: 14px 24px 12px; border-inline-start: 3px solid #2FA66A; }
+    #app-page-chrome .page-hero-title { font-size: 28px; }
+    #app-page-chrome .page-breadcrumb { margin: 12px 0 20px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="main">
+    <div id="app-page-chrome" class="page-chrome-block">
+      <div class="page-hero card-fmms"><div class="page-hero-content"><h1 class="page-hero-title">بازرسی روزانه خودرو</h1></div></div>
+      <nav class="page-breadcrumb"><a href="#">داشبورد</a><span class="bc-sep">/</span><span>راننده</span><span class="bc-sep">/</span><span class="bc-current">بازرسی روزانه خودرو</span></nav>
+    </div>
+
+    <section class="page" id="page-inspection" style="display:block;">
+      <div class="page-wizard card-fmms" id="inspection-wizard">
+        <div class="page-wizard-inner">
+          <div class="page-wizard-step current" data-step="1"><span class="page-wizard-dot">1</span><span class="page-wizard-label">انتخاب خودرو</span></div>
+          <div class="page-wizard-step" data-step="2"><span class="page-wizard-dot">2</span><span class="page-wizard-label">تکمیل چک‌لیست</span></div>
+          <div class="page-wizard-step" data-step="3"><span class="page-wizard-dot">3</span><span class="page-wizard-label">ثبت نتیجه</span></div>
+        </div>
+      </div>
+
+      <div id="driver-step-1">
+        <div class="card-fmms p-3 driver-vehicle-card">
+          <div class="inspection-card-header">
+            <span class="inspection-card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9L18 10l-2.7-3.6a1 1 0 0 0-.8-.4H9.5a1 1 0 0 0-.8.4L6 10l-2.5 1.1C2.7 11.3 2 12.1 2 13v3c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+            </span>
+            <label class="form-label">انتخاب خودرو</label>
+          </div>
+          <div class="inspection-vehicle-body">
+            <div id="inspection-selected-vehicle" class="selected-vehicle-summary text-muted">placeholder</div>
+            <div class="inspection-empty-state">
+              <div class="inspection-empty-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9L18 10l-2.7-3.6a1 1 0 0 0-.8-.4H9.5a1 1 0 0 0-.8.4L6 10l-2.5 1.1C2.7 11.3 2 12.1 2 13v3c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+              </div>
+              <h2 class="inspection-empty-title">خودرویی انتخاب نشده است</h2>
+              <p class="inspection-empty-sub">برای شروع بازرسی، ابتدا یک خودرو را انتخاب کنید.</p>
+            </div>
+          </div>
+          <div class="inspection-actions d-flex flex-wrap gap-2">
+            <button class="btn btn-fmms-primary" type="button">انتخاب خودرو</button>
+            <button class="btn btn-fmms-outline" type="button" disabled>شروع بازرسی</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>
