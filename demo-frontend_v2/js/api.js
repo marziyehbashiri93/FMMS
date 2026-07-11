@@ -1139,6 +1139,8 @@ window.FMMS = window.FMMS || {};
     purchaseRequisition: true,
     materialRequest: true,
     vehicleHandover: true,
+    transportHandoverApproval: false,
+    transportHandoverReject: false,
     externalInvoice: true,
     workshopAcceptReject: true,
     faultReporterName: true,

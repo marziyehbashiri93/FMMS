@@ -14,6 +14,7 @@ window.FMMS = window.FMMS || {};
     faults: { domPage: "faults", group: null },
     distribution: { domPage: "distribution", group: "distribution" },
     "transport-repairs": { domPage: "transport", group: "transport", transportView: "repairs" },
+    "transport-handover": { domPage: "transport-handover", group: "transport" },
     "transport-materials": { domPage: "transport", group: "transport", transportView: "materials" },
     "transport-invoices": { domPage: "transport", group: "transport", transportView: "invoices" },
     transport: { domPage: "transport", group: "transport", transportView: "repairs" },
@@ -38,10 +39,16 @@ window.FMMS = window.FMMS || {};
       breadcrumb: ["داشبورد", "توزیع", "درخواست‌های تعمیر"],
     },
     "transport-repairs": {
-      title: "درخواست‌های تعمیر",
-      breadcrumb: ["داشبورد", "ترابری", "درخواست‌های تعمیر"],
+      title: "تایید درخواست تعمیر",
+      breadcrumb: ["داشبورد", "ترابری", "تایید درخواست تعمیر"],
       wizard: ["بررسی درخواست", "تصمیم", "تخصیص"],
       wizardStep: 1,
+    },
+    "transport-handover": {
+      title: "تایید تحویل خودرو",
+      breadcrumb: ["داشبورد", "ترابری", "تایید تحویل خودرو"],
+      wizard: ["تایید راننده", "بررسی ترابری", "بازگشت به ناوگان"],
+      wizardStep: 2,
     },
     "transport-materials": {
       title: "درخواست‌های قطعه",
@@ -77,7 +84,7 @@ window.FMMS = window.FMMS || {};
   const GROUP_PAGES = {
     driver: ["inspection", "handover"],
     distribution: ["distribution"],
-    transport: ["transport-repairs", "transport-materials", "transport-invoices"],
+    transport: ["transport-repairs", "transport-handover", "transport-materials", "transport-invoices"],
     workshop: ["workshop-orders", "workshop-materials", "workshop-history"],
     sap: ["sap"],
   };
@@ -86,7 +93,7 @@ window.FMMS = window.FMMS || {};
     MANAGER: null,
     DRIVER: ["dashboard", "inspection", "handover"],
     DISTRIBUTION: ["dashboard", "distribution"],
-    TRANSPORT: ["dashboard", "transport-repairs", "transport-materials", "transport-invoices"],
+    TRANSPORT: ["dashboard", "transport-repairs", "transport-handover", "transport-materials", "transport-invoices"],
     WORKSHOP: ["dashboard", "workshop-orders", "workshop-materials", "workshop-history"],
   };
 
@@ -263,6 +270,7 @@ window.FMMS = window.FMMS || {};
       vehicles: FMMS.pages.vehicles?.render,
       inspection: FMMS.pages.inspection?.render,
       handover: FMMS.pages.handover?.render,
+      "transport-handover": FMMS.pages.transportHandover?.render,
       faults: FMMS.pages.faults?.render,
       distribution: FMMS.pages.faults?.renderDistribution,
       "transport-repairs": () => FMMS.pages.repair?.renderTransport("repairs"),

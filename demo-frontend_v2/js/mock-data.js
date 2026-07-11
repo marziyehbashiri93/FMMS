@@ -270,6 +270,17 @@
     completed_at: now(),
   });
   DB.vehicleHandovers.push({
+    id: "ho-completed-1025",
+    repair_order_id: "ro-completed-1025",
+    vehicle_id: "veh-1025",
+    status: "ACCEPTED",
+    created_at: new Date(Date.now() - 86400000 * 7).toISOString(),
+    updated_at: new Date(Date.now() - 86400000 * 7).toISOString(),
+    comment: "OK",
+    driver_id: "driver-demo",
+    confirmed_at: new Date(Date.now() - 86400000 * 7).toISOString(),
+  });
+  DB.vehicleHandovers.push({
     id: "ho-1050",
     repair_order_id: "ro-handover-1050",
     vehicle_id: "veh-1050",

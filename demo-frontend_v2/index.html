@@ -150,7 +150,13 @@
                             <span class="nav-sublink-icon" aria-hidden="true">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h4"/></svg>
                             </span>
-                            <span class="nav-label">درخواست‌های تعمیر</span>
+                            <span class="nav-label">تایید درخواست تعمیر</span>
+                        </a>
+                        <a class="nav-sublink" data-page="transport-handover">
+                            <span class="nav-sublink-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 7.5 18 10l-6 6-3-3 2.5-2.5"/><path d="M6 18h12"/><path d="M7 14l-2 2v2h2l2-2"/></svg>
+                            </span>
+                            <span class="nav-label">تایید تحویل خودرو</span>
                         </a>
                         <a class="nav-sublink" data-page="transport-materials">
                             <span class="nav-sublink-icon" aria-hidden="true">
@@ -500,6 +506,28 @@
                 </div>
             </section>
 
+            <!-- ---------------- TRANSPORT HANDOVER APPROVAL ---------------- -->
+            <section class="page" id="page-transport-handover">
+                <div class="card-fmms p-3 mb-3">
+                    <div id="transport-handover-hint" class="small text-muted"></div>
+                </div>
+                <div class="table-fmms-wrap mb-3">
+                    <table class="table-fmms">
+                        <thead>
+                        <tr>
+                            <th>خودرو</th>
+                            <th>دستور تعمیر</th>
+                            <th>تعمیرگاه</th>
+                            <th>نوع تعمیر</th>
+                            <th>وضعیت</th>
+                            <th>عملیات</th>
+                        </tr>
+                        </thead>
+                        <tbody id="transport-handover-tbody"></tbody>
+                    </table>
+                </div>
+            </section>
+
             <!-- ---------------- WORKSHOP ---------------- -->
             <section class="page" id="page-workshop">
                 <div class="workshop-view" data-workshop-view="orders">
@@ -670,6 +698,7 @@
 <script src="js/vehicles.js"></script>
 <script src="js/inspection.js"></script>
 <script src="js/handover.js"></script>
+<script src="js/transport-handover.js"></script>
 <script src="js/faults.js"></script>
 <script src="js/repair.js"></script>
 <script src="js/sap.js"></script>
