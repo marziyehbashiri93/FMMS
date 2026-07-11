@@ -41,7 +41,7 @@ FMMS.pages = FMMS.pages || {};
     { key: "FAULT_CREATED", label: "خرابی ثبت شد" },
     { key: "TRANSPORT_APPROVED", label: "تایید ترابری" },
     { key: "WORKSHOP_ASSIGNED", label: "تخصیص تعمیرگاه" },
-    { key: "TECHNICIAN_ACCEPTED", label: "تایید تعمیرکار", alt: ["REPAIR_STARTED"] },
+    { key: "TECHNICIAN_ACCEPTED", label: "تایید تعمیرکار" },
     { key: "REPAIR_STARTED", label: "شروع تعمیر" },
     { key: "MATERIAL_REQUESTED", label: "درخواست قطعه", optional: true },
     { key: "REPAIR_COMPLETED", label: "پایان تعمیر" },
@@ -49,28 +49,48 @@ FMMS.pages = FMMS.pages || {};
     { key: "VEHICLE_ACTIVE", label: "فعال‌سازی خودرو", derived: true },
   ];
 
+  /** Last completed checklist step index derived from API repair-order status. */
+  const STATUS_STEP_DONE_THROUGH = {
+    CREATED: 0,
+    APPROVED: 1,
+    WORKSHOP_ASSIGNED: 2,
+    WAITING_WORKSHOP_CONFIRMATION: 3,
+    ASSIGNED: 3,
+    IN_PROGRESS: 4,
+    WAITING_PARTS: 4,
+    WAITING_DRIVER_CONFIRMATION: 6,
+    COMPLETED: 6,
+    ACCEPTED_BY_DRIVER: 8,
+    REJECTED_BY_DRIVER: 7,
+    CANCELLED: -1,
+  };
+
   function renderWorkflowChecklist(events, order) {
     const eventSet = new Set((events || []).map((e) => e.event));
-    if (order?.status === "ACCEPTED_BY_DRIVER") eventSet.add("VEHICLE_ACTIVE");
+    const status = order?.status;
+    const doneThrough = STATUS_STEP_DONE_THROUGH[status] ?? -1;
     let currentFound = false;
-    return `<div class="workflow-checklist">${WORKFLOW_STEPS.map((step) => {
+    return `<div class="workflow-checklist">${WORKFLOW_STEPS.map((step, stepIndex) => {
       const done =
+        stepIndex <= doneThrough ||
         eventSet.has(step.key) ||
         (step.alt || []).some((k) => eventSet.has(k)) ||
-        (step.key === "VEHICLE_ACTIVE" && order?.status === "ACCEPTED_BY_DRIVER");
+        (step.key === "VEHICLE_ACTIVE" && status === "ACCEPTED_BY_DRIVER");
       let icon = "○";
       let cls = "pending";
       if (done) {
         icon = "✓";
         cls = "done";
-      } else if (!currentFound && !step.optional) {
-        icon = "⏳";
-        cls = "current";
-        currentFound = true;
-      } else if (!currentFound && step.optional && eventSet.has("REPAIR_STARTED") && !eventSet.has("REPAIR_COMPLETED")) {
-        icon = "⏳";
-        cls = "current";
-        currentFound = true;
+      } else if (!currentFound) {
+        const partsPhase = status === "IN_PROGRESS" || status === "WAITING_PARTS";
+        if (step.optional && !(partsPhase && step.key === "MATERIAL_REQUESTED")) {
+          icon = "○";
+          cls = "pending";
+        } else {
+          icon = "●";
+          cls = "current";
+          currentFound = true;
+        }
       }
       return `<div class="workflow-checklist-item ${cls}"><span class="wf-check-icon">${icon}</span>${FMMS.ui.escapeHtml(step.label)}</div>`;
     }).join("")}</div>`;
@@ -122,13 +142,16 @@ FMMS.pages = FMMS.pages || {};
     document.getElementById("timeline-modal-body").innerHTML = `<div class="text-muted">در حال بارگذاری…</div>`;
     getTimelineModal().show();
     try {
-      const events = await FMMS.api.getRepairTimeline(order.id);
+      const [events, freshOrder] = await Promise.all([
+        FMMS.api.getRepairTimeline(order.id),
+        FMMS.api.getRepairOrder(order.id),
+      ]);
       const labeled = events.map((e) => ({
         ...e,
         event: EVENT_LABELS[e.event] || e.event,
       }));
       document.getElementById("timeline-modal-body").innerHTML =
-        `<div class="mb-3"><div class="modal-section-title">مراحل جریان</div>${renderWorkflowChecklist(events, order)}</div>` +
+        `<div class="mb-3"><div class="modal-section-title">مراحل جریان</div>${renderWorkflowChecklist(events, freshOrder)}</div>` +
         `<div class="modal-section-title">رویدادهای ثبت‌شده</div>${FMMS.ui.renderTimeline(labeled)}`;
     } catch (err) {
       document.getElementById("timeline-modal-body").innerHTML = `<div class="text-danger">${FMMS.ui.escapeHtml(err.message)}</div>`;
@@ -793,7 +816,11 @@ FMMS.pages = FMMS.pages || {};
     }
   }
 
-  const WORKSHOP_START_STATUSES = new Set(["WORKSHOP_ASSIGNED", "ASSIGNED"]);
+  const WORKSHOP_START_STATUSES = new Set([
+    "WORKSHOP_ASSIGNED",
+    "ASSIGNED",
+    "WAITING_WORKSHOP_CONFIRMATION",
+  ]);
 
   async function enrichWorkshopOrders(orders) {
     return Promise.all(
@@ -822,6 +849,9 @@ FMMS.pages = FMMS.pages || {};
     }
     if (order.status === "WORKSHOP_ASSIGNED" && isExternal && canShowStartRepair(order)) {
       actions.push(`<button class="btn btn-fmms-primary btn-sm" data-action="start">شروع تعمیر خارجی</button>`);
+    }
+    if (order.status === "WAITING_WORKSHOP_CONFIRMATION" && isInternal && canShowStartRepair(order)) {
+      actions.push(`<button class="btn btn-fmms-primary btn-sm" data-action="start">شروع تعمیر</button>`);
     }
     if (order.status === "ASSIGNED" && canShowStartRepair(order)) {
       actions.push(`<button class="btn btn-fmms-primary btn-sm" data-action="start">شروع تعمیر</button>`);
@@ -973,6 +1003,8 @@ FMMS.pages = FMMS.pages || {};
         tbody.innerHTML = relevant.length
           ? relevant.map(workshopRow).join("")
           : `<tr><td colspan="6"><div class="empty-state"><div class="title">کاری در تعمیرگاه در جریان نیست</div></div></td></tr>`;
+
+        FMMS.shell.refreshWorkshopWizard?.(relevant);
 
         tbody.querySelectorAll("tr[data-id]").forEach((tr) => {
           const order = relevant.find((r) => r.id === tr.dataset.id);

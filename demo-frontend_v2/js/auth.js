@@ -25,7 +25,7 @@ window.FMMS = window.FMMS || {};
     CREATED: ["ایجادشده", "gray"],
     APPROVED: ["تاییدشده", "blue"],
     WORKSHOP_ASSIGNED: ["تعمیرگاه تخصیص یافته", "blue"],
-    WAITING_WORKSHOP_CONFIRMATION: ["منتظر تایید تعمیرگاه", "amber"],
+    WAITING_WORKSHOP_CONFIRMATION: ["آماده شروع تعمیر", "amber"],
     WAITING_PARTS: ["منتظر قطعه", "amber"],
     IN_PROGRESS: ["در حال انجام", "orange"],
     WAITING_DRIVER_CONFIRMATION: ["منتظر تایید راننده", "blue"],

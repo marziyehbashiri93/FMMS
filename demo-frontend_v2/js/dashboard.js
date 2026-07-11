@@ -331,7 +331,23 @@ window.FMMS = window.FMMS || {};
     navigate(initial);
   }
 
-  FMMS.shell = { init, navigate, applyRoleVisibility, getCurrentPage: () => currentPage };
+  function refreshWorkshopWizard(orders) {
+    if (currentPage !== "workshop-orders") return;
+    const cfg = PAGE_CHROME["workshop-orders"];
+    if (!cfg?.wizard?.length) return;
+    const wizardEl = document.getElementById("page-chrome-wizard");
+    if (!wizardEl) return;
+    wizardEl.style.display = "block";
+    wizardEl.innerHTML = renderLocalWizardHtml(cfg.wizard, deriveWorkshopWizardStep(orders));
+  }
+
+  FMMS.shell = {
+    init,
+    navigate,
+    applyRoleVisibility,
+    getCurrentPage: () => currentPage,
+    refreshWorkshopWizard,
+  };
 
   /** Derive human-readable workflow stage for dashboard cards. */
   function workflowStageLabel(vehicle, fault, repairOrder) {
@@ -367,7 +383,24 @@ window.FMMS = window.FMMS || {};
     return FMMS.ui.badge(vehicle?.status || "—");
   }
 
-  FMMS.workflow = { workflowStageLabel, vehicleStatusSummary };
+  FMMS.workflow = { workflowStageLabel, vehicleStatusSummary, deriveWorkshopWizardStep };
+
+  function deriveWorkshopWizardStep(orders) {
+    if (!orders?.length) return 1;
+    const stepByStatus = {
+      WORKSHOP_ASSIGNED: 1,
+      WAITING_WORKSHOP_CONFIRMATION: 2,
+      ASSIGNED: 2,
+      IN_PROGRESS: 3,
+      WAITING_PARTS: 3,
+      WAITING_DRIVER_CONFIRMATION: 4,
+      COMPLETED: 4,
+      ACCEPTED_BY_DRIVER: 4,
+      REJECTED_BY_DRIVER: 4,
+      CANCELLED: 1,
+    };
+    return orders.reduce((max, order) => Math.max(max, stepByStatus[order.status] || 1), 1);
+  }
 
   FMMS.pages = FMMS.pages || {};
 
