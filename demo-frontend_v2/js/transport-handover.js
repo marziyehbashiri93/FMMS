@@ -119,6 +119,26 @@ FMMS.pages = FMMS.pages || {};
     bootstrap.Modal.getInstance(document.getElementById("detail-modal"))?.hide();
   }
 
+  async function approveOrder(orderId) {
+    if (FMMS.api.capabilities.transportHandoverApproval) {
+      FMMS.ui.toast("API تایید ترابری هنوز پیاده‌سازی نشده است.", "error");
+      return false;
+    }
+    setReviewed(orderId, "approved");
+    FMMS.ui.toast("تایید صحت تعمیر ثبت شد.");
+    return true;
+  }
+
+  async function rejectOrder(orderId) {
+    if (FMMS.api.capabilities.transportHandoverReject) {
+      FMMS.ui.toast("API رد تعمیر ترابری هنوز پیاده‌سازی نشده است.", "error");
+      return false;
+    }
+    setReviewed(orderId, "rejected");
+    FMMS.ui.toast("رد تعمیر ثبت شد.");
+    return true;
+  }
+
   async function showDetail(order) {
     FMMS.ui.openDetailModalLoading("جزئیات تایید تحویل خودرو");
     try {
@@ -184,15 +204,12 @@ FMMS.pages = FMMS.pages || {};
         const btn = e.currentTarget;
         btn.disabled = true;
         try {
-          if (FMMS.api.capabilities.transportHandoverApproval) {
-            FMMS.ui.toast("API تایید ترابری هنوز پیاده‌سازی نشده است.", "error");
+          if (await approveOrder(fullOrder.id)) {
+            hideDetailModal();
+            await render();
+          } else {
             btn.disabled = false;
-            return;
           }
-          setReviewed(fullOrder.id, "approved");
-          FMMS.ui.toast("تایید صحت تعمیر در UI ثبت شد (بدون API بک‌اند).");
-          hideDetailModal();
-          await render();
         } catch (err) {
           FMMS.ui.toast(err.message, "error");
           btn.disabled = false;
@@ -203,15 +220,12 @@ FMMS.pages = FMMS.pages || {};
         const btn = e.currentTarget;
         btn.disabled = true;
         try {
-          if (FMMS.api.capabilities.transportHandoverReject) {
-            FMMS.ui.toast("API رد تعمیر ترابری هنوز پیاده‌سازی نشده است.", "error");
+          if (await rejectOrder(fullOrder.id)) {
+            hideDetailModal();
+            await render();
+          } else {
             btn.disabled = false;
-            return;
           }
-          setReviewed(fullOrder.id, "rejected");
-          FMMS.ui.toast("رد تعمیر در UI ثبت شد (بدون API بک‌اند).");
-          hideDetailModal();
-          await render();
         } catch (err) {
           FMMS.ui.toast(err.message, "error");
           btn.disabled = false;
@@ -231,11 +245,50 @@ FMMS.pages = FMMS.pages || {};
       <td>${order.workshop_type ? workshopTypeLabel(order.workshop_type) : "—"}</td>
       <td>${FMMS.ui.badge(order.status)}</td>
       <td>
-        <div class="d-flex flex-wrap gap-1">
+        <div class="d-flex flex-wrap gap-1 align-items-center">
           <button type="button" class="btn btn-fmms-outline btn-sm" data-action="detail">مشاهده جزئیات</button>
+          <button type="button" class="btn btn-fmms-success btn-sm" data-action="approve">تایید صحت تعمیر</button>
+          <button type="button" class="btn btn-fmms-danger btn-sm" data-action="reject">رد تعمیر</button>
         </div>
       </td>
     </tr>`;
+  }
+
+  function wireTableActions(orders) {
+    const tbody = document.getElementById("transport-handover-tbody");
+    if (!tbody) return;
+    tbody.querySelectorAll("[data-ro-id]").forEach((tr) => {
+      const id = tr.dataset.roId;
+      const order = orders.find((o) => o.id === id);
+      if (!order) return;
+
+      tr.querySelector('[data-action="detail"]')?.addEventListener("click", () => showDetail(order));
+
+      tr.querySelector('[data-action="approve"]')?.addEventListener("click", async (e) => {
+        const btn = e.currentTarget;
+        btn.disabled = true;
+        try {
+          if (await approveOrder(order.id)) await render();
+          else btn.disabled = false;
+        } catch (err) {
+          FMMS.ui.toast(err.message, "error");
+          btn.disabled = false;
+        }
+      });
+
+      tr.querySelector('[data-action="reject"]')?.addEventListener("click", async (e) => {
+        const btn = e.currentTarget;
+        if (!window.confirm("آیا از رد تعمیر این خودرو اطمینان دارید؟")) return;
+        btn.disabled = true;
+        try {
+          if (await rejectOrder(order.id)) await render();
+          else btn.disabled = false;
+        } catch (err) {
+          FMMS.ui.toast(err.message, "error");
+          btn.disabled = false;
+        }
+      });
+    });
   }
 
   async function render() {
@@ -257,13 +310,7 @@ FMMS.pages = FMMS.pages || {};
       }
 
       tbody.innerHTML = orders.map(tableRow).join("");
-      tbody.querySelectorAll("[data-ro-id]").forEach((tr) => {
-        const id = tr.dataset.roId;
-        const order = orders.find((o) => o.id === id);
-        tr.querySelector('[data-action="detail"]')?.addEventListener("click", () => {
-          if (order) showDetail(order);
-        });
-      });
+      wireTableActions(orders);
     } catch (err) {
       tbody.innerHTML = `<tr><td colspan="6" class="text-danger py-3">${FMMS.ui.escapeHtml(err.message)}</td></tr>`;
       FMMS.ui.toast(err.message, "error");

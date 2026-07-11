@@ -267,3 +267,107 @@ class TestDriverInspectionWorkflowAPI:
         assert len(retrieved.data["items"]) == 2
         components = {item["component"] for item in retrieved.data["items"]}
         assert components == {"Front light", "Refrigerator"}
+
+
+class TestDistributionUsableWorkflowAPI:
+    """Distribution usable closes fault and cancels early repair orders."""
+
+    def test_distribution_usable_allows_next_driver_inspection(
+        self, authenticated_client: APIClient
+    ) -> None:
+        vehicle = create_vehicle(
+            authenticated_client, plate="12USE001", vin="1HGCM82633A004371"
+        )
+        created = authenticated_client.post(
+            "/api/v1/inspections/",
+            {
+                "vehicle_id": vehicle["id"],
+                "inspection_type": "PRE_TRIP",
+                "odometer_value": 1000,
+                "odometer_unit": "KM",
+                "inspected_at": datetime.now(tz=UTC).isoformat(),
+                "items": [
+                    {
+                        "category": "LIGHTS",
+                        "description": "Front light",
+                        "result": "FAIL",
+                        "notes": "Broken",
+                        "severity": "MEDIUM",
+                    }
+                ],
+            },
+            format="json",
+        )
+        assert created.status_code == 201, created.data
+
+        submitted = authenticated_client.post(
+            f"/api/v1/inspections/{created.data['id']}/submit/", {}, format="json"
+        )
+        assert submitted.status_code == 200, submitted.data
+        assert submitted.data["has_failures"] is True
+
+        faults = authenticated_client.get(f"/api/v1/faults/?vehicle_id={vehicle['id']}")
+        assert faults.status_code == 200
+        assert faults.data["count"] == 1
+        fault = faults.data["results"][0]
+        assert fault["status"] == "OPEN"
+
+        orders = authenticated_client.get(
+            f"/api/v1/repair-orders/?vehicle_id={vehicle['id']}"
+        )
+        assert orders.status_code == 200
+        assert orders.data["count"] == 1
+        order = orders.data["results"][0]
+        assert order["status"] == "CREATED"
+
+        vehicle_detail = authenticated_client.get(f"/api/v1/vehicles/{vehicle['id']}/")
+        assert vehicle_detail.data["status"] == VehicleStatus.ACTIVE.value
+
+        closed = authenticated_client.post(
+            f"/api/v1/faults/{fault['id']}/close/", {}, format="json"
+        )
+        assert closed.status_code == 200, closed.data
+        assert closed.data["status"] == "CLOSED"
+
+        cancelled = authenticated_client.get(f"/api/v1/repair-orders/{order['id']}/")
+        assert cancelled.status_code == 200
+        assert cancelled.data["status"] == "CANCELLED"
+
+        timeline = authenticated_client.get(
+            f"/api/v1/repair-orders/{order['id']}/timeline/"
+        )
+        assert timeline.status_code == 200, timeline.data
+        events = {item["event"] for item in timeline.data}
+        assert "DISTRIBUTION_APPROVED_USABLE" in events
+
+        vehicle_after = authenticated_client.get(f"/api/v1/vehicles/{vehicle['id']}/")
+        assert vehicle_after.data["status"] == VehicleStatus.ACTIVE.value
+
+        next_inspection = authenticated_client.post(
+            "/api/v1/inspections/",
+            {
+                "vehicle_id": vehicle["id"],
+                "inspection_type": "PRE_TRIP",
+                "odometer_value": 1100,
+                "odometer_unit": "KM",
+                "inspected_at": datetime.now(tz=UTC).isoformat(),
+                "items": [
+                    {
+                        "category": "SAFETY",
+                        "description": "Seat belt",
+                        "result": "PASS",
+                    }
+                ],
+            },
+            format="json",
+        )
+        assert next_inspection.status_code == 201, next_inspection.data
+
+        next_submitted = authenticated_client.post(
+            f"/api/v1/inspections/{next_inspection.data['id']}/submit/",
+            {},
+            format="json",
+        )
+        assert next_submitted.status_code == 200, next_submitted.data
+        assert next_submitted.data["status"] == "SUBMITTED"
+        assert next_submitted.data["has_failures"] is False

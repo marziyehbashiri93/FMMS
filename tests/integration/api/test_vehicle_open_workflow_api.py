@@ -130,18 +130,25 @@ class TestVehicleOpenWorkflowAPI:
         assert response.data["error_code"] == VEHICLE_OPEN_FLOW_ERROR_CODE
         assert response.data["message"] == VEHICLE_OPEN_FLOW_MESSAGE
 
-    def test_submit_failed_inspection_rejected_when_open_repair_exists(
+    def test_submit_failed_inspection_allowed_after_distribution_usable_close(
         self, authenticated_client: APIClient
     ) -> None:
         vehicle = create_vehicle(
             authenticated_client, plate="12WF003", vin="1HGCM82633A004503"
         )
         _, order = _open_fault_and_repair(authenticated_client, vehicle["id"])
-        authenticated_client.post(
+        closed = authenticated_client.post(
             f"/api/v1/faults/{order['fault_id']}/close/",
             {},
             format="json",
         )
+        assert closed.status_code == 200, closed.data
+        assert closed.data["status"] == "CLOSED"
+
+        cancelled = authenticated_client.get(f"/api/v1/repair-orders/{order['id']}/")
+        assert cancelled.status_code == 200
+        assert cancelled.data["status"] == "CANCELLED"
+
         inspection_id = _create_inspection_with_fail_items(
             authenticated_client, vehicle["id"], fail_count=1
         )
@@ -152,8 +159,8 @@ class TestVehicleOpenWorkflowAPI:
             format="json",
         )
 
-        assert response.status_code == 422, response.data
-        assert response.data["error_code"] == VEHICLE_OPEN_FLOW_ERROR_CODE
+        assert response.status_code == 200, response.data
+        assert response.data["has_failures"] is True
 
     def test_report_fault_rejected_when_open_fault_exists(
         self, authenticated_client: APIClient
@@ -177,32 +184,37 @@ class TestVehicleOpenWorkflowAPI:
         assert response.status_code == 422, response.data
         assert response.data["error_code"] == VEHICLE_OPEN_FLOW_ERROR_CODE
 
-    def test_report_fault_rejected_when_open_repair_exists(
+    def test_report_fault_allowed_after_distribution_usable_close(
         self, authenticated_client: APIClient
     ) -> None:
         vehicle = create_vehicle(
             authenticated_client, plate="12WF005", vin="1HGCM82633A004505"
         )
-        fault, _ = _open_fault_and_repair(authenticated_client, vehicle["id"])
-        authenticated_client.post(
+        fault, order = _open_fault_and_repair(authenticated_client, vehicle["id"])
+        closed = authenticated_client.post(
             f"/api/v1/faults/{fault['id']}/close/",
             {},
             format="json",
         )
+        assert closed.status_code == 200, closed.data
+
+        cancelled = authenticated_client.get(f"/api/v1/repair-orders/{order['id']}/")
+        assert cancelled.status_code == 200
+        assert cancelled.data["status"] == "CANCELLED"
 
         response = authenticated_client.post(
             "/api/v1/faults/",
             {
                 "vehicle_id": vehicle["id"],
                 "code": "DUP-02",
-                "description": "Blocked by open repair",
+                "description": "Fresh fault after distribution usable",
                 "severity": "LOW",
             },
             format="json",
         )
 
-        assert response.status_code == 422, response.data
-        assert response.data["error_code"] == VEHICLE_OPEN_FLOW_ERROR_CODE
+        assert response.status_code == 201, response.data
+        assert response.data["status"] == "OPEN"
 
     def test_new_fault_allowed_after_workflow_closed(
         self, authenticated_client: APIClient

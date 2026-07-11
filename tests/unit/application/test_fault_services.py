@@ -30,7 +30,10 @@ from apps.fault.domain.exceptions import (
 )
 from apps.fault.domain.interfaces.fault_repository import IFaultRepository
 from apps.fault.domain.value_objects import FaultCode, FaultDescription, FaultSeverity
-from apps.repair.domain.entities import RepairOrder, RepairOrderStatus
+from apps.repair.domain.entities import (
+    RepairOrder,
+    RepairOrderStatus,
+)
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
 from apps.vehicle.domain.entities import Vehicle, VehicleCategory, VehicleStatus
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
@@ -58,6 +61,34 @@ def _make_vehicle() -> Vehicle:
     )
 
 
+def _make_repair_order(
+    *,
+    fault_id: uuid.UUID,
+    vehicle_id: uuid.UUID | None = None,
+    status: RepairOrderStatus = RepairOrderStatus.CREATED,
+) -> RepairOrder:
+    now = datetime.now(tz=UTC)
+    return RepairOrder(
+        id=uuid.uuid4(),
+        vehicle_id=vehicle_id or uuid.uuid4(),
+        fault_id=fault_id,
+        status=status,
+        created_by_id=uuid.uuid4(),
+        created_at=now,
+        updated_at=now,
+    )
+
+
+def _close_fault_service(
+    fault_repo: FakeFaultRepository,
+    repair_repo: FakeRepairOrderRepository | None = None,
+) -> CloseFaultService:
+    return CloseFaultService(
+        fault_repo,
+        repair_repo or FakeRepairOrderRepository(),
+    )
+
+
 def _make_fault(
     vehicle_id: uuid.UUID | None = None,
     status: FaultStatus = FaultStatus.OPEN,
@@ -76,6 +107,9 @@ def _make_fault(
         created_at=now,
         updated_at=now,
     )
+
+
+_close_service = _close_fault_service
 
 
 # ---------------------------------------------------------------------------
@@ -382,7 +416,7 @@ class TestCloseFaultService:
         fault = _make_fault()
         repo = FakeFaultRepository(initial=[fault])
 
-        result = CloseFaultService(repo).execute(
+        result = _close_service(repo).execute(
             CloseFaultDTO(
                 fault_id=fault.id,
                 request_id="req-close",
@@ -395,7 +429,7 @@ class TestCloseFaultService:
     def test_raises_not_found_for_missing_fault(self) -> None:
         repo = FakeFaultRepository()
         with pytest.raises(FMMSNotFoundError):
-            CloseFaultService(repo).execute(
+            _close_service(repo).execute(
                 CloseFaultDTO(
                     fault_id=uuid.uuid4(),
                     request_id="req-ghost",
@@ -408,7 +442,7 @@ class TestCloseFaultService:
         repo = FakeFaultRepository(initial=[fault])
 
         with pytest.raises(FaultAlreadyClosedError):
-            CloseFaultService(repo).execute(
+            _close_service(repo).execute(
                 CloseFaultDTO(
                     fault_id=fault.id,
                     request_id="req-re-close",
@@ -420,7 +454,7 @@ class TestCloseFaultService:
         fault = _make_fault(status=FaultStatus.IN_REPAIR)
         repo = FakeFaultRepository(initial=[fault])
 
-        result = CloseFaultService(repo).execute(
+        result = _close_service(repo).execute(
             CloseFaultDTO(
                 fault_id=fault.id,
                 request_id="req-close-repair",
@@ -429,6 +463,65 @@ class TestCloseFaultService:
         )
 
         assert result.status == FaultStatus.CLOSED
+
+    def test_cancels_created_and_approved_repair_orders(self) -> None:
+        fault = _make_fault()
+        created_order = _make_repair_order(
+            fault_id=fault.id,
+            vehicle_id=fault.vehicle_id,
+            status=RepairOrderStatus.CREATED,
+        )
+        approved_order = _make_repair_order(
+            fault_id=fault.id,
+            vehicle_id=fault.vehicle_id,
+            status=RepairOrderStatus.APPROVED,
+        )
+        fault_repo = FakeFaultRepository(initial=[fault])
+        repair_repo = FakeRepairOrderRepository(
+            initial=[created_order, approved_order]
+        )
+
+        _close_service(fault_repo, repair_repo).execute(
+            CloseFaultDTO(
+                fault_id=fault.id,
+                request_id="req-distribution-usable",
+                closed_by=uuid.uuid4(),
+            )
+        )
+
+        assert repair_repo.get_by_id(created_order.id).status == RepairOrderStatus.CANCELLED
+        assert repair_repo.get_by_id(approved_order.id).status == RepairOrderStatus.CANCELLED
+
+    def test_does_not_cancel_in_progress_or_completed_repair_orders(self) -> None:
+        fault = _make_fault()
+        in_progress = _make_repair_order(
+            fault_id=fault.id,
+            vehicle_id=fault.vehicle_id,
+            status=RepairOrderStatus.IN_PROGRESS,
+        )
+        completed = _make_repair_order(
+            fault_id=fault.id,
+            vehicle_id=fault.vehicle_id,
+            status=RepairOrderStatus.COMPLETED,
+        )
+        fault_repo = FakeFaultRepository(initial=[fault])
+        repair_repo = FakeRepairOrderRepository(initial=[in_progress, completed])
+
+        _close_service(fault_repo, repair_repo).execute(
+            CloseFaultDTO(
+                fault_id=fault.id,
+                request_id="req-distribution-usable-skip",
+                closed_by=uuid.uuid4(),
+            )
+        )
+
+        assert (
+            repair_repo.get_by_id(in_progress.id).status
+            == RepairOrderStatus.IN_PROGRESS
+        )
+        assert (
+            repair_repo.get_by_id(completed.id).status == RepairOrderStatus.COMPLETED
+        )
 
 
 # ---------------------------------------------------------------------------

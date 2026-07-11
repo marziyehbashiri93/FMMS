@@ -132,7 +132,6 @@ class Command(BaseCommand):
         with transaction.atomic():
             deleted_summary = self._delete_all()
             reset_n = VehicleModel.objects.filter(
-                status__in=_WORKFLOW_VEHICLE_STATUSES,
                 is_deleted=False,
             ).update(status=VehicleStatus.ACTIVE.value)
 

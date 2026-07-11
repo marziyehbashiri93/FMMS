@@ -460,7 +460,11 @@ def get_assign_fault_service() -> AssignFaultService:
 
 def get_close_fault_service() -> CloseFaultService:
     """Return CloseFaultService."""
-    return CloseFaultService(get_fault_repository())
+    return CloseFaultService(
+        get_fault_repository(),
+        get_repair_order_repository(),
+        get_record_repair_order_event_service(),
+    )
 
 
 def get_repair_order_event_repository() -> DjangoRepairOrderEventRepository:
