@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Wizard Checklist Preview</title>
+  <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet"/>
+  <link href="css/style.css" rel="stylesheet"/>
+  <link href="css/page-chrome.css" rel="stylesheet"/>
+  <link href="css/inspection.css" rel="stylesheet"/>
+  <style>body{margin:0;background:#f7f9fc;font-family:Vazirmatn,Tahoma,sans-serif;padding:24px;}</style>
+</head>
+<body>
+<section class="page" id="page-inspection" style="display:block;max-width:700px;margin:0 auto;">
+  <div class="page-wizard card-fmms" id="inspection-wizard">
+    <div class="page-wizard-inner">
+      <div class="page-wizard-step done" data-step="1"><span class="page-wizard-dot">✓</span><span class="page-wizard-label">انتخاب خودرو</span></div>
+      <div class="page-wizard-step current" data-step="2"><span class="page-wizard-dot">2</span><span class="page-wizard-label">تکمیل چک‌لیست</span></div>
+      <div class="page-wizard-step" data-step="3"><span class="page-wizard-dot">3</span><span class="page-wizard-label">ثبت نتیجه</span></div>
+    </div>
+  </div>
+  <div id="driver-step-2">
+    <div id="inspection-checklist">
+      <div class="checklist-row" data-template="1">
+        <div class="checklist-row-main">
+          <div><div class="item-name">وضعیت لاستیک‌ها</div><div class="item-cat">ایمنی</div></div>
+          <div class="result-toggle">
+            <button type="button" class="pass selected" data-result="PASS">سالم</button>
+            <button type="button" class="fail" data-result="FAIL">خرابی</button>
+          </div>
+        </div>
+        <div class="checklist-notes-wrap" hidden></div>
+      </div>
+      <div class="checklist-row has-fail" data-template="2">
+        <div class="checklist-row-main">
+          <div><div class="item-name">سیستم ترمز</div><div class="item-cat">ایمنی</div></div>
+          <div class="result-toggle">
+            <button type="button" class="pass" data-result="PASS">سالم</button>
+            <button type="button" class="fail selected" data-result="FAIL">خرابی</button>
+          </div>
+        </div>
+        <div class="checklist-notes-wrap">
+          <label class="checklist-notes-label required">شرح خرابی</label>
+          <textarea class="form-control checklist-notes-input" rows="2" placeholder="شرح خرابی را بنویسید…">صدای غیرعادی هنگام ترمزگیری</textarea>
+          <div class="checklist-severity-wrap">
+            <label class="checklist-notes-label required">شدت خرابی</label>
+            <select class="form-control checklist-severity-select"><option>HIGH</option></select>
+          </div>
+        </div>
+      </div>
+      <div class="checklist-row" data-template="3">
+        <div class="checklist-row-main">
+          <div><div class="item-name">چراغ‌های جلو</div><div class="item-cat">برقی</div></div>
+          <div class="result-toggle">
+            <button type="button" class="pass" data-result="PASS">سالم</button>
+            <button type="button" class="fail" data-result="FAIL">خرابی</button>
+          </div>
+        </div>
+        <div class="checklist-notes-wrap" hidden></div>
+      </div>
+    </div>
+    <button class="btn btn-fmms-success" type="button" id="inspection-submit-btn">ثبت نتیجه بازرسی</button>
+  </div>
+</section>
+</body>
+</html>

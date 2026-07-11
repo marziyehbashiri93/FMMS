@@ -38,10 +38,10 @@ FMMS.pages = FMMS.pages || {};
     const detailBtn = `<button type="button" class="btn btn-fmms-outline btn-sm" data-action="dist-detail">مشاهده جزئیات</button>`;
     const state = getDistributionDecision(fault, vehicle);
     if (state.reviewed) {
-      return `<div class="d-flex flex-wrap gap-1 align-items-center">${detailBtn}<span class="reviewed-notice">${FMMS.ui.escapeHtml(state.decision)}</span></div>`;
+      return detailBtn;
     }
     if (!DISTRIBUTION_ACTIONABLE.has(fault.status)) {
-      return `<div class="d-flex flex-wrap gap-1 align-items-center">${detailBtn}<span class="reviewed-notice">این خرابی قبلاً بررسی شده است.</span></div>`;
+      return detailBtn;
     }
     const groupId = `dist-actions-${fault.id}`;
     return `<div class="d-flex flex-wrap gap-1" id="${groupId}">

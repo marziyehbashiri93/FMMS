@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Wizard Result Preview</title>
+  <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet"/>
+  <link href="css/style.css" rel="stylesheet"/>
+  <link href="css/inspection.css" rel="stylesheet"/>
+  <style>body{margin:0;background:#f7f9fc;font-family:Vazirmatn,Tahoma,sans-serif;padding:24px;}</style>
+</head>
+<body>
+<section class="page" id="page-inspection" style="display:block;max-width:700px;margin:0 auto;">
+  <div class="page-wizard card-fmms" id="inspection-wizard">
+    <div class="page-wizard-inner">
+      <div class="page-wizard-step done" data-step="1"><span class="page-wizard-dot">✓</span><span class="page-wizard-label">انتخاب خودرو</span></div>
+      <div class="page-wizard-step done" data-step="2"><span class="page-wizard-dot">✓</span><span class="page-wizard-label">تکمیل چک‌لیست</span></div>
+      <div class="page-wizard-step current" data-step="3"><span class="page-wizard-dot">3</span><span class="page-wizard-label">ثبت نتیجه</span></div>
+    </div>
+  </div>
+  <div id="driver-step-3">
+    <div id="inspection-result">
+      <div class="result-banner fail">
+        <div>
+          <h3>خرابی ثبت شد و درخواست تعمیر ایجاد شد</h3>
+          <p>موارد زیر در بازرسی خودرو پژو 405 · 12ب345 ناموفق بودند:</p>
+          <ul>
+            <li>سیستم ترمز <span class="badge-fmms badge-red"><span class="dot"></span>HIGH</span> — <span class="text-muted">صدای غیرعادی هنگام ترمزگیری</span></li>
+            <li>چراغ جلو چپ <span class="badge-fmms badge-amber"><span class="dot"></span>MEDIUM</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <button class="btn btn-fmms-outline mt-3" id="inspection-restart-btn">بازرسی جدید</button>
+  </div>
+</section>
+</body>
+</html>
