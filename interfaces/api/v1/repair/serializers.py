@@ -38,6 +38,14 @@ class RepairCompleteSerializer(serializers.Serializer):
     completed_at = serializers.DateTimeField()
 
 
+class TransportHandoverRejectSerializer(serializers.Serializer):
+    """Validate transport post-handover rejection input."""
+
+    comment = serializers.CharField(
+        max_length=500, required=False, allow_null=True, allow_blank=True
+    )
+
+
 class RepairActivityCreateSerializer(serializers.Serializer):
     """Validate repair activity creation input."""
 

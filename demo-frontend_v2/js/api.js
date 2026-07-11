@@ -659,6 +659,56 @@ window.FMMS = window.FMMS || {};
       recordMockEvent(ro.id, "WAITING_DRIVER_CONFIRMATION", "منتظر تایید راننده.");
       return ro;
     }
+    m = match("/repair-orders/:id/transport-handover-approve/");
+    if (m && method === "POST") {
+      const ro = DB.repairOrders.find((x) => x.id === m[0]);
+      if (!ro) throw new ApiError("دستور تعمیر یافت نشد.", 404);
+      if (ro.status !== "ACCEPTED_BY_DRIVER") {
+        throw new ApiError(`Cannot approve transport handover from '${ro.status}'.`, 422);
+      }
+      ro.status = "COMPLETED";
+      ro.updated_at = now();
+      const fault = DB.faults.find((x) => x.id === ro.fault_id);
+      if (fault && fault.status !== "CLOSED") {
+        fault.status = "CLOSED";
+        fault.updated_at = now();
+      }
+      recordMockEvent(ro.id, "TRANSPORT_HANDOVER_APPROVED", "تایید نهایی تحویل توسط ترابری.");
+      return ro;
+    }
+    m = match("/repair-orders/:id/transport-handover-reject/");
+    if (m && method === "POST") {
+      const ro = DB.repairOrders.find((x) => x.id === m[0]);
+      if (!ro) throw new ApiError("دستور تعمیر یافت نشد.", 404);
+      if (ro.status !== "ACCEPTED_BY_DRIVER") {
+        throw new ApiError(`Cannot reject transport handover from '${ro.status}'.`, 422);
+      }
+      ro.status = "COMPLETED";
+      ro.updated_at = now();
+      DB.repairOrders.push({
+        id: uid("ro"),
+        vehicle_id: ro.vehicle_id,
+        fault_id: ro.fault_id,
+        status: "CREATED",
+        created_by_id: "supervisor-demo",
+        created_at: now(),
+        updated_at: now(),
+        activities: [],
+        parts: [],
+        technician_id: null,
+      });
+      const v = DB.vehicles.find((x) => x.id === ro.vehicle_id);
+      if (v) {
+        v.status = "UNDER_REPAIR";
+        v.updated_at = now();
+      }
+      recordMockEvent(
+        ro.id,
+        "TRANSPORT_HANDOVER_REJECTED",
+        body?.comment ? `رد تعمیر توسط ترابری (${body.comment})` : "رد تعمیر توسط ترابری."
+      );
+      return ro;
+    }
     m = match("/repair-orders/:id/sync-sap/");
     if (m && method === "POST") {
       const ro = DB.repairOrders.find((x) => x.id === m[0]);
@@ -1139,8 +1189,8 @@ window.FMMS = window.FMMS || {};
     purchaseRequisition: true,
     materialRequest: true,
     vehicleHandover: true,
-    transportHandoverApproval: false,
-    transportHandoverReject: false,
+    transportHandoverApproval: true,
+    transportHandoverReject: true,
     externalInvoice: true,
     workshopAcceptReject: true,
     faultReporterName: true,
@@ -1226,6 +1276,13 @@ window.FMMS = window.FMMS || {};
     listVehicleHandovers: (query) => request("/vehicle-handovers/", { query: query || {} }),
     confirmVehicleHandover: (id, payload) =>
       request(`/vehicle-handovers/${id}/confirm/`, { method: "POST", body: payload }),
+    transportHandoverApprove: (repairOrderId) =>
+      request(`/repair-orders/${repairOrderId}/transport-handover-approve/`, { method: "POST" }),
+    transportHandoverReject: (repairOrderId, payload) =>
+      request(`/repair-orders/${repairOrderId}/transport-handover-reject/`, {
+        method: "POST",
+        body: payload || {},
+      }),
 
     createPurchaseRequisition: (repairOrderId) =>
       request("/purchase-requisitions/", { method: "POST", body: { repair_order_id: repairOrderId } }),

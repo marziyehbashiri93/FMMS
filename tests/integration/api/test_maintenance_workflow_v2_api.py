@@ -50,6 +50,35 @@ def _move_to_workshop_assigned(client: APIClient, order_id: str) -> dict:
     return assigned.data
 
 
+def _move_to_accepted_by_driver(
+    client: APIClient, technician_client: APIClient, order: dict
+) -> dict:
+    """Run repair through driver handover acceptance."""
+    _move_to_workshop_assigned(client, order["id"])
+    technician_client.post(
+        f"/api/v1/repair-orders/{order['id']}/accept/", {}, format="json"
+    )
+    technician_client.post(
+        f"/api/v1/repair-orders/{order['id']}/start/", {}, format="json"
+    )
+    technician_client.post(
+        f"/api/v1/repair-orders/{order['id']}/complete/",
+        {"completed_at": datetime.now(tz=UTC).isoformat()},
+        format="json",
+    )
+    handovers = technician_client.get("/api/v1/vehicle-handovers/")
+    target = next(
+        item for item in handovers.data if item["repair_order_id"] == order["id"]
+    )
+    confirmed = technician_client.post(
+        f"/api/v1/vehicle-handovers/{target['id']}/confirm/",
+        {"accepted": True, "comment": "ok"},
+        format="json",
+    )
+    assert confirmed.status_code == 200, confirmed.data
+    return order
+
+
 class TestMaintenanceWorkflowV2API:
     """Maintenance workflow v2 end-to-end scenarios."""
 
@@ -209,6 +238,78 @@ class TestMaintenanceWorkflowV2API:
         repair = technician_client.get(f"/api/v1/repair-orders/{order['id']}/")
         assert repair.status_code == 200
         assert repair.data["status"] == "ACCEPTED_BY_DRIVER"
+
+    def test_transport_handover_approve_completes_repair_and_closes_fault(
+        self,
+        supervisor_client: APIClient,
+        technician_client: APIClient,
+        authenticated_client: APIClient,
+    ) -> None:
+        order = _create_order(authenticated_client, "12MWF214", "1HGCM82633A008214")
+        _move_to_accepted_by_driver(authenticated_client, technician_client, order)
+
+        approved = supervisor_client.post(
+            f"/api/v1/repair-orders/{order['id']}/transport-handover-approve/",
+            {},
+            format="json",
+        )
+        assert approved.status_code == 200, approved.data
+        assert approved.data["status"] == "COMPLETED"
+
+        repair = authenticated_client.get(f"/api/v1/repair-orders/{order['id']}/")
+        assert repair.data["status"] == "COMPLETED"
+
+        fault = authenticated_client.get(f"/api/v1/faults/{order['fault_id']}/")
+        assert fault.status_code == 200
+        assert fault.data["status"] == "CLOSED"
+
+    def test_transport_handover_reject_creates_follow_up_repair(
+        self,
+        supervisor_client: APIClient,
+        technician_client: APIClient,
+        authenticated_client: APIClient,
+    ) -> None:
+        order = _create_order(authenticated_client, "12MWF215", "1HGCM82633A008215")
+        vehicle_id = order["vehicle_id"]
+        _move_to_accepted_by_driver(authenticated_client, technician_client, order)
+
+        rejected = supervisor_client.post(
+            f"/api/v1/repair-orders/{order['id']}/transport-handover-reject/",
+            {"comment": "not fixed properly"},
+            format="json",
+        )
+        assert rejected.status_code == 200, rejected.data
+        assert rejected.data["status"] == "COMPLETED"
+
+        vehicle = authenticated_client.get(f"/api/v1/vehicles/{vehicle_id}/")
+        assert vehicle.data["status"] == "UNDER_REPAIR"
+
+        listed = authenticated_client.get(
+            f"/api/v1/repair-orders/?vehicle_id={vehicle_id}"
+        )
+        results = listed.data["results"] if "results" in listed.data else listed.data
+        follow_ups = [
+            item
+            for item in results
+            if item["status"] == "CREATED" and item["id"] != order["id"]
+        ]
+        assert len(follow_ups) == 1
+        assert follow_ups[0]["fault_id"] == order["fault_id"]
+
+    def test_viewer_cannot_approve_transport_handover(
+        self,
+        viewer_client: APIClient,
+        technician_client: APIClient,
+        authenticated_client: APIClient,
+    ) -> None:
+        order = _create_order(authenticated_client, "12MWF216", "1HGCM82633A008216")
+        _move_to_accepted_by_driver(authenticated_client, technician_client, order)
+        response = viewer_client.post(
+            f"/api/v1/repair-orders/{order['id']}/transport-handover-approve/",
+            {},
+            format="json",
+        )
+        assert response.status_code == 403
 
     def test_external_invoice_upload_list_and_approve(
         self, supervisor_client: APIClient, authenticated_client: APIClient

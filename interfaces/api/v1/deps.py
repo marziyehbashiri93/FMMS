@@ -145,6 +145,10 @@ from apps.repair.application.services.repair_order_timeline_service import (
 from apps.repair.application.services.sync_repair_to_sap_service import (
     SyncRepairToSAPService,
 )
+from apps.repair.application.services.transport_handover_decision_service import (
+    ApproveTransportHandoverService,
+    RejectTransportHandoverService,
+)
 from apps.repair.application.services.update_repair_status_service import (
     CancelRepairOrderService,
     CompleteRepairOrderService,
@@ -537,6 +541,24 @@ def get_accept_repair_order_service() -> AcceptRepairOrderService:
 def get_reject_repair_order_service() -> RejectRepairOrderService:
     """Return RejectRepairOrderService."""
     return RejectRepairOrderService(
+        get_repair_order_repository(),
+        get_vehicle_repository(),
+        get_record_repair_order_event_service(),
+    )
+
+
+def get_approve_transport_handover_service() -> ApproveTransportHandoverService:
+    """Return ApproveTransportHandoverService."""
+    return ApproveTransportHandoverService(
+        get_repair_order_repository(),
+        get_fault_repository(),
+        get_record_repair_order_event_service(),
+    )
+
+
+def get_reject_transport_handover_service() -> RejectTransportHandoverService:
+    """Return RejectTransportHandoverService."""
+    return RejectTransportHandoverService(
         get_repair_order_repository(),
         get_vehicle_repository(),
         get_record_repair_order_event_service(),

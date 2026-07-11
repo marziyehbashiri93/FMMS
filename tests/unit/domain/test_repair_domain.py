@@ -201,6 +201,13 @@ class TestRepairOrderLifecycle:
         order.add_activity(_make_activity())
         assert order.total_labor_hours == Decimal("5.0")
 
+    def test_complete_after_transport_handover(self) -> None:
+        order = _make_order(status=RepairOrderStatus.ACCEPTED_BY_DRIVER)
+        completed_at = datetime.now(tz=UTC)
+        order.complete_after_transport_handover(completed_at=completed_at)
+        assert order.status == RepairOrderStatus.COMPLETED
+        assert order.completed_at == completed_at
+
     def test_invalid_transition(self) -> None:
         order = _make_order(status=RepairOrderStatus.CREATED)
         with pytest.raises(RepairOrderInvalidStateTransitionError):

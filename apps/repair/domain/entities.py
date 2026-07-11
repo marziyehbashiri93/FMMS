@@ -110,7 +110,7 @@ _ALLOWED_TRANSITIONS: dict[RepairOrderStatus, frozenset[RepairOrderStatus]] = {
             RepairOrderStatus.REJECTED_BY_DRIVER,
         }
     ),
-    RepairOrderStatus.ACCEPTED_BY_DRIVER: frozenset(),
+    RepairOrderStatus.ACCEPTED_BY_DRIVER: frozenset({RepairOrderStatus.COMPLETED}),
     RepairOrderStatus.REJECTED_BY_DRIVER: frozenset(),
     RepairOrderStatus.COMPLETED: frozenset(),
     RepairOrderStatus.CANCELLED: frozenset(),
@@ -348,6 +348,18 @@ class RepairOrder:
             return
         self.transition_to(RepairOrderStatus.REJECTED_BY_DRIVER)
 
+    def complete_after_transport_handover(self, completed_at: datetime) -> None:
+        """Finalize a driver-accepted repair order after transport validation.
+
+        Args:
+            completed_at: UTC timestamp when transport approved completion.
+
+        Raises:
+            RepairOrderInvalidStateTransitionError: If not ACCEPTED_BY_DRIVER.
+        """
+        self.transition_to(RepairOrderStatus.COMPLETED)
+        self.completed_at = completed_at
+
     def cancel(self) -> None:
         """Cancel the repair order.
 
@@ -423,6 +435,8 @@ class RepairOrderEventType(StrEnum):
     WAITING_DRIVER_CONFIRMATION = "WAITING_DRIVER_CONFIRMATION"
     DRIVER_ACCEPTED = "DRIVER_ACCEPTED"
     DRIVER_REJECTED = "DRIVER_REJECTED"
+    TRANSPORT_HANDOVER_APPROVED = "TRANSPORT_HANDOVER_APPROVED"
+    TRANSPORT_HANDOVER_REJECTED = "TRANSPORT_HANDOVER_REJECTED"
     INVOICE_UPLOADED = "INVOICE_UPLOADED"
     INVOICE_APPROVED = "INVOICE_APPROVED"
     EXTERNAL_INVOICE_UPLOADED = "EXTERNAL_INVOICE_UPLOADED"

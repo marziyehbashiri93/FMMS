@@ -2,17 +2,12 @@
  * Page: تایید تحویل خودرو (Transport final handover validation)
  *
  * Lists repair orders where the driver accepted handover (ACCEPTED_BY_DRIVER).
- * Read APIs: GET /repair-orders/, GET /repair-orders/{id}/, GET /timeline/,
- * GET /vehicle-handovers/, GET /vehicles/{id}/
- *
- * Transport approve/reject actions have no backend endpoint yet — UI-only.
+ * Approve/reject: POST /repair-orders/{id}/transport-handover-approve|reject/
  */
 window.FMMS = window.FMMS || {};
 FMMS.pages = FMMS.pages || {};
 
 (function (FMMS) {
-  const REVIEW_STORAGE_KEY = "fmms_transport_handover_reviewed";
-
   let vehiclesById = {};
   let handoversByRepairOrder = {};
 
@@ -22,23 +17,8 @@ FMMS.pages = FMMS.pages || {};
     return "—";
   }
 
-  function getReviewedMap() {
-    try {
-      return JSON.parse(sessionStorage.getItem(REVIEW_STORAGE_KEY) || "{}");
-    } catch (_) {
-      return {};
-    }
-  }
-
-  function setReviewed(repairOrderId, decision) {
-    const map = getReviewedMap();
-    map[repairOrderId] = { decision, at: new Date().toISOString() };
-    sessionStorage.setItem(REVIEW_STORAGE_KEY, JSON.stringify(map));
-  }
-
   function isPendingTransportReview(order) {
-    if (order.status !== "ACCEPTED_BY_DRIVER") return false;
-    return !getReviewedMap()[order.id];
+    return order.status === "ACCEPTED_BY_DRIVER";
   }
 
   async function ensureVehicles() {
@@ -105,14 +85,7 @@ FMMS.pages = FMMS.pages || {};
   }
 
   function actionAvailabilityNotice() {
-    const caps = FMMS.api.capabilities;
-    if (caps.transportHandoverApproval && caps.transportHandoverReject) return "";
-    return `<div class="demo-only-msg mb-3">
-      API تایید نهایی ترابری در بک‌اند موجود نیست.
-      <span class="mono d-block mt-1">POST /repair-orders/{id}/transport-handover-approve/</span>
-      <span class="mono d-block">POST /repair-orders/{id}/transport-handover-reject/</span>
-      دکمه‌های زیر فقط وضعیت UI را به‌روز می‌کنند.
-    </div>`;
+    return "";
   }
 
   function hideDetailModal() {
@@ -121,22 +94,22 @@ FMMS.pages = FMMS.pages || {};
 
   async function approveOrder(orderId) {
     if (FMMS.api.capabilities.transportHandoverApproval) {
-      FMMS.ui.toast("API تایید ترابری هنوز پیاده‌سازی نشده است.", "error");
-      return false;
+      await FMMS.api.transportHandoverApprove(orderId);
+      FMMS.ui.toast("تایید صحت تعمیر ثبت شد.");
+      return true;
     }
-    setReviewed(orderId, "approved");
-    FMMS.ui.toast("تایید صحت تعمیر ثبت شد.");
-    return true;
+    FMMS.ui.toast("API تایید ترابری در دسترس نیست.", "error");
+    return false;
   }
 
-  async function rejectOrder(orderId) {
+  async function rejectOrder(orderId, comment) {
     if (FMMS.api.capabilities.transportHandoverReject) {
-      FMMS.ui.toast("API رد تعمیر ترابری هنوز پیاده‌سازی نشده است.", "error");
-      return false;
+      await FMMS.api.transportHandoverReject(orderId, comment ? { comment } : {});
+      FMMS.ui.toast("رد تعمیر ثبت شد.");
+      return true;
     }
-    setReviewed(orderId, "rejected");
-    FMMS.ui.toast("رد تعمیر ثبت شد.");
-    return true;
+    FMMS.ui.toast("API رد تعمیر ترابری در دسترس نیست.", "error");
+    return false;
   }
 
   async function showDetail(order) {

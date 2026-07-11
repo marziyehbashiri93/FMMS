@@ -254,6 +254,25 @@ class RepairOrderResponseDTO:
 
 
 @dataclass(frozen=True)
+class TransportHandoverApproveDTO:
+    """Input DTO for transport post-handover approval."""
+
+    repair_order_id: uuid.UUID
+    request_id: str
+    approved_by: uuid.UUID
+
+
+@dataclass(frozen=True)
+class TransportHandoverRejectDTO:
+    """Input DTO for transport post-handover rejection."""
+
+    repair_order_id: uuid.UUID
+    request_id: str
+    rejected_by: uuid.UUID
+    comment: str | None = field(default=None)
+
+
+@dataclass(frozen=True)
 class RepairOrderTimelineEventDTO:
     """One repair-order workflow event for timeline APIs."""
 

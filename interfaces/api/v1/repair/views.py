@@ -22,12 +22,15 @@ from apps.repair.application.dto.repair_dto import (
     CompleteRepairOrderDTO,
     CreateRepairOrderDTO,
     SyncRepairToSAPDTO,
+    TransportHandoverApproveDTO,
+    TransportHandoverRejectDTO,
 )
 from apps.repair.domain.entities import RepairOrderStatus, WorkshopType
 from core.permissions import (
     IsReadOnlyOrTechnicianOrAbove,
     IsSupervisorOrAbove,
     IsTechnicianOrAbove,
+    IsTransportSupervisorOrAbove,
 )
 from interfaces.api.v1 import deps
 from interfaces.api.v1.material.views import RepairOrderMaterialRequestMixin
@@ -45,6 +48,7 @@ from interfaces.api.v1.repair.serializers import (
     RepairOrderTimelineEventSerializer,
     RepairPartCreateSerializer,
     RepairSyncSAPSerializer,
+    TransportHandoverRejectSerializer,
 )
 from interfaces.api.v1.utils import paginate_dto_list, request_id_from, user_id_from
 
@@ -270,6 +274,54 @@ class RepairOrderViewSet(
                 repair_order_id=uuid.UUID(str(pk)),
                 request_id=request_id_from(request),
                 **serializer.validated_data,
+            )
+        )
+        return Response(RepairOrderResponseSerializer(result).data)
+
+    @extend_schema(request=None, responses=RepairOrderResponseSerializer)
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="transport-handover-approve",
+        permission_classes=[IsTransportSupervisorOrAbove],
+    )
+    @transaction.atomic
+    def transport_handover_approve(
+        self, request: Request, pk: str | None = None
+    ) -> Response:
+        """Transport supervisor approves post-driver handover validation."""
+        result = deps.get_approve_transport_handover_service().execute(
+            TransportHandoverApproveDTO(
+                repair_order_id=uuid.UUID(str(pk)),
+                request_id=request_id_from(request),
+                approved_by=user_id_from(request),
+            )
+        )
+        return Response(RepairOrderResponseSerializer(result).data)
+
+    @extend_schema(
+        request=TransportHandoverRejectSerializer,
+        responses=RepairOrderResponseSerializer,
+    )
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="transport-handover-reject",
+        permission_classes=[IsTransportSupervisorOrAbove],
+    )
+    @transaction.atomic
+    def transport_handover_reject(
+        self, request: Request, pk: str | None = None
+    ) -> Response:
+        """Transport supervisor rejects post-driver handover validation."""
+        serializer = TransportHandoverRejectSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        result = deps.get_reject_transport_handover_service().execute(
+            TransportHandoverRejectDTO(
+                repair_order_id=uuid.UUID(str(pk)),
+                request_id=request_id_from(request),
+                rejected_by=user_id_from(request),
+                comment=serializer.validated_data.get("comment") or None,
             )
         )
         return Response(RepairOrderResponseSerializer(result).data)
