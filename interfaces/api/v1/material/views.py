@@ -1,0 +1,108 @@
+"""Material request API viewset."""
+
+from __future__ import annotations
+
+import uuid
+
+from drf_spectacular.utils import extend_schema
+from rest_framework import status
+from rest_framework.decorators import action
+from rest_framework.request import Request
+from rest_framework.response import Response
+from rest_framework.viewsets import GenericViewSet
+
+from apps.material.application.dto.material_request_dto import (
+    CreateMaterialRequestDTO,
+    CreateMaterialRequestItemDTO,
+    MaterialRequestDecisionDTO,
+)
+from apps.material.domain.entities import MaterialRequestStatus
+from core.permissions import IsReadOnlyOrTechnicianOrAbove, IsTransportSupervisorOrAbove
+from interfaces.api.v1 import deps
+from interfaces.api.v1.material.serializers import (
+    MaterialRequestCreateSerializer,
+    MaterialRequestResponseSerializer,
+)
+from interfaces.api.v1.utils import request_id_from, user_id_from
+
+
+class MaterialRequestViewSet(GenericViewSet):
+    """Expose material request services through REST endpoints."""
+
+    permission_classes = [IsReadOnlyOrTechnicianOrAbove]
+
+    @extend_schema(responses=MaterialRequestResponseSerializer(many=True))
+    def list(self, request: Request) -> Response:
+        """List material requests."""
+        status_raw = request.query_params.get("status")
+        mr_status = MaterialRequestStatus(status_raw) if status_raw else None
+        items = deps.get_list_material_requests_service().execute(status=mr_status)
+        return Response(MaterialRequestResponseSerializer(items, many=True).data)
+
+    @extend_schema(responses=MaterialRequestResponseSerializer)
+    @action(
+        detail=True,
+        methods=["post"],
+        permission_classes=[IsTransportSupervisorOrAbove],
+    )
+    def approve(self, request: Request, pk: str | None = None) -> Response:
+        """Approve material request."""
+        result = deps.get_approve_material_request_service().execute(
+            MaterialRequestDecisionDTO(
+                material_request_id=uuid.UUID(str(pk)),
+                request_id=request_id_from(request),
+                decided_by=user_id_from(request),
+            )
+        )
+        return Response(MaterialRequestResponseSerializer(result).data)
+
+    @extend_schema(responses=MaterialRequestResponseSerializer)
+    @action(
+        detail=True,
+        methods=["post"],
+        permission_classes=[IsTransportSupervisorOrAbove],
+    )
+    def reject(self, request: Request, pk: str | None = None) -> Response:
+        """Reject material request."""
+        result = deps.get_reject_material_request_service().execute(
+            MaterialRequestDecisionDTO(
+                material_request_id=uuid.UUID(str(pk)),
+                request_id=request_id_from(request),
+                decided_by=user_id_from(request),
+            )
+        )
+        return Response(MaterialRequestResponseSerializer(result).data)
+
+
+class RepairOrderMaterialRequestMixin:
+    """Mixin with repair-order scoped material request creation action."""
+
+    @extend_schema(
+        request=MaterialRequestCreateSerializer,
+        responses=MaterialRequestResponseSerializer,
+    )
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="material-requests",
+        permission_classes=[IsReadOnlyOrTechnicianOrAbove],
+    )
+    def material_requests(self, request: Request, pk: str | None = None) -> Response:
+        """Create a material request for a repair order."""
+        serializer = MaterialRequestCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        result = deps.get_create_material_request_service().execute(
+            CreateMaterialRequestDTO(
+                repair_order_id=uuid.UUID(str(pk)),
+                items=tuple(
+                    CreateMaterialRequestItemDTO(**item)
+                    for item in serializer.validated_data["items"]
+                ),
+                request_id=request_id_from(request),
+                requested_by=user_id_from(request),
+            )
+        )
+        return Response(
+            MaterialRequestResponseSerializer(result).data,
+            status=status.HTTP_201_CREATED,
+        )

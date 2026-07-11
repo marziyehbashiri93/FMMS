@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime
 
 from apps.repair.application.dto.repair_dto import (
@@ -17,6 +18,8 @@ from apps.repair.application.services.repair_order_timeline_service import (
 )
 from apps.repair.domain.entities import RepairOrderEventType
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
+from apps.vehicle.domain.entities import VehicleStatus
+from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
 from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
 
@@ -24,6 +27,8 @@ logger = get_structured_logger("repair", __name__)
 
 _APPROVE_MESSAGE = "دستور تعمیر توسط واحد ترابری تأیید شد."
 _WORKSHOP_MESSAGE = "نوع تعمیرگاه با موفقیت انتخاب شد."
+_WORKSHOP_ACCEPTED_MESSAGE = "تعمیرگاه داخلی کار را پذیرفت."
+_WORKSHOP_REJECTED_MESSAGE = "تعمیرگاه درخواست تعمیر را رد کرد."
 
 
 class ApproveRepairOrderService:
@@ -99,6 +104,7 @@ class ApproveRepairOrderService:
             status=saved.status,
             message=_APPROVE_MESSAGE,
             workshop_type=saved.workshop_type,
+            workshop_id=saved.workshop_id,
         )
 
 
@@ -148,7 +154,7 @@ class AssignWorkshopService:
             message=f"Repair order '{dto.repair_order_id}' not found.",
             details={"repair_order_id": str(dto.repair_order_id)},
         )
-        order.assign_workshop(dto.workshop_type)
+        order.assign_workshop(dto.workshop_type, dto.workshop_id)
         order.updated_at = datetime.now(tz=UTC)
         saved = self._repo.save(order)
         record_repair_timeline_event(
@@ -179,4 +185,102 @@ class AssignWorkshopService:
             status=saved.status,
             message=_WORKSHOP_MESSAGE,
             workshop_type=saved.workshop_type,
+            workshop_id=saved.workshop_id,
+        )
+
+
+class AcceptRepairOrderService:
+    """Accept an internally assigned workshop before technical start."""
+
+    def __init__(
+        self,
+        repair_order_repository: IRepairOrderRepository,
+        event_recorder: RecordRepairOrderEventService | None = None,
+    ) -> None:
+        self._repo = repair_order_repository
+        self._event_recorder = event_recorder
+
+    def execute(
+        self,
+        repair_order_id: uuid.UUID,
+        request_id: str,
+        accepted_by: uuid.UUID,
+    ) -> RepairDecisionResponseDTO:
+        """Transition WORKSHOP_ASSIGNED(INTERNAL) to WAITING_WORKSHOP_CONFIRMATION."""
+        order = load_or_not_found(
+            lambda: self._repo.get_by_id(repair_order_id),
+            message=f"Repair order '{repair_order_id}' not found.",
+            details={"repair_order_id": str(repair_order_id)},
+        )
+        order.accept_internal_workshop()
+        order.updated_at = datetime.now(tz=UTC)
+        saved = self._repo.save(order)
+        record_repair_timeline_event(
+            self._event_recorder,
+            saved.id,
+            RepairOrderEventType.TECHNICIAN_ACCEPTED,
+            _WORKSHOP_ACCEPTED_MESSAGE,
+            created_by_id=accepted_by,
+            request_id=request_id,
+        )
+        return RepairDecisionResponseDTO(
+            id=saved.id,
+            status=saved.status,
+            message=_WORKSHOP_ACCEPTED_MESSAGE,
+            workshop_type=saved.workshop_type,
+            workshop_id=saved.workshop_id,
+        )
+
+
+class RejectRepairOrderService:
+    """Reject repair order at workshop step and cancel workflow."""
+
+    def __init__(
+        self,
+        repair_order_repository: IRepairOrderRepository,
+        vehicle_repository: IVehicleRepository,
+        event_recorder: RecordRepairOrderEventService | None = None,
+    ) -> None:
+        self._repo = repair_order_repository
+        self._vehicle_repo = vehicle_repository
+        self._event_recorder = event_recorder
+
+    def execute(
+        self,
+        repair_order_id: uuid.UUID,
+        request_id: str,
+        rejected_by: uuid.UUID,
+    ) -> RepairDecisionResponseDTO:
+        """Transition WORKSHOP_ASSIGNED to CANCELLED."""
+        order = load_or_not_found(
+            lambda: self._repo.get_by_id(repair_order_id),
+            message=f"Repair order '{repair_order_id}' not found.",
+            details={"repair_order_id": str(repair_order_id)},
+        )
+        order.cancel()
+        order.updated_at = datetime.now(tz=UTC)
+        saved = self._repo.save(order)
+        vehicle = load_or_not_found(
+            lambda: self._vehicle_repo.get_by_id(order.vehicle_id),
+            message=f"Vehicle '{order.vehicle_id}' not found.",
+            details={"vehicle_id": str(order.vehicle_id)},
+        )
+        if vehicle.status != VehicleStatus.ACTIVE:
+            vehicle.activate()
+            vehicle.updated_at = datetime.now(tz=UTC)
+            self._vehicle_repo.save(vehicle)
+        record_repair_timeline_event(
+            self._event_recorder,
+            saved.id,
+            RepairOrderEventType.REPAIR_REJECTED,
+            _WORKSHOP_REJECTED_MESSAGE,
+            created_by_id=rejected_by,
+            request_id=request_id,
+        )
+        return RepairDecisionResponseDTO(
+            id=saved.id,
+            status=saved.status,
+            message=_WORKSHOP_REJECTED_MESSAGE,
+            workshop_type=saved.workshop_type,
+            workshop_id=saved.workshop_id,
         )

@@ -66,3 +66,11 @@ class RepairActivityNotFoundError(RepairDomainError, DomainNotFoundError):
     def __init__(self, activity_id: object) -> None:
         super().__init__(f"Repair activity not found: '{activity_id}'.")
         self.activity_id = activity_id
+
+
+class ExternalRepairInvoiceNotFoundError(RepairDomainError, DomainNotFoundError):
+    """Raised when an external repair invoice cannot be located."""
+
+    def __init__(self, invoice_id: object) -> None:
+        super().__init__(f"External repair invoice not found: '{invoice_id}'.")
+        self.invoice_id = invoice_id

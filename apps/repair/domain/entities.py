@@ -38,8 +38,13 @@ class RepairOrderStatus(StrEnum):
     CREATED = "CREATED"
     APPROVED = "APPROVED"
     WORKSHOP_ASSIGNED = "WORKSHOP_ASSIGNED"
+    WAITING_WORKSHOP_CONFIRMATION = "WAITING_WORKSHOP_CONFIRMATION"
+    WAITING_PARTS = "WAITING_PARTS"
     ASSIGNED = "ASSIGNED"
     IN_PROGRESS = "IN_PROGRESS"
+    WAITING_DRIVER_CONFIRMATION = "WAITING_DRIVER_CONFIRMATION"
+    ACCEPTED_BY_DRIVER = "ACCEPTED_BY_DRIVER"
+    REJECTED_BY_DRIVER = "REJECTED_BY_DRIVER"
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"
 
@@ -70,9 +75,19 @@ _ALLOWED_TRANSITIONS: dict[RepairOrderStatus, frozenset[RepairOrderStatus]] = {
     RepairOrderStatus.WORKSHOP_ASSIGNED: frozenset(
         {
             RepairOrderStatus.ASSIGNED,
+            RepairOrderStatus.WAITING_WORKSHOP_CONFIRMATION,
+            RepairOrderStatus.IN_PROGRESS,  # backward-compat / EXTERNAL shortcut
+            RepairOrderStatus.CANCELLED,
+        }
+    ),
+    RepairOrderStatus.WAITING_WORKSHOP_CONFIRMATION: frozenset(
+        {
             RepairOrderStatus.IN_PROGRESS,
             RepairOrderStatus.CANCELLED,
         }
+    ),
+    RepairOrderStatus.WAITING_PARTS: frozenset(
+        {RepairOrderStatus.IN_PROGRESS, RepairOrderStatus.CANCELLED}
     ),
     RepairOrderStatus.ASSIGNED: frozenset(
         {
@@ -82,8 +97,21 @@ _ALLOWED_TRANSITIONS: dict[RepairOrderStatus, frozenset[RepairOrderStatus]] = {
         }
     ),
     RepairOrderStatus.IN_PROGRESS: frozenset(
-        {RepairOrderStatus.COMPLETED, RepairOrderStatus.CANCELLED}
+        {
+            RepairOrderStatus.COMPLETED,
+            RepairOrderStatus.WAITING_PARTS,
+            RepairOrderStatus.WAITING_DRIVER_CONFIRMATION,
+            RepairOrderStatus.CANCELLED,
+        }
     ),
+    RepairOrderStatus.WAITING_DRIVER_CONFIRMATION: frozenset(
+        {
+            RepairOrderStatus.ACCEPTED_BY_DRIVER,
+            RepairOrderStatus.REJECTED_BY_DRIVER,
+        }
+    ),
+    RepairOrderStatus.ACCEPTED_BY_DRIVER: frozenset(),
+    RepairOrderStatus.REJECTED_BY_DRIVER: frozenset(),
     RepairOrderStatus.COMPLETED: frozenset(),
     RepairOrderStatus.CANCELLED: frozenset(),
 }
@@ -93,8 +121,19 @@ _MUTABLE_STATUSES: frozenset[RepairOrderStatus] = frozenset(
         RepairOrderStatus.CREATED,
         RepairOrderStatus.APPROVED,
         RepairOrderStatus.WORKSHOP_ASSIGNED,
+        RepairOrderStatus.WAITING_WORKSHOP_CONFIRMATION,
+        RepairOrderStatus.WAITING_PARTS,
         RepairOrderStatus.ASSIGNED,
         RepairOrderStatus.IN_PROGRESS,
+    }
+)
+
+_TERMINAL_STATUSES: frozenset[RepairOrderStatus] = frozenset(
+    {
+        RepairOrderStatus.COMPLETED,
+        RepairOrderStatus.CANCELLED,
+        RepairOrderStatus.ACCEPTED_BY_DRIVER,
+        RepairOrderStatus.REJECTED_BY_DRIVER,
     }
 )
 
@@ -172,6 +211,7 @@ class RepairOrder:
     parts: list[RepairPart] = field(default_factory=list)
     sap_order_number: str | None = field(default=None)
     workshop_type: WorkshopType | None = field(default=None)
+    workshop_id: str | None = field(default=None)
     completed_at: datetime | None = field(default=None)
 
     def _assert_mutable(self, operation: str) -> None:
@@ -232,7 +272,9 @@ class RepairOrder:
         """
         self.transition_to(RepairOrderStatus.APPROVED)
 
-    def assign_workshop(self, workshop_type: WorkshopType) -> None:
+    def assign_workshop(
+        self, workshop_type: WorkshopType, workshop_id: str | None = None
+    ) -> None:
         """Select internal or external workshop after transport approval.
 
         Args:
@@ -243,6 +285,16 @@ class RepairOrder:
         """
         self.transition_to(RepairOrderStatus.WORKSHOP_ASSIGNED)
         self.workshop_type = workshop_type
+        self.workshop_id = workshop_id
+
+    def accept_internal_workshop(self) -> None:
+        """Accept an internally assigned workshop before work starts."""
+        if self.workshop_type != WorkshopType.INTERNAL:
+            raise RepairOrderInvalidStateTransitionError(
+                current_status=self.status.value,
+                target_status=RepairOrderStatus.WAITING_WORKSHOP_CONFIRMATION.value,
+            )
+        self.transition_to(RepairOrderStatus.WAITING_WORKSHOP_CONFIRMATION)
 
     def start_work(self) -> None:
         """Mark the repair order as actively in progress.
@@ -256,6 +308,7 @@ class RepairOrder:
         if self.status not in (
             RepairOrderStatus.ASSIGNED,
             RepairOrderStatus.WORKSHOP_ASSIGNED,
+            RepairOrderStatus.WAITING_WORKSHOP_CONFIRMATION,
         ):
             raise RepairOrderInvalidStateTransitionError(
                 current_status=self.status.value,
@@ -274,6 +327,26 @@ class RepairOrder:
         """
         self.transition_to(RepairOrderStatus.COMPLETED)
         self.completed_at = completed_at
+
+    def complete_waiting_driver_confirmation(self, completed_at: datetime) -> None:
+        """Mark technical work complete and wait for driver handover decision."""
+        self.transition_to(RepairOrderStatus.WAITING_DRIVER_CONFIRMATION)
+        self.completed_at = completed_at
+
+    def wait_for_parts(self) -> None:
+        """Pause repair while waiting for parts."""
+        self.transition_to(RepairOrderStatus.WAITING_PARTS)
+
+    def resume_after_parts(self) -> None:
+        """Resume repair after parts are available."""
+        self.transition_to(RepairOrderStatus.IN_PROGRESS)
+
+    def confirm_handover(self, accepted: bool) -> None:
+        """Apply driver handover decision."""
+        if accepted:
+            self.transition_to(RepairOrderStatus.ACCEPTED_BY_DRIVER)
+            return
+        self.transition_to(RepairOrderStatus.REJECTED_BY_DRIVER)
 
     def cancel(self) -> None:
         """Cancel the repair order.
@@ -322,8 +395,8 @@ class RepairOrder:
 
     @property
     def is_active(self) -> bool:
-        """Return True if the repair order is in a mutable (active) state."""
-        return self.status in _MUTABLE_STATUSES
+        """Return True if the repair order is not in a terminal status."""
+        return self.status not in _TERMINAL_STATUSES
 
 
 class RepairOrderEventType(StrEnum):
@@ -333,8 +406,26 @@ class RepairOrderEventType(StrEnum):
     DISTRIBUTION_APPROVED = "DISTRIBUTION_APPROVED"
     TRANSPORT_APPROVED = "TRANSPORT_APPROVED"
     WORKSHOP_ASSIGNED = "WORKSHOP_ASSIGNED"
+    TECHNICIAN_ACCEPTED = "TECHNICIAN_ACCEPTED"
+    TECHNICIAN_REJECTED = "TECHNICIAN_REJECTED"
+    REPAIR_REJECTED = "REPAIR_REJECTED"
+    MATERIAL_REQUESTED = "MATERIAL_REQUESTED"
+    MATERIAL_APPROVED = "MATERIAL_APPROVED"
+    MATERIAL_REJECTED = "MATERIAL_REJECTED"
+    MATERIAL_WAITING_STOCK = "MATERIAL_WAITING_STOCK"
+    STOCK_ISSUED = "STOCK_ISSUED"
+    PURCHASE_REQUIRED = "PURCHASE_REQUIRED"
+    PART_RECEIVED = "PART_RECEIVED"
+    PARTS_RECEIVED = "PARTS_RECEIVED"
     REPAIR_STARTED = "REPAIR_STARTED"
     REPAIR_COMPLETED = "REPAIR_COMPLETED"
+    WAITING_DRIVER_CONFIRMATION = "WAITING_DRIVER_CONFIRMATION"
+    DRIVER_ACCEPTED = "DRIVER_ACCEPTED"
+    DRIVER_REJECTED = "DRIVER_REJECTED"
+    INVOICE_UPLOADED = "INVOICE_UPLOADED"
+    INVOICE_APPROVED = "INVOICE_APPROVED"
+    EXTERNAL_INVOICE_UPLOADED = "EXTERNAL_INVOICE_UPLOADED"
+    EXTERNAL_INVOICE_APPROVED = "EXTERNAL_INVOICE_APPROVED"
 
 
 @dataclass(frozen=True)

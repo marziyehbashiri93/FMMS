@@ -55,6 +55,7 @@ def _to_response_dto(order: RepairOrder) -> RepairOrderResponseDTO:
         completed_at=order.completed_at,
         sap_order_number=order.sap_order_number,
         workshop_type=order.workshop_type,
+        workshop_id=order.workshop_id,
         technician_id=order.assignment.technician_id if order.assignment else None,
         assigned_at=order.assignment.assigned_at if order.assignment else None,
         activities=[

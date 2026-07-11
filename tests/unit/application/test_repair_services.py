@@ -23,6 +23,9 @@ from apps.integration.domain.entities import (
 from apps.integration.domain.interfaces.sap_transaction_repository import (
     ISAPTransactionRepository,
 )
+from apps.material.domain.interfaces.material_request_repository import (
+    IMaterialRequestRepository,
+)
 from apps.repair.application.dto.repair_dto import (
     AddRepairActivityDTO,
     AddRepairPartDTO,
@@ -279,6 +282,30 @@ class FakeVehicleRepository(IVehicleRepository):
         self._store.pop(vehicle_id, None)
 
 
+class FakeMaterialRequestRepository(IMaterialRequestRepository):
+    """Empty material-request store for complete-repair unit tests."""
+
+    def get_by_id(self, request_id: uuid.UUID):
+        raise KeyError(request_id)
+
+    def list_all(self, *, status=None):
+        return []
+
+    def list_by_repair_order(self, repair_order_id: uuid.UUID):
+        return []
+
+    def save(self, material_request):
+        return material_request
+
+
+class FakeCreateVehicleHandover:
+    """No-op handover port for CompleteRepairOrderService unit tests."""
+
+    def execute(self, *, repair_order_id: uuid.UUID, vehicle_id: uuid.UUID) -> None:
+        self.repair_order_id = repair_order_id
+        self.vehicle_id = vehicle_id
+
+
 class FakeFaultRepository(IFaultRepository):
     def __init__(self, initial: list[Fault] | None = None) -> None:
         self._store: dict[uuid.UUID, Fault] = {f.id: f for f in (initial or [])}
@@ -475,23 +502,39 @@ class TestAssignRepairOrderService:
 
 class TestStartRepairService:
     def test_starts_assigned_order(self) -> None:
-        order = _make_order(status=RepairOrderStatus.ASSIGNED)
-        result = StartRepairService(FakeRepairRepository([order])).execute(order.id)
+        vehicle = _make_vehicle()
+        order = _make_order(status=RepairOrderStatus.ASSIGNED, vehicle_id=vehicle.id)
+        result = StartRepairService(
+            FakeRepairRepository([order]),
+            FakeVehicleRepository([vehicle]),
+        ).execute(order.id)
 
         assert result.status == RepairOrderStatus.IN_PROGRESS
 
     def test_raises_when_not_assigned(self) -> None:
-        order = _make_order(status=RepairOrderStatus.CREATED)
+        vehicle = _make_vehicle()
+        order = _make_order(status=RepairOrderStatus.CREATED, vehicle_id=vehicle.id)
         with pytest.raises(RepairOrderInvalidStateTransitionError):
-            StartRepairService(FakeRepairRepository([order])).execute(order.id)
+            StartRepairService(
+                FakeRepairRepository([order]),
+                FakeVehicleRepository([vehicle]),
+            ).execute(order.id)
 
 
 class TestCompleteRepairOrderService:
     def test_completes_in_progress_order(self) -> None:
-        order = _make_order(status=RepairOrderStatus.IN_PROGRESS)
+        vehicle = _make_vehicle()
+        vehicle.status = VehicleStatus.UNDER_REPAIR
+        order = _make_order(status=RepairOrderStatus.IN_PROGRESS, vehicle_id=vehicle.id)
         completed_at = datetime.now(tz=UTC)
+        handover = FakeCreateVehicleHandover()
 
-        result = CompleteRepairOrderService(FakeRepairRepository([order])).execute(
+        result = CompleteRepairOrderService(
+            FakeRepairRepository([order]),
+            FakeVehicleRepository([vehicle]),
+            FakeMaterialRequestRepository(),
+            handover,
+        ).execute(
             CompleteRepairOrderDTO(
                 repair_order_id=order.id,
                 completed_at=completed_at,
@@ -500,13 +543,20 @@ class TestCompleteRepairOrderService:
             )
         )
 
-        assert result.status == RepairOrderStatus.COMPLETED
+        assert result.status == RepairOrderStatus.WAITING_DRIVER_CONFIRMATION
         assert result.completed_at == completed_at
+        assert handover.repair_order_id == order.id
 
     def test_raises_when_not_in_progress(self) -> None:
-        order = _make_order(status=RepairOrderStatus.ASSIGNED)
+        vehicle = _make_vehicle()
+        order = _make_order(status=RepairOrderStatus.ASSIGNED, vehicle_id=vehicle.id)
         with pytest.raises(RepairOrderInvalidStateTransitionError):
-            CompleteRepairOrderService(FakeRepairRepository([order])).execute(
+            CompleteRepairOrderService(
+                FakeRepairRepository([order]),
+                FakeVehicleRepository([vehicle]),
+                FakeMaterialRequestRepository(),
+                FakeCreateVehicleHandover(),
+            ).execute(
                 CompleteRepairOrderDTO(
                     repair_order_id=order.id,
                     completed_at=datetime.now(tz=UTC),

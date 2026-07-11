@@ -9,6 +9,8 @@ urlpatterns = [
     path("", include("interfaces.api.v1.inspection.urls")),
     path("", include("interfaces.api.v1.fault.urls")),
     path("", include("interfaces.api.v1.repair.urls")),
+    path("", include("interfaces.api.v1.material.urls")),
+    path("", include("interfaces.api.v1.handover.urls")),
     path("", include("interfaces.api.v1.preventive_maintenance.urls")),
     path("", include("interfaces.api.v1.procurement.urls")),
     path("", include("interfaces.api.v1.integration.urls")),

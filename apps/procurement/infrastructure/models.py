@@ -19,6 +19,7 @@ class PurchaseRequisitionModel(BaseModel):
     repair_order_id = models.UUIDField(db_index=True)
     status = models.CharField(max_length=20, db_index=True)
     requested_by_id = models.UUIDField()
+    material_request_id = models.UUIDField(null=True, blank=True, default=None)
     sap_pr_number = models.CharField(max_length=10, blank=True, default="")
     approved_by_id = models.UUIDField(null=True, blank=True, default=None)
 

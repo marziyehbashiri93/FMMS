@@ -13,7 +13,12 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from typing import Protocol
 
+from apps.material.domain.entities import MaterialRequestStatus
+from apps.material.domain.interfaces.material_request_repository import (
+    IMaterialRequestRepository,
+)
 from apps.repair.application.dto.repair_dto import (
     CloseRepairOrderDTO,
     CompleteRepairOrderDTO,
@@ -30,10 +35,19 @@ from apps.repair.application.services.repair_order_timeline_service import (
 )
 from apps.repair.domain.entities import RepairOrderEventType
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
+from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
 from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
 
 logger = get_structured_logger("repair", __name__)
+
+
+class CreateVehicleHandoverPort(Protocol):
+    """Port for creating a vehicle handover after technical completion."""
+
+    def execute(self, *, repair_order_id: uuid.UUID, vehicle_id: uuid.UUID) -> None:
+        """Create handover when absent for repair order."""
+        ...
 
 
 class StartRepairService:
@@ -47,9 +61,11 @@ class StartRepairService:
     def __init__(
         self,
         repair_order_repository: IRepairOrderRepository,
+        vehicle_repository: IVehicleRepository,
         event_recorder: RecordRepairOrderEventService | None = None,
     ) -> None:
         self._repo = repair_order_repository
+        self._vehicle_repo = vehicle_repository
         self._event_recorder = event_recorder
 
     def execute(
@@ -91,6 +107,14 @@ class StartRepairService:
         order.start_work()
         order.updated_at = datetime.now(tz=UTC)
         saved = self._repo.save(order)
+        vehicle = load_or_not_found(
+            lambda: self._vehicle_repo.get_by_id(saved.vehicle_id),
+            message=f"Vehicle '{saved.vehicle_id}' not found.",
+            details={"vehicle_id": str(saved.vehicle_id)},
+        )
+        vehicle.mark_under_repair()
+        vehicle.updated_at = datetime.now(tz=UTC)
+        self._vehicle_repo.save(vehicle)
         record_repair_timeline_event(
             self._event_recorder,
             saved.id,
@@ -126,9 +150,15 @@ class CompleteRepairOrderService:
     def __init__(
         self,
         repair_order_repository: IRepairOrderRepository,
+        vehicle_repository: IVehicleRepository,
+        material_request_repository: IMaterialRequestRepository,
+        create_vehicle_handover_service: CreateVehicleHandoverPort,
         event_recorder: RecordRepairOrderEventService | None = None,
     ) -> None:
         self._repo = repair_order_repository
+        self._vehicle_repo = vehicle_repository
+        self._material_request_repo = material_request_repository
+        self._create_handover_service = create_vehicle_handover_service
         self._event_recorder = event_recorder
 
     def execute(self, dto: CompleteRepairOrderDTO) -> RepairOrderResponseDTO:
@@ -161,14 +191,62 @@ class CompleteRepairOrderService:
             details={"repair_order_id": str(dto.repair_order_id)},
         )
 
-        order.complete(completed_at=dto.completed_at)
+        pending_material = [
+            request
+            for request in self._material_request_repo.list_by_repair_order(
+                dto.repair_order_id
+            )
+            if request.status
+            not in {
+                MaterialRequestStatus.REJECTED,
+                MaterialRequestStatus.STOCK_ISSUED,
+                MaterialRequestStatus.RECEIVED,
+            }
+        ]
+        if pending_material:
+            from core.exceptions.base_exception import (  # noqa: PLC0415
+                FMMSConflictError,
+            )
+
+            raise FMMSConflictError(
+                message="Cannot complete repair order with pending material requests.",
+                error_code="PENDING_MATERIAL_REQUESTS",
+                details={
+                    "repair_order_id": str(dto.repair_order_id),
+                    "pending_material_request_ids": [
+                        str(item.id) for item in pending_material
+                    ],
+                },
+            )
+
+        order.complete_waiting_driver_confirmation(completed_at=dto.completed_at)
         order.updated_at = datetime.now(tz=UTC)
         saved = self._repo.save(order)
+        vehicle = load_or_not_found(
+            lambda: self._vehicle_repo.get_by_id(saved.vehicle_id),
+            message=f"Vehicle '{saved.vehicle_id}' not found.",
+            details={"vehicle_id": str(saved.vehicle_id)},
+        )
+        vehicle.mark_waiting_driver_confirmation()
+        vehicle.updated_at = datetime.now(tz=UTC)
+        self._vehicle_repo.save(vehicle)
+        self._create_handover_service.execute(
+            repair_order_id=saved.id,
+            vehicle_id=saved.vehicle_id,
+        )
         record_repair_timeline_event(
             self._event_recorder,
             saved.id,
             RepairOrderEventType.REPAIR_COMPLETED,
-            "تعمیر با موفقیت پایان یافت.",
+            "تعمیر فنی تکمیل شد.",
+            created_by_id=dto.completed_by,
+            request_id=dto.request_id,
+        )
+        record_repair_timeline_event(
+            self._event_recorder,
+            saved.id,
+            RepairOrderEventType.WAITING_DRIVER_CONFIRMATION,
+            "تعمیر انجام شد و در انتظار تایید راننده است.",
             created_by_id=dto.completed_by,
             request_id=dto.request_id,
         )

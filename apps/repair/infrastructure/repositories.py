@@ -34,7 +34,12 @@ from core.logging.structured_logger import get_structured_logger
 
 logger = get_structured_logger(domain="repair", module=__name__)
 
-_TERMINAL_STATUSES = {RepairOrderStatus.COMPLETED, RepairOrderStatus.CANCELLED}
+_TERMINAL_STATUSES = {
+    RepairOrderStatus.COMPLETED,
+    RepairOrderStatus.CANCELLED,
+    RepairOrderStatus.ACCEPTED_BY_DRIVER,
+    RepairOrderStatus.REJECTED_BY_DRIVER,
+}
 
 
 def _to_domain(
@@ -89,6 +94,7 @@ def _to_domain(
         parts=domain_parts,
         sap_order_number=orm.sap_order_number or None,
         workshop_type=WorkshopType(orm.workshop_type) if orm.workshop_type else None,
+        workshop_id=orm.workshop_id or None,
         completed_at=orm.completed_at,
     )
 
@@ -173,6 +179,7 @@ class DjangoRepairOrderRepository(IRepairOrderRepository):
                     "workshop_type": (
                         order.workshop_type.value if order.workshop_type else ""
                     ),
+                    "workshop_id": order.workshop_id or "",
                     "completed_at": order.completed_at,
                     "assigned_technician_id": (
                         order.assignment.technician_id if order.assignment else None

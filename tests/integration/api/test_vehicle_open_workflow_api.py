@@ -228,6 +228,16 @@ class TestVehicleOpenWorkflowAPI:
             {"completed_at": datetime.now(tz=UTC).isoformat()},
             format="json",
         )
+        handovers = authenticated_client.get("/api/v1/vehicle-handovers/")
+        target = next(
+            item for item in handovers.data if item["repair_order_id"] == order["id"]
+        )
+        confirmed = authenticated_client.post(
+            f"/api/v1/vehicle-handovers/{target['id']}/confirm/",
+            {"accepted": True, "comment": "ok"},
+            format="json",
+        )
+        assert confirmed.status_code == 200, confirmed.data
         authenticated_client.post(
             f"/api/v1/faults/{fault['id']}/close/", {}, format="json"
         )

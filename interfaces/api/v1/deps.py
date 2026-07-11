@@ -29,6 +29,12 @@ from apps.fault.application.services.get_fault_service import (
 )
 from apps.fault.application.services.report_fault_service import ReportFaultService
 from apps.fault.infrastructure.repositories import DjangoFaultRepository
+from apps.handover.application.services.handover_service import (
+    ConfirmVehicleHandoverService,
+    CreateVehicleHandoverService,
+    ListVehicleHandoversService,
+)
+from apps.handover.infrastructure.repositories import DjangoVehicleHandoverRepository
 from apps.inspection.application.services.add_inspection_item_service import (
     AddInspectionItemService,
 )
@@ -54,6 +60,17 @@ from apps.integration.application.services.retry_failed_sap_transactions_service
     RetryFailedSAPTransactionsService,
 )
 from apps.integration.infrastructure.repositories import DjangoSAPTransactionRepository
+from apps.material.application.services.material_request_service import (
+    ApproveMaterialRequestService,
+    CreateMaterialRequestService,
+    ListMaterialRequestsService,
+    RejectMaterialRequestService,
+)
+from apps.material.infrastructure.inventory_adapter import StubInventoryAvailabilityAdapter
+from apps.material.infrastructure.repositories import (
+    DjangoInventoryTransactionRepository,
+    DjangoMaterialRequestRepository,
+)
 from apps.preventive_maintenance.application.services.complete_pm_work_order_service import (
     CompletePMWorkOrderService,
 )
@@ -101,14 +118,21 @@ from apps.repair.application.services.add_repair_activity_service import (
     AddRepairPartService,
 )
 from apps.repair.application.services.approve_repair_order_service import (
+    AcceptRepairOrderService,
     ApproveRepairOrderService,
     AssignWorkshopService,
+    RejectRepairOrderService,
 )
 from apps.repair.application.services.assign_repair_order_service import (
     AssignRepairOrderService,
 )
 from apps.repair.application.services.create_repair_order_service import (
     CreateRepairOrderService,
+)
+from apps.repair.application.services.external_invoice_service import (
+    ApproveExternalInvoiceService,
+    ListExternalInvoicesService,
+    UploadExternalInvoiceService,
 )
 from apps.repair.application.services.get_repair_order_service import (
     GetRepairOrderService,
@@ -128,6 +152,9 @@ from apps.repair.application.services.update_repair_status_service import (
 )
 from apps.repair.infrastructure.event_repositories import (
     DjangoRepairOrderEventRepository,
+)
+from apps.repair.infrastructure.invoice_repositories import (
+    DjangoExternalRepairInvoiceRepository,
 )
 from apps.repair.infrastructure.repositories import DjangoRepairOrderRepository
 from apps.vehicle.application.services.activate_vehicle_service import (
@@ -213,9 +240,29 @@ def get_fault_repository() -> DjangoFaultRepository:
     return DjangoFaultRepository()
 
 
+def get_material_request_repository() -> DjangoMaterialRequestRepository:
+    """Return the material request repository."""
+    return DjangoMaterialRequestRepository()
+
+
+def get_inventory_transaction_repository() -> DjangoInventoryTransactionRepository:
+    """Return the inventory transaction repository."""
+    return DjangoInventoryTransactionRepository()
+
+
+def get_vehicle_handover_repository() -> DjangoVehicleHandoverRepository:
+    """Return the vehicle handover repository."""
+    return DjangoVehicleHandoverRepository()
+
+
 def get_repair_order_repository() -> DjangoRepairOrderRepository:
     """Return the repair-order repository."""
     return DjangoRepairOrderRepository()
+
+
+def get_external_invoice_repository() -> DjangoExternalRepairInvoiceRepository:
+    """Return external invoice repository."""
+    return DjangoExternalRepairInvoiceRepository()
 
 
 def get_pm_plan_repository() -> DjangoPMPlanRepository:
@@ -475,10 +522,82 @@ def get_assign_workshop_service() -> AssignWorkshopService:
     )
 
 
+def get_accept_repair_order_service() -> AcceptRepairOrderService:
+    """Return AcceptRepairOrderService."""
+    return AcceptRepairOrderService(
+        get_repair_order_repository(),
+        get_record_repair_order_event_service(),
+    )
+
+
+def get_reject_repair_order_service() -> RejectRepairOrderService:
+    """Return RejectRepairOrderService."""
+    return RejectRepairOrderService(
+        get_repair_order_repository(),
+        get_vehicle_repository(),
+        get_record_repair_order_event_service(),
+    )
+
+
+def get_create_material_request_service() -> CreateMaterialRequestService:
+    """Return CreateMaterialRequestService."""
+    return CreateMaterialRequestService(
+        get_material_request_repository(),
+        get_repair_order_repository(),
+        get_record_repair_order_event_service(),
+    )
+
+
+def get_list_material_requests_service() -> ListMaterialRequestsService:
+    """Return ListMaterialRequestsService."""
+    return ListMaterialRequestsService(get_material_request_repository())
+
+
+def get_approve_material_request_service() -> ApproveMaterialRequestService:
+    """Return ApproveMaterialRequestService."""
+    return ApproveMaterialRequestService(
+        get_material_request_repository(),
+        StubInventoryAvailabilityAdapter(),
+        get_inventory_transaction_repository(),
+        get_create_purchase_requisition_service(),
+        get_add_pr_line_item_service(),
+        get_record_repair_order_event_service(),
+    )
+
+
+def get_reject_material_request_service() -> RejectMaterialRequestService:
+    """Return RejectMaterialRequestService."""
+    return RejectMaterialRequestService(
+        get_material_request_repository(),
+        get_record_repair_order_event_service(),
+    )
+
+
+def get_create_vehicle_handover_service() -> CreateVehicleHandoverService:
+    """Return CreateVehicleHandoverService."""
+    return CreateVehicleHandoverService(get_vehicle_handover_repository())
+
+
+def get_list_vehicle_handovers_service() -> ListVehicleHandoversService:
+    """Return ListVehicleHandoversService."""
+    return ListVehicleHandoversService(get_vehicle_handover_repository())
+
+
+def get_confirm_vehicle_handover_service() -> ConfirmVehicleHandoverService:
+    """Return ConfirmVehicleHandoverService."""
+    return ConfirmVehicleHandoverService(
+        get_vehicle_handover_repository(),
+        get_repair_order_repository(),
+        get_vehicle_repository(),
+        get_record_repair_order_event_service(),
+    )
+
+
 def get_start_repair_service() -> StartRepairService:
     """Return StartRepairService."""
     return StartRepairService(
         get_repair_order_repository(),
+        get_vehicle_repository(),
         get_record_repair_order_event_service(),
     )
 
@@ -487,6 +606,9 @@ def get_complete_repair_order_service() -> CompleteRepairOrderService:
     """Return CompleteRepairOrderService."""
     return CompleteRepairOrderService(
         get_repair_order_repository(),
+        get_vehicle_repository(),
+        get_material_request_repository(),
+        get_create_vehicle_handover_service(),
         get_record_repair_order_event_service(),
     )
 
@@ -513,6 +635,28 @@ def get_sync_repair_to_sap_service() -> SyncRepairToSAPService:
         get_vehicle_repository(),
         get_sap_transaction_manager(),
         PMOrderBAPIAdapter(_sap_client()),
+    )
+
+
+def get_upload_external_invoice_service() -> UploadExternalInvoiceService:
+    """Return UploadExternalInvoiceService."""
+    return UploadExternalInvoiceService(
+        get_external_invoice_repository(),
+        get_repair_order_repository(),
+        get_record_repair_order_event_service(),
+    )
+
+
+def get_list_external_invoices_service() -> ListExternalInvoicesService:
+    """Return ListExternalInvoicesService."""
+    return ListExternalInvoicesService(get_external_invoice_repository())
+
+
+def get_approve_external_invoice_service() -> ApproveExternalInvoiceService:
+    """Return ApproveExternalInvoiceService."""
+    return ApproveExternalInvoiceService(
+        get_external_invoice_repository(),
+        get_record_repair_order_event_service(),
     )
 
 

@@ -36,6 +36,7 @@ class VehicleStatus(StrEnum):
     ACTIVE = "ACTIVE"
     INACTIVE = "INACTIVE"
     UNDER_REPAIR = "UNDER_REPAIR"
+    WAITING_DRIVER_CONFIRMATION = "WAITING_DRIVER_CONFIRMATION"
     SUSPENDED = "SUSPENDED"
     OUT_OF_SERVICE = "OUT_OF_SERVICE"
 
@@ -62,6 +63,7 @@ _ALLOWED_TRANSITIONS: dict[VehicleStatus, frozenset[VehicleStatus]] = {
         {
             VehicleStatus.INACTIVE,
             VehicleStatus.UNDER_REPAIR,
+            VehicleStatus.WAITING_DRIVER_CONFIRMATION,
             VehicleStatus.SUSPENDED,
             VehicleStatus.OUT_OF_SERVICE,
         }
@@ -70,8 +72,17 @@ _ALLOWED_TRANSITIONS: dict[VehicleStatus, frozenset[VehicleStatus]] = {
         {
             VehicleStatus.ACTIVE,
             VehicleStatus.INACTIVE,
+            VehicleStatus.WAITING_DRIVER_CONFIRMATION,
             VehicleStatus.SUSPENDED,
             VehicleStatus.OUT_OF_SERVICE,
+        }
+    ),
+    VehicleStatus.WAITING_DRIVER_CONFIRMATION: frozenset(
+        {
+            VehicleStatus.ACTIVE,
+            VehicleStatus.OUT_OF_SERVICE,
+            VehicleStatus.SUSPENDED,
+            VehicleStatus.INACTIVE,
         }
     ),
     VehicleStatus.SUSPENDED: frozenset(
@@ -79,6 +90,7 @@ _ALLOWED_TRANSITIONS: dict[VehicleStatus, frozenset[VehicleStatus]] = {
             VehicleStatus.ACTIVE,
             VehicleStatus.INACTIVE,
             VehicleStatus.UNDER_REPAIR,
+            VehicleStatus.WAITING_DRIVER_CONFIRMATION,
             VehicleStatus.OUT_OF_SERVICE,
         }
     ),
@@ -86,6 +98,7 @@ _ALLOWED_TRANSITIONS: dict[VehicleStatus, frozenset[VehicleStatus]] = {
         {
             VehicleStatus.ACTIVE,
             VehicleStatus.UNDER_REPAIR,
+            VehicleStatus.WAITING_DRIVER_CONFIRMATION,
             VehicleStatus.INACTIVE,
             VehicleStatus.SUSPENDED,
         }
@@ -175,6 +188,10 @@ class Vehicle:
                 current status.
         """
         self.transition_to(VehicleStatus.ACTIVE)
+
+    def mark_waiting_driver_confirmation(self) -> None:
+        """Transition vehicle to WAITING_DRIVER_CONFIRMATION after repair."""
+        self.transition_to(VehicleStatus.WAITING_DRIVER_CONFIRMATION)
 
     def activate(self) -> None:
         """Return the vehicle to ACTIVE when maintenance clearance allows it.

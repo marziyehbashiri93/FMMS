@@ -76,6 +76,7 @@ def _pr_to_domain(orm: PurchaseRequisitionModel) -> PurchaseRequisition:
             SAPDocumentNumber(orm.sap_pr_number) if orm.sap_pr_number else None
         ),
         approved_by_id=orm.approved_by_id,
+        material_request_id=orm.material_request_id,
     )
 
 
@@ -149,6 +150,7 @@ class DjangoPurchaseRequisitionRepository(IPurchaseRequisitionRepository):
                     "repair_order_id": pr.repair_order_id,
                     "status": pr.status.value,
                     "requested_by_id": pr.requested_by_id,
+                    "material_request_id": pr.material_request_id,
                     "sap_pr_number": (
                         pr.sap_pr_number.value if pr.sap_pr_number else ""
                     ),

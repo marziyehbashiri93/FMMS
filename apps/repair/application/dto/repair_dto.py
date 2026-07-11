@@ -14,6 +14,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from apps.repair.domain.entities import RepairOrderStatus, WorkshopType
+from apps.repair.domain.invoice_entities import ExternalRepairInvoiceStatus
 
 
 @dataclass(frozen=True)
@@ -207,6 +208,7 @@ class AssignWorkshopDTO:
     workshop_type: WorkshopType
     request_id: str
     assigned_by: uuid.UUID
+    workshop_id: str | None = field(default=None)
 
 
 @dataclass(frozen=True)
@@ -224,6 +226,7 @@ class RepairDecisionResponseDTO:
     status: RepairOrderStatus
     message: str
     workshop_type: WorkshopType | None = field(default=None)
+    workshop_id: str | None = field(default=None)
 
 
 @dataclass(frozen=True)
@@ -246,6 +249,7 @@ class RepairOrderResponseDTO:
     assigned_at: datetime | None = field(default=None)
     sap_order_number: str | None = field(default=None)
     workshop_type: WorkshopType | None = field(default=None)
+    workshop_id: str | None = field(default=None)
     completed_at: datetime | None = field(default=None)
 
 
@@ -257,3 +261,41 @@ class RepairOrderTimelineEventDTO:
     description: str
     created_at: datetime
     created_by_id: uuid.UUID | None = field(default=None)
+
+
+@dataclass(frozen=True)
+class UploadExternalInvoiceDTO:
+    """Input DTO for uploading an external repair invoice."""
+
+    repair_order_id: uuid.UUID
+    amount: Decimal
+    currency: str
+    request_id: str
+    uploaded_by: uuid.UUID
+    vendor_id: str | None = field(default=None)
+    document: str | None = field(default=None)
+
+
+@dataclass(frozen=True)
+class ApproveExternalInvoiceDTO:
+    """Input DTO for approving an external repair invoice."""
+
+    invoice_id: uuid.UUID
+    request_id: str
+    approved_by: uuid.UUID
+
+
+@dataclass(frozen=True)
+class ExternalInvoiceResponseDTO:
+    """Output DTO for external repair invoice APIs."""
+
+    id: uuid.UUID
+    repair_order_id: uuid.UUID
+    amount: Decimal
+    currency: str
+    status: ExternalRepairInvoiceStatus
+    created_by_id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+    vendor_id: str | None = field(default=None)
+    document: str | None = field(default=None)

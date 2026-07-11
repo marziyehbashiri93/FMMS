@@ -40,7 +40,7 @@ class VehicleModel(BaseModel):
     model = models.CharField(max_length=100)
     year = models.PositiveSmallIntegerField()
     category = models.CharField(max_length=20)
-    status = models.CharField(max_length=20, db_index=True)
+    status = models.CharField(max_length=30, db_index=True)
 
     class Meta:
         app_label = "vehicle"

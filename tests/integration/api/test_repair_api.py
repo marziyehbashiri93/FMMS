@@ -93,7 +93,7 @@ class TestRepairAPI:
             format="json",
         )
         assert completed.status_code == 200, completed.data
-        assert completed.data["status"] == "COMPLETED"
+        assert completed.data["status"] == "WAITING_DRIVER_CONFIRMATION"
 
         listed = authenticated_client.get(
             f"/api/v1/repair-orders/?vehicle_id={vehicle['id']}"

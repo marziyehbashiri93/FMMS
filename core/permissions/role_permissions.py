@@ -13,6 +13,20 @@ from rest_framework.request import Request
 from rest_framework.views import APIView
 
 
+def _normalized_role(user: Any) -> str | None:
+    """Map legacy/demo roles to canonical FMMS authorization roles."""
+    role = getattr(user, "role", None)
+    role_map = {
+        "DISTRIBUTION": "SUPERVISOR",
+        "TRANSPORT": "SUPERVISOR",
+        "WAREHOUSE": "SUPERVISOR",
+        "DRIVER": "TECHNICIAN",
+    }
+    if role in role_map:
+        return role_map[role]
+    return role
+
+
 class IsFMMSAuthenticated(BasePermission):
     """Require an authenticated FMMS user."""
 
@@ -28,7 +42,7 @@ class IsAdminRole(BasePermission):
         """Return True for authenticated ADMIN users."""
         user: Any = request.user
         return bool(
-            user and user.is_authenticated and getattr(user, "role", None) == "ADMIN"
+            user and user.is_authenticated and _normalized_role(user) == "ADMIN"
         )
 
 
@@ -41,7 +55,7 @@ class IsSupervisorOrAbove(BasePermission):
         return bool(
             user
             and user.is_authenticated
-            and getattr(user, "role", None) in {"ADMIN", "SUPERVISOR"}
+            and _normalized_role(user) in {"ADMIN", "SUPERVISOR"}
         )
 
 
@@ -54,7 +68,7 @@ class IsTechnicianOrAbove(BasePermission):
         return bool(
             user
             and user.is_authenticated
-            and getattr(user, "role", None) in {"ADMIN", "SUPERVISOR", "TECHNICIAN"}
+            and _normalized_role(user) in {"ADMIN", "SUPERVISOR", "TECHNICIAN"}
         )
 
 
@@ -71,4 +85,17 @@ class IsReadOnlyOrTechnicianOrAbove(BasePermission):
             return False
         if request.method in SAFE_METHODS:
             return True
-        return getattr(user, "role", None) in {"ADMIN", "SUPERVISOR", "TECHNICIAN"}
+        return _normalized_role(user) in {"ADMIN", "SUPERVISOR", "TECHNICIAN"}
+
+
+class IsTransportSupervisorOrAbove(BasePermission):
+    """Allow transport/supervisor/admin roles for workflow approvals."""
+
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        """Return True for users mapped to supervisor privileges."""
+        user: Any = request.user
+        return bool(
+            user
+            and user.is_authenticated
+            and _normalized_role(user) in {"ADMIN", "SUPERVISOR"}
+        )

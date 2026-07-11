@@ -23,8 +23,16 @@ from apps.repair.application.dto.repair_dto import (
     SyncRepairToSAPDTO,
 )
 from apps.repair.domain.entities import RepairOrderStatus, WorkshopType
-from core.permissions import IsReadOnlyOrTechnicianOrAbove, IsSupervisorOrAbove
+from core.permissions import (
+    IsReadOnlyOrTechnicianOrAbove,
+    IsSupervisorOrAbove,
+    IsTechnicianOrAbove,
+)
 from interfaces.api.v1 import deps
+from interfaces.api.v1.material.views import RepairOrderMaterialRequestMixin
+from interfaces.api.v1.repair.external_invoice_views import (
+    RepairOrderExternalInvoiceMixin,
+)
 from interfaces.api.v1.repair.serializers import (
     RepairActivityCreateSerializer,
     RepairAssignSerializer,
@@ -40,7 +48,9 @@ from interfaces.api.v1.repair.serializers import (
 from interfaces.api.v1.utils import paginate_dto_list, request_id_from, user_id_from
 
 
-class RepairOrderViewSet(GenericViewSet):
+class RepairOrderViewSet(
+    RepairOrderMaterialRequestMixin, RepairOrderExternalInvoiceMixin, GenericViewSet
+):
     """Expose repair application services through REST endpoints."""
 
     permission_classes = [IsReadOnlyOrTechnicianOrAbove]
@@ -128,9 +138,32 @@ class RepairOrderViewSet(GenericViewSet):
             AssignWorkshopDTO(
                 repair_order_id=uuid.UUID(str(pk)),
                 workshop_type=WorkshopType(serializer.validated_data["workshop_type"]),
+                workshop_id=serializer.validated_data.get("workshop_id") or None,
                 request_id=request_id_from(request),
                 assigned_by=user_id_from(request),
             )
+        )
+        return Response(RepairDecisionResponseSerializer(result).data)
+
+    @extend_schema(request=None, responses=RepairDecisionResponseSerializer)
+    @action(detail=True, methods=["post"], permission_classes=[IsTechnicianOrAbove])
+    def accept(self, request: Request, pk: str | None = None) -> Response:
+        """Internal workshop accepts the repair order."""
+        result = deps.get_accept_repair_order_service().execute(
+            repair_order_id=uuid.UUID(str(pk)),
+            request_id=request_id_from(request),
+            accepted_by=user_id_from(request),
+        )
+        return Response(RepairDecisionResponseSerializer(result).data)
+
+    @extend_schema(request=None, responses=RepairDecisionResponseSerializer)
+    @action(detail=True, methods=["post"], permission_classes=[IsTechnicianOrAbove])
+    def reject(self, request: Request, pk: str | None = None) -> Response:
+        """Internal workshop rejects the repair order."""
+        result = deps.get_reject_repair_order_service().execute(
+            repair_order_id=uuid.UUID(str(pk)),
+            request_id=request_id_from(request),
+            rejected_by=user_id_from(request),
         )
         return Response(RepairDecisionResponseSerializer(result).data)
 

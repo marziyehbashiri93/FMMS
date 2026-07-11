@@ -122,6 +122,7 @@ class PurchaseRequisition:
     line_items: list[PRLineItem] = field(default_factory=list)
     sap_pr_number: SAPDocumentNumber | None = field(default=None)
     approved_by_id: uuid.UUID | None = field(default=None)
+    material_request_id: uuid.UUID | None = field(default=None)
 
     def transition_to(self, target: PRStatus) -> None:
         """Guard and apply a PR status transition.

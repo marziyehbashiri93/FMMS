@@ -40,6 +40,7 @@ def _pr_to_response_dto(
         updated_at=pr.updated_at,
         sap_pr_number=pr.sap_pr_number.value if pr.sap_pr_number else None,
         approved_by_id=pr.approved_by_id,
+        material_request_id=pr.material_request_id,
         sap_transaction_id=sap_transaction_id,
         sap_transaction_status=sap_transaction_status,
         line_items=[
@@ -114,6 +115,7 @@ class CreatePurchaseRequisitionService:
             repair_order_id=dto.repair_order_id,
             status=PRStatus.DRAFT,
             requested_by_id=dto.requested_by,
+            material_request_id=dto.material_request_id,
             created_at=now,
             updated_at=now,
         )

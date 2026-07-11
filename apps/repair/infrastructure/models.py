@@ -28,6 +28,7 @@ class RepairOrderModel(BaseModel):
     initiator_id = models.UUIDField()
     sap_order_number = models.CharField(max_length=30, blank=True, default="")
     workshop_type = models.CharField(max_length=20, blank=True, default="")
+    workshop_id = models.CharField(max_length=64, blank=True, default="")
     completed_at = models.DateTimeField(null=True, blank=True, default=None)
     # TechnicianAssignment (value object — denormalized)
     assigned_technician_id = models.UUIDField(null=True, blank=True, default=None)
@@ -130,3 +131,24 @@ class RepairOrderEventModel(BaseModel):
         verbose_name = "Repair Order Event"
         verbose_name_plural = "Repair Order Events"
         ordering = ["created_at"]
+
+
+class ExternalRepairInvoiceModel(BaseModel):
+    """Persistence model for external workshop invoices."""
+
+    repair_order = models.ForeignKey(
+        RepairOrderModel,
+        on_delete=models.CASCADE,
+        related_name="external_invoices",
+        db_index=True,
+    )
+    vendor_id = models.CharField(max_length=64, blank=True, default="")
+    amount = models.DecimalField(max_digits=15, decimal_places=2)
+    currency = models.CharField(max_length=3)
+    document = models.CharField(max_length=500, blank=True, default="")
+    status = models.CharField(max_length=20, db_index=True)
+    uploaded_by_id = models.UUIDField()
+
+    class Meta:
+        app_label = "repair"
+        db_table = "external_repair_invoice"

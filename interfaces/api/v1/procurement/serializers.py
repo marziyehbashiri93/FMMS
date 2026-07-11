@@ -83,6 +83,7 @@ class PurchaseRequisitionResponseSerializer(serializers.Serializer):
     line_items = PRLineItemResponseSerializer(many=True)
     sap_pr_number = serializers.CharField(allow_null=True)
     approved_by_id = serializers.UUIDField(allow_null=True)
+    material_request_id = serializers.UUIDField(allow_null=True)
     sap_transaction_id = serializers.UUIDField(allow_null=True)
     sap_transaction_status = serializers.CharField(allow_null=True)
 

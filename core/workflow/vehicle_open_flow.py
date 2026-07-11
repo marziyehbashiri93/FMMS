@@ -26,6 +26,8 @@ FAULT_OPEN_STATUSES: frozenset[FaultStatus] = frozenset(
 REPAIR_ORDER_TERMINAL_STATUSES: frozenset[RepairOrderStatus] = frozenset(
     {
         RepairOrderStatus.COMPLETED,
+        RepairOrderStatus.ACCEPTED_BY_DRIVER,
+        RepairOrderStatus.REJECTED_BY_DRIVER,
         RepairOrderStatus.CANCELLED,
     }
 )

@@ -5,6 +5,7 @@ from __future__ import annotations
 from rest_framework import serializers
 
 from apps.repair.domain.entities import RepairOrderStatus, WorkshopType
+from apps.repair.domain.invoice_entities import ExternalRepairInvoiceStatus
 
 
 class RepairOrderCreateSerializer(serializers.Serializer):
@@ -25,6 +26,9 @@ class RepairAssignWorkshopSerializer(serializers.Serializer):
 
     workshop_type = serializers.ChoiceField(
         choices=[item.value for item in WorkshopType]
+    )
+    workshop_id = serializers.CharField(
+        max_length=64, required=False, allow_null=True, allow_blank=True
     )
 
 
@@ -113,6 +117,7 @@ class RepairOrderResponseSerializer(serializers.Serializer):
     workshop_type = serializers.ChoiceField(
         choices=[item.value for item in WorkshopType], allow_null=True
     )
+    workshop_id = serializers.CharField(allow_null=True)
     completed_at = serializers.DateTimeField(allow_null=True)
 
 
@@ -127,3 +132,34 @@ class RepairDecisionResponseSerializer(serializers.Serializer):
         allow_null=True,
         required=False,
     )
+    workshop_id = serializers.CharField(allow_null=True, required=False)
+
+
+class ExternalInvoiceUploadSerializer(serializers.Serializer):
+    """Validate external invoice upload payload."""
+
+    amount = serializers.DecimalField(max_digits=15, decimal_places=2)
+    currency = serializers.CharField(max_length=3)
+    vendor_id = serializers.CharField(
+        max_length=64, required=False, allow_null=True, allow_blank=True
+    )
+    document = serializers.CharField(
+        max_length=500, required=False, allow_null=True, allow_blank=True
+    )
+
+
+class ExternalInvoiceResponseSerializer(serializers.Serializer):
+    """Serialize external invoice response DTO."""
+
+    id = serializers.UUIDField()
+    repair_order_id = serializers.UUIDField()
+    amount = serializers.DecimalField(max_digits=15, decimal_places=2)
+    currency = serializers.CharField()
+    status = serializers.ChoiceField(
+        choices=[item.value for item in ExternalRepairInvoiceStatus]
+    )
+    created_by_id = serializers.UUIDField()
+    created_at = serializers.DateTimeField()
+    updated_at = serializers.DateTimeField()
+    vendor_id = serializers.CharField(allow_null=True, required=False)
+    document = serializers.CharField(allow_null=True, required=False)

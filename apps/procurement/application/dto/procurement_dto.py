@@ -28,6 +28,7 @@ class CreatePurchaseRequisitionDTO:
     repair_order_id: uuid.UUID
     request_id: str
     requested_by: uuid.UUID
+    material_request_id: uuid.UUID | None = field(default=None)
 
 
 @dataclass(frozen=True)
@@ -143,6 +144,7 @@ class PurchaseRequisitionResponseDTO:
     line_items: list[PRLineItemResponseDTO] = field(default_factory=list)
     sap_pr_number: str | None = field(default=None)
     approved_by_id: uuid.UUID | None = field(default=None)
+    material_request_id: uuid.UUID | None = field(default=None)
     sap_transaction_id: uuid.UUID | None = field(default=None)
     sap_transaction_status: str | None = field(default=None)
 

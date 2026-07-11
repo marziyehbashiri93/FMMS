@@ -138,6 +138,18 @@ class TestVehicleActivateAPI:
             format="json",
         )
         assert completed.status_code == 200, completed.data
+        assert completed.data["status"] == "WAITING_DRIVER_CONFIRMATION"
+
+        handovers = authenticated_client.get("/api/v1/vehicle-handovers/")
+        target = next(
+            item for item in handovers.data if item["repair_order_id"] == order_id
+        )
+        confirmed = authenticated_client.post(
+            f"/api/v1/vehicle-handovers/{target['id']}/confirm/",
+            {"accepted": True, "comment": "ok"},
+            format="json",
+        )
+        assert confirmed.status_code == 200, confirmed.data
 
         open_fault = authenticated_client.get(f"/api/v1/faults/{fault_id}/")
         assert open_fault.status_code == 200
