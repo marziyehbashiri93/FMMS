@@ -15,6 +15,7 @@
     <link href="css/dashboard.css" rel="stylesheet"/>
     <link href="css/page-chrome.css" rel="stylesheet"/>
     <link href="css/inspection.css" rel="stylesheet"/>
+    <link href="css/distribution-modal.css" rel="stylesheet"/>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%235b8fd4'/%3E%3Ctext x='16' y='22' font-size='14' font-family='sans-serif' fill='white' text-anchor='middle' font-weight='700'%3EFM%3C/text%3E%3C/svg%3E"/>
 </head>
 <body>
@@ -223,22 +224,14 @@
                 <div class="page-hero card-fmms">
                     <div class="page-hero-content">
                         <h1 class="page-hero-title" id="page-chrome-title"></h1>
+                        <nav class="page-breadcrumb" id="page-breadcrumb" aria-label="مسیر صفحه"></nav>
                     </div>
                 </div>
-                <nav class="page-breadcrumb" id="page-breadcrumb" aria-label="مسیر صفحه"></nav>
                 <div class="page-wizard card-fmms" id="page-chrome-wizard" style="display:none;"></div>
             </div>
 
             <!-- ---------------- DASHBOARD ---------------- -->
             <section class="page" id="page-dashboard">
-                <div class="dashboard-hero card-fmms">
-                    <div class="dashboard-hero-content">
-                        <h1 class="dashboard-hero-title">داشبورد کنترل ناوگان</h1>
-                        <p class="dashboard-hero-sub">نمای کلی وضعیت خودروها، خرابی‌ها و تعمیرات جاری</p>
-                    </div>
-                </div>
-                <nav class="page-breadcrumb" aria-label="مسیر صفحه"><span class="bc-current">داشبورد</span></nav>
-
                 <div class="kpi-grid" id="dashboard-stats"></div>
 
                 <div class="card-fmms p-3 mb-3">
@@ -587,15 +580,18 @@
 
 <!-- Generic detail modal (vehicle / fault) -->
 <div class="modal fade" id="detail-modal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered modal-fmms-wide">
+    <div class="modal-dialog modal-dialog-centered modal-fmms-wide modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="detail-modal-title">جزئیات</h5>
+                <div class="detail-modal-heading">
+                    <h5 class="modal-title" id="detail-modal-title">جزئیات</h5>
+                    <p class="detail-modal-subtitle d-none" id="detail-modal-subtitle"></p>
+                </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body" id="detail-modal-body"></div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-fmms-outline" data-bs-dismiss="modal">بستن</button>
+            <div class="modal-footer" id="detail-modal-footer">
+                <button type="button" class="btn btn-fmms-outline" data-bs-dismiss="modal" id="detail-modal-dismiss">بستن</button>
             </div>
         </div>
     </div>

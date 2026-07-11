@@ -25,6 +25,10 @@ window.FMMS = window.FMMS || {};
   };
 
   const PAGE_CHROME = {
+    dashboard: {
+      title: "داشبورد کنترل ناوگان",
+      breadcrumb: ["داشبورد"],
+    },
     vehicles: { title: "خودروها", breadcrumb: ["داشبورد", "خودروها"] },
     inspection: { title: "بازرسی روزانه خودرو", breadcrumb: ["داشبورد", "راننده", "بازرسی روزانه خودرو"] },
     handover: { title: "تایید تحویل خودرو", breadcrumb: ["داشبورد", "راننده", "تایید تحویل خودرو"] },
@@ -66,6 +70,9 @@ window.FMMS = window.FMMS || {};
       breadcrumb: ["داشبورد", "SAP", "وضعیت یکپارچه‌سازی"],
     },
   };
+
+  const BC_HOME_ICON =
+    '<svg class="bc-home-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 4l9 6.5V19a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-8.5Z"/></svg>';
 
   const GROUP_PAGES = {
     driver: ["inspection", "handover"],
@@ -119,13 +126,26 @@ window.FMMS = window.FMMS || {};
       .join("")}</div>`;
   }
 
+  function renderBreadcrumbHtml(parts) {
+    return parts
+      .map((part, i) => {
+        const sep = i > 0 ? '<span class="bc-sep">/</span>' : "";
+        const isLast = i === parts.length - 1;
+        if (isLast) {
+          const home = i === 0 ? BC_HOME_ICON : "";
+          return `${sep}<span class="bc-current">${home}${part}</span>`;
+        }
+        if (i === 0) {
+          return `${sep}<a href="#dashboard" data-bc-page="dashboard">${BC_HOME_ICON}${part}</a>`;
+        }
+        return `${sep}<span>${part}</span>`;
+      })
+      .join("");
+  }
+
   function renderPageChrome(pageId) {
     const chrome = document.getElementById("app-page-chrome");
     if (!chrome) return;
-    if (pageId === "dashboard") {
-      chrome.style.display = "none";
-      return;
-    }
     const cfg = PAGE_CHROME[pageId];
     if (!cfg) {
       chrome.style.display = "none";
@@ -135,20 +155,7 @@ window.FMMS = window.FMMS || {};
     const titleEl = document.getElementById("page-chrome-title");
     if (titleEl) titleEl.textContent = cfg.title;
     const bcEl = document.getElementById("page-breadcrumb");
-    if (bcEl) {
-      bcEl.innerHTML = cfg.breadcrumb
-        .map((part, i) => {
-          const sep = i > 0 ? '<span class="bc-sep">/</span>' : "";
-          if (i === cfg.breadcrumb.length - 1) {
-            return `${sep}<span class="bc-current">${part}</span>`;
-          }
-          if (i === 0) {
-            return `${sep}<a href="#dashboard" data-bc-page="dashboard">${part}</a>`;
-          }
-          return `${sep}<span>${part}</span>`;
-        })
-        .join("");
-    }
+    if (bcEl) bcEl.innerHTML = renderBreadcrumbHtml(cfg.breadcrumb || []);
     const wizardEl = document.getElementById("page-chrome-wizard");
     if (wizardEl) {
       if (cfg.wizard?.length) {

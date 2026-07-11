@@ -662,7 +662,18 @@ FMMS.pages = FMMS.pages || {};
     const prev = btn.textContent;
     btn.textContent = "در حال شروع…";
     try {
-      await FMMS.api.startRepair(order.id);
+      const fresh = await FMMS.api.getRepairOrder(order.id);
+      if (!canShowStartRepair(fresh)) {
+        FMMS.ui.toast(
+          fresh.status === "IN_PROGRESS"
+            ? "تعمیر قبلاً آغاز شده است."
+            : "وضعیت دستور تعمیر تغییر کرده است.",
+          "error"
+        );
+        renderWorkshop("orders");
+        return;
+      }
+      await FMMS.api.startRepair(fresh.id);
       FMMS.ui.toast("تعمیر آغاز شد.");
       renderWorkshop("orders");
     } catch (err) {
@@ -782,13 +793,20 @@ FMMS.pages = FMMS.pages || {};
     }
   }
 
+  const WORKSHOP_START_STATUSES = new Set(["WORKSHOP_ASSIGNED", "ASSIGNED"]);
+
   async function enrichWorkshopOrders(orders) {
     return Promise.all(
-      orders.map(async (order) => ({
-        ...order,
-        materialRequestCount: await countMaterialRequests(order.id),
-      }))
+      orders.map(async (order) => {
+        const fresh = await FMMS.api.getRepairOrder(order.id);
+        const materialRequestCount = await countMaterialRequests(fresh.id);
+        return { ...fresh, materialRequestCount };
+      })
     );
+  }
+
+  function canShowStartRepair(order) {
+    return WORKSHOP_START_STATUSES.has(order.status);
   }
 
   function workshopActions(order) {
@@ -802,13 +820,14 @@ FMMS.pages = FMMS.pages || {};
         `<button class="btn btn-fmms-danger btn-sm" data-action="reject">رد تعمیر</button>`
       );
     }
-    if (order.status === "WORKSHOP_ASSIGNED" && isExternal) {
+    if (order.status === "WORKSHOP_ASSIGNED" && isExternal && canShowStartRepair(order)) {
       actions.push(`<button class="btn btn-fmms-primary btn-sm" data-action="start">شروع تعمیر خارجی</button>`);
     }
-    if (order.status === "WAITING_WORKSHOP_CONFIRMATION" || order.status === "ASSIGNED") {
+    if (order.status === "ASSIGNED" && canShowStartRepair(order)) {
       actions.push(`<button class="btn btn-fmms-primary btn-sm" data-action="start">شروع تعمیر</button>`);
     }
     if (order.status === "IN_PROGRESS") {
+      actions.push(`<span class="reviewed-notice workshop-in-progress-notice">تعمیر در حال انجام است</span>`);
       actions.push(
         `<button class="btn btn-fmms-outline btn-sm" data-action="request-material">درخواست قطعه</button>`,
         `<button class="btn btn-fmms-outline btn-sm" data-action="activity">ثبت فعالیت</button>`,

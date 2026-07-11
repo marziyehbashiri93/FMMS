@@ -86,17 +86,127 @@ FMMS.pages = FMMS.pages || {};
     if (caps.severityScope === "fault" || !items?.length) return "";
     const rows = (items || []).map(
       (item) => `<tr>
-        <td>${FMMS.ui.escapeHtml(item.component)}</td>
-        <td>${FMMS.ui.escapeHtml(item.description)}</td>
+        <td class="distribution-item-component">${FMMS.ui.escapeHtml(item.component)}</td>
+        <td class="distribution-item-desc">${FMMS.ui.escapeHtml(item.description)}</td>
         <td>${FMMS.ui.badge(item.severity)}</td>
         <td class="mono">${FMMS.ui.escapeHtml(item.inspection_item_id || "—")}</td>
       </tr>`
     );
     return (
-      `<div class="modal-section"><div class="modal-section-title">آیتم‌های خرابی (بازرسی)</div>` +
+      `<div class="modal-section distribution-modal-section"><div class="modal-section-title">آیتم‌های خرابی (بازرسی)</div>` +
+      `<div class="distribution-fault-items-table">` +
       FMMS.ui.renderTable(["قطعه", "توضیح", "شدت", "آیتم بازرسی"], rows) +
-      `</div>`
+      `</div></div>`
     );
+  }
+
+  function renderDistributionSummary(fault, vehicle, repairOrder) {
+    const vehicleValue = vehicle ? FMMS.ui.vehicleLabel(vehicle) : `<span class="mono">${FMMS.ui.escapeHtml(fault.vehicle_id)}</span>`;
+    const inspectionValue = fault.inspection_id
+      ? `<span class="dm-summary-text">تکمیل‌شده</span>`
+      : `<span class="dm-summary-muted">—</span>`;
+    const repairValue = repairOrder
+      ? FMMS.ui.badge(repairOrder.status)
+      : `<span class="dm-summary-muted">ثبت نشده</span>`;
+    const sapValue = fault.sap_notification_number
+      ? FMMS.ui.badge("SUCCESS")
+      : FMMS.ui.badge("PENDING");
+
+    return `<div class="distribution-summary-card">
+      <div class="distribution-summary-heading">خلاصه بازرسی</div>
+      <div class="distribution-summary-grid">
+        <div class="distribution-summary-item">
+          <span class="dm-summary-label">خودرو</span>
+          <span class="dm-summary-value">${vehicleValue}</span>
+        </div>
+        <div class="distribution-summary-item">
+          <span class="dm-summary-label">بازرسی</span>
+          <span class="dm-summary-value">${inspectionValue}</span>
+        </div>
+        <div class="distribution-summary-item">
+          <span class="dm-summary-label">خرابی</span>
+          <span class="dm-summary-value">${FMMS.ui.badge(fault.status)}</span>
+        </div>
+        <div class="distribution-summary-item">
+          <span class="dm-summary-label">شدت</span>
+          <span class="dm-summary-value">${FMMS.ui.badge(fault.severity)}</span>
+        </div>
+        <div class="distribution-summary-item">
+          <span class="dm-summary-label">دستور تعمیر</span>
+          <span class="dm-summary-value">${repairValue}</span>
+        </div>
+        <div class="distribution-summary-item">
+          <span class="dm-summary-label">SAP</span>
+          <span class="dm-summary-value">${sapValue}</span>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  function renderDistributionDecisionCard(reviewed, decisionState, faultStatus) {
+    if (reviewed) {
+      return `<div class="distribution-decision-sticky">
+        <div class="distribution-decision-card distribution-decision-card--reviewed">
+          <div class="distribution-decision-header">
+            <h4 class="distribution-decision-title">تصمیم توزیع</h4>
+            <p class="distribution-decision-sub">تصمیم برای این خودرو قبلاً ثبت شده است.</p>
+          </div>
+          <div class="distribution-reviewed-banner">
+            <span class="distribution-reviewed-label">تصمیم ثبت‌شده</span>
+            <span class="distribution-reviewed-value">${FMMS.ui.escapeHtml(decisionState.decision)}</span>
+          </div>
+        </div>
+      </div>`;
+    }
+    if (!DISTRIBUTION_ACTIONABLE.has(faultStatus)) return "";
+    return `<div class="distribution-decision-sticky">
+      <div class="distribution-decision-card">
+        <div class="distribution-decision-header">
+          <h4 class="distribution-decision-title">تصمیم توزیع</h4>
+          <p class="distribution-decision-sub">مشخص کنید آیا این خودرو می‌تواند به سرویس بازگردد.</p>
+        </div>
+        <div class="transport-detail-actions">
+          <p class="distribution-decision-hint">پس از بررسی جزئیات خرابی و خودرو، یکی از گزینه‌های زیر را انتخاب کنید.</p>
+          <div class="distribution-option-cards">
+            <div class="distribution-option-card distribution-option-usable">
+              <button type="button" class="btn btn-fmms-success btn-sm distribution-option-btn" id="distribution-detail-usable">
+                <span class="distribution-option-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9L18 10l-2.7-3.6a1 1 0 0 0-.8-.4H9.5a1 1 0 0 0-.8.4L6 10l-2.5 1.1C2.7 11.3 2 12.1 2 13v3c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/><path d="m9 12 2 2 4-4"/></svg>
+                </span>
+                <span class="distribution-option-text">
+                  <span class="distribution-option-label">خودرو قابل استفاده است</span>
+                  <span class="distribution-option-desc">خودرو برای بهره‌برداری ایمن است.</span>
+                </span>
+              </button>
+            </div>
+            <div class="distribution-option-card distribution-option-unusable">
+              <button type="button" class="btn btn-fmms-danger btn-sm distribution-option-btn" id="distribution-detail-unusable">
+                <span class="distribution-option-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                </span>
+                <span class="distribution-option-text">
+                  <span class="distribution-option-label">خودرو غیرقابل استفاده است</span>
+                  <span class="distribution-option-desc">خودرو تا پایان تعمیر خارج از سرویس می‌ماند.</span>
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  function wireDistributionOptionCards() {
+    document.querySelectorAll(".distribution-option-btn").forEach((btn) => {
+      btn.addEventListener(
+        "click",
+        () => {
+          document.querySelectorAll(".distribution-option-card").forEach((card) => card.classList.remove("is-selected"));
+          btn.closest(".distribution-option-card")?.classList.add("is-selected");
+        },
+        true
+      );
+    });
   }
 
   function hideDetailModal() {
@@ -135,16 +245,23 @@ FMMS.pages = FMMS.pages || {};
         ["شماره تجهیز SAP", vehicle?.sap_equipment_number ? `<span class="mono">${FMMS.ui.escapeHtml(vehicle.sap_equipment_number)}</span>` : "—"],
       ];
 
+      const inspectionRows = [
+        ["شناسه بازرسی", fault.inspection_id ? `<span class="mono">${fault.inspection_id}</span>` : "—"],
+        ["زمان ثبت", FMMS.ui.formatDateTime(fault.reported_at || fault.created_at)],
+        ["ثبت‌کننده", reporterValue],
+      ];
+
       const faultRows = [
         ["شناسه خرابی", `<span class="mono">${FMMS.ui.escapeHtml(fault.id)}</span>`],
         ["کد خرابی", `<span class="mono">${FMMS.ui.escapeHtml(fault.code)}</span>`],
         ["توضیح خرابی", FMMS.ui.escapeHtml(fault.description)],
         ["وضعیت خرابی", FMMS.ui.badge(fault.status)],
         ["شدت", FMMS.ui.badge(fault.severity)],
-        ["ثبت‌کننده", reporterValue],
-        ["زمان ثبت", FMMS.ui.formatDateTime(fault.reported_at || fault.created_at)],
-        ["شناسه بازرسی", fault.inspection_id ? `<span class="mono">${fault.inspection_id}</span>` : "—"],
-        ["اعلان SAP", fault.sap_notification_number || "—"],
+      ];
+
+      const sapRows = [
+        ["اعلان SAP", fault.sap_notification_number ? `<span class="mono">${FMMS.ui.escapeHtml(fault.sap_notification_number)}</span>` : "—"],
+        ["وضعیت یکپارچه‌سازی", fault.sap_notification_number ? FMMS.ui.badge("SUCCESS") : FMMS.ui.badge("PENDING")],
       ];
 
       const repairRows = repairOrder
@@ -154,9 +271,9 @@ FMMS.pages = FMMS.pages || {};
           ]
         : [["دستور تعمیر", `<span class="text-muted">هنوز ثبت نشده است.</span>`]];
 
-      let decisionSection = "";
+      let reviewedSection = "";
       if (decisionState.reviewed) {
-        decisionSection = `<div class="modal-section"><div class="modal-section-title">تصمیم ثبت‌شده</div>${FMMS.ui.renderDl([
+        reviewedSection = `<div class="modal-section distribution-modal-section"><div class="modal-section-title">تصمیم ثبت‌شده</div>${FMMS.ui.renderDl([
           ["وضعیت", "بررسی شد"],
           ["تصمیم", decisionState.decision],
           ["وضعیت خودرو", vehicle ? FMMS.ui.badge(vehicle.status) : "—"],
@@ -164,30 +281,35 @@ FMMS.pages = FMMS.pages || {};
         ])}</div>`;
       }
 
-      let actionBar = "";
-      if (!decisionState.reviewed && DISTRIBUTION_ACTIONABLE.has(fault.status)) {
-        actionBar = `<div class="transport-detail-actions">
-          <p class="small text-muted mb-2">پس از بررسی جزئیات خرابی و خودرو، یکی از گزینه‌های زیر را انتخاب کنید.</p>
-          <div class="d-flex flex-wrap gap-2">
-            <button type="button" class="btn btn-fmms-success btn-sm" id="distribution-detail-usable">خودرو قابل استفاده است</button>
-            <button type="button" class="btn btn-fmms-danger btn-sm" id="distribution-detail-unusable">خودرو غیرقابل استفاده است</button>
-          </div>
-        </div>`;
-      }
-
       let body =
-        `<div class="modal-section"><div class="modal-section-title">خودرو</div>${FMMS.ui.renderDl(vehicleRows)}</div>` +
-        `<div class="modal-section"><div class="modal-section-title">خرابی</div>${FMMS.ui.renderDl(faultRows)}</div>` +
-        `<div class="modal-section"><div class="modal-section-title">دستور تعمیر مرتبط</div>${FMMS.ui.renderDl(repairRows)}</div>` +
+        `<div class="distribution-detail-modal">` +
+        renderDistributionSummary(fault, vehicle, repairOrder) +
+        `<div class="modal-section distribution-modal-section"><div class="modal-section-title">اطلاعات خودرو</div>${FMMS.ui.renderDl(vehicleRows)}</div>` +
+        `<div class="modal-section distribution-modal-section"><div class="modal-section-title">اطلاعات بازرسی</div>${FMMS.ui.renderDl(inspectionRows)}</div>` +
+        `<div class="modal-section distribution-modal-section"><div class="modal-section-title">اطلاعات خرابی</div>${FMMS.ui.renderDl(faultRows)}</div>` +
+        `<div class="modal-section distribution-modal-section"><div class="modal-section-title">دستور تعمیر</div>${FMMS.ui.renderDl(repairRows)}</div>` +
+        `<div class="modal-section distribution-modal-section"><div class="modal-section-title">اطلاعات SAP</div>${FMMS.ui.renderDl(sapRows)}</div>` +
         renderItemSeverityTable(fault.items) +
-        decisionSection +
+        reviewedSection +
         (repairOrder && FMMS.api.capabilities.repairTimeline
-          ? `<div class="modal-section"><div class="modal-section-title">تاریخچه مراحل</div><div id="distribution-detail-timeline" class="text-muted">در حال بارگذاری…</div></div>`
+          ? `<div class="modal-section distribution-modal-section"><div class="modal-section-title">تاریخچه مراحل</div><div id="distribution-detail-timeline" class="distribution-timeline-host text-muted">در حال بارگذاری…</div></div>`
           : "") +
-        actionBar;
+        renderDistributionDecisionCard(decisionState.reviewed, decisionState, fault.status) +
+        `</div>`;
 
       const titlePlate = vehicle?.plate_number || fault.code;
-      FMMS.ui.openDetailModal(`بررسی تایید توزیع · ${titlePlate}`, body);
+      FMMS.ui.openDetailModal("بررسی تایید توزیع", body);
+
+      const modalEl = document.getElementById("detail-modal");
+      const subEl = document.getElementById("detail-modal-subtitle");
+      const dismissBtn = document.getElementById("detail-modal-dismiss");
+      if (subEl) {
+        subEl.textContent = vehicle ? FMMS.ui.vehicleLabel(vehicle) : titlePlate;
+        subEl.classList.remove("d-none");
+      }
+      if (dismissBtn) dismissBtn.textContent = "انصراف";
+      modalEl?.classList.add("distribution-detail-mode");
+      wireDistributionOptionCards();
 
       const bindDecision = (id, usable) => {
         document.getElementById(id)?.addEventListener("click", async (e) => {

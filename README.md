@@ -53,7 +53,9 @@ retry, and full audit trail via `SAPTransaction` records.
 | Driver Management       | Driver profiles, vehicle assignments                 |
 | Inspection              | Pre/post-trip inspections, checklist management      |
 | Fault Management        | Fault reporting, severity classification, lifecycle  |
-| Repair Management       | Repair orders, technician assignment, parts tracking |
+| Repair Management       | Repair orders, workshop workflow, external invoices  |
+| Material Requests       | Parts requests, stock issue, PR handoff              |
+| Vehicle Handover        | Driver accept/reject after repair completion         |
 | Preventive Maintenance  | PM plans, scheduled work orders, overdue triggers    |
 | Procurement             | Purchase requisitions, orders, goods receipt/issue   |
 | Integration             | SAP transaction tracking, sync status, retry logs    |
@@ -98,17 +100,20 @@ FMMS/
 │   ├── inspection/
 │   ├── fault/
 │   ├── repair/
+│   ├── material/
+│   ├── handover/
 │   ├── preventive_maintenance/
 │   ├── procurement/
 │   ├── integration/
 │   └── reporting/           # Phase 2
 ├── infrastructure/          # Shared infrastructure
-│   ├── database/            # BaseModel
+│   ├── database/            # BaseModel, management commands
 │   ├── sap/                 # SAP clients + adapters + transaction manager
 │   └── messaging/           # Celery app + tasks
 ├── interfaces/              # REST API (DRF views, serializers, URLs)
 │   └── api/
 │       └── v1/
+├── demo-frontend_v2/        # Local demo UI (workflow v2)
 ├── tests/                   # All tests
 │   ├── unit/
 │   ├── integration/
@@ -230,6 +235,26 @@ python manage.py migrate
 `ensure_database` creates the configured PostgreSQL database when missing and
 is a no-op when it already exists. Docker Compose and WSGI/ASGI startup run
 this automatically before migrations / serving traffic.
+
+### Development data reset (DEBUG only)
+
+When local workflow/demo data becomes inconsistent after schema or workflow
+changes, wipe operational records while keeping master data:
+
+```bash
+# Preview counts (no writes)
+python manage.py reset_workflow_data --dry-run
+
+# Confirm interactively (type RESET) or skip prompt
+python manage.py reset_workflow_data
+python manage.py reset_workflow_data --yes
+```
+
+| Kept | Deleted | Vehicle status reset |
+|------|---------|----------------------|
+| Vehicles, inspection checklist templates, users | Inspections, faults, repairs (+ events/invoices), materials, handovers, procurement, SAP transactions, drivers, PM plans/work orders | `UNDER_REPAIR` and `WAITING_DRIVER_CONFIRMATION` → `ACTIVE` |
+
+The command refuses to run when `DEBUG=False` (staging/production/tests).
 
 ---
 

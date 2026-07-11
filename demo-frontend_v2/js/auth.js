@@ -126,8 +126,17 @@ window.FMMS = window.FMMS || {};
   }
 
   function openDetailModal(title, bodyHtml) {
+    const modalEl = document.getElementById("detail-modal");
+    const subEl = document.getElementById("detail-modal-subtitle");
+    const dismissBtn = document.getElementById("detail-modal-dismiss");
     document.getElementById("detail-modal-title").textContent = title;
     document.getElementById("detail-modal-body").innerHTML = bodyHtml;
+    if (subEl) {
+      subEl.textContent = "";
+      subEl.classList.add("d-none");
+    }
+    if (dismissBtn) dismissBtn.textContent = "بستن";
+    modalEl?.classList.remove("distribution-detail-mode");
     if (!detailModalInstance) {
       detailModalInstance = new bootstrap.Modal(document.getElementById("detail-modal"));
     }
