@@ -80,6 +80,7 @@ _ALLOWED_TRANSITIONS: dict[VehicleStatus, frozenset[VehicleStatus]] = {
     VehicleStatus.WAITING_DRIVER_CONFIRMATION: frozenset(
         {
             VehicleStatus.ACTIVE,
+            VehicleStatus.UNDER_REPAIR,
             VehicleStatus.OUT_OF_SERVICE,
             VehicleStatus.SUSPENDED,
             VehicleStatus.INACTIVE,

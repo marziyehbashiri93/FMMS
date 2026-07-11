@@ -14,7 +14,9 @@ from datetime import UTC, datetime
 from apps.fault.application.dto.fault_dto import CloseFaultDTO, FaultResponseDTO
 from apps.fault.application.services.report_fault_service import _to_response_dto
 from apps.fault.domain.interfaces.fault_repository import IFaultRepository
-from apps.repair.application.services._timeline_helper import record_repair_timeline_event
+from apps.repair.application.services._timeline_helper import (
+    record_repair_timeline_event,
+)
 from apps.repair.application.services.repair_order_timeline_service import (
     RecordRepairOrderEventService,
 )
@@ -33,6 +35,9 @@ _DISTRIBUTION_USABLE_CANCEL_STATUSES: frozenset[RepairOrderStatus] = frozenset(
 )
 _DISTRIBUTION_USABLE_EVENT_DESCRIPTION = (
     "توزیع: خودرو قابل استفاده — دستور تعمیر لغو شد."
+)
+_FAULT_CLOSED_FINAL_APPROVAL_DESCRIPTION = (
+    "خرابی بسته شد و دستور تعمیر در انتظار تایید نهایی، تکمیل شد."
 )
 
 
@@ -123,6 +128,23 @@ class CloseFaultService:
         now = datetime.now(tz=UTC)
 
         for order in self._repair_repo.list_by_fault(dto.fault_id):
+            if order.status == RepairOrderStatus.WAITING_TRANSPORT_FINAL_APPROVAL:
+                order.complete_after_transport_handover(
+                    completed_at=order.completed_at or now,
+                )
+                order.updated_at = now
+                self._repair_repo.save(order)
+                record_repair_timeline_event(
+                    self._event_recorder,
+                    order.id,
+                    RepairOrderEventType.TRANSPORT_HANDOVER_APPROVED,
+                    _FAULT_CLOSED_FINAL_APPROVAL_DESCRIPTION,
+                    created_by_id=dto.closed_by,
+                    request_id=dto.request_id,
+                )
+                cancelled_count += 1
+                continue
+
             if order.status not in _DISTRIBUTION_USABLE_CANCEL_STATUSES:
                 continue
 

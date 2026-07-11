@@ -202,7 +202,7 @@ class TestRepairOrderLifecycle:
         assert order.total_labor_hours == Decimal("5.0")
 
     def test_complete_after_transport_handover(self) -> None:
-        order = _make_order(status=RepairOrderStatus.ACCEPTED_BY_DRIVER)
+        order = _make_order(status=RepairOrderStatus.WAITING_TRANSPORT_FINAL_APPROVAL)
         completed_at = datetime.now(tz=UTC)
         order.complete_after_transport_handover(completed_at=completed_at)
         assert order.status == RepairOrderStatus.COMPLETED

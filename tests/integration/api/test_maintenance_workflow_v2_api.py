@@ -53,7 +53,7 @@ def _move_to_workshop_assigned(client: APIClient, order_id: str) -> dict:
 def _move_to_accepted_by_driver(
     client: APIClient, technician_client: APIClient, order: dict
 ) -> dict:
-    """Run repair through driver handover acceptance."""
+    """Run internal repair through driver acceptance and final transport wait."""
     _move_to_workshop_assigned(client, order["id"])
     technician_client.post(
         f"/api/v1/repair-orders/{order['id']}/accept/", {}, format="json"
@@ -77,6 +77,20 @@ def _move_to_accepted_by_driver(
     )
     assert confirmed.status_code == 200, confirmed.data
     return order
+
+
+def _confirm_driver_handover(client: APIClient, order_id: str) -> dict:
+    """Confirm the handover for a repair order."""
+    handovers = client.get("/api/v1/vehicle-handovers/")
+    assert handovers.status_code == 200, handovers.data
+    target = next(item for item in handovers.data if item["repair_order_id"] == order_id)
+    confirmed = client.post(
+        f"/api/v1/vehicle-handovers/{target['id']}/confirm/",
+        {"accepted": True, "comment": "ok"},
+        format="json",
+    )
+    assert confirmed.status_code == 200, confirmed.data
+    return confirmed.data
 
 
 class TestMaintenanceWorkflowV2API:
@@ -237,7 +251,11 @@ class TestMaintenanceWorkflowV2API:
 
         repair = technician_client.get(f"/api/v1/repair-orders/{order['id']}/")
         assert repair.status_code == 200
-        assert repair.data["status"] == "ACCEPTED_BY_DRIVER"
+        assert repair.data["status"] == "WAITING_TRANSPORT_FINAL_APPROVAL"
+
+        vehicle = technician_client.get(f"/api/v1/vehicles/{order['vehicle_id']}/")
+        assert vehicle.status_code == 200
+        assert vehicle.data["status"] == "WAITING_DRIVER_CONFIRMATION"
 
     def test_transport_handover_approve_completes_repair_and_closes_fault(
         self,
@@ -262,6 +280,10 @@ class TestMaintenanceWorkflowV2API:
         fault = authenticated_client.get(f"/api/v1/faults/{order['fault_id']}/")
         assert fault.status_code == 200
         assert fault.data["status"] == "CLOSED"
+
+        vehicle = authenticated_client.get(f"/api/v1/vehicles/{order['vehicle_id']}/")
+        assert vehicle.status_code == 200
+        assert vehicle.data["status"] == "ACTIVE"
 
     def test_transport_handover_reject_creates_follow_up_repair(
         self,
@@ -312,9 +334,44 @@ class TestMaintenanceWorkflowV2API:
         assert response.status_code == 403
 
     def test_external_invoice_upload_list_and_approve(
-        self, supervisor_client: APIClient, authenticated_client: APIClient
+        self,
+        supervisor_client: APIClient,
+        technician_client: APIClient,
+        authenticated_client: APIClient,
     ) -> None:
         order = _create_order(authenticated_client, "12MWF208", "1HGCM82633A008208")
+        approved = authenticated_client.post(
+            f"/api/v1/repair-orders/{order['id']}/approve/", {}, format="json"
+        )
+        assert approved.status_code == 200, approved.data
+
+        assigned = authenticated_client.post(
+            f"/api/v1/repair-orders/{order['id']}/assign-workshop/",
+            {"workshop_type": "EXTERNAL", "workshop_id": "EXT-001"},
+            format="json",
+        )
+        assert assigned.status_code == 200, assigned.data
+        assert assigned.data["workshop_type"] == "EXTERNAL"
+
+        started = technician_client.post(
+            f"/api/v1/repair-orders/{order['id']}/start/", {}, format="json"
+        )
+        assert started.status_code == 422, started.data
+
+        completed = technician_client.post(
+            f"/api/v1/repair-orders/{order['id']}/complete/",
+            {"completed_at": datetime.now(tz=UTC).isoformat()},
+            format="json",
+        )
+        assert completed.status_code == 200, completed.data
+        assert completed.data["status"] == "WAITING_DRIVER_CONFIRMATION"
+
+        _confirm_driver_handover(technician_client, order["id"])
+        repair_after_handover = authenticated_client.get(
+            f"/api/v1/repair-orders/{order['id']}/"
+        )
+        assert repair_after_handover.data["status"] == "WAITING_TRANSPORT_FINAL_APPROVAL"
+
         uploaded = authenticated_client.post(
             f"/api/v1/repair-orders/{order['id']}/invoice/",
             {"amount": "500000.00", "currency": "IRR"},
@@ -334,6 +391,13 @@ class TestMaintenanceWorkflowV2API:
         )
         assert approved.status_code == 200, approved.data
         assert approved.data["status"] == "APPROVED"
+
+        repair = authenticated_client.get(f"/api/v1/repair-orders/{order['id']}/")
+        assert repair.data["status"] == "COMPLETED"
+        fault = authenticated_client.get(f"/api/v1/faults/{order['fault_id']}/")
+        assert fault.data["status"] == "CLOSED"
+        vehicle = authenticated_client.get(f"/api/v1/vehicles/{order['vehicle_id']}/")
+        assert vehicle.data["status"] == "ACTIVE"
 
     def test_approve_material_unavailable_creates_pr(
         self,
@@ -522,7 +586,16 @@ class TestMaintenanceWorkflowV2API:
         assert confirmed.status_code == 200, confirmed.data
 
         repair = technician_client.get(f"/api/v1/repair-orders/{order['id']}/")
-        assert repair.data["status"] == "ACCEPTED_BY_DRIVER"
+        assert repair.data["status"] == "WAITING_TRANSPORT_FINAL_APPROVAL"
+        vehicle = authenticated_client.get(f"/api/v1/vehicles/{vehicle_id}/")
+        assert vehicle.data["status"] == "WAITING_DRIVER_CONFIRMATION"
+
+        final_approved = authenticated_client.post(
+            f"/api/v1/repair-orders/{order['id']}/transport-handover-approve/",
+            {},
+            format="json",
+        )
+        assert final_approved.status_code == 200, final_approved.data
         vehicle = authenticated_client.get(f"/api/v1/vehicles/{vehicle_id}/")
         assert vehicle.data["status"] == "ACTIVE"
 

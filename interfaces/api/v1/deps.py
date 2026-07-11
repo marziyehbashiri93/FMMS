@@ -66,7 +66,9 @@ from apps.material.application.services.material_request_service import (
     ListMaterialRequestsService,
     RejectMaterialRequestService,
 )
-from apps.material.infrastructure.inventory_adapter import StubInventoryAvailabilityAdapter
+from apps.material.infrastructure.inventory_adapter import (
+    StubInventoryAvailabilityAdapter,
+)
 from apps.material.infrastructure.repositories import (
     DjangoInventoryTransactionRepository,
     DjangoMaterialRequestRepository,
@@ -551,6 +553,7 @@ def get_approve_transport_handover_service() -> ApproveTransportHandoverService:
     """Return ApproveTransportHandoverService."""
     return ApproveTransportHandoverService(
         get_repair_order_repository(),
+        get_vehicle_repository(),
         get_fault_repository(),
         get_record_repair_order_event_service(),
     )
@@ -682,6 +685,9 @@ def get_approve_external_invoice_service() -> ApproveExternalInvoiceService:
     """Return ApproveExternalInvoiceService."""
     return ApproveExternalInvoiceService(
         get_external_invoice_repository(),
+        get_repair_order_repository(),
+        get_fault_repository(),
+        get_vehicle_repository(),
         get_record_repair_order_event_service(),
     )
 

@@ -28,6 +28,7 @@ from apps.repair.domain.entities import (
     RepairOrderStatus,
 )
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
+from apps.vehicle.domain.entities import VehicleStatus
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
 from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
@@ -83,15 +84,17 @@ class ApproveTransportHandoverService:
     def __init__(
         self,
         repair_order_repository: IRepairOrderRepository,
+        vehicle_repository: IVehicleRepository,
         fault_repository: IFaultRepository,
         event_recorder: RecordRepairOrderEventService | None = None,
     ) -> None:
         self._repair_repo = repair_order_repository
+        self._vehicle_repo = vehicle_repository
         self._fault_repo = fault_repository
         self._event_recorder = event_recorder
 
     def execute(self, dto: TransportHandoverApproveDTO) -> RepairOrderResponseDTO:
-        """Transition ACCEPTED_BY_DRIVER to COMPLETED and close the linked fault."""
+        """Transition final-approval waiting order to COMPLETED and activate vehicle."""
         logger.info(
             "Approving transport handover",
             extra={
@@ -122,6 +125,15 @@ class ApproveTransportHandoverService:
             request_id=dto.request_id,
             repair_order_id=saved.id,
         )
+        vehicle = load_or_not_found(
+            lambda: self._vehicle_repo.get_by_id(saved.vehicle_id),
+            message=f"Vehicle '{saved.vehicle_id}' not found.",
+            details={"vehicle_id": str(saved.vehicle_id)},
+        )
+        if vehicle.status != VehicleStatus.ACTIVE:
+            vehicle.activate()
+            vehicle.updated_at = now
+            self._vehicle_repo.save(vehicle)
         record_repair_timeline_event(
             self._event_recorder,
             saved.id,

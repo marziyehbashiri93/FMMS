@@ -6,6 +6,9 @@ import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 
+from apps.fault.domain.entities import Fault, FaultStatus
+from apps.fault.domain.exceptions import FaultNotFoundError
+from apps.fault.domain.interfaces.fault_repository import IFaultRepository
 from apps.repair.application.dto.repair_dto import (
     ApproveExternalInvoiceDTO,
     ExternalInvoiceResponseDTO,
@@ -17,7 +20,12 @@ from apps.repair.application.services._timeline_helper import (
 from apps.repair.application.services.repair_order_timeline_service import (
     RecordRepairOrderEventService,
 )
-from apps.repair.domain.entities import RepairOrderEventType
+from apps.repair.domain.entities import (
+    RepairOrder,
+    RepairOrderEventType,
+    RepairOrderStatus,
+    WorkshopType,
+)
 from apps.repair.domain.interfaces.external_invoice_repository import (
     IExternalRepairInvoiceRepository,
 )
@@ -26,6 +34,9 @@ from apps.repair.domain.invoice_entities import (
     ExternalRepairInvoice,
     ExternalRepairInvoiceStatus,
 )
+from apps.vehicle.domain.entities import VehicleStatus
+from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
+from core.exceptions.base_exception import FMMSConflictError
 from core.exceptions.translation import load_or_not_found
 
 
@@ -60,11 +71,12 @@ class UploadExternalInvoiceService:
 
     def execute(self, dto: UploadExternalInvoiceDTO) -> ExternalInvoiceResponseDTO:
         """Upload external invoice."""
-        load_or_not_found(
+        order = load_or_not_found(
             lambda: self._repair_repo.get_by_id(dto.repair_order_id),
             message=f"Repair order '{dto.repair_order_id}' not found.",
             details={"repair_order_id": str(dto.repair_order_id)},
         )
+        _assert_external_invoice_upload_allowed(order)
         now = datetime.now(tz=UTC)
         saved = self._repo.save(
             ExternalRepairInvoice(
@@ -108,21 +120,50 @@ class ApproveExternalInvoiceService:
     def __init__(
         self,
         invoice_repository: IExternalRepairInvoiceRepository,
+        repair_order_repository: IRepairOrderRepository,
+        fault_repository: IFaultRepository,
+        vehicle_repository: IVehicleRepository,
         event_recorder: RecordRepairOrderEventService | None = None,
     ) -> None:
         self._repo = invoice_repository
+        self._repair_repo = repair_order_repository
+        self._fault_repo = fault_repository
+        self._vehicle_repo = vehicle_repository
         self._event_recorder = event_recorder
 
     def execute(self, dto: ApproveExternalInvoiceDTO) -> ExternalInvoiceResponseDTO:
-        """Approve external invoice."""
+        """Approve external invoice and finalize the external repair workflow."""
         invoice = load_or_not_found(
             lambda: self._repo.get_by_id(dto.invoice_id),
             message=f"External invoice '{dto.invoice_id}' not found.",
             details={"invoice_id": str(dto.invoice_id)},
         )
+        order = load_or_not_found(
+            lambda: self._repair_repo.get_by_id(invoice.repair_order_id),
+            message=f"Repair order '{invoice.repair_order_id}' not found.",
+            details={"repair_order_id": str(invoice.repair_order_id)},
+        )
+        _assert_external_invoice_approval_allowed(order)
+        now = datetime.now(tz=UTC)
         invoice.approve()
-        invoice.updated_at = datetime.now(tz=UTC)
+        invoice.updated_at = now
         saved = self._repo.save(invoice)
+        order.complete_after_transport_handover(completed_at=order.completed_at or now)
+        order.updated_at = now
+        finalized_order = self._repair_repo.save(order)
+        _close_fault_for_completed_external_repair(
+            fault_id=finalized_order.fault_id,
+            fault_repository=self._fault_repo,
+        )
+        vehicle = load_or_not_found(
+            lambda: self._vehicle_repo.get_by_id(finalized_order.vehicle_id),
+            message=f"Vehicle '{finalized_order.vehicle_id}' not found.",
+            details={"vehicle_id": str(finalized_order.vehicle_id)},
+        )
+        if vehicle.status != VehicleStatus.ACTIVE:
+            vehicle.activate()
+            vehicle.updated_at = now
+            self._vehicle_repo.save(vehicle)
         record_repair_timeline_event(
             self._event_recorder,
             saved.repair_order_id,
@@ -131,4 +172,74 @@ class ApproveExternalInvoiceService:
             created_by_id=dto.approved_by,
             request_id=dto.request_id,
         )
+        record_repair_timeline_event(
+            self._event_recorder,
+            saved.repair_order_id,
+            RepairOrderEventType.EXTERNAL_INVOICE_APPROVED,
+            "تعمیر خارجی تکمیل و خودرو فعال شد.",
+            created_by_id=dto.approved_by,
+            request_id=dto.request_id,
+        )
         return _to_dto(saved)
+
+
+def _assert_external_invoice_upload_allowed(order: RepairOrder) -> None:
+    """Require an external repair accepted by driver before invoice upload."""
+    if order.workshop_type != WorkshopType.EXTERNAL:
+        raise FMMSConflictError(
+            message="External invoice can only be uploaded for external repair orders.",
+            error_code="EXTERNAL_INVOICE_REQUIRES_EXTERNAL_REPAIR",
+            details={"repair_order_id": str(order.id)},
+        )
+    if order.status != RepairOrderStatus.WAITING_TRANSPORT_FINAL_APPROVAL:
+        raise FMMSConflictError(
+            message="External invoice can only be uploaded after driver handover confirmation.",
+            error_code="EXTERNAL_INVOICE_REQUIRES_DRIVER_CONFIRMATION",
+            details={
+                "repair_order_id": str(order.id),
+                "status": order.status.value,
+            },
+        )
+
+
+def _assert_external_invoice_approval_allowed(order: RepairOrder) -> None:
+    """Require a driver-confirmed external repair before invoice approval."""
+    if order.workshop_type != WorkshopType.EXTERNAL:
+        raise FMMSConflictError(
+            message="External invoice can only be approved for external repair orders.",
+            error_code="EXTERNAL_INVOICE_APPROVAL_REQUIRES_EXTERNAL_REPAIR",
+            details={"repair_order_id": str(order.id)},
+        )
+    if order.status != RepairOrderStatus.WAITING_TRANSPORT_FINAL_APPROVAL:
+        raise FMMSConflictError(
+            message="External invoice can only be approved while waiting for transport final approval.",
+            error_code="EXTERNAL_INVOICE_APPROVAL_INVALID_REPAIR_STATE",
+            details={
+                "repair_order_id": str(order.id),
+                "status": order.status.value,
+            },
+        )
+
+
+def _close_fault_for_completed_external_repair(
+    *,
+    fault_id: uuid.UUID,
+    fault_repository: IFaultRepository,
+) -> None:
+    """Close the repair fault after external invoice approval."""
+    try:
+        fault = fault_repository.get_by_id(fault_id)
+    except FaultNotFoundError:
+        return
+    if fault.status == FaultStatus.CLOSED:
+        return
+    _close_open_fault(fault)
+    fault.updated_at = datetime.now(tz=UTC)
+    fault_repository.save(fault)
+
+
+def _close_open_fault(fault: Fault) -> None:
+    """Transition a non-closed fault to CLOSED through valid domain states."""
+    if fault.status == FaultStatus.ASSIGNED:
+        fault.start_repair()
+    fault.close()

@@ -21,7 +21,7 @@ class RepairOrderModel(BaseModel):
 
     vehicle_id = models.UUIDField(db_index=True)
     fault_id = models.UUIDField(db_index=True)
-    status = models.CharField(max_length=30, db_index=True)
+    status = models.CharField(max_length=40, db_index=True)
     # 'initiator_id' stores the domain-level "who created the order".
     # We cannot use 'created_by_id' as it is the auto-generated attname
     # of BaseModel.created_by (a ForeignKey).

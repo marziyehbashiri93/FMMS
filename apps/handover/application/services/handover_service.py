@@ -127,19 +127,19 @@ class ConfirmVehicleHandoverService:
         self._repair_repo.save(repair_order)
 
         if dto.accepted:
-            vehicle = load_or_not_found(
-                lambda: self._vehicle_repo.get_by_id(saved_handover.vehicle_id),
-                message=f"Vehicle '{saved_handover.vehicle_id}' not found.",
-                details={"vehicle_id": str(saved_handover.vehicle_id)},
-            )
-            vehicle.activate()
-            vehicle.updated_at = datetime.now(tz=UTC)
-            self._vehicle_repo.save(vehicle)
             record_repair_timeline_event(
                 self._event_recorder,
                 repair_order.id,
                 RepairOrderEventType.DRIVER_ACCEPTED,
                 "تحویل خودرو توسط راننده تایید شد.",
+                created_by_id=dto.confirmed_by,
+                request_id=dto.request_id,
+            )
+            record_repair_timeline_event(
+                self._event_recorder,
+                repair_order.id,
+                RepairOrderEventType.WAITING_TRANSPORT_FINAL_APPROVAL,
+                "در انتظار تایید نهایی واحد ترابری.",
                 created_by_id=dto.confirmed_by,
                 request_id=dto.request_id,
             )

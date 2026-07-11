@@ -43,6 +43,7 @@ class RepairOrderStatus(StrEnum):
     ASSIGNED = "ASSIGNED"
     IN_PROGRESS = "IN_PROGRESS"
     WAITING_DRIVER_CONFIRMATION = "WAITING_DRIVER_CONFIRMATION"
+    WAITING_TRANSPORT_FINAL_APPROVAL = "WAITING_TRANSPORT_FINAL_APPROVAL"
     ACCEPTED_BY_DRIVER = "ACCEPTED_BY_DRIVER"
     REJECTED_BY_DRIVER = "REJECTED_BY_DRIVER"
     COMPLETED = "COMPLETED"
@@ -77,6 +78,7 @@ _ALLOWED_TRANSITIONS: dict[RepairOrderStatus, frozenset[RepairOrderStatus]] = {
             RepairOrderStatus.ASSIGNED,
             RepairOrderStatus.WAITING_WORKSHOP_CONFIRMATION,
             RepairOrderStatus.IN_PROGRESS,  # backward-compat / EXTERNAL shortcut
+            RepairOrderStatus.WAITING_DRIVER_CONFIRMATION,
             RepairOrderStatus.CANCELLED,
         }
     ),
@@ -106,9 +108,13 @@ _ALLOWED_TRANSITIONS: dict[RepairOrderStatus, frozenset[RepairOrderStatus]] = {
     ),
     RepairOrderStatus.WAITING_DRIVER_CONFIRMATION: frozenset(
         {
+            RepairOrderStatus.WAITING_TRANSPORT_FINAL_APPROVAL,
             RepairOrderStatus.ACCEPTED_BY_DRIVER,
             RepairOrderStatus.REJECTED_BY_DRIVER,
         }
+    ),
+    RepairOrderStatus.WAITING_TRANSPORT_FINAL_APPROVAL: frozenset(
+        {RepairOrderStatus.COMPLETED, RepairOrderStatus.CANCELLED}
     ),
     RepairOrderStatus.ACCEPTED_BY_DRIVER: frozenset({RepairOrderStatus.COMPLETED}),
     RepairOrderStatus.REJECTED_BY_DRIVER: frozenset(),
@@ -132,7 +138,6 @@ _TERMINAL_STATUSES: frozenset[RepairOrderStatus] = frozenset(
     {
         RepairOrderStatus.COMPLETED,
         RepairOrderStatus.CANCELLED,
-        RepairOrderStatus.ACCEPTED_BY_DRIVER,
         RepairOrderStatus.REJECTED_BY_DRIVER,
     }
 )
@@ -305,6 +310,11 @@ class RepairOrder:
         Raises:
             RepairOrderInvalidStateTransitionError: If not in a startable state.
         """
+        if self.workshop_type == WorkshopType.EXTERNAL:
+            raise RepairOrderInvalidStateTransitionError(
+                current_status=self.status.value,
+                target_status=RepairOrderStatus.IN_PROGRESS.value,
+            )
         if self.status not in (
             RepairOrderStatus.ASSIGNED,
             RepairOrderStatus.WORKSHOP_ASSIGNED,
@@ -330,6 +340,14 @@ class RepairOrder:
 
     def complete_waiting_driver_confirmation(self, completed_at: datetime) -> None:
         """Mark technical work complete and wait for driver handover decision."""
+        if (
+            self.status == RepairOrderStatus.WORKSHOP_ASSIGNED
+            and self.workshop_type != WorkshopType.EXTERNAL
+        ):
+            raise RepairOrderInvalidStateTransitionError(
+                current_status=self.status.value,
+                target_status=RepairOrderStatus.WAITING_DRIVER_CONFIRMATION.value,
+            )
         self.transition_to(RepairOrderStatus.WAITING_DRIVER_CONFIRMATION)
         self.completed_at = completed_at
 
@@ -344,7 +362,7 @@ class RepairOrder:
     def confirm_handover(self, accepted: bool) -> None:
         """Apply driver handover decision."""
         if accepted:
-            self.transition_to(RepairOrderStatus.ACCEPTED_BY_DRIVER)
+            self.transition_to(RepairOrderStatus.WAITING_TRANSPORT_FINAL_APPROVAL)
             return
         self.transition_to(RepairOrderStatus.REJECTED_BY_DRIVER)
 
@@ -355,7 +373,7 @@ class RepairOrder:
             completed_at: UTC timestamp when transport approved completion.
 
         Raises:
-            RepairOrderInvalidStateTransitionError: If not ACCEPTED_BY_DRIVER.
+            RepairOrderInvalidStateTransitionError: If not waiting for transport.
         """
         self.transition_to(RepairOrderStatus.COMPLETED)
         self.completed_at = completed_at
@@ -433,6 +451,7 @@ class RepairOrderEventType(StrEnum):
     REPAIR_STARTED = "REPAIR_STARTED"
     REPAIR_COMPLETED = "REPAIR_COMPLETED"
     WAITING_DRIVER_CONFIRMATION = "WAITING_DRIVER_CONFIRMATION"
+    WAITING_TRANSPORT_FINAL_APPROVAL = "WAITING_TRANSPORT_FINAL_APPROVAL"
     DRIVER_ACCEPTED = "DRIVER_ACCEPTED"
     DRIVER_REJECTED = "DRIVER_REJECTED"
     TRANSPORT_HANDOVER_APPROVED = "TRANSPORT_HANDOVER_APPROVED"

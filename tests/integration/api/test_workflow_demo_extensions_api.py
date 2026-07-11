@@ -155,14 +155,15 @@ class TestVehicleActivateAPI:
         assert open_fault.status_code == 200
         assert open_fault.data["status"] == "OPEN"
 
-        deactivated = authenticated_client.post(
-            f"/api/v1/vehicles/{vehicle['id']}/deactivate/", {}, format="json"
+        approved_final = supervisor_client.post(
+            f"/api/v1/repair-orders/{order_id}/transport-handover-approve/",
+            {},
+            format="json",
         )
-        assert deactivated.status_code == 200
+        assert approved_final.status_code == 200, approved_final.data
+        assert approved_final.data["status"] == "COMPLETED"
 
-        activated = supervisor_client.post(
-            f"/api/v1/vehicles/{vehicle['id']}/activate/", {}, format="json"
-        )
+        activated = authenticated_client.get(f"/api/v1/vehicles/{vehicle['id']}/")
         assert activated.status_code == 200, activated.data
         assert activated.data["status"] == VehicleStatus.ACTIVE.value
 

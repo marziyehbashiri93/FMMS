@@ -22,7 +22,7 @@ from apps.repair.domain.entities import RepairOrder, RepairOrderStatus
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
 from apps.vehicle.domain.entities import Vehicle, VehicleCategory, VehicleStatus
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
-from apps.vehicle.domain.value_objects import PlateNumber, VIN
+from apps.vehicle.domain.value_objects import VIN, PlateNumber
 from core.exceptions.base_exception import FMMSNotFoundError
 
 
@@ -36,7 +36,11 @@ def _make_order(*, status: RepairOrderStatus) -> RepairOrder:
         created_by_id=uuid.uuid4(),
         created_at=now,
         updated_at=now,
-        completed_at=now if status == RepairOrderStatus.ACCEPTED_BY_DRIVER else None,
+        completed_at=(
+            now
+            if status == RepairOrderStatus.WAITING_TRANSPORT_FINAL_APPROVAL
+            else None
+        ),
     )
 
 
@@ -66,7 +70,7 @@ def _make_vehicle(*, vehicle_id: uuid.UUID) -> Vehicle:
         model="Hilux",
         year=2022,
         category=VehicleCategory.LIGHT,
-        status=VehicleStatus.ACTIVE,
+        status=VehicleStatus.WAITING_DRIVER_CONFIRMATION,
         created_at=now,
         updated_at=now,
     )
@@ -96,7 +100,6 @@ class FakeRepairRepository(IRepairOrderRepository):
         terminal = {
             RepairOrderStatus.COMPLETED,
             RepairOrderStatus.CANCELLED,
-            RepairOrderStatus.ACCEPTED_BY_DRIVER,
             RepairOrderStatus.REJECTED_BY_DRIVER,
         }
         return [
@@ -182,12 +185,16 @@ class FakeVehicleRepository(IVehicleRepository):
 
 class TestApproveTransportHandoverService:
     def test_approves_and_closes_fault(self) -> None:
-        order = _make_order(status=RepairOrderStatus.ACCEPTED_BY_DRIVER)
+        order = _make_order(status=RepairOrderStatus.WAITING_TRANSPORT_FINAL_APPROVAL)
         fault = _make_fault(fault_id=order.fault_id, vehicle_id=order.vehicle_id)
+        vehicle = _make_vehicle(vehicle_id=order.vehicle_id)
         repair_repo = FakeRepairRepository([order])
         fault_repo = FakeFaultRepository([fault])
+        vehicle_repo = FakeVehicleRepository([vehicle])
 
-        result = ApproveTransportHandoverService(repair_repo, fault_repo).execute(
+        result = ApproveTransportHandoverService(
+            repair_repo, vehicle_repo, fault_repo
+        ).execute(
             TransportHandoverApproveDTO(
                 repair_order_id=order.id,
                 request_id="req-transport-approve",
@@ -198,11 +205,14 @@ class TestApproveTransportHandoverService:
         assert result.status == RepairOrderStatus.COMPLETED
         assert repair_repo.get_by_id(order.id).status == RepairOrderStatus.COMPLETED
         assert fault_repo.get_by_id(fault.id).status == FaultStatus.CLOSED
+        assert vehicle_repo.get_by_id(vehicle.id).status == VehicleStatus.ACTIVE
 
     def test_raises_not_found_for_missing_order(self) -> None:
         with pytest.raises(FMMSNotFoundError):
             ApproveTransportHandoverService(
-                FakeRepairRepository(), FakeFaultRepository()
+                FakeRepairRepository(),
+                FakeVehicleRepository(),
+                FakeFaultRepository(),
             ).execute(
                 TransportHandoverApproveDTO(
                     repair_order_id=uuid.uuid4(),
@@ -214,7 +224,7 @@ class TestApproveTransportHandoverService:
 
 class TestRejectTransportHandoverService:
     def test_rejects_and_creates_follow_up_repair(self) -> None:
-        order = _make_order(status=RepairOrderStatus.ACCEPTED_BY_DRIVER)
+        order = _make_order(status=RepairOrderStatus.WAITING_TRANSPORT_FINAL_APPROVAL)
         vehicle = _make_vehicle(vehicle_id=order.vehicle_id)
         repair_repo = FakeRepairRepository([order])
         vehicle_repo = FakeVehicleRepository([vehicle])
