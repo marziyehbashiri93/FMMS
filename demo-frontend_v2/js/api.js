@@ -624,7 +624,7 @@ window.FMMS = window.FMMS || {};
     if (m && method === "POST") {
       const ro = DB.repairOrders.find((x) => x.id === m[0]);
       if (!ro) throw new ApiError("دستور تعمیر یافت نشد.", 404);
-      if (ro.status !== "IN_PROGRESS" && ro.status !== "WAITING_PARTS") {
+      if (ro.status !== "IN_PROGRESS") {
         throw new ApiError(`Cannot complete repair from '${ro.status}'.`, 422);
       }
       const pendingMr = (DB.materialRequests || []).filter(

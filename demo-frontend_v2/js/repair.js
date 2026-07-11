@@ -792,13 +792,32 @@ FMMS.pages = FMMS.pages || {};
     );
   }
 
+  const ALREADY_COMPLETED_STATUSES = new Set([
+    "WAITING_DRIVER_CONFIRMATION",
+    "ACCEPTED_BY_DRIVER",
+    "CANCELLED",
+  ]);
+  const ALREADY_COMPLETED_MESSAGE = "این تعمیر قبلاً تکمیل شده و منتظر تایید راننده است.";
+
   async function complete(order, btn) {
+    if (btn.disabled) return;
     btn.disabled = true;
     const prev = btn.textContent;
     btn.textContent = "در حال اتمام…";
     try {
-      await FMMS.api.completeRepair(order.id);
-      FMMS.ui.toast("تعمیر فنی پایان یافت — منتظر تایید راننده.");
+      const fresh = await FMMS.api.getRepairOrder(order.id);
+      if (ALREADY_COMPLETED_STATUSES.has(fresh.status)) {
+        FMMS.ui.toast(ALREADY_COMPLETED_MESSAGE, "error");
+        renderWorkshop("orders");
+        return;
+      }
+      if (fresh.status !== "IN_PROGRESS") {
+        FMMS.ui.toast("وضعیت دستور تعمیر برای اتمام تعمیر مناسب نیست.", "error");
+        renderWorkshop("orders");
+        return;
+      }
+      await FMMS.api.completeRepair(fresh.id);
+      FMMS.ui.toast("تعمیر فنی پایان یافت. منتظر تایید راننده.");
       renderWorkshop("orders");
     } catch (err) {
       FMMS.ui.toast(err.message, "error");
