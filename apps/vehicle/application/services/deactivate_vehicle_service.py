@@ -15,6 +15,7 @@ from apps.vehicle.application.dto.vehicle_dto import (
     DeactivateVehicleDTO,
     VehicleResponseDTO,
 )
+from apps.vehicle.domain.entities import VEHICLE_STATUS_LABELS
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
 from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
@@ -88,17 +89,13 @@ class DeactivateVehicleService:
 
         return VehicleResponseDTO(
             id=saved.id,
-            plate_number=saved.plate_number.value,
-            vin=saved.vin.value,
-            make=saved.make,
-            model=saved.model,
-            year=saved.year,
-            category=saved.category,
+            vehicle_number=saved.vehicle_number.value,
+            license_plate=saved.license_plate.value,
             status=saved.status,
+            status_label=VEHICLE_STATUS_LABELS[saved.status],
             created_at=saved.created_at,
             updated_at=saved.updated_at,
-            chassis_number=saved.chassis_number.value if saved.chassis_number else None,
-            sap_equipment_number=(
-                saved.sap_equipment_number.value if saved.sap_equipment_number else None
-            ),
+            commissioning_date=saved.commissioning_date,
+            driver1_customer_number=saved.driver1_customer_number,
+            driver2_customer_number=saved.driver2_customer_number,
         )

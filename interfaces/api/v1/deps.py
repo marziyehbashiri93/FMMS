@@ -9,17 +9,10 @@ from __future__ import annotations
 from apps.authentication.infrastructure.user_profile_reader import (
     DjangoUserProfileReader,
 )
-from apps.driver.application.services.assign_driver_to_vehicle_service import (
-    AssignDriverToVehicleService,
-)
 from apps.driver.application.services.get_driver_service import (
     GetDriverService,
     ListDriversService,
 )
-from apps.driver.application.services.register_driver_service import (
-    RegisterDriverService,
-)
-from apps.driver.application.services.suspend_driver_service import SuspendDriverService
 from apps.driver.infrastructure.repositories import DjangoDriverRepository
 from apps.fault.application.services.assign_fault_service import AssignFaultService
 from apps.fault.application.services.close_fault_service import CloseFaultService
@@ -166,15 +159,16 @@ from apps.repair.infrastructure.repositories import DjangoRepairOrderRepository
 from apps.vehicle.application.services.activate_vehicle_service import (
     ActivateVehicleService,
 )
-from apps.vehicle.application.services.create_vehicle_service import (
-    CreateVehicleService,
-)
 from apps.vehicle.application.services.deactivate_vehicle_service import (
     DeactivateVehicleService,
 )
 from apps.vehicle.application.services.get_vehicle_service import (
     GetVehicleService,
     ListVehiclesService,
+)
+from apps.vehicle.application.services.record_odometer_service import (
+    ListVehicleOdometerHistoryService,
+    RecordVehicleOdometerService,
 )
 from apps.vehicle.application.services.sync_sap_equipment_service import (
     SyncSAPEquipmentService,
@@ -200,6 +194,7 @@ from infrastructure.sap.adapters.odata.object_part_catalog_odata_adapter import 
     ObjectPartCatalogODataAdapter,
 )
 from infrastructure.sap.client.mock.mock_client import MockSAPClient
+from infrastructure.sap.client.odata_client import SAPODataClient
 from infrastructure.sap.config import SAPConfig
 from infrastructure.sap.transaction.sap_transaction_manager import SAPTransactionManager
 
@@ -219,6 +214,34 @@ def _sap_client() -> MockSAPClient:
             "The API v1 composition root currently requires SAP_USE_MOCK=True."
         )
     return MockSAPClient()
+
+
+def _sap_odata_client() -> MockSAPClient | SAPODataClient:
+    """Build the SAP OData client used for read integrations."""
+    config = SAPConfig.from_env()
+    if config.use_mock:
+        return MockSAPClient()
+    return SAPODataClient(
+        base_url=config.base_url,
+        username=config.username,
+        password=config.password,
+        client_code=config.client,
+        timeout_seconds=config.timeout_seconds,
+        verify_ssl=config.verify_ssl,
+    )
+
+
+def _equipment_adapter() -> EquipmentODataAdapter:
+    """Return the configured SAP equipment adapter."""
+    config = SAPConfig.from_env()
+    return EquipmentODataAdapter(
+        _sap_odata_client(),
+        service=config.equipment_service,
+        entity_set=config.equipment_entity_set,
+        page_size=config.equipment_page_size,
+        extra_filter=config.equipment_filter,
+        response_format=config.equipment_response_format,
+    )
 
 
 def get_vehicle_repository() -> DjangoVehicleRepository:
@@ -301,11 +324,6 @@ def get_sap_transaction_manager() -> SAPTransactionManager:
     return SAPTransactionManager(repository=get_sap_transaction_repository())
 
 
-def get_create_vehicle_service() -> CreateVehicleService:
-    """Return CreateVehicleService."""
-    return CreateVehicleService(get_vehicle_repository())
-
-
 def get_update_vehicle_service() -> UpdateVehicleService:
     """Return UpdateVehicleService."""
     return UpdateVehicleService(get_vehicle_repository())
@@ -334,7 +352,7 @@ def get_sync_sap_equipment_service() -> SyncSAPEquipmentService:
     """Return SyncSAPEquipmentService."""
     return SyncSAPEquipmentService(
         get_vehicle_repository(),
-        EquipmentODataAdapter(_sap_client()),
+        _equipment_adapter(),
     )
 
 
@@ -342,8 +360,19 @@ def get_sync_vehicles_from_sap_service() -> SyncVehiclesFromSAPService:
     """Return SyncVehiclesFromSAPService for bulk equipment import."""
     return SyncVehiclesFromSAPService(
         get_vehicle_repository(),
-        EquipmentODataAdapter(_sap_client()),
+        _equipment_adapter(),
+        get_driver_repository(),
     )
+
+
+def get_record_vehicle_odometer_service() -> RecordVehicleOdometerService:
+    """Return RecordVehicleOdometerService."""
+    return RecordVehicleOdometerService(get_vehicle_repository())
+
+
+def get_list_vehicle_odometer_history_service() -> ListVehicleOdometerHistoryService:
+    """Return ListVehicleOdometerHistoryService."""
+    return ListVehicleOdometerHistoryService(get_vehicle_repository())
 
 
 def get_get_vehicle_service() -> GetVehicleService:
@@ -356,11 +385,6 @@ def get_list_vehicles_service() -> ListVehiclesService:
     return ListVehiclesService(get_vehicle_repository())
 
 
-def get_register_driver_service() -> RegisterDriverService:
-    """Return RegisterDriverService."""
-    return RegisterDriverService(get_driver_repository())
-
-
 def get_get_driver_service() -> GetDriverService:
     """Return GetDriverService."""
     return GetDriverService(get_driver_repository())
@@ -369,19 +393,6 @@ def get_get_driver_service() -> GetDriverService:
 def get_list_drivers_service() -> ListDriversService:
     """Return ListDriversService."""
     return ListDriversService(get_driver_repository())
-
-
-def get_assign_driver_to_vehicle_service() -> AssignDriverToVehicleService:
-    """Return AssignDriverToVehicleService."""
-    return AssignDriverToVehicleService(
-        get_driver_repository(),
-        get_vehicle_repository(),
-    )
-
-
-def get_suspend_driver_service() -> SuspendDriverService:
-    """Return SuspendDriverService."""
-    return SuspendDriverService(get_driver_repository())
 
 
 def get_create_inspection_service() -> CreateInspectionService:
@@ -528,6 +539,8 @@ def get_assign_workshop_service() -> AssignWorkshopService:
     """Return AssignWorkshopService."""
     return AssignWorkshopService(
         get_repair_order_repository(),
+        get_vehicle_repository(),
+        get_create_vehicle_handover_service(),
         get_record_repair_order_event_service(),
     )
 
@@ -619,6 +632,7 @@ def get_confirm_vehicle_handover_service() -> ConfirmVehicleHandoverService:
         get_repair_order_repository(),
         get_vehicle_repository(),
         get_record_repair_order_event_service(),
+        get_external_invoice_repository(),
     )
 
 

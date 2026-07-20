@@ -35,6 +35,7 @@ from apps.repair.application.services.repair_order_timeline_service import (
 )
 from apps.repair.domain.entities import RepairOrderEventType
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
+from apps.vehicle.domain.entities import VehicleStatus
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
 from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
@@ -227,6 +228,10 @@ class CompleteRepairOrderService:
             message=f"Vehicle '{saved.vehicle_id}' not found.",
             details={"vehicle_id": str(saved.vehicle_id)},
         )
+        if vehicle.status == VehicleStatus.INACTIVE:
+            vehicle.mark_under_repair()
+            vehicle.updated_at = datetime.now(tz=UTC)
+            self._vehicle_repo.save(vehicle)
         vehicle.mark_waiting_driver_confirmation()
         vehicle.updated_at = datetime.now(tz=UTC)
         self._vehicle_repo.save(vehicle)

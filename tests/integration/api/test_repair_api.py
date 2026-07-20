@@ -22,7 +22,7 @@ class TestRepairAPI:
             authenticated_client,
             plate="12REP001",
             vin="1HGCM82633A004356",
-            sap_equipment_number="100001",
+            vehicle_number="100001",
         )
         fault = authenticated_client.post(
             "/api/v1/faults/",

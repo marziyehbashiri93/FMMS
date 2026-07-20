@@ -8,7 +8,7 @@ from __future__ import annotations
 import uuid
 
 from apps.vehicle.application.dto.vehicle_dto import VehicleResponseDTO
-from apps.vehicle.domain.entities import Vehicle, VehicleStatus
+from apps.vehicle.domain.entities import VEHICLE_STATUS_LABELS, Vehicle, VehicleStatus
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
 from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
@@ -20,19 +20,15 @@ def _to_response_dto(vehicle: Vehicle) -> VehicleResponseDTO:
     """Map domain entity → response DTO."""
     return VehicleResponseDTO(
         id=vehicle.id,
-        plate_number=vehicle.plate_number.value,
-        vin=vehicle.vin.value,
-        make=vehicle.make,
-        model=vehicle.model,
-        year=vehicle.year,
-        category=vehicle.category,
+        vehicle_number=vehicle.vehicle_number.value,
+        license_plate=vehicle.license_plate.value,
         status=vehicle.status,
+        status_label=VEHICLE_STATUS_LABELS[vehicle.status],
         created_at=vehicle.created_at,
         updated_at=vehicle.updated_at,
-        chassis_number=vehicle.chassis_number.value if vehicle.chassis_number else None,
-        sap_equipment_number=(
-            vehicle.sap_equipment_number.value if vehicle.sap_equipment_number else None
-        ),
+        commissioning_date=vehicle.commissioning_date,
+        driver1_customer_number=vehicle.driver1_customer_number,
+        driver2_customer_number=vehicle.driver2_customer_number,
     )
 
 

@@ -58,9 +58,9 @@ from apps.preventive_maintenance.domain.value_objects import (
     TriggerCondition,
     TriggerType,
 )
-from apps.vehicle.domain.entities import Vehicle, VehicleCategory, VehicleStatus
+from apps.vehicle.domain.entities import Vehicle, VehicleStatus
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
-from apps.vehicle.domain.value_objects import VIN, PlateNumber, SAPEquipmentNumber
+from apps.vehicle.domain.value_objects import PlateNumber, SAPVehicleNumber
 from core.exceptions.base_exception import FMMSConflictError, FMMSNotFoundError
 from core.sap.dtos.pm_notification import (
     CreatePMNotificationRequest,
@@ -127,19 +127,14 @@ def _tx_manager(
     return SAPTransactionManager(repository=repo or FakeSAPTransactionRepository())
 
 
-def _make_vehicle(*, with_sap: bool = False) -> Vehicle:
+def _make_vehicle(*, vehicle_number: str = "200001") -> Vehicle:
     return Vehicle(
         id=uuid.uuid4(),
-        plate_number=PlateNumber("PMPLT001"),
-        vin=VIN("1HGCM82633A004352"),
-        make="Toyota",
-        model="Hilux",
-        year=2022,
-        category=VehicleCategory.LIGHT,
+        vehicle_number=SAPVehicleNumber(vehicle_number),
+        license_plate=PlateNumber("PMPLT001"),
         status=VehicleStatus.ACTIVE,
         created_at=datetime.now(tz=UTC),
         updated_at=datetime.now(tz=UTC),
-        sap_equipment_number=SAPEquipmentNumber("200001") if with_sap else None,
     )
 
 
@@ -258,15 +253,15 @@ class FakeVehicleRepository(IVehicleRepository):
     def get_by_plate(self, plate_number: PlateNumber) -> Vehicle | None:
         return None
 
-    def get_by_sap_equipment_number(
-        self, sap_equipment_number: SAPEquipmentNumber
+    def get_by_vehicle_number(
+        self, vehicle_number: SAPVehicleNumber
     ) -> Vehicle | None:
         return next(
             (
                 v
                 for v in self._store.values()
-                if v.sap_equipment_number is not None
-                and v.sap_equipment_number == sap_equipment_number
+                if v.vehicle_number is not None
+                and v.vehicle_number == vehicle_number
             ),
             None,
         )
@@ -430,7 +425,7 @@ class TestTriggerPMWorkOrderService:
             )
 
     def test_creates_sap_notification_when_requested(self) -> None:
-        vehicle = _make_vehicle(with_sap=True)
+        vehicle = _make_vehicle()
         plan = _make_plan(vehicle_id=vehicle.id)
         sap = FakeSAPPMNotificationPort(notification_number="10009999")
         service = TriggerPMWorkOrderService(
@@ -456,7 +451,7 @@ class TestTriggerPMWorkOrderService:
         assert sap.calls[0].equipment_number == "200001"
 
     def test_raises_when_sap_requested_without_port(self) -> None:
-        vehicle = _make_vehicle(with_sap=True)
+        vehicle = _make_vehicle()
         plan = _make_plan(vehicle_id=vehicle.id)
         service = TriggerPMWorkOrderService(
             FakePMPlanRepository([plan]),

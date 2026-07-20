@@ -71,6 +71,15 @@ class ISAPClient(ABC):
         """
 
     @abstractmethod
+    def odata_get_xml(
+        self,
+        service: str,
+        entity: str = "",
+        params: dict[str, Any] | None = None,
+    ) -> str:
+        """Execute a GET request and return the raw XML response body."""
+
+    @abstractmethod
     def odata_post(
         self,
         service: str,

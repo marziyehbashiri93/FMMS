@@ -99,6 +99,17 @@ class SAPBAPIClient(ISAPClient):
             "SAPBAPIClient does not support OData requests. Use SAPODataClient."
         )
 
+    def odata_get_xml(
+        self,
+        service: str,
+        entity: str = "",
+        params: dict[str, Any] | None = None,
+    ) -> str:
+        """Not supported on BAPIClient."""
+        raise NotImplementedError(
+            "SAPBAPIClient does not support OData requests. Use SAPODataClient."
+        )
+
     def bapi_call(
         self,
         function_module: str,

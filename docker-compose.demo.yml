@@ -1,0 +1,62 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# FMMS Demo — frontend + backend
+#
+# Uses host Postgres (data stays on your machine). No Redis / Celery.
+#
+# Start:
+#   docker compose -f docker-compose.demo.yml up --build
+#
+# URLs:
+#   Frontend  http://localhost:5500
+#   Backend   http://localhost:8000/api/v1/
+#
+# Stop:
+#   docker compose -f docker-compose.demo.yml down
+# ──────────────────────────────────────────────────────────────────────────────
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.demo.backend
+    image: fmms-demo-backend:v2
+    container_name: fmms_demo_backend
+    env_file:
+      - .env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.demo
+      POSTGRES_HOST: host.docker.internal
+      CELERY_BROKER_URL: memory://
+      SAP_USE_MOCK: ${SAP_USE_MOCK:-True}
+      SAP_BASE_URL: ${SAP_BASE_URL:-}
+      SAP_CLIENT: ${SAP_CLIENT:-}
+      SAP_USERNAME: ${SAP_USERNAME:-}
+      SAP_PASSWORD: ${SAP_PASSWORD:-}
+      SAP_ASHOST: ${SAP_ASHOST:-}
+      SAP_SYSNR: ${SAP_SYSNR:-00}
+      SAP_VERIFY_SSL: ${SAP_VERIFY_SSL:-True}
+      SAP_EQUIPMENT_SERVICE: ${SAP_EQUIPMENT_SERVICE:-API_EQUIPMENT}
+      SAP_EQUIPMENT_ENTITY_SET: ${SAP_EQUIPMENT_ENTITY_SET:-Equipment}
+      SAP_EQUIPMENT_PAGE_SIZE: ${SAP_EQUIPMENT_PAGE_SIZE:-200}
+      SAP_EQUIPMENT_FILTER: ${SAP_EQUIPMENT_FILTER:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./demo-frontend_v2
+      dockerfile: Dockerfile
+    image: fmms-demo-frontend:v2
+    container_name: fmms_demo_frontend
+    environment:
+      API_BASE_URL: http://localhost:8000/api/v1
+      DEMO_MODE: "false"
+      PORT: "5500"
+    ports:
+      - "5500:5500"
+    depends_on:
+      - backend
+    restart: unless-stopped

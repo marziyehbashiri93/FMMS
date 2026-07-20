@@ -1,0 +1,95 @@
+<?xml version="1.0"?>
+<Root>
+<Columns>
+	<Column Name="CodeGroup"></Column>
+	<Column Name="Code"></Column>
+	<Column Name="GroupText"></Column>
+	<Column Name="CodeText"></Column>
+</Columns>
+<Rows>
+	<Row>
+		<Value>FL-BRK</Value>
+		<Value>B001</Value>
+		<Value>سیستم ترمز</Value>
+		<Value> ترمز جلو</Value>
+	</Row>
+	<Row>
+		<Value>FL-BRK</Value>
+		<Value>B002</Value>
+		<Value>سیستم ترمز</Value>
+		<Value>ترمز عقب</Value>
+	</Row>
+	<Row>
+		<Value>FL-BRK</Value>
+		<Value>B003</Value>
+		<Value>سیستم ترمز</Value>
+		<Value>ترمز دستی</Value>
+	</Row>
+	<Row>
+		<Value>FL-CAB</Value>
+		<Value>C001</Value>
+		<Value> کابین راننده</Value>
+		<Value>داشبورد</Value>
+	</Row>
+	<Row>
+		<Value>FL-CAB</Value>
+		<Value>C002</Value>
+		<Value> کابین راننده</Value>
+		<Value>تهویه مطبوع</Value>
+	</Row>
+	<Row>
+		<Value>FL-CAB</Value>
+		<Value>C003</Value>
+		<Value> کابین راننده</Value>
+		<Value>آینه‌ها</Value>
+	</Row>
+	<Row>
+		<Value>FL-ELEC</Value>
+		<Value>L001</Value>
+		<Value>برق و روشنایی</Value>
+		<Value>چراغ جلو</Value>
+	</Row>
+	<Row>
+		<Value>FL-ELEC</Value>
+		<Value>L002</Value>
+		<Value>برق و روشنایی</Value>
+		<Value>چراغ عقب/خطر</Value>
+	</Row>
+	<Row>
+		<Value>FL-ELEC</Value>
+		<Value>L003</Value>
+		<Value>برق و روشنایی</Value>
+		<Value>باتری/دینام</Value>
+	</Row>
+	<Row>
+		<Value>FL-ENG</Value>
+		<Value>E001</Value>
+		<Value>موتور و سوخت‌رسانی</Value>
+		<Value>موتور اصلی</Value>
+	</Row>
+	<Row>
+		<Value>FL-ENG</Value>
+		<Value>E002</Value>
+		<Value>موتور و سوخت‌رسانی</Value>
+		<Value>سیستم خنک‌کننده</Value>
+	</Row>
+	<Row>
+		<Value>FL-ENG</Value>
+		<Value>E003</Value>
+		<Value>موتور و سوخت‌رسانی</Value>
+		<Value>فیلتر روغن/هوا</Value>
+	</Row>
+	<Row>
+		<Value>FL-SUSP</Value>
+		<Value>S001</Value>
+		<Value>تعلیق و فرمان</Value>
+		<Value> کمک‌ فنر</Value>
+	</Row>
+	<Row>
+		<Value>FL-SUSP</Value>
+		<Value>S002</Value>
+		<Value>تعلیق و فرمان</Value>
+		<Value>سیستم فرمان</Value>
+	</Row>
+</Rows>
+</Root>

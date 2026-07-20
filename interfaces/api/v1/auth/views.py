@@ -5,21 +5,26 @@ from __future__ import annotations
 from typing import Any
 
 from drf_spectacular.utils import extend_schema
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.views import APIView
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-from interfaces.api.v1.auth.serializers import EmailTokenObtainPairSerializer
+from interfaces.api.v1.auth.serializers import (
+    UsernameTokenObtainPairSerializer,
+    UserProfileSerializer,
+)
 
 
 class FMMSJWTTokenObtainPairView(TokenObtainPairView):
     """Issue an access and refresh JWT pair."""
 
-    serializer_class = EmailTokenObtainPairSerializer
+    serializer_class = UsernameTokenObtainPairSerializer
 
     @extend_schema(tags=["auth"])
     def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
-        """Issue a JWT pair for valid email credentials."""
+        """Issue a JWT pair for valid username credentials."""
         return super().post(request, *args, **kwargs)
 
 
@@ -30,3 +35,14 @@ class FMMSJWTTokenRefreshView(TokenRefreshView):
     def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """Issue a new access token from a refresh token."""
         return super().post(request, *args, **kwargs)
+
+
+class CurrentUserView(APIView):
+    """Return the authenticated FMMS user profile."""
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(tags=["auth"], responses=UserProfileSerializer)
+    def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        """Return the current user's session profile."""
+        return Response(UserProfileSerializer(request.user).data)

@@ -5,6 +5,6 @@ definition lives in ``apps.vehicle.infrastructure.models`` to maintain
 Clean Architecture layering. This shim satisfies Django without coupling.
 """
 
-from apps.vehicle.infrastructure.models import VehicleModel
+from apps.vehicle.infrastructure.models import VehicleModel, VehicleOdometerReadingModel
 
-__all__ = ["VehicleModel"]
+__all__ = ["VehicleModel", "VehicleOdometerReadingModel"]

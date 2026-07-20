@@ -10,23 +10,26 @@ import pytest
 from apps.driver.domain.entities import Driver, DriverStatus
 from apps.driver.domain.exceptions import DriverNotFoundError
 from apps.driver.domain.interfaces.driver_repository import IDriverRepository
-from apps.driver.domain.value_objects import DriverContact, LicenseClass, LicenseNumber
+from apps.driver.domain.value_objects import CustomerNumber
+from apps.driver.infrastructure.models import DriverModel
 from apps.driver.infrastructure.repositories import DjangoDriverRepository
 
 pytestmark = pytest.mark.django_db
 
 
 def _make_driver(
-    license: str = "LIC001",
+    customer_number: str = "6000000001",
     status: DriverStatus = DriverStatus.ACTIVE,
 ) -> Driver:
     repo = DjangoDriverRepository()
     driver = Driver(
         id=uuid.uuid4(),
-        full_name="Ahmad Rezaei",
-        license_number=LicenseNumber(license),
-        license_class=LicenseClass.B,
-        contact=DriverContact(phone="+989121234567", email="ahmad@example.com"),
+        customer_number=CustomerNumber(customer_number),
+        name="Ahmad Rezaei",
+        mobile="09121234567",
+        personnel_number="21000001",
+        gender="مذکر",
+        nilofar_code="520000001",
         status=status,
         created_at=datetime.now(tz=UTC),
         updated_at=datetime.now(tz=UTC),
@@ -45,80 +48,57 @@ class TestSaveAndRetrieve:
         driver = _make_driver()
         fetched = repo.get_by_id(driver.id)
         assert fetched.id == driver.id
-        assert fetched.license_number.value == "LIC001"
-        assert fetched.full_name == "Ahmad Rezaei"
+        assert fetched.customer_number.value == "6000000001"
+        assert fetched.name == "Ahmad Rezaei"
 
     def test_get_by_id_not_found(self) -> None:
         repo = DjangoDriverRepository()
         with pytest.raises(DriverNotFoundError):
             repo.get_by_id(uuid.uuid4())
 
-    def test_get_by_license(self) -> None:
+    def test_get_by_customer_number(self) -> None:
         repo = DjangoDriverRepository()
-        _make_driver(license="LIC002")
-        driver = repo.get_by_license(LicenseNumber("LIC002"))
-        assert driver.license_number.value == "LIC002"
+        _make_driver(customer_number="6000000002")
+        driver = repo.get_by_customer_number(CustomerNumber("6000000002"))
+        assert driver.customer_number.value == "6000000002"
 
-    def test_contact_preserved(self) -> None:
+    def test_sap_contact_fields_preserved(self) -> None:
         repo = DjangoDriverRepository()
         driver = _make_driver()
         fetched = repo.get_by_id(driver.id)
-        assert fetched.contact.phone == "+989121234567"
-        assert fetched.contact.email == "ahmad@example.com"
+        assert fetched.mobile == "09121234567"
+        assert fetched.personnel_number == "21000001"
 
     def test_update_status(self) -> None:
         repo = DjangoDriverRepository()
         driver = _make_driver()
-        driver.suspend()
+        driver.decommission()
         repo.save(driver)
         fetched = repo.get_by_id(driver.id)
-        assert fetched.status == DriverStatus.SUSPENDED
-
-
-class TestVehicleAssignment:
-    def test_get_by_vehicle_assigned(self) -> None:
-        repo = DjangoDriverRepository()
-        vehicle_id = uuid.uuid4()
-        driver = _make_driver(license="LIC003")
-        driver.assign_vehicle(vehicle_id)
-        repo.save(driver)
-        found = repo.get_by_vehicle(vehicle_id)
-        assert found is not None
-        assert found.assigned_vehicle_id == vehicle_id
-
-    def test_get_by_vehicle_none(self) -> None:
-        repo = DjangoDriverRepository()
-        result = repo.get_by_vehicle(uuid.uuid4())
-        assert result is None
+        assert fetched.status == DriverStatus.DECOMMISSIONED
 
 
 class TestListAndExists:
     def test_list_by_status(self) -> None:
         repo = DjangoDriverRepository()
-        _make_driver(license="LIC004", status=DriverStatus.ACTIVE)
-        _make_driver(license="LIC005", status=DriverStatus.SUSPENDED)
+        _make_driver(customer_number="6000000004", status=DriverStatus.ACTIVE)
+        _make_driver(
+            customer_number="6000000005",
+            status=DriverStatus.DECOMMISSIONED,
+        )
         active = repo.list_by_status(DriverStatus.ACTIVE)
         assert all(d.status == DriverStatus.ACTIVE for d in active)
 
-    def test_exists_by_license_true(self) -> None:
-        repo = DjangoDriverRepository()
-        _make_driver(license="LIC006")
-        assert repo.exists_by_license(LicenseNumber("LIC006")) is True
 
-    def test_exists_by_license_false(self) -> None:
+class TestDecommission:
+    def test_decommission_missing_from_sap_preserves_rows(self) -> None:
         repo = DjangoDriverRepository()
-        assert repo.exists_by_license(LicenseNumber("ZZZZZZ")) is False
+        kept = _make_driver(customer_number="6000000008")
+        missing = _make_driver(customer_number="6000000009")
 
+        count = repo.decommission_missing_from_sap({kept.customer_number.value})
 
-class TestSoftDelete:
-    def test_delete_hides_record(self) -> None:
-        repo = DjangoDriverRepository()
-        driver = _make_driver(license="LIC007")
-        repo.delete(driver.id)
-        with pytest.raises(DriverNotFoundError):
-            repo.get_by_id(driver.id)
-
-    def test_delete_nonexistent_raises(self) -> None:
-        repo = DjangoDriverRepository()
-        with pytest.raises(DriverNotFoundError):
-            repo.delete(uuid.uuid4())
+        assert count == 1
+        assert repo.get_by_id(kept.id).status == DriverStatus.ACTIVE
+        assert repo.get_by_id(missing.id).status == DriverStatus.DECOMMISSIONED
+        assert DriverModel.objects.get(id=missing.id).is_deleted is False

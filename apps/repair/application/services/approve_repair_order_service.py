@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from typing import Protocol
 
 from apps.repair.application.dto.repair_dto import (
     ApproveRepairOrderDTO,
@@ -16,7 +17,11 @@ from apps.repair.application.services._timeline_helper import (
 from apps.repair.application.services.repair_order_timeline_service import (
     RecordRepairOrderEventService,
 )
-from apps.repair.domain.entities import RepairOrderEventType
+from apps.repair.domain.entities import (
+    RepairOrder,
+    RepairOrderEventType,
+    WorkshopType,
+)
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
 from apps.vehicle.domain.entities import VehicleStatus
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
@@ -27,8 +32,19 @@ logger = get_structured_logger("repair", __name__)
 
 _APPROVE_MESSAGE = "دستور تعمیر توسط واحد ترابری تأیید شد."
 _WORKSHOP_MESSAGE = "نوع تعمیرگاه با موفقیت انتخاب شد."
+_EXTERNAL_HANDOVER_MESSAGE = (
+    "تعمیرگاه خارجی انتخاب شد؛ خودرو برای تایید تحویل به راننده ارسال شد."
+)
 _WORKSHOP_ACCEPTED_MESSAGE = "تعمیرگاه داخلی کار را پذیرفت."
 _WORKSHOP_REJECTED_MESSAGE = "تعمیرگاه درخواست تعمیر را رد کرد."
+
+
+class CreateVehicleHandoverPort(Protocol):
+    """Port for creating a vehicle handover after external workshop assignment."""
+
+    def execute(self, *, repair_order_id: uuid.UUID, vehicle_id: uuid.UUID) -> None:
+        """Create handover when absent for repair order."""
+        ...
 
 
 class ApproveRepairOrderService:
@@ -111,20 +127,30 @@ class ApproveRepairOrderService:
 class AssignWorkshopService:
     """Assign INTERNAL/EXTERNAL workshop after transport approval.
 
+    For ``EXTERNAL``, the order immediately advances to driver handover so the
+    vehicle leaves the workshop queue and waits for driver confirmation.
+
     Args:
         repair_order_repository: Concrete ``IRepairOrderRepository``.
+        vehicle_repository: Used to mark the vehicle waiting for driver handover.
+        create_handover_service: Creates the driver handover record for EXTERNAL.
+        event_recorder: Optional timeline recorder.
     """
 
     def __init__(
         self,
         repair_order_repository: IRepairOrderRepository,
+        vehicle_repository: IVehicleRepository | None = None,
+        create_handover_service: CreateVehicleHandoverPort | None = None,
         event_recorder: RecordRepairOrderEventService | None = None,
     ) -> None:
         self._repo = repair_order_repository
+        self._vehicle_repo = vehicle_repository
+        self._create_handover_service = create_handover_service
         self._event_recorder = event_recorder
 
     def execute(self, dto: AssignWorkshopDTO) -> RepairDecisionResponseDTO:
-        """Transition APPROVED → WORKSHOP_ASSIGNED and store workshop type.
+        """Transition APPROVED → WORKSHOP_ASSIGNED (INTERNAL) or driver handover (EXTERNAL).
 
         Args:
             dto: Workshop assignment request.
@@ -133,7 +159,7 @@ class AssignWorkshopService:
             Compact decision response with Persian confirmation message.
 
         Raises:
-            FMMSNotFoundError: If the repair order does not exist.
+            FMMSNotFoundError: If the repair order or vehicle does not exist.
             RepairOrderInvalidStateTransitionError: If not in APPROVED status.
         """
         logger.info(
@@ -154,8 +180,9 @@ class AssignWorkshopService:
             message=f"Repair order '{dto.repair_order_id}' not found.",
             details={"repair_order_id": str(dto.repair_order_id)},
         )
+        now = datetime.now(tz=UTC)
         order.assign_workshop(dto.workshop_type, dto.workshop_id)
-        order.updated_at = datetime.now(tz=UTC)
+        order.updated_at = now
         saved = self._repo.save(order)
         record_repair_timeline_event(
             self._event_recorder,
@@ -165,6 +192,16 @@ class AssignWorkshopService:
             created_by_id=dto.assigned_by,
             request_id=dto.request_id,
         )
+
+        message = _WORKSHOP_MESSAGE
+        if saved.workshop_type == WorkshopType.EXTERNAL:
+            saved = self._advance_external_to_driver_handover(
+                order=saved,
+                assigned_by=dto.assigned_by,
+                request_id=dto.request_id,
+                now=now,
+            )
+            message = _EXTERNAL_HANDOVER_MESSAGE
 
         logger.info(
             "Workshop assigned to repair order",
@@ -178,15 +215,61 @@ class AssignWorkshopService:
                 "workshop_type": (
                     saved.workshop_type.value if saved.workshop_type else None
                 ),
+                "status": saved.status.value,
             },
         )
         return RepairDecisionResponseDTO(
             id=saved.id,
             status=saved.status,
-            message=_WORKSHOP_MESSAGE,
+            message=message,
             workshop_type=saved.workshop_type,
             workshop_id=saved.workshop_id,
         )
+
+    def _advance_external_to_driver_handover(
+        self,
+        *,
+        order: RepairOrder,
+        assigned_by: uuid.UUID,
+        request_id: str,
+        now: datetime,
+    ) -> RepairOrder:
+        """Move EXTERNAL repair to WAITING_DRIVER_CONFIRMATION and create handover."""
+        if self._vehicle_repo is None or self._create_handover_service is None:
+            raise RuntimeError(
+                "AssignWorkshopService requires vehicle and handover ports for EXTERNAL."
+            )
+
+        order.complete_waiting_driver_confirmation(completed_at=now)
+        order.updated_at = now
+        saved = self._repo.save(order)
+
+        vehicle = load_or_not_found(
+            lambda: self._vehicle_repo.get_by_id(saved.vehicle_id),
+            message=f"Vehicle '{saved.vehicle_id}' not found.",
+            details={"vehicle_id": str(saved.vehicle_id)},
+        )
+        if vehicle.status == VehicleStatus.INACTIVE:
+            vehicle.mark_under_repair()
+            vehicle.updated_at = now
+            self._vehicle_repo.save(vehicle)
+        vehicle.mark_waiting_driver_confirmation()
+        vehicle.updated_at = now
+        self._vehicle_repo.save(vehicle)
+
+        self._create_handover_service.execute(
+            repair_order_id=saved.id,
+            vehicle_id=saved.vehicle_id,
+        )
+        record_repair_timeline_event(
+            self._event_recorder,
+            saved.id,
+            RepairOrderEventType.WAITING_DRIVER_CONFIRMATION,
+            "تعمیر خارجی به مرحله تایید تحویل راننده منتقل شد.",
+            created_by_id=assigned_by,
+            request_id=request_id,
+        )
+        return saved
 
 
 class AcceptRepairOrderService:

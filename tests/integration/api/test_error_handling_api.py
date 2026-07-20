@@ -70,9 +70,10 @@ class TestAPIErrorMapping:
         self, authenticated_client: APIClient
     ) -> None:
         """Serializer validation failures return VALIDATION_ERROR."""
-        response = authenticated_client.post(
-            "/api/v1/vehicles/",
-            {"plate_number": "BAD"},
+        vehicle = create_vehicle(authenticated_client, plate="12ERRVAL")
+        response = authenticated_client.patch(
+            f"/api/v1/vehicles/{vehicle['id']}/",
+            {"status": "BAD"},
             format="json",
         )
         assert response.status_code == 400
@@ -102,7 +103,7 @@ class TestAPIErrorMapping:
             authenticated_client,
             plate="12ERR002",
             vin="1HGCM82633A004393",
-            sap_equipment_number="100099",
+            vehicle_number="100099",
         )
         fault = authenticated_client.post(
             "/api/v1/faults/",

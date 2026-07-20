@@ -79,14 +79,22 @@ def _move_to_accepted_by_driver(
     return order
 
 
-def _confirm_driver_handover(client: APIClient, order_id: str) -> dict:
+def _confirm_driver_handover(
+    client: APIClient,
+    order_id: str,
+    *,
+    invoice: dict | None = None,
+) -> dict:
     """Confirm the handover for a repair order."""
     handovers = client.get("/api/v1/vehicle-handovers/")
     assert handovers.status_code == 200, handovers.data
     target = next(item for item in handovers.data if item["repair_order_id"] == order_id)
+    payload: dict = {"accepted": True, "comment": "ok"}
+    if invoice:
+        payload.update(invoice)
     confirmed = client.post(
         f"/api/v1/vehicle-handovers/{target['id']}/confirm/",
-        {"accepted": True, "comment": "ok"},
+        payload,
         format="json",
     )
     assert confirmed.status_code == 200, confirmed.data
@@ -352,45 +360,60 @@ class TestMaintenanceWorkflowV2API:
         )
         assert assigned.status_code == 200, assigned.data
         assert assigned.data["workshop_type"] == "EXTERNAL"
+        assert assigned.data["status"] == "WAITING_DRIVER_CONFIRMATION"
+
+        repair_after_assign = authenticated_client.get(
+            f"/api/v1/repair-orders/{order['id']}/"
+        )
+        assert repair_after_assign.data["status"] == "WAITING_DRIVER_CONFIRMATION"
+
+        vehicle_after_assign = authenticated_client.get(
+            f"/api/v1/vehicles/{order['vehicle_id']}/"
+        )
+        assert vehicle_after_assign.data["status"] == "WAITING_DRIVER_CONFIRMATION"
+
+        handovers = technician_client.get("/api/v1/vehicle-handovers/")
+        assert any(item["repair_order_id"] == order["id"] for item in handovers.data)
 
         started = technician_client.post(
             f"/api/v1/repair-orders/{order['id']}/start/", {}, format="json"
         )
         assert started.status_code == 422, started.data
 
-        completed = technician_client.post(
-            f"/api/v1/repair-orders/{order['id']}/complete/",
-            {"completed_at": datetime.now(tz=UTC).isoformat()},
+        missing_invoice = technician_client.post(
+            f"/api/v1/vehicle-handovers/"
+            f"{next(item['id'] for item in handovers.data if item['repair_order_id'] == order['id'])}"
+            f"/confirm/",
+            {"accepted": True, "comment": "ok"},
             format="json",
         )
-        assert completed.status_code == 200, completed.data
-        assert completed.data["status"] == "WAITING_DRIVER_CONFIRMATION"
+        assert missing_invoice.status_code == 422, missing_invoice.data
+        assert missing_invoice.data["error_code"] == "EXTERNAL_HANDOVER_INVOICE_REQUIRED"
 
-        _confirm_driver_handover(technician_client, order["id"])
+        _confirm_driver_handover(
+            technician_client,
+            order["id"],
+            invoice={"invoice_amount": "500000.00", "invoice_currency": "IRR"},
+        )
         repair_after_handover = authenticated_client.get(
             f"/api/v1/repair-orders/{order['id']}/"
         )
         assert repair_after_handover.data["status"] == "WAITING_TRANSPORT_FINAL_APPROVAL"
 
-        uploaded = authenticated_client.post(
-            f"/api/v1/repair-orders/{order['id']}/invoice/",
-            {"amount": "500000.00", "currency": "IRR"},
-            format="json",
-        )
-        assert uploaded.status_code == 201, uploaded.data
-        assert uploaded.data["status"] == "UPLOADED"
-
         listed = authenticated_client.get("/api/v1/external-invoices/")
         assert listed.status_code == 200, listed.data
-        assert any(item["id"] == uploaded.data["id"] for item in listed.data)
+        uploaded = next(
+            item for item in listed.data if item["repair_order_id"] == order["id"]
+        )
+        assert uploaded["status"] == "UPLOADED"
 
-        approved = supervisor_client.post(
-            f"/api/v1/external-invoices/{uploaded.data['id']}/approve/",
+        approved_invoice = supervisor_client.post(
+            f"/api/v1/external-invoices/{uploaded['id']}/approve/",
             {},
             format="json",
         )
-        assert approved.status_code == 200, approved.data
-        assert approved.data["status"] == "APPROVED"
+        assert approved_invoice.status_code == 200, approved_invoice.data
+        assert approved_invoice.data["status"] == "APPROVED"
 
         repair = authenticated_client.get(f"/api/v1/repair-orders/{order['id']}/")
         assert repair.data["status"] == "COMPLETED"

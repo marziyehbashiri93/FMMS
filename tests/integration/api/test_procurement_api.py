@@ -16,13 +16,17 @@ pytestmark = pytest.mark.django_db
 class TestProcurementAPI:
     """Cover PR create, line items, SAP submit, and PO receive."""
 
-    def test_pr_submit_and_receive_po(self, authenticated_client: APIClient) -> None:
+    def test_pr_submit_and_receive_po(
+        self, authenticated_client: APIClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Create a PR, submit to SAP, and receive a PO."""
+        monkeypatch.setenv("SAP_USE_MOCK", "True")
+
         vehicle = create_vehicle(
             authenticated_client,
             plate="12PRC001",
             vin="1HGCM82633A004358",
-            sap_equipment_number="100002",
+            vehicle_number="100002",
         )
         fault = authenticated_client.post(
             "/api/v1/faults/",

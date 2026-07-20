@@ -1,0 +1,128 @@
+"""Services for recording and reading vehicle daily odometer history."""
+
+from __future__ import annotations
+
+import uuid
+from datetime import UTC, datetime
+
+from django.db import transaction
+
+from apps.vehicle.application.dto.vehicle_dto import (
+    RecordVehicleOdometerDTO,
+    VehicleOdometerResponseDTO,
+)
+from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
+from apps.vehicle.infrastructure.models import VehicleOdometerReadingModel
+from core.exceptions.base_exception import FMMSValidationError
+from core.exceptions.translation import load_or_not_found
+from core.logging.structured_logger import get_structured_logger
+
+logger = get_structured_logger("vehicle", __name__)
+
+_MIN_DAILY_DELTA_KM = 10
+
+
+class RecordVehicleOdometerService:
+    """Create or update one daily odometer reading for a vehicle."""
+
+    def __init__(self, vehicle_repository: IVehicleRepository) -> None:
+        self._vehicle_repo = vehicle_repository
+
+    @transaction.atomic
+    def execute(self, dto: RecordVehicleOdometerDTO) -> VehicleOdometerResponseDTO:
+        """Record a daily odometer value after validating monotonic growth."""
+        load_or_not_found(
+            lambda: self._vehicle_repo.get_by_id(dto.vehicle_id),
+            message=f"Vehicle '{dto.vehicle_id}' not found.",
+            details={"vehicle_id": str(dto.vehicle_id)},
+        )
+        previous = (
+            VehicleOdometerReadingModel.objects.filter(
+                vehicle_id=dto.vehicle_id,
+                reading_date__lt=dto.reading_date,
+                is_deleted=False,
+            )
+            .order_by("-reading_date")
+            .first()
+        )
+        if previous is not None:
+            minimum = previous.odometer_km + _MIN_DAILY_DELTA_KM
+            if dto.odometer_km < minimum:
+                raise FMMSValidationError(
+                    message=(
+                        "Odometer reading must be at least "
+                        f"{_MIN_DAILY_DELTA_KM} km greater than the previous reading."
+                    ),
+                    details={
+                        "vehicle_id": str(dto.vehicle_id),
+                        "previous_date": str(previous.reading_date),
+                        "previous_odometer_km": previous.odometer_km,
+                        "minimum_odometer_km": minimum,
+                        "submitted_odometer_km": dto.odometer_km,
+                    },
+                )
+
+        now = datetime.now(tz=UTC)
+        obj, created = VehicleOdometerReadingModel.objects.update_or_create(
+            vehicle_id=dto.vehicle_id,
+            reading_date=dto.reading_date,
+            is_deleted=False,
+            defaults={
+                "odometer_km": dto.odometer_km,
+                "source": dto.source,
+                "recorded_by_id": dto.recorded_by,
+                "recorded_at": now,
+            },
+        )
+        logger.info(
+            "Vehicle odometer recorded",
+            extra={
+                "domain": "vehicle",
+                "service": "RecordVehicleOdometerService",
+                "operation": "execute",
+                "request_id": dto.request_id,
+                "vehicle_id": str(dto.vehicle_id),
+                "reading_date": str(dto.reading_date),
+                "record_created": created,
+            },
+        )
+        return _to_response_dto(obj)
+
+
+class ListVehicleOdometerHistoryService:
+    """List odometer readings for one vehicle in newest-first order."""
+
+    def __init__(self, vehicle_repository: IVehicleRepository) -> None:
+        self._vehicle_repo = vehicle_repository
+
+    def execute(
+        self,
+        vehicle_id: uuid.UUID,
+        request_id: str = "",
+    ) -> list[VehicleOdometerResponseDTO]:
+        """Return all non-deleted odometer readings for ``vehicle_id``."""
+        load_or_not_found(
+            lambda: self._vehicle_repo.get_by_id(vehicle_id),
+            message=f"Vehicle '{vehicle_id}' not found.",
+            details={"vehicle_id": str(vehicle_id)},
+        )
+        qs = VehicleOdometerReadingModel.objects.filter(
+            vehicle_id=vehicle_id,
+            is_deleted=False,
+        ).order_by("-reading_date")
+        return [_to_response_dto(obj) for obj in qs]
+
+
+def _to_response_dto(
+    obj: VehicleOdometerReadingModel,
+) -> VehicleOdometerResponseDTO:
+    return VehicleOdometerResponseDTO(
+        id=obj.id,
+        vehicle_id=obj.vehicle_id,
+        reading_date=obj.reading_date,
+        odometer_km=obj.odometer_km,
+        source=obj.source,
+        recorded_by=obj.recorded_by_id,
+        recorded_at=obj.recorded_at,
+        updated_at=obj.updated_at,
+    )

@@ -32,7 +32,7 @@ def enrich_inspection_response(
             driver = driver_repository.get_by_id(inspection.driver_id)
             driver_summary = InspectionDriverSummaryDTO(
                 id=driver.id,
-                name=driver.full_name,
+                name=driver.name,
             )
         except Exception:
             driver_summary = None

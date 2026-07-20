@@ -7,24 +7,20 @@ from datetime import UTC, datetime
 
 import pytest
 
-from apps.vehicle.domain.entities import Vehicle, VehicleCategory, VehicleStatus
+from apps.vehicle.domain.entities import Vehicle, VehicleStatus
 from apps.vehicle.domain.exceptions import (
     VehicleInvalidStateTransitionError,
     VehicleNotFoundError,
 )
-from apps.vehicle.domain.value_objects import VIN, PlateNumber, SAPEquipmentNumber
+from apps.vehicle.domain.value_objects import PlateNumber, SAPVehicleNumber
 
 
 def _make_vehicle(**kwargs: object) -> Vehicle:
     """Build a minimal valid Vehicle for tests."""
     defaults: dict[str, object] = {
         "id": uuid.uuid4(),
-        "plate_number": PlateNumber("12-ب-345"),
-        "vin": VIN("1HGBH41JXMN109186"),
-        "make": "Toyota",
-        "model": "Hilux",
-        "year": 2022,
-        "category": VehicleCategory.LIGHT,
+        "vehicle_number": SAPVehicleNumber("20320"),
+        "license_plate": PlateNumber("12-ب-345"),
         "status": VehicleStatus.ACTIVE,
         "created_at": datetime.now(tz=UTC),
         "updated_at": datetime.now(tz=UTC),
@@ -51,39 +47,18 @@ class TestPlateNumber:
             PlateNumber("A" * 21)
 
 
-class TestVIN:
-    def test_valid_vin(self) -> None:
-        v = VIN("1HGBH41JXMN109186")
-        assert v.value == "1HGBH41JXMN109186"
-
-    def test_lowercase_normalised(self) -> None:
-        v = VIN("1hgbh41jxmn109186")
-        assert v.value == "1HGBH41JXMN109186"
-
-    def test_invalid_length(self) -> None:
-        with pytest.raises(ValueError, match="exactly 17"):
-            VIN("SHORT")
-
-    def test_forbidden_char_i(self) -> None:
-        with pytest.raises(ValueError, match="exactly 17"):
-            VIN("1HGBH41JXMNI0918")
-
-    def test_str(self) -> None:
-        assert str(VIN("1HGBH41JXMN109186")) == "1HGBH41JXMN109186"
-
-
-class TestSAPEquipmentNumber:
+class TestSAPVehicleNumber:
     def test_valid(self) -> None:
-        eq = SAPEquipmentNumber("000000012345")
+        eq = SAPVehicleNumber("000000012345")
         assert eq.value == "000000012345"
 
     def test_non_numeric_raises(self) -> None:
         with pytest.raises(ValueError, match="only digits"):
-            SAPEquipmentNumber("EQ-12345")
+            SAPVehicleNumber("EQ-12345")
 
     def test_too_long_raises(self) -> None:
         with pytest.raises(ValueError, match="18 digits"):
-            SAPEquipmentNumber("1" * 19)
+            SAPVehicleNumber("1" * 19)
 
 
 class TestVehicleEntity:
@@ -143,13 +118,13 @@ class TestVehicleEntity:
 
     def test_optional_fields_default_none(self) -> None:
         v = _make_vehicle()
-        assert v.chassis_number is None
-        assert v.sap_equipment_number is None
+        assert v.commissioning_date is None
+        assert v.driver1_customer_number is None
+        assert v.driver2_customer_number is None
 
     def test_with_sap_number(self) -> None:
-        v = _make_vehicle(sap_equipment_number=SAPEquipmentNumber("000123"))
-        assert v.sap_equipment_number is not None
-        assert v.sap_equipment_number.value == "000123"
+        v = _make_vehicle(vehicle_number=SAPVehicleNumber("000123"))
+        assert v.vehicle_number.value == "000123"
 
 
 class TestVehicleExceptions:

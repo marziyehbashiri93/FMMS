@@ -8,21 +8,20 @@ from infrastructure.database.base_model import BaseModel
 
 
 class DriverModel(BaseModel):
-    """Persistence model for a fleet driver.
+    """Persistence model for a SAP-sourced fleet driver.
 
-    The ``assigned_vehicle_id`` is a plain UUIDField — not a Django FK —
-    to preserve domain boundary independence (Vehicle is a separate aggregate).
+    TODO: Split SAP master-data models from ``BaseModel`` once the shared audit
+    model is reviewed. Drivers are never deleted by FMMS, so ``is_deleted`` is
+    inherited for now but must not drive business visibility.
     """
 
-    full_name = models.CharField(max_length=200)
-    license_number = models.CharField(max_length=20, db_index=True)
-    license_class = models.CharField(max_length=5)
-    phone = models.CharField(max_length=20)
-    email = models.CharField(max_length=254, blank=True, default="")
+    customer_number = models.CharField(max_length=20, db_index=True)
+    name = models.CharField(max_length=200)
+    mobile = models.CharField(max_length=20, blank=True, default="")
+    personnel_number = models.CharField(max_length=20, blank=True, default="")
+    gender = models.CharField(max_length=20, blank=True, default="")
+    nilofar_code = models.CharField(max_length=20, blank=True, default="")
     status = models.CharField(max_length=20, db_index=True)
-    assigned_vehicle_id = models.UUIDField(
-        null=True, blank=True, default=None, db_index=True
-    )
 
     class Meta:
         app_label = "driver"
@@ -31,16 +30,13 @@ class DriverModel(BaseModel):
         verbose_name_plural = "Drivers"
         constraints = [
             models.UniqueConstraint(
-                fields=["license_number"],
-                condition=models.Q(is_deleted=False),
-                name="unique_active_license_number",
+                fields=["customer_number"],
+                name="unique_driver_customer_number",
             ),
         ]
         indexes = [
-            models.Index(
-                fields=["status", "is_deleted"], name="driver_status_deleted_idx"
-            ),
+            models.Index(fields=["status"], name="driver_status_idx"),
         ]
 
     def __str__(self) -> str:
-        return f"{self.full_name} ({self.license_number})"
+        return f"{self.name} ({self.customer_number})"

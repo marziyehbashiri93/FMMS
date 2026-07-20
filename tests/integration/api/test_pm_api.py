@@ -16,9 +16,11 @@ class TestPMAPI:
     """Cover PM plan trigger and work-order completion."""
 
     def test_create_plan_trigger_complete(
-        self, authenticated_client: APIClient
+        self, authenticated_client: APIClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Create a PM plan, trigger a work order, and complete it."""
+        monkeypatch.setenv("SAP_USE_MOCK", "True")
+
         vehicle = create_vehicle(
             authenticated_client, plate="12PM0001", vin="1HGCM82633A004357"
         )

@@ -47,6 +47,13 @@ class VehicleHandoverViewSet(GenericViewSet):
                 comment=serializer.validated_data.get("comment"),
                 request_id=request_id_from(request),
                 confirmed_by=user_id_from(request),
+                invoice_amount=serializer.validated_data.get("invoice_amount"),
+                invoice_currency=serializer.validated_data.get("invoice_currency")
+                or None,
+                invoice_vendor_id=serializer.validated_data.get("invoice_vendor_id")
+                or None,
+                invoice_document=serializer.validated_data.get("invoice_document")
+                or None,
             )
         )
         return Response(VehicleHandoverResponseSerializer(result).data)

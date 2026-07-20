@@ -92,7 +92,7 @@ class TestCeleryFailureScenarios:
         service = MagicMock()
         service.execute.side_effect = FMMSNotFoundError(
             message="No vehicle linked",
-            details={"sap_equipment_number": "999"},
+            details={"vehicle_number": "999"},
         )
         with (
             patch(

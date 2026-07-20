@@ -9,9 +9,10 @@ from __future__ import annotations
 
 import uuid
 from abc import ABC, abstractmethod
+from datetime import datetime
 
 from apps.vehicle.domain.entities import Vehicle, VehicleStatus
-from apps.vehicle.domain.value_objects import PlateNumber, SAPEquipmentNumber
+from apps.vehicle.domain.value_objects import PlateNumber, SAPVehicleNumber
 
 
 class IVehicleRepository(ABC):
@@ -51,17 +52,21 @@ class IVehicleRepository(ABC):
         """
 
     @abstractmethod
-    def get_by_sap_equipment_number(
-        self, sap_equipment_number: SAPEquipmentNumber
+    def get_by_vehicle_number(
+        self, vehicle_number: SAPVehicleNumber, include_deleted: bool = False
     ) -> Vehicle | None:
-        """Retrieve a vehicle by its SAP equipment number, if linked.
+        """Retrieve a vehicle by its SAP VehicleNumber, if linked.
 
         Args:
-            sap_equipment_number: Validated SAP PM equipment number.
+            vehicle_number: Validated SAP VehicleNumber.
 
         Returns:
             The matching ``Vehicle`` aggregate, or ``None`` if not linked.
         """
+
+    def list_vehicle_numbers(self) -> set[str]:
+        """Return SAP VehicleNumber values stored locally, including soft-deleted rows."""
+        return set()
 
     @abstractmethod
     def list_active(self) -> list[Vehicle]:
@@ -114,3 +119,19 @@ class IVehicleRepository(ABC):
         Raises:
             VehicleNotFoundError: If no vehicle exists with this ID.
         """
+
+    def decommission_missing_from_sap(self, seen_vehicle_numbers: set[str]) -> int:
+        """Soft-delete vehicles whose SAP VehicleNumber is absent from a sync."""
+        del seen_vehicle_numbers
+        return 0
+
+    def record_driver_assignment_snapshot(
+        self,
+        *,
+        vehicle: Vehicle,
+        sync_run_id: uuid.UUID,
+        synced_at: datetime,
+        request_id: str = "",
+    ) -> None:
+        """Persist a two-role SAP driver assignment snapshot for one vehicle."""
+        del vehicle, sync_run_id, synced_at, request_id

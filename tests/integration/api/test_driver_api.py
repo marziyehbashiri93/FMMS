@@ -5,53 +5,67 @@ from __future__ import annotations
 import pytest
 from rest_framework.test import APIClient
 
-from tests.integration.api.conftest import create_vehicle
+from apps.driver.domain.entities import DriverStatus
+from apps.driver.infrastructure.models import DriverModel
 
 pytestmark = pytest.mark.django_db
 
 
 class TestDriverAPI:
-    """Cover driver register, assign, and suspend flows."""
+    """Cover read-only driver API flows."""
 
-    def test_register_assign_suspend(self, authenticated_client: APIClient) -> None:
-        """Register a driver, assign a vehicle, then suspend."""
-        vehicle = create_vehicle(
-            authenticated_client, plate="12DRV001", vin="1HGCM82633A004353"
-        )
-        created = authenticated_client.post(
+    def test_manual_register_is_not_available(
+        self,
+        authenticated_client: APIClient,
+    ) -> None:
+        """Driver registration is SAP-sync driven, not a manual API action."""
+        response = authenticated_client.post(
             "/api/v1/drivers/",
             {
-                "full_name": "Ali Ahmadi",
-                "license_number": "LIC12345",
-                "license_class": "B",
-                "phone": "+989123456789",
-                "email": "ali@fmms.test",
+                "customer_number": "6000001234",
+                "name": "Ali Ahmadi",
+                "mobile": "09123456789",
+                "personnel_number": "21000001",
+                "gender": "مذکر",
+                "nilofar_code": "520000001",
             },
             format="json",
         )
-        assert created.status_code == 201, created.data
-        driver_id = created.data["id"]
+        assert response.status_code == 405
+
+    def test_read_driver_and_manual_actions_are_unavailable(
+        self,
+        authenticated_client: APIClient,
+    ) -> None:
+        """Driver records can be read, but manual mutation actions are unavailable."""
+        driver = DriverModel.objects.create(
+            customer_number="6000001234",
+            name="Ali Ahmadi",
+            mobile="09123456789",
+            personnel_number="21000001",
+            gender="مذکر",
+            nilofar_code="520000001",
+            status=DriverStatus.ACTIVE.value,
+        )
 
         listed = authenticated_client.get("/api/v1/drivers/")
         assert listed.status_code == 200
         assert listed.data["count"] >= 1
 
-        retrieved = authenticated_client.get(f"/api/v1/drivers/{driver_id}/")
+        retrieved = authenticated_client.get(f"/api/v1/drivers/{driver.id}/")
         assert retrieved.status_code == 200
-        assert retrieved.data["license_number"] == "LIC12345"
+        assert retrieved.data["customer_number"] == "6000001234"
 
-        assigned = authenticated_client.post(
-            f"/api/v1/drivers/{driver_id}/assign/",
-            {"vehicle_id": vehicle["id"]},
+        assign = authenticated_client.post(
+            f"/api/v1/drivers/{driver.id}/assign/",
+            {"vehicle_id": "00000000-0000-0000-0000-000000000001"},
             format="json",
         )
-        assert assigned.status_code == 200, assigned.data
-        assert assigned.data["assigned_vehicle_id"] == vehicle["id"]
+        assert assign.status_code == 404
 
         suspended = authenticated_client.post(
-            f"/api/v1/drivers/{driver_id}/suspend/",
+            f"/api/v1/drivers/{driver.id}/suspend/",
             {},
             format="json",
         )
-        assert suspended.status_code == 200, suspended.data
-        assert suspended.data["status"] == "SUSPENDED"
+        assert suspended.status_code == 404

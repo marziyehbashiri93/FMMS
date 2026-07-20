@@ -21,6 +21,12 @@ class SAPEquipmentDTO:
         serial_number: Optional manufacturer serial number.
         category: Optional SAP equipment category code.
         object_type: Optional SAP object type (e.g. fleet vehicle type).
+        license_plate: Optional fleet license plate from SAP vehicle-driver view.
+        commissioning_date: Optional SAP commissioning date in source format.
+        driver1_customer_number: SAP Driver1CustomerNo for the main driver.
+        driver2_customer_number: SAP Driver2CustomerNo for the assistant driver.
+        driver1_name/mobile/personnel_number/gender/nilofar_code: Main driver SAP fields.
+        driver2_name/mobile/personnel_number/gender/nilofar_code: Assistant driver SAP fields.
     """
 
     equipment_number: str
@@ -30,3 +36,17 @@ class SAPEquipmentDTO:
     serial_number: str | None = None
     category: str | None = None
     object_type: str | None = None
+    license_plate: str | None = None
+    commissioning_date: str | None = None
+    driver1_customer_number: str | None = None
+    driver2_customer_number: str | None = None
+    driver1_name: str | None = None
+    driver1_mobile: str | None = None
+    driver1_personnel_number: str | None = None
+    driver1_gender: str | None = None
+    driver1_nilofar_code: str | None = None
+    driver2_name: str | None = None
+    driver2_mobile: str | None = None
+    driver2_personnel_number: str | None = None
+    driver2_gender: str | None = None
+    driver2_nilofar_code: str | None = None

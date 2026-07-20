@@ -19,6 +19,7 @@ env = environ.Env(
     LOG_LEVEL=(str, "INFO"),
     ALLOWED_HOSTS=(list, []),
     CORS_ALLOWED_ORIGINS=(list, []),
+    VEHICLE_SYNC_INTERVAL_HOURS=(int, 24),
 )
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -252,12 +253,16 @@ CELERY_IMPORTS = (
     "infrastructure.messaging.tasks.sap_sync_tasks",
     "infrastructure.messaging.tasks.maintenance_tasks",
 )
-# Reduced M8 scope: retry + overdue PM. Single-equipment sync is on-demand only
-# (requires sap_equipment_number) and is not beat-scheduled.
+VEHICLE_SYNC_INTERVAL_HOURS = env("VEHICLE_SYNC_INTERVAL_HOURS")
+
 CELERY_BEAT_SCHEDULE = {
     "retry-failed-sap-every-15m": {
         "task": "fmms.retry_failed_sap_transactions",
         "schedule": 15 * 60,
+    },
+    "sync-vehicles-from-sap": {
+        "task": "fmms.sync_vehicles_from_sap",
+        "schedule": VEHICLE_SYNC_INTERVAL_HOURS * 60 * 60,
     },
     "trigger-overdue-pm-daily": {
         "task": "fmms.trigger_overdue_pm_work_orders",

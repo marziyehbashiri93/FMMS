@@ -17,45 +17,26 @@ pytestmark = pytest.mark.django_db
 
 
 class TestVehicleSAPBulkSyncAPI:
-    """Cover POST /api/v1/vehicles/sync-sap/ bulk import."""
+    """Vehicle SAP sync is scheduled/operational, not a phase-1 public API."""
 
-    def test_sync_creates_vehicles_from_mock_sap(
+    def test_vehicle_sync_api_is_not_available_in_phase_1(
         self, authenticated_client: APIClient
     ) -> None:
         response = authenticated_client.post(
             "/api/v1/vehicles/sync-sap/", {}, format="json"
         )
 
-        assert response.status_code == 200, response.data
-        assert response.data["total_received"] >= 1
-        assert response.data["created"] >= 1
-        assert response.data["failed"] == 0
-
-        listed = authenticated_client.get("/api/v1/vehicles/")
-        assert listed.status_code == 200
-        assert listed.data["count"] >= response.data["created"]
-
-    def test_sync_updates_existing_and_is_idempotent(
-        self, authenticated_client: APIClient
-    ) -> None:
-        first = authenticated_client.post(
-            "/api/v1/vehicles/sync-sap/", {}, format="json"
-        )
-        assert first.status_code == 200
-        second = authenticated_client.post(
-            "/api/v1/vehicles/sync-sap/", {}, format="json"
-        )
-        assert second.status_code == 200
-
-        assert second.data["created"] == 0
-        assert second.data["updated"] == first.data["created"] + first.data["updated"]
-        assert second.data["failed"] == 0
+        assert response.status_code == 405
 
 
 class TestInspectionTemplateSAPSyncAPI:
     """Cover inspection-template sync and list APIs."""
 
-    def test_sync_and_list_templates(self, authenticated_client: APIClient) -> None:
+    def test_sync_and_list_templates(
+        self, authenticated_client: APIClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("SAP_USE_MOCK", "True")
+
         synced = authenticated_client.post(
             "/api/v1/inspection-templates/sync-sap/", {}, format="json"
         )

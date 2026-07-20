@@ -33,7 +33,7 @@ class FMMSUser(AbstractBaseUser, PermissionsMixin):
     """
     Custom user model for FMMS.
 
-    Uses email as the login identifier instead of username.
+    Uses username as the login identifier.
     Includes an FMMS-specific role field for authorization.
 
     All business models reference this via settings.AUTH_USER_MODEL
@@ -48,7 +48,13 @@ class FMMSUser(AbstractBaseUser, PermissionsMixin):
     )
     email = models.EmailField(
         unique=True,
-        help_text="Email address — used as the login identifier.",
+        help_text="Email address for contact and notifications.",
+    )
+    username = models.CharField(
+        max_length=150,
+        unique=True,
+        db_index=True,
+        help_text="Username — used as the login identifier.",
     )
     full_name = models.CharField(
         max_length=255,
@@ -80,8 +86,8 @@ class FMMSUser(AbstractBaseUser, PermissionsMixin):
 
     objects: FMMSUserManager = FMMSUserManager()
 
-    USERNAME_FIELD = "email"
-    REQUIRED_FIELDS = ["full_name"]
+    USERNAME_FIELD = "username"
+    REQUIRED_FIELDS = ["email", "full_name"]
 
     class Meta:
         app_label = "authentication"

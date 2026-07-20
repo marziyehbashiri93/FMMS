@@ -20,9 +20,9 @@ from apps.repair.application.services.transport_handover_decision_service import
 )
 from apps.repair.domain.entities import RepairOrder, RepairOrderStatus
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
-from apps.vehicle.domain.entities import Vehicle, VehicleCategory, VehicleStatus
+from apps.vehicle.domain.entities import Vehicle, VehicleStatus
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
-from apps.vehicle.domain.value_objects import VIN, PlateNumber
+from apps.vehicle.domain.value_objects import PlateNumber, SAPVehicleNumber
 from core.exceptions.base_exception import FMMSNotFoundError
 
 
@@ -64,12 +64,8 @@ def _make_vehicle(*, vehicle_id: uuid.UUID) -> Vehicle:
     now = datetime.now(tz=UTC)
     return Vehicle(
         id=vehicle_id,
-        plate_number=PlateNumber("12TRN001"),
-        vin=VIN("1HGCM82633A009001"),
-        make="Toyota",
-        model="Hilux",
-        year=2022,
-        category=VehicleCategory.LIGHT,
+        vehicle_number=SAPVehicleNumber("300004"),
+        license_plate=PlateNumber("12TRN001"),
         status=VehicleStatus.WAITING_DRIVER_CONFIRMATION,
         created_at=now,
         updated_at=now,
@@ -163,7 +159,7 @@ class FakeVehicleRepository(IVehicleRepository):
     def get_by_plate(self, plate_number: PlateNumber) -> Vehicle | None:
         return None
 
-    def get_by_sap_equipment_number(self, sap_equipment_number) -> Vehicle | None:
+    def get_by_vehicle_number(self, vehicle_number) -> Vehicle | None:
         return None
 
     def exists_by_plate(self, plate_number: PlateNumber) -> bool:

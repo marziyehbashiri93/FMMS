@@ -6,7 +6,7 @@ import uuid
 from abc import ABC, abstractmethod
 
 from apps.driver.domain.entities import Driver, DriverStatus
-from apps.driver.domain.value_objects import LicenseNumber
+from apps.driver.domain.value_objects import CustomerNumber
 
 
 class IDriverRepository(ABC):
@@ -27,28 +27,17 @@ class IDriverRepository(ABC):
         """
 
     @abstractmethod
-    def get_by_license(self, license_number: LicenseNumber) -> Driver:
-        """Retrieve a driver by their license number.
+    def get_by_customer_number(self, customer_number: CustomerNumber) -> Driver:
+        """Retrieve a driver by SAP customer number.
 
         Args:
-            license_number: The validated ``LicenseNumber`` value object.
+            customer_number: The validated SAP ``CustomerNumber`` value object.
 
         Returns:
             The matching ``Driver`` aggregate.
 
         Raises:
-            DriverNotFoundError: If no driver with this license number exists.
-        """
-
-    @abstractmethod
-    def get_by_vehicle(self, vehicle_id: uuid.UUID) -> Driver | None:
-        """Retrieve the driver currently assigned to a vehicle.
-
-        Args:
-            vehicle_id: The UUID of the assigned vehicle.
-
-        Returns:
-            The assigned ``Driver`` aggregate, or ``None`` if unassigned.
+            DriverNotFoundError: If no driver with this customer number exists.
         """
 
     @abstractmethod
@@ -63,15 +52,8 @@ class IDriverRepository(ABC):
         """
 
     @abstractmethod
-    def exists_by_license(self, license_number: LicenseNumber) -> bool:
-        """Check whether a driver with the given license number exists.
-
-        Args:
-            license_number: The license number to check.
-
-        Returns:
-            ``True`` if a driver with this license number exists.
-        """
+    def decommission_missing_from_sap(self, seen_customer_numbers: set[str]) -> int:
+        """Mark drivers absent from a SAP sync as DECOMMISSIONED."""
 
     @abstractmethod
     def save(self, driver: Driver) -> Driver:
@@ -82,15 +64,4 @@ class IDriverRepository(ABC):
 
         Returns:
             The saved ``Driver`` aggregate.
-        """
-
-    @abstractmethod
-    def delete(self, driver_id: uuid.UUID) -> None:
-        """Soft-delete a driver record.
-
-        Args:
-            driver_id: The UUID of the driver to delete.
-
-        Raises:
-            DriverNotFoundError: If no driver exists with this ID.
         """

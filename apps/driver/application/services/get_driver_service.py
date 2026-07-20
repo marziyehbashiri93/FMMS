@@ -20,15 +20,15 @@ def _to_response_dto(driver: Driver) -> DriverResponseDTO:
     """Map domain entity → response DTO."""
     return DriverResponseDTO(
         id=driver.id,
-        full_name=driver.full_name,
-        license_number=driver.license_number.value,
-        license_class=driver.license_class,
+        customer_number=driver.customer_number.value,
+        name=driver.name,
         status=driver.status,
-        phone=driver.contact.phone,
-        email=driver.contact.email,
         created_at=driver.created_at,
         updated_at=driver.updated_at,
-        assigned_vehicle_id=driver.assigned_vehicle_id,
+        mobile=driver.mobile,
+        personnel_number=driver.personnel_number,
+        gender=driver.gender,
+        nilofar_code=driver.nilofar_code,
     )
 
 

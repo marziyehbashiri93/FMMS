@@ -9,17 +9,16 @@ import pytest
 
 from apps.driver.domain.entities import Driver, DriverStatus
 from apps.driver.domain.exceptions import DriverInvalidStateTransitionError
-from apps.driver.domain.value_objects import DriverContact, LicenseClass, LicenseNumber
+from apps.driver.domain.value_objects import CustomerNumber
 
 
 def _driver(*, status: DriverStatus = DriverStatus.ACTIVE) -> Driver:
     now = datetime.now(tz=UTC)
     return Driver(
         id=uuid.uuid4(),
-        full_name="Ali Driver",
-        license_number=LicenseNumber("LIC12345"),
-        license_class=LicenseClass.B,
-        contact=DriverContact(phone="+989121111111"),
+        customer_number=CustomerNumber("6000001234"),
+        name="Ali Driver",
+        mobile="09121111111",
         status=status,
         created_at=now,
         updated_at=now,
@@ -30,41 +29,32 @@ def _driver(*, status: DriverStatus = DriverStatus.ACTIVE) -> Driver:
 class TestDriverDomainEdges:
     """Driver lifecycle and value-object boundaries."""
 
-    def test_suspend_and_reinstate(self) -> None:
-        """ACTIVE → SUSPENDED → ACTIVE is allowed."""
+    def test_decommission_and_reactivate(self) -> None:
+        """ACTIVE -> DECOMMISSIONED -> ACTIVE is allowed."""
         driver = _driver()
-        driver.suspend()
-        assert driver.status == DriverStatus.SUSPENDED
-        driver.reinstate()
+        driver.decommission()
+        assert driver.status == DriverStatus.DECOMMISSIONED
+        driver.reactivate()
         assert driver.status == DriverStatus.ACTIVE
 
-    def test_cannot_reinstate_inactive(self) -> None:
-        """INACTIVE is terminal for reinstate."""
-        driver = _driver(status=DriverStatus.INACTIVE)
+    def test_cannot_reactivate_active_driver(self) -> None:
+        """ACTIVE -> ACTIVE is not a meaningful lifecycle transition."""
+        driver = _driver()
         with pytest.raises(DriverInvalidStateTransitionError):
-            driver.reinstate()
+            driver.reactivate()
 
-    def test_deactivate_from_active(self) -> None:
-        """ACTIVE may deactivate to INACTIVE."""
+    def test_decommission_from_active(self) -> None:
+        """ACTIVE may move to DECOMMISSIONED when absent from SAP."""
         driver = _driver()
-        driver.deactivate()
-        assert driver.status == DriverStatus.INACTIVE
+        driver.decommission()
+        assert driver.status == DriverStatus.DECOMMISSIONED
 
-    def test_assign_and_unassign_vehicle(self) -> None:
-        """Vehicle assignment is recorded by ID only."""
-        driver = _driver()
-        vehicle_id = uuid.uuid4()
-        driver.assign_vehicle(vehicle_id)
-        assert driver.assigned_vehicle_id == vehicle_id
-        driver.unassign_vehicle()
-        assert driver.assigned_vehicle_id is None
+    def test_customer_number_rejects_non_numeric(self) -> None:
+        """SAP CustomerNumber must be numeric."""
+        with pytest.raises(ValueError, match="numeric"):
+            CustomerNumber("LIC-TECH-1")
 
-    def test_license_rejects_hyphen(self) -> None:
-        """License numbers must be alphanumeric (no punctuation)."""
-        with pytest.raises(ValueError, match="alphanumeric"):
-            LicenseNumber("LIC-TECH-1")
-
-    def test_license_rejects_too_short(self) -> None:
-        """License numbers require at least 5 characters."""
-        with pytest.raises(ValueError, match="alphanumeric"):
-            LicenseNumber("AB12")
+    def test_customer_number_rejects_blank(self) -> None:
+        """SAP CustomerNumber must not be blank."""
+        with pytest.raises(ValueError, match="numeric"):
+            CustomerNumber("")

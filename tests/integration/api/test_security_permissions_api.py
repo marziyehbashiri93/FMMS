@@ -13,6 +13,8 @@ from django.contrib.auth.base_user import AbstractBaseUser
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 
+from apps.driver.domain.entities import DriverStatus
+from apps.driver.infrastructure.models import DriverModel
 from tests.factories.user_factory import FMMSUserFactory
 from tests.integration.api.conftest import create_vehicle
 
@@ -92,8 +94,8 @@ class TestViewerPermissions:
 class TestTechnicianVsSupervisorActions:
     """Supervisor-gated actions reject technicians."""
 
-    def test_technician_can_create_vehicle(self, technician_client: APIClient) -> None:
-        """TECHNICIAN may perform operational writes."""
+    def test_technician_cannot_create_vehicle(self, technician_client: APIClient) -> None:
+        """Vehicle creation is SAP-only; manual API create is unavailable."""
         response = technician_client.post(
             "/api/v1/vehicles/",
             {
@@ -106,7 +108,7 @@ class TestTechnicianVsSupervisorActions:
             },
             format="json",
         )
-        assert response.status_code == 201
+        assert response.status_code == 405
 
     def test_technician_cannot_deactivate_vehicle(
         self, authenticated_client: APIClient, technician_client: APIClient
@@ -137,27 +139,22 @@ class TestTechnicianVsSupervisorActions:
         assert response.status_code == 200
         assert response.data["status"] == "INACTIVE"
 
-    def test_technician_cannot_suspend_driver(
+    def test_driver_suspend_endpoint_is_unavailable(
         self, authenticated_client: APIClient, technician_client: APIClient
     ) -> None:
-        """Driver suspend requires SUPERVISOR or ADMIN."""
-        created = authenticated_client.post(
-            "/api/v1/drivers/",
-            {
-                "full_name": "Ali Driver",
-                "license_number": "LICTECH01",
-                "license_class": "B",
-                "phone": "+989121111111",
-            },
-            format="json",
+        """Driver status changes are SAP-sync driven, not manual API actions."""
+        driver = DriverModel.objects.create(
+            customer_number="6000007777",
+            name="Ali Driver",
+            mobile="09121111111",
+            status=DriverStatus.ACTIVE.value,
         )
-        assert created.status_code == 201, created.data
         response = technician_client.post(
-            f"/api/v1/drivers/{created.data['id']}/suspend/",
+            f"/api/v1/drivers/{driver.id}/suspend/",
             {},
             format="json",
         )
-        assert response.status_code == 403
+        assert response.status_code == 404
 
 
 class TestJWTFailureScenarios:

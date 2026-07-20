@@ -65,9 +65,9 @@ from apps.repair.domain.exceptions import (
 )
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
 from apps.repair.domain.value_objects import TechnicianAssignment
-from apps.vehicle.domain.entities import Vehicle, VehicleCategory, VehicleStatus
+from apps.vehicle.domain.entities import Vehicle, VehicleStatus
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
-from apps.vehicle.domain.value_objects import VIN, PlateNumber, SAPEquipmentNumber
+from apps.vehicle.domain.value_objects import PlateNumber, SAPVehicleNumber
 from core.exceptions.base_exception import FMMSConflictError, FMMSNotFoundError
 from core.sap.dtos.pm_order import CreatePMOrderRequest, SAPPMOrderDTO
 from core.sap.ports.pm_order_port import ISAPPMOrderPort
@@ -131,19 +131,14 @@ def _tx_manager(
     return SAPTransactionManager(repository=repo or FakeSAPTransactionRepository())
 
 
-def _make_vehicle(*, with_sap: bool = False) -> Vehicle:
+def _make_vehicle(*, vehicle_number: str = "100001") -> Vehicle:
     return Vehicle(
         id=uuid.uuid4(),
-        plate_number=PlateNumber("REPPLT01"),
-        vin=VIN("1HGCM82633A004352"),
-        make="Toyota",
-        model="Hilux",
-        year=2022,
-        category=VehicleCategory.LIGHT,
+        vehicle_number=SAPVehicleNumber(vehicle_number),
+        license_plate=PlateNumber("REPPLT01"),
         status=VehicleStatus.ACTIVE,
         created_at=datetime.now(tz=UTC),
         updated_at=datetime.now(tz=UTC),
-        sap_equipment_number=SAPEquipmentNumber("100001") if with_sap else None,
     )
 
 
@@ -252,15 +247,15 @@ class FakeVehicleRepository(IVehicleRepository):
     def get_by_plate(self, plate_number: PlateNumber) -> Vehicle | None:
         return None
 
-    def get_by_sap_equipment_number(
-        self, sap_equipment_number: SAPEquipmentNumber
+    def get_by_vehicle_number(
+        self, vehicle_number: SAPVehicleNumber
     ) -> Vehicle | None:
         return next(
             (
                 v
                 for v in self._store.values()
-                if v.sap_equipment_number is not None
-                and v.sap_equipment_number == sap_equipment_number
+                if v.vehicle_number is not None
+                and v.vehicle_number == vehicle_number
             ),
             None,
         )
@@ -690,7 +685,7 @@ class TestAddRepairPartService:
 
 class TestSyncRepairToSAPService:
     def test_syncs_and_stores_sap_order_number(self) -> None:
-        vehicle = _make_vehicle(with_sap=True)
+        vehicle = _make_vehicle()
         order = _make_order(vehicle_id=vehicle.id)
         sap = FakeSAPPMOrderPort(order_number="40009999")
 
@@ -715,7 +710,7 @@ class TestSyncRepairToSAPService:
         assert sap.calls[0].equipment_number == "100001"
 
     def test_raises_when_already_synced(self) -> None:
-        vehicle = _make_vehicle(with_sap=True)
+        vehicle = _make_vehicle()
         order = _make_order(vehicle_id=vehicle.id)
         order.link_sap_order("40000001")
 
@@ -736,26 +731,27 @@ class TestSyncRepairToSAPService:
                 )
             )
 
-    def test_raises_when_vehicle_has_no_sap_equipment(self) -> None:
-        vehicle = _make_vehicle(with_sap=False)
+    def test_sync_uses_vehicle_number_from_sap_master_data(self) -> None:
+        vehicle = _make_vehicle()
         order = _make_order(vehicle_id=vehicle.id)
 
-        with pytest.raises(FMMSConflictError):
-            SyncRepairToSAPService(
-                FakeRepairRepository([order]),
-                FakeVehicleRepository([vehicle]),
-                _tx_manager(),
-                FakeSAPPMOrderPort(),
-            ).execute(
-                SyncRepairToSAPDTO(
-                    repair_order_id=order.id,
-                    order_type="PM01",
-                    description="No equipment",
-                    planned_start=datetime.now(tz=UTC),
-                    request_id="req-noeq",
-                    requested_by=uuid.uuid4(),
-                )
+        result = SyncRepairToSAPService(
+            FakeRepairRepository([order]),
+            FakeVehicleRepository([vehicle]),
+            _tx_manager(),
+            FakeSAPPMOrderPort(),
+        ).execute(
+            SyncRepairToSAPDTO(
+                repair_order_id=order.id,
+                order_type="PM01",
+                description="Uses vehicle number",
+                planned_start=datetime.now(tz=UTC),
+                request_id="req-vehicle-number",
+                requested_by=uuid.uuid4(),
             )
+        )
+
+        assert result.sap_order_number == "40001234"
 
 
 # ---------------------------------------------------------------------------

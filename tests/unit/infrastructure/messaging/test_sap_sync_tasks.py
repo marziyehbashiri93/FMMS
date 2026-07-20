@@ -23,7 +23,7 @@ def test_sync_equipment_from_sap_calls_application_service() -> None:
 
     service.execute.assert_called_once_with("10000123", request_id="corr-sync-1")
     assert result["status"] == "ok"
-    assert result["sap_equipment_number"] == "10000123"
+    assert result["vehicle_number"] == "10000123"
 
 
 @pytest.mark.unit

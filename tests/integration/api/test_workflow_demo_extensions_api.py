@@ -8,6 +8,8 @@ from uuid import uuid4
 import pytest
 from rest_framework.test import APIClient
 
+from apps.driver.domain.entities import DriverStatus
+from apps.driver.infrastructure.models import DriverModel
 from apps.vehicle.domain.entities import VehicleStatus
 from tests.integration.api.conftest import create_vehicle
 
@@ -211,18 +213,12 @@ class TestInspectionHistoryAPI:
         vehicle = create_vehicle(
             authenticated_client, plate="12HIS001", vin="1HGCM82633A004421"
         )
-        driver = authenticated_client.post(
-            "/api/v1/drivers/",
-            {
-                "full_name": "History Driver",
-                "license_number": "LICHIS01",
-                "license_class": "B",
-                "phone": "+989120000001",
-                "email": "history@fmms.test",
-            },
-            format="json",
+        driver = DriverModel.objects.create(
+            customer_number="6000008888",
+            name="History Driver",
+            mobile="09120000001",
+            status=DriverStatus.ACTIVE.value,
         )
-        assert driver.status_code == 201, driver.data
 
         for idx, result in enumerate(("PASS", "FAIL")):
             created = authenticated_client.post(
@@ -233,7 +229,7 @@ class TestInspectionHistoryAPI:
                     "odometer_value": 1000 + idx,
                     "odometer_unit": "KM",
                     "inspected_at": datetime.now(tz=UTC).isoformat(),
-                    "driver_id": driver.data["id"],
+                    "driver_id": str(driver.id),
                     "items": [
                         {
                             "category": "SAFETY",

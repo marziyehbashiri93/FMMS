@@ -51,9 +51,9 @@ from apps.inspection.domain.value_objects import (
 )
 from apps.repair.domain.entities import RepairOrder, RepairOrderStatus
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
-from apps.vehicle.domain.entities import Vehicle, VehicleCategory, VehicleStatus
+from apps.vehicle.domain.entities import Vehicle, VehicleStatus
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
-from apps.vehicle.domain.value_objects import VIN, PlateNumber, SAPEquipmentNumber
+from apps.vehicle.domain.value_objects import PlateNumber, SAPVehicleNumber
 from core.exceptions.base_exception import FMMSNotFoundError, FMMSStateError
 from core.workflow import VEHICLE_OPEN_FLOW_ERROR_CODE, VEHICLE_OPEN_FLOW_MESSAGE
 
@@ -65,12 +65,8 @@ from core.workflow import VEHICLE_OPEN_FLOW_ERROR_CODE, VEHICLE_OPEN_FLOW_MESSAG
 def _make_vehicle() -> Vehicle:
     return Vehicle(
         id=uuid.uuid4(),
-        plate_number=PlateNumber("INSP0001"),
-        vin=VIN("1HGCM82633A004352"),
-        make="Toyota",
-        model="Hilux",
-        year=2022,
-        category=VehicleCategory.LIGHT,
+        vehicle_number=SAPVehicleNumber("300001"),
+        license_plate=PlateNumber("INSP0001"),
         status=VehicleStatus.ACTIVE,
         created_at=datetime.now(tz=UTC),
         updated_at=datetime.now(tz=UTC),
@@ -162,15 +158,15 @@ class FakeVehicleRepository(IVehicleRepository):
     def get_by_plate(self, plate_number: PlateNumber) -> Vehicle | None:
         return None
 
-    def get_by_sap_equipment_number(
-        self, sap_equipment_number: SAPEquipmentNumber
+    def get_by_vehicle_number(
+        self, vehicle_number: SAPVehicleNumber
     ) -> Vehicle | None:
         return next(
             (
                 v
                 for v in self._store.values()
-                if v.sap_equipment_number is not None
-                and v.sap_equipment_number == sap_equipment_number
+                if v.vehicle_number is not None
+                and v.vehicle_number == vehicle_number
             ),
             None,
         )

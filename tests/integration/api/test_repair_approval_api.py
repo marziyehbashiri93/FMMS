@@ -149,7 +149,8 @@ class TestRepairAssignWorkshopAPI:
         )
         assert response.status_code == 200, response.data
         assert response.data["workshop_type"] == "EXTERNAL"
-        assert response.data["status"] == "WORKSHOP_ASSIGNED"
+        assert response.data["status"] == "WAITING_DRIVER_CONFIRMATION"
+        assert "راننده" in response.data["message"]
 
     def test_assign_workshop_before_approval_returns_422(
         self, authenticated_client: APIClient

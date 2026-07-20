@@ -14,16 +14,17 @@ class TestAuthTokenAPI:
     """Cover token obtain and refresh flows."""
 
     def test_obtain_token_with_valid_credentials(self, api_client: APIClient) -> None:
-        """Issue access and refresh tokens for a valid email/password."""
+        """Issue access and refresh tokens for a valid username/password."""
         user = FMMSUserFactory(role="ADMIN", password="testpass123!")
         response = api_client.post(
             "/api/v1/auth/token/",
-            {"email": user.email, "password": "testpass123!"},
+            {"username": user.username, "password": "testpass123!"},
             format="json",
         )
         assert response.status_code == 200
         assert "access" in response.data
         assert "refresh" in response.data
+        assert response.data["user"]["username"] == user.username
 
     def test_obtain_token_rejects_invalid_credentials(
         self, api_client: APIClient
@@ -32,7 +33,7 @@ class TestAuthTokenAPI:
         user = FMMSUserFactory(role="ADMIN", password="testpass123!")
         response = api_client.post(
             "/api/v1/auth/token/",
-            {"email": user.email, "password": "wrong-password"},
+            {"username": user.username, "password": "wrong-password"},
             format="json",
         )
         assert response.status_code == 401
@@ -42,7 +43,7 @@ class TestAuthTokenAPI:
         user = FMMSUserFactory(role="ADMIN", password="testpass123!")
         obtain = api_client.post(
             "/api/v1/auth/token/",
-            {"email": user.email, "password": "testpass123!"},
+            {"username": user.username, "password": "testpass123!"},
             format="json",
         )
         assert obtain.status_code == 200
@@ -53,3 +54,17 @@ class TestAuthTokenAPI:
         )
         assert refresh.status_code == 200
         assert "access" in refresh.data
+
+    def test_current_user_profile(self, api_client: APIClient) -> None:
+        """Return the authenticated user's profile."""
+        user = FMMSUserFactory(role="SUPERVISOR", password="testpass123!")
+        obtain = api_client.post(
+            "/api/v1/auth/token/",
+            {"username": user.username, "password": "testpass123!"},
+            format="json",
+        )
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {obtain.data['access']}")
+        response = api_client.get("/api/v1/auth/me/")
+        assert response.status_code == 200
+        assert response.data["username"] == user.username
+        assert response.data["role"] == "SUPERVISOR"

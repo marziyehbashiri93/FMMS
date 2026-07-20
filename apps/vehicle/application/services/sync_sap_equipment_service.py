@@ -11,11 +11,13 @@ All SAP write operations must go through ``SAPTransactionManager``.
 
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime
 
 from apps.vehicle.application.dto.vehicle_dto import VehicleResponseDTO
+from apps.vehicle.domain.entities import VEHICLE_STATUS_LABELS
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
-from apps.vehicle.domain.value_objects import ChassisNumber, SAPEquipmentNumber
+from apps.vehicle.domain.value_objects import PlateNumber, SAPVehicleNumber
 from core.exceptions.base_exception import FMMSNotFoundError
 from core.logging.structured_logger import get_structured_logger
 from core.sap.ports.equipment_port import ISAPEquipmentPort
@@ -42,7 +44,7 @@ class SyncSAPEquipmentService:
 
     def execute(
         self,
-        sap_equipment_number: str,
+        vehicle_number: str,
         request_id: str = "",
     ) -> VehicleResponseDTO:
         """Fetch SAP equipment details and update the matching vehicle record.
@@ -50,10 +52,10 @@ class SyncSAPEquipmentService:
         The vehicle is looked up by its SAP equipment number via the repository.
         If no matching vehicle exists, ``FMMSNotFoundError`` is raised.
         The only fields updated are those that can be sourced directly from the
-        SAP ``SAPEquipmentDTO`` (description → model, serial → chassis).
+        SAP vehicle-driver OData view.
 
         Args:
-            sap_equipment_number: SAP PM equipment number to sync.
+            vehicle_number: SAP VehicleNumber to sync.
             request_id: Optional correlation ID for structured logging.
 
         Returns:
@@ -70,28 +72,35 @@ class SyncSAPEquipmentService:
                 "service": "SyncSAPEquipmentService",
                 "operation": "execute",
                 "request_id": request_id,
-                "sap_equipment_number": sap_equipment_number,
+                "vehicle_number": vehicle_number,
             },
         )
 
-        sap_dto = self._sap.get_equipment(sap_equipment_number)
-        matched_vehicle = self._repo.get_by_sap_equipment_number(
-            SAPEquipmentNumber(sap_equipment_number)
+        sap_dto = self._sap.get_equipment(vehicle_number)
+        matched_vehicle = self._repo.get_by_vehicle_number(
+            SAPVehicleNumber(vehicle_number)
         )
 
         if matched_vehicle is None:
             raise FMMSNotFoundError(
-                message=f"No vehicle linked to SAP equipment '{sap_equipment_number}'.",
-                details={"sap_equipment_number": sap_equipment_number},
+                message=f"No vehicle linked to SAP VehicleNumber '{vehicle_number}'.",
+                details={"vehicle_number": vehicle_number},
             )
 
-        if sap_dto.description:
-            matched_vehicle.model = sap_dto.description
-        if sap_dto.serial_number:
-            matched_vehicle.chassis_number = ChassisNumber(sap_dto.serial_number[:50])
-        matched_vehicle.sap_equipment_number = SAPEquipmentNumber(sap_equipment_number)
+        if sap_dto.license_plate:
+            matched_vehicle.license_plate = PlateNumber(sap_dto.license_plate)
+        matched_vehicle.vehicle_number = SAPVehicleNumber(vehicle_number)
+        matched_vehicle.commissioning_date = sap_dto.commissioning_date
+        matched_vehicle.driver1_customer_number = sap_dto.driver1_customer_number
+        matched_vehicle.driver2_customer_number = sap_dto.driver2_customer_number
         matched_vehicle.updated_at = datetime.now(tz=UTC)
         saved = self._repo.save(matched_vehicle)
+        self._repo.record_driver_assignment_snapshot(
+            vehicle=saved,
+            sync_run_id=uuid.uuid4(),
+            synced_at=saved.updated_at,
+            request_id=request_id,
+        )
 
         logger.info(
             "Vehicle synced with SAP successfully",
@@ -107,17 +116,13 @@ class SyncSAPEquipmentService:
 
         return VehicleResponseDTO(
             id=saved.id,
-            plate_number=saved.plate_number.value,
-            vin=saved.vin.value,
-            make=saved.make,
-            model=saved.model,
-            year=saved.year,
-            category=saved.category,
+            vehicle_number=saved.vehicle_number.value,
+            license_plate=saved.license_plate.value,
             status=saved.status,
+            status_label=VEHICLE_STATUS_LABELS[saved.status],
             created_at=saved.created_at,
             updated_at=saved.updated_at,
-            chassis_number=saved.chassis_number.value if saved.chassis_number else None,
-            sap_equipment_number=(
-                saved.sap_equipment_number.value if saved.sap_equipment_number else None
-            ),
+            commissioning_date=saved.commissioning_date,
+            driver1_customer_number=saved.driver1_customer_number,
+            driver2_customer_number=saved.driver2_customer_number,
         )
