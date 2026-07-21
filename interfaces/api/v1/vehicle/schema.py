@@ -8,6 +8,7 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema
 from apps.vehicle.domain.entities import VehicleStatus
 from interfaces.api.v1.schema_tags import API_TAGS
 from interfaces.api.v1.vehicle.serializers import (
+    VehicleDriverAssignmentHistoryResponseSerializer,
     VehicleOdometerRecordSerializer,
     VehicleOdometerResponseSerializer,
     VehicleResponseSerializer,
@@ -39,6 +40,21 @@ vehicle_id_parameter = OpenApiParameter(
     required=True,
     type=OpenApiTypes.UUID,
 )
+
+date_range_parameters = [
+    OpenApiParameter(
+        name="from_date",
+        description="Filter history from this date, inclusive.",
+        required=False,
+        type=OpenApiTypes.DATE,
+    ),
+    OpenApiParameter(
+        name="to_date",
+        description="Filter history until this date, inclusive.",
+        required=False,
+        type=OpenApiTypes.DATE,
+    ),
+]
 
 retrieve = extend_schema(
     tags=[API_TAGS.vehicle],
@@ -77,7 +93,7 @@ change_status = extend_schema(
 odometer_list = extend_schema(
     tags=[API_TAGS.vehicle],
     methods=["GET"],
-    parameters=[vehicle_id_parameter],
+    parameters=[vehicle_id_parameter, *date_range_parameters],
     responses=VehicleOdometerResponseSerializer(many=True),
 )
 
@@ -87,4 +103,10 @@ odometer_record = extend_schema(
     parameters=[vehicle_id_parameter],
     request=VehicleOdometerRecordSerializer,
     responses=VehicleOdometerResponseSerializer,
+)
+
+driver_assignment_history = extend_schema(
+    tags=[API_TAGS.vehicle],
+    parameters=[vehicle_id_parameter, *date_range_parameters],
+    responses=VehicleDriverAssignmentHistoryResponseSerializer(many=True),
 )

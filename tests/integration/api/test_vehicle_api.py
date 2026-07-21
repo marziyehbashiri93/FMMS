@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import uuid
+from datetime import UTC, datetime
+
 import pytest
 from rest_framework.test import APIClient
 
+from apps.vehicle.infrastructure.models import VehicleDriverAssignmentHistoryModel
 from tests.integration.api.conftest import create_vehicle
 
 pytestmark = pytest.mark.django_db
@@ -150,6 +154,63 @@ class TestVehicleAPI:
         history = authenticated_client.get(url)
         assert history.status_code == 200
         assert len(history.data) == 1
+
+    def test_odometer_history_supports_date_filter(
+        self, authenticated_client: APIClient
+    ) -> None:
+        vehicle = create_vehicle(authenticated_client)
+        url = f"/api/v1/vehicles/{vehicle['id']}/odometer/"
+        authenticated_client.post(
+            url,
+            {"reading_date": "2026-07-15", "odometer_km": 1000},
+            format="json",
+        )
+        authenticated_client.post(
+            url,
+            {"reading_date": "2026-07-16", "odometer_km": 1015},
+            format="json",
+        )
+
+        history = authenticated_client.get(f"{url}?from_date=2026-07-16")
+
+        assert history.status_code == 200
+        assert [item["reading_date"] for item in history.data] == ["2026-07-16"]
+
+    def test_vehicle_driver_assignment_history_supports_date_filter(
+        self, authenticated_client: APIClient
+    ) -> None:
+        vehicle = create_vehicle(authenticated_client, vehicle_number="203200001")
+        vehicle_id = vehicle["id"]
+        VehicleDriverAssignmentHistoryModel.objects.create(
+            sync_run_id=uuid.uuid4(),
+            request_id="old-sync",
+            synced_at=datetime(2026, 7, 14, 8, 0, tzinfo=UTC),
+            vehicle_id=vehicle_id,
+            vehicle_number=vehicle["vehicle_number"],
+            license_plate=vehicle["license_plate"],
+            driver_role=VehicleDriverAssignmentHistoryModel.DriverRole.DRIVER,
+            driver_customer_number="6000000001",
+        )
+        VehicleDriverAssignmentHistoryModel.objects.create(
+            sync_run_id=uuid.uuid4(),
+            request_id="new-sync",
+            synced_at=datetime(2026, 7, 16, 8, 0, tzinfo=UTC),
+            vehicle_id=vehicle_id,
+            vehicle_number=vehicle["vehicle_number"],
+            license_plate=vehicle["license_plate"],
+            driver_role=VehicleDriverAssignmentHistoryModel.DriverRole.ASSISTANT,
+            driver_customer_number="6000000002",
+        )
+
+        response = authenticated_client.get(
+            f"/api/v1/vehicles/{vehicle_id}/driver-assignment-history/"
+            "?from_date=2026-07-16"
+        )
+
+        assert response.status_code == 200, response.data
+        assert [item["driver_customer_number"] for item in response.data] == [
+            "6000000002"
+        ]
 
     def test_odometer_must_increase_by_at_least_10_km(
         self, authenticated_client: APIClient

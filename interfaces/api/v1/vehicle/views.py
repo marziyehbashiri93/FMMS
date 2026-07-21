@@ -19,6 +19,8 @@ from interfaces.api.v1 import deps
 from interfaces.api.v1.utils import paginate_dto_list, request_id_from, user_id_from
 from interfaces.api.v1.vehicle import schema as vehicle_schema
 from interfaces.api.v1.vehicle.serializers import (
+    DateRangeFilterSerializer,
+    VehicleDriverAssignmentHistoryResponseSerializer,
     VehicleOdometerRecordSerializer,
     VehicleOdometerResponseSerializer,
     VehicleResponseSerializer,
@@ -87,9 +89,13 @@ class VehicleViewSet(GenericViewSet):
     def odometer(self, request: Request, pk: str | None = None) -> Response:
         """List, create, or update vehicle daily odometer readings."""
         if request.method == "GET":
+            filters = DateRangeFilterSerializer(data=request.query_params)
+            filters.is_valid(raise_exception=True)
             result = deps.get_list_vehicle_odometer_history_service().execute(
                 uuid.UUID(str(pk)),
-                request_id_from(request),
+                from_date=filters.validated_data.get("from_date"),
+                to_date=filters.validated_data.get("to_date"),
+                request_id=request_id_from(request),
             )
             return Response(VehicleOdometerResponseSerializer(result, many=True).data)
 
@@ -106,3 +112,20 @@ class VehicleViewSet(GenericViewSet):
             )
         )
         return Response(VehicleOdometerResponseSerializer(result).data)
+
+    @vehicle_schema.driver_assignment_history
+    @action(detail=True, methods=["get"], url_path="driver-assignment-history")
+    def driver_assignment_history(
+        self, request: Request, pk: str | None = None
+    ) -> Response:
+        """List SAP driver-assignment history for one vehicle."""
+        filters = DateRangeFilterSerializer(data=request.query_params)
+        filters.is_valid(raise_exception=True)
+        result = deps.get_list_vehicle_driver_assignment_history_service().execute(
+            uuid.UUID(str(pk)),
+            from_date=filters.validated_data.get("from_date"),
+            to_date=filters.validated_data.get("to_date"),
+        )
+        return Response(
+            VehicleDriverAssignmentHistoryResponseSerializer(result, many=True).data
+        )

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 
+from rest_framework.decorators import action
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
@@ -14,6 +15,10 @@ from interfaces.api.v1 import deps
 from interfaces.api.v1.driver import schema as driver_schema
 from interfaces.api.v1.driver.serializers import DriverResponseSerializer
 from interfaces.api.v1.utils import paginate_dto_list, request_id_from
+from interfaces.api.v1.vehicle.serializers import (
+    DateRangeFilterSerializer,
+    VehicleDriverAssignmentHistoryResponseSerializer,
+)
 
 
 class DriverViewSet(GenericViewSet):
@@ -47,3 +52,20 @@ class DriverViewSet(GenericViewSet):
         if page is not None:
             return self.get_paginated_response(serializer.data)
         return Response(serializer.data)
+
+    @driver_schema.vehicle_assignment_history
+    @action(detail=True, methods=["get"], url_path="vehicle-assignment-history")
+    def vehicle_assignment_history(
+        self, request: Request, pk: str | None = None
+    ) -> Response:
+        """List SAP vehicle-assignment history for one driver."""
+        filters = DateRangeFilterSerializer(data=request.query_params)
+        filters.is_valid(raise_exception=True)
+        result = deps.get_list_driver_vehicle_assignment_history_service().execute(
+            uuid.UUID(str(pk)),
+            from_date=filters.validated_data.get("from_date"),
+            to_date=filters.validated_data.get("to_date"),
+        )
+        return Response(
+            VehicleDriverAssignmentHistoryResponseSerializer(result, many=True).data
+        )

@@ -99,3 +99,18 @@ class VehicleOdometerResponseDTO:
     recorded_by: uuid.UUID
     recorded_at: datetime
     updated_at: datetime
+
+
+@dataclass(frozen=True)
+class VehicleDriverAssignmentHistoryResponseDTO:
+    """Output DTO for a SAP driver-assignment snapshot."""
+
+    id: uuid.UUID
+    sync_run_id: uuid.UUID
+    request_id: str
+    synced_at: datetime
+    vehicle_id: uuid.UUID
+    vehicle_number: str
+    license_plate: str
+    driver_role: str
+    driver_customer_number: str | None

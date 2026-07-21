@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import uuid
+from datetime import UTC, datetime
+
 import pytest
 from rest_framework.test import APIClient
 
 from apps.driver.domain.entities import DriverStatus
 from apps.driver.infrastructure.models import DriverModel
+from apps.vehicle.infrastructure.models import VehicleDriverAssignmentHistoryModel
 
 pytestmark = pytest.mark.django_db
 
@@ -141,3 +145,41 @@ class TestDriverAPI:
             "Reza Driver",
             "Ali Driver",
         ]
+
+    def test_driver_vehicle_assignment_history_supports_date_filter(
+        self,
+        authenticated_client: APIClient,
+    ) -> None:
+        driver = DriverModel.objects.create(
+            customer_number="6000005234",
+            name="History Driver",
+            status=DriverStatus.ACTIVE.value,
+        )
+        VehicleDriverAssignmentHistoryModel.objects.create(
+            sync_run_id=uuid.uuid4(),
+            request_id="old-sync",
+            synced_at=datetime(2026, 7, 14, 8, 0, tzinfo=UTC),
+            vehicle_id=uuid.uuid4(),
+            vehicle_number="203200001",
+            license_plate="11الف111",
+            driver_role=VehicleDriverAssignmentHistoryModel.DriverRole.DRIVER,
+            driver_customer_number=driver.customer_number,
+        )
+        VehicleDriverAssignmentHistoryModel.objects.create(
+            sync_run_id=uuid.uuid4(),
+            request_id="new-sync",
+            synced_at=datetime(2026, 7, 16, 8, 0, tzinfo=UTC),
+            vehicle_id=uuid.uuid4(),
+            vehicle_number="203200002",
+            license_plate="22ب222",
+            driver_role=VehicleDriverAssignmentHistoryModel.DriverRole.ASSISTANT,
+            driver_customer_number=driver.customer_number,
+        )
+
+        response = authenticated_client.get(
+            f"/api/v1/drivers/{driver.id}/vehicle-assignment-history/"
+            "?from_date=2026-07-16"
+        )
+
+        assert response.status_code == 200, response.data
+        assert [item["vehicle_number"] for item in response.data] == ["203200002"]

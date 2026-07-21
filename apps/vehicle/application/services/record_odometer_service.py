@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from django.db import transaction
 
@@ -98,6 +98,9 @@ class ListVehicleOdometerHistoryService:
     def execute(
         self,
         vehicle_id: uuid.UUID,
+        *,
+        from_date: date | None = None,
+        to_date: date | None = None,
         request_id: str = "",
     ) -> list[VehicleOdometerResponseDTO]:
         """Return all non-deleted odometer readings for ``vehicle_id``."""
@@ -109,7 +112,12 @@ class ListVehicleOdometerHistoryService:
         qs = VehicleOdometerReadingModel.objects.filter(
             vehicle_id=vehicle_id,
             is_deleted=False,
-        ).order_by("-reading_date")
+        )
+        if from_date is not None:
+            qs = qs.filter(reading_date__gte=from_date)
+        if to_date is not None:
+            qs = qs.filter(reading_date__lte=to_date)
+        qs = qs.order_by("-reading_date")
         return [_to_response_dto(obj) for obj in qs]
 
 

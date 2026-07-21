@@ -30,6 +30,23 @@ class VehicleOdometerRecordSerializer(serializers.Serializer):
     source = serializers.CharField(max_length=30, required=False, default="DRIVER")
 
 
+class DateRangeFilterSerializer(serializers.Serializer):
+    """Validate optional from/to date query parameters."""
+
+    from_date = serializers.DateField(required=False)
+    to_date = serializers.DateField(required=False)
+
+    def validate(self, attrs: dict[str, object]) -> dict[str, object]:
+        """Ensure the date range is chronologically valid."""
+        from_date = attrs.get("from_date")
+        to_date = attrs.get("to_date")
+        if from_date and to_date and from_date > to_date:
+            raise serializers.ValidationError(
+                {"to_date": "to_date must be greater than or equal to from_date."}
+            )
+        return attrs
+
+
 class VehicleStatusChangeSerializer(serializers.Serializer):
     """Validate a vehicle status change requested from FMMS."""
 
@@ -53,3 +70,17 @@ class VehicleOdometerResponseSerializer(serializers.Serializer):
     recorded_by = serializers.UUIDField()
     recorded_at = serializers.DateTimeField()
     updated_at = serializers.DateTimeField()
+
+
+class VehicleDriverAssignmentHistoryResponseSerializer(serializers.Serializer):
+    """Serialize SAP driver-assignment history snapshots."""
+
+    id = serializers.UUIDField()
+    sync_run_id = serializers.UUIDField()
+    request_id = serializers.CharField()
+    synced_at = serializers.DateTimeField()
+    vehicle_id = serializers.UUIDField()
+    vehicle_number = serializers.CharField()
+    license_plate = serializers.CharField()
+    driver_role = serializers.ChoiceField(choices=["DRIVER", "ASSISTANT"])
+    driver_customer_number = serializers.CharField(allow_null=True)

@@ -8,6 +8,10 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema
 from apps.driver.domain.entities import DriverStatus
 from interfaces.api.v1.driver.serializers import DriverResponseSerializer
 from interfaces.api.v1.schema_tags import API_TAGS
+from interfaces.api.v1.vehicle.schema import date_range_parameters
+from interfaces.api.v1.vehicle.serializers import (
+    VehicleDriverAssignmentHistoryResponseSerializer,
+)
 
 _DRIVER_ORDERING_FIELDS = [
     "customer_number",
@@ -62,4 +66,10 @@ list = extend_schema(
         ),
     ],
     responses=DriverResponseSerializer(many=True),
+)
+
+vehicle_assignment_history = extend_schema(
+    tags=[API_TAGS.driver],
+    parameters=[driver_id_parameter, *date_range_parameters],
+    responses=VehicleDriverAssignmentHistoryResponseSerializer(many=True),
 )
