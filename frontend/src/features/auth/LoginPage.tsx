@@ -36,8 +36,7 @@ export function LoginPage() {
         setSubmitting(true);
         try {
             const response = await api.login(username, password);
-            api.setAccessToken(response.access);
-            api.setRefreshToken(response.refresh);
+            api.setAuthSession(response);
             navigate('/vehicles', {replace: true});
         } catch (err) {
             if (err instanceof ApiError && err.status === 401) {

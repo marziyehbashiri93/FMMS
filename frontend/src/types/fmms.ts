@@ -18,7 +18,16 @@ export interface AuthUser {
 export interface LoginResponse {
   access: string;
   refresh: string;
+  token_type: string;
+  access_expires_at: string;
+  refresh_expires_at: string;
   user: AuthUser;
+}
+
+export interface RefreshTokenResponse {
+  access: string;
+  token_type: string;
+  access_expires_at: string;
 }
 
 export type VehicleStatus =
