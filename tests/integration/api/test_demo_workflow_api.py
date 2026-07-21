@@ -49,10 +49,10 @@ class TestInspectionTemplateSAPSyncAPI:
         assert listed.status_code == 200
         results = listed.data["results"] if "results" in listed.data else listed.data
         descriptions = {item["description"] for item in results}
-        assert "Seat belt" in descriptions
-        assert "Front light" in descriptions
-        assert "Refrigerator" in descriptions
-        assert "Safety equipment" in descriptions
+        assert "ترمز جلو" in descriptions
+        assert "چراغ جلو" in descriptions
+        assert "موتور اصلی" in descriptions
+        assert "باتری/دینام" in descriptions
 
         again = authenticated_client.post(
             "/api/v1/inspection-templates/sync-sap/", {}, format="json"

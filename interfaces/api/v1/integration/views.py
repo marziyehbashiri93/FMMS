@@ -10,11 +10,14 @@ from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
 from apps.integration.domain.entities import SAPTransactionStatus
-from core.permissions import IsFMMSAuthenticated
+from core.permissions import IsFMMSAuthenticated, IsSupervisorOrAbove
 from interfaces.api.v1 import deps
-from interfaces.api.v1.integration.serializers import SAPTransactionResponseSerializer
+from interfaces.api.v1.integration.serializers import (
+    SAPSyncRunResponseSerializer,
+    SAPTransactionResponseSerializer,
+)
 from interfaces.api.v1.schema_tags import API_TAGS
-from interfaces.api.v1.utils import paginate_dto_list
+from interfaces.api.v1.utils import paginate_dto_list, request_id_from
 
 
 class SAPTransactionViewSet(GenericViewSet):
@@ -52,3 +55,21 @@ class SAPTransactionViewSet(GenericViewSet):
         if page is not None:
             return self.get_paginated_response(serializer.data)
         return Response(serializer.data)
+
+
+class SAPSyncViewSet(GenericViewSet):
+    """Expose a single API for running all SAP read synchronisations."""
+
+    permission_classes = [IsSupervisorOrAbove]
+
+    @extend_schema(
+        tags=[API_TAGS.integration],
+        request=None,
+        responses=SAPSyncRunResponseSerializer,
+    )
+    def create(self, request: Request) -> Response:
+        """Run every supported SAP read sync."""
+        result = deps.get_run_sap_sync_service().execute(
+            request_id=request_id_from(request)
+        )
+        return Response(SAPSyncRunResponseSerializer(result).data)

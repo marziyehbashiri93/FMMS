@@ -20,6 +20,10 @@ Optional environment variables:
     SAP_VEHICLE_DRIVER_SERVICE    — Vehicle-driver OData service
         (default: ZC_VEHICLEDRIVER_CDS)
     SAP_VEHICLE_DRIVER_ENTITY_SET — Vehicle-driver entity set (default: empty)
+    SAP_OBJECT_PART_CATALOG_SERVICE    — Object-part catalog OData service
+        (default: ZI_FLEET_CAT_B_CDS)
+    SAP_OBJECT_PART_CATALOG_ENTITY_SET — Object-part catalog entity set
+        (default: empty)
 """
 
 from __future__ import annotations
@@ -61,6 +65,8 @@ class SAPConfig:
     verify_ssl: bool
     vehicle_driver_service: str
     vehicle_driver_entity_set: str
+    object_part_catalog_service: str
+    object_part_catalog_entity_set: str
 
     @classmethod
     def from_env(cls) -> SAPConfig:
@@ -89,6 +95,14 @@ class SAPConfig:
         )
         vehicle_driver_entity_set = os.environ.get(
             "SAP_VEHICLE_DRIVER_ENTITY_SET",
+            "",
+        )
+        object_part_catalog_service = os.environ.get(
+            "SAP_OBJECT_PART_CATALOG_SERVICE",
+            "ZI_FLEET_CAT_B_CDS",
+        )
+        object_part_catalog_entity_set = os.environ.get(
+            "SAP_OBJECT_PART_CATALOG_ENTITY_SET",
             "",
         )
 
@@ -130,6 +144,8 @@ class SAPConfig:
             verify_ssl=verify_ssl,
             vehicle_driver_service=vehicle_driver_service,
             vehicle_driver_entity_set=vehicle_driver_entity_set,
+            object_part_catalog_service=object_part_catalog_service,
+            object_part_catalog_entity_set=object_part_catalog_entity_set,
         )
 
 

@@ -14,6 +14,7 @@ from apps.integration.domain.entities import (
     SAPTransactionStatus,
 )
 from apps.integration.infrastructure.repositories import DjangoSAPTransactionRepository
+from apps.vehicle.infrastructure.models import VehicleModel
 
 pytestmark = pytest.mark.django_db
 
@@ -50,3 +51,20 @@ class TestIntegrationAPI:
         assert retrieved.status_code == 200
         assert retrieved.data["id"] == str(saved.id)
         assert retrieved.data["status"] == "PENDING"
+
+    def test_global_sap_sync_uses_mock_odata_fixtures(
+        self, authenticated_client: APIClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Run all read syncs through XML mock fixtures when mock mode is active."""
+        monkeypatch.setenv("SAP_USE_MOCK", "True")
+
+        response = authenticated_client.post("/api/v1/sap-sync/", {}, format="json")
+
+        assert response.status_code == 200, response.data
+        assert response.data["status"] == "SUCCESS"
+        items = {item["name"]: item for item in response.data["items"]}
+        assert items["vehicles"]["summary"]["total_received"] >= 1
+        assert items["vehicles"]["summary"]["failed"] == 0
+        assert items["inspection_templates"]["summary"]["total_received"] >= 4
+        assert items["inspection_templates"]["summary"]["failed"] == 0
+        assert VehicleModel.objects.exists()

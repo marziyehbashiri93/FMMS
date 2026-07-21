@@ -52,6 +52,7 @@ from apps.inspection.infrastructure.template_repositories import (
 from apps.integration.application.services.retry_failed_sap_transactions_service import (
     RetryFailedSAPTransactionsService,
 )
+from apps.integration.application.services.run_sap_sync_service import RunSAPSyncService
 from apps.integration.infrastructure.repositories import DjangoSAPTransactionRepository
 from apps.material.application.services.material_request_service import (
     ApproveMaterialRequestService,
@@ -414,9 +415,22 @@ def get_sync_inspection_templates_from_sap_service() -> (
     SyncInspectionTemplatesFromSAPService
 ):
     """Return SyncInspectionTemplatesFromSAPService."""
+    config = SAPConfig.from_env()
     return SyncInspectionTemplatesFromSAPService(
         get_inspection_template_repository(),
-        ObjectPartCatalogODataAdapter(_sap_client()),
+        ObjectPartCatalogODataAdapter(
+            _sap_odata_client(),
+            service=config.object_part_catalog_service,
+            entity_set=config.object_part_catalog_entity_set,
+        ),
+    )
+
+
+def get_run_sap_sync_service() -> RunSAPSyncService:
+    """Return the global SAP read-sync orchestration service."""
+    return RunSAPSyncService(
+        get_sync_vehicles_from_sap_service(),
+        get_sync_inspection_templates_from_sap_service(),
     )
 
 

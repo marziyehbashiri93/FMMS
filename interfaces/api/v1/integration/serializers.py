@@ -28,3 +28,21 @@ class SAPTransactionResponseSerializer(serializers.Serializer):
     created_at = serializers.DateTimeField()
     updated_at = serializers.DateTimeField()
     completed_at = serializers.DateTimeField(allow_null=True)
+
+
+class SAPSyncItemResultSerializer(serializers.Serializer):
+    """Serialize the result of one SAP read-sync item."""
+
+    name = serializers.CharField()
+    status = serializers.ChoiceField(choices=["SUCCESS", "FAILED", "PARTIAL_SUCCESS"])
+    summary = serializers.DictField()
+    error = serializers.CharField(allow_null=True)
+
+
+class SAPSyncRunResponseSerializer(serializers.Serializer):
+    """Serialize the global SAP read-sync run result."""
+
+    status = serializers.ChoiceField(choices=["SUCCESS", "FAILED", "PARTIAL_SUCCESS"])
+    started_at = serializers.DateTimeField()
+    finished_at = serializers.DateTimeField()
+    items = SAPSyncItemResultSerializer(many=True)
