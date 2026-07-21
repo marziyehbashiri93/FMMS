@@ -9,6 +9,8 @@ from typing import Any
 import pytest
 from rest_framework.test import APIClient
 
+from apps.driver.domain.entities import DriverStatus
+from apps.driver.infrastructure.models import DriverModel
 from apps.fault.domain.entities import FaultStatus
 from apps.fault.domain.value_objects import FaultSeverity
 from apps.fault.infrastructure.models import FaultModel
@@ -61,6 +63,20 @@ class TestVehicleAPI:
         )
         vehicle_id = created["id"]
         assert created["status"] == "ACTIVE"
+        DriverModel.objects.create(
+            customer_number="6000000001",
+            name="راننده اصلی",
+            status=DriverStatus.ACTIVE.value,
+        )
+        DriverModel.objects.create(
+            customer_number="6000000002",
+            name="کمک راننده",
+            status=DriverStatus.ACTIVE.value,
+        )
+        VehicleModel.objects.filter(id=vehicle_id).update(
+            driver1_customer_number="6000000001",
+            driver2_customer_number="6000000002",
+        )
 
         listed = authenticated_client.get("/api/v1/vehicles/")
         assert listed.status_code == 200
@@ -70,6 +86,14 @@ class TestVehicleAPI:
         assert retrieved.status_code == 200
         assert retrieved.data["license_plate"] == "12VEH001"
         assert retrieved.data["status_label"] == "عملیاتی"
+        assert retrieved.data["driver1"] == {
+            "customer_number": "6000000001",
+            "name": "راننده اصلی",
+        }
+        assert retrieved.data["driver2"] == {
+            "customer_number": "6000000002",
+            "name": "کمک راننده",
+        }
 
         patched = authenticated_client.patch(
             f"/api/v1/vehicles/{vehicle_id}/",

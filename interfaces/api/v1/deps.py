@@ -378,7 +378,7 @@ def get_list_driver_vehicle_assignment_history_service() -> (
 
 def get_get_vehicle_service() -> GetVehicleService:
     """Return GetVehicleService."""
-    return GetVehicleService(get_vehicle_repository())
+    return GetVehicleService(get_vehicle_repository(), get_driver_repository())
 
 
 def get_list_vehicles_service() -> ListVehiclesService:

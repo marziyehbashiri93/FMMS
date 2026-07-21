@@ -26,6 +26,14 @@ class ChangeVehicleStatusDTO:
 
 
 @dataclass(frozen=True)
+class VehicleAssignedDriverDTO:
+    """Driver details displayed inside vehicle detail responses."""
+
+    customer_number: str
+    name: str | None
+
+
+@dataclass(frozen=True)
 class VehicleResponseDTO:
     """Output DTO returned by all vehicle read and write operations.
 
@@ -54,6 +62,8 @@ class VehicleResponseDTO:
     commissioning_date: str | None = field(default=None)
     driver1_customer_number: str | None = field(default=None)
     driver2_customer_number: str | None = field(default=None)
+    driver1: VehicleAssignedDriverDTO | None = field(default=None)
+    driver2: VehicleAssignedDriverDTO | None = field(default=None)
 
 
 @dataclass(frozen=True)

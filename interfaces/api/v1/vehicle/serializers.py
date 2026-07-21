@@ -7,6 +7,13 @@ from rest_framework import serializers
 from apps.vehicle.domain.entities import VehicleStatus
 
 
+class VehicleAssignedDriverSerializer(serializers.Serializer):
+    """Serialize assigned driver details in vehicle responses."""
+
+    customer_number = serializers.CharField()
+    name = serializers.CharField(allow_null=True)
+
+
 class VehicleResponseSerializer(serializers.Serializer):
     """Serialize application vehicle response DTOs."""
 
@@ -20,6 +27,8 @@ class VehicleResponseSerializer(serializers.Serializer):
     commissioning_date = serializers.CharField(allow_null=True)
     driver1_customer_number = serializers.CharField(allow_null=True)
     driver2_customer_number = serializers.CharField(allow_null=True)
+    driver1 = VehicleAssignedDriverSerializer(allow_null=True)
+    driver2 = VehicleAssignedDriverSerializer(allow_null=True)
 
 
 class VehicleSummarySerializer(serializers.Serializer):

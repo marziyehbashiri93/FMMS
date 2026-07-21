@@ -8,7 +8,13 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from apps.vehicle.application.dto.vehicle_dto import VehicleResponseDTO
+from apps.driver.domain.exceptions import DriverNotFoundError
+from apps.driver.domain.interfaces.driver_repository import IDriverRepository
+from apps.driver.domain.value_objects import CustomerNumber
+from apps.vehicle.application.dto.vehicle_dto import (
+    VehicleAssignedDriverDTO,
+    VehicleResponseDTO,
+)
 from apps.vehicle.domain.entities import VEHICLE_STATUS_LABELS, Vehicle, VehicleStatus
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
 from core.exceptions.base_exception import FMMSValidationError
@@ -31,7 +37,12 @@ _VEHICLE_ORDERING_FIELDS = frozenset(
 )
 
 
-def _to_response_dto(vehicle: Vehicle) -> VehicleResponseDTO:
+def _to_response_dto(
+    vehicle: Vehicle,
+    *,
+    driver1: VehicleAssignedDriverDTO | None = None,
+    driver2: VehicleAssignedDriverDTO | None = None,
+) -> VehicleResponseDTO:
     """Map domain entity → response DTO."""
     return VehicleResponseDTO(
         id=vehicle.id,
@@ -44,6 +55,8 @@ def _to_response_dto(vehicle: Vehicle) -> VehicleResponseDTO:
         commissioning_date=vehicle.commissioning_date,
         driver1_customer_number=vehicle.driver1_customer_number,
         driver2_customer_number=vehicle.driver2_customer_number,
+        driver1=driver1,
+        driver2=driver2,
     )
 
 
@@ -52,10 +65,16 @@ class GetVehicleService:
 
     Args:
         vehicle_repository: Concrete ``IVehicleRepository``.
+        driver_repository: Concrete ``IDriverRepository``.
     """
 
-    def __init__(self, vehicle_repository: IVehicleRepository) -> None:
+    def __init__(
+        self,
+        vehicle_repository: IVehicleRepository,
+        driver_repository: IDriverRepository,
+    ) -> None:
         self._repo = vehicle_repository
+        self._driver_repo = driver_repository
 
     def execute(
         self, vehicle_id: uuid.UUID, request_id: str = ""
@@ -101,7 +120,17 @@ class GetVehicleService:
             },
         )
 
-        return _to_response_dto(vehicle)
+        return _to_response_dto(
+            vehicle,
+            driver1=_assigned_driver(
+                self._driver_repo,
+                vehicle.driver1_customer_number,
+            ),
+            driver2=_assigned_driver(
+                self._driver_repo,
+                vehicle.driver2_customer_number,
+            ),
+        )
 
 
 class ListVehiclesService:
@@ -193,3 +222,23 @@ def _sort_vehicles(vehicles: list[Vehicle], ordering: str) -> list[Vehicle]:
 def _sortable_value(value: Any) -> Any:
     """Return a primitive value suitable for stable sorting."""
     return getattr(value, "value", value) or ""
+
+
+def _assigned_driver(
+    driver_repository: IDriverRepository,
+    customer_number: str | None,
+) -> VehicleAssignedDriverDTO | None:
+    """Return assigned driver details by SAP customer number, when available."""
+    if not customer_number:
+        return None
+    try:
+        driver = driver_repository.get_by_customer_number(CustomerNumber(customer_number))
+    except (DriverNotFoundError, ValueError):
+        return VehicleAssignedDriverDTO(
+            customer_number=customer_number,
+            name=None,
+        )
+    return VehicleAssignedDriverDTO(
+        customer_number=driver.customer_number.value,
+        name=driver.name,
+    )
