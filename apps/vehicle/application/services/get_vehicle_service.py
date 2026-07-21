@@ -31,8 +31,6 @@ _VEHICLE_ORDERING_FIELDS = frozenset(
         "created_at",
         "updated_at",
         "commissioning_date",
-        "driver1_customer_number",
-        "driver2_customer_number",
     }
 )
 
@@ -53,8 +51,6 @@ def _to_response_dto(
         created_at=vehicle.created_at,
         updated_at=vehicle.updated_at,
         commissioning_date=vehicle.commissioning_date,
-        driver1_customer_number=vehicle.driver1_customer_number,
-        driver2_customer_number=vehicle.driver2_customer_number,
         driver1=driver1,
         driver2=driver2,
     )

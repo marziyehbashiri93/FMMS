@@ -25,8 +25,6 @@ class VehicleResponseSerializer(serializers.Serializer):
     created_at = serializers.DateTimeField()
     updated_at = serializers.DateTimeField()
     commissioning_date = serializers.CharField(allow_null=True)
-    driver1_customer_number = serializers.CharField(allow_null=True)
-    driver2_customer_number = serializers.CharField(allow_null=True)
     driver1 = VehicleAssignedDriverSerializer(allow_null=True)
     driver2 = VehicleAssignedDriverSerializer(allow_null=True)
 

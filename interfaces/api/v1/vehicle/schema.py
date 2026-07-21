@@ -29,10 +29,6 @@ _VEHICLE_ORDERING_FIELDS = [
     "-updated_at",
     "commissioning_date",
     "-commissioning_date",
-    "driver1_customer_number",
-    "-driver1_customer_number",
-    "driver2_customer_number",
-    "-driver2_customer_number",
 ]
 
 vehicle_id_parameter = OpenApiParameter(

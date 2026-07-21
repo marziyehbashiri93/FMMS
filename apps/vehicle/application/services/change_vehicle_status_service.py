@@ -206,6 +206,4 @@ def _to_response_dto(vehicle: Vehicle) -> VehicleResponseDTO:
         created_at=vehicle.created_at,
         updated_at=vehicle.updated_at,
         commissioning_date=vehicle.commissioning_date,
-        driver1_customer_number=vehicle.driver1_customer_number,
-        driver2_customer_number=vehicle.driver2_customer_number,
     )

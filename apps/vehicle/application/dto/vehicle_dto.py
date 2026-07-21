@@ -45,8 +45,8 @@ class VehicleResponseDTO:
         vehicle_number: SAP ``VehicleNumber`` and unique vehicle identifier.
         license_plate: SAP ``LicensePlate``.
         commissioning_date: SAP ``CommissioningDate`` in source format.
-        driver1_customer_number: SAP ``Driver1CustomerNo``.
-        driver2_customer_number: SAP ``Driver2CustomerNo``.
+        driver1: Main assigned driver display data.
+        driver2: Assistant assigned driver display data.
         status: Current lifecycle status.
         created_at: UTC timestamp of record creation.
         updated_at: UTC timestamp of the last modification.
@@ -60,8 +60,6 @@ class VehicleResponseDTO:
     created_at: datetime
     updated_at: datetime
     commissioning_date: str | None = field(default=None)
-    driver1_customer_number: str | None = field(default=None)
-    driver2_customer_number: str | None = field(default=None)
     driver1: VehicleAssignedDriverDTO | None = field(default=None)
     driver2: VehicleAssignedDriverDTO | None = field(default=None)
 

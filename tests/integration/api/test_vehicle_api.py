@@ -86,6 +86,8 @@ class TestVehicleAPI:
         assert retrieved.status_code == 200
         assert retrieved.data["license_plate"] == "12VEH001"
         assert retrieved.data["status_label"] == "عملیاتی"
+        assert "driver1_customer_number" not in retrieved.data
+        assert "driver2_customer_number" not in retrieved.data
         assert retrieved.data["driver1"] == {
             "customer_number": "6000000001",
             "name": "راننده اصلی",
