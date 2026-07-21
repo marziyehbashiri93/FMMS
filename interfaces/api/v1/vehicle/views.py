@@ -20,7 +20,7 @@ from interfaces.api.v1.utils import paginate_dto_list, request_id_from, user_id_
 from interfaces.api.v1.vehicle import schema as vehicle_schema
 from interfaces.api.v1.vehicle.serializers import (
     DateRangeFilterSerializer,
-    VehicleDriverAssignmentHistoryResponseSerializer,
+    VehicleDriverAssignmentSnapshotResponseSerializer,
     VehicleOdometerRecordSerializer,
     VehicleOdometerResponseSerializer,
     VehicleResponseSerializer,
@@ -138,7 +138,7 @@ class VehicleViewSet(GenericViewSet):
             to_date=filters.validated_data.get("to_date"),
         )
         return Response(
-            VehicleDriverAssignmentHistoryResponseSerializer(result, many=True).data
+            VehicleDriverAssignmentSnapshotResponseSerializer(result, many=True).data
         )
 
     @vehicle_schema.summary

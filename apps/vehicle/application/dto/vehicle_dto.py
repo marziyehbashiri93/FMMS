@@ -135,3 +135,12 @@ class VehicleDriverAssignmentHistoryResponseDTO:
     license_plate: str
     driver_role: str
     driver_customer_number: str | None
+
+
+@dataclass(frozen=True)
+class VehicleDriverAssignmentSnapshotResponseDTO:
+    """Output DTO for one vehicle driver-assignment snapshot."""
+
+    assigned_at: datetime
+    driver: VehicleAssignedDriverDTO | None
+    assistant: VehicleAssignedDriverDTO | None

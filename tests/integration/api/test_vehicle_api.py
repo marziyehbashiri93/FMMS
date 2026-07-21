@@ -333,6 +333,21 @@ class TestVehicleAPI:
     ) -> None:
         vehicle = create_vehicle(authenticated_client, vehicle_number="203200001")
         vehicle_id = vehicle["id"]
+        DriverModel.objects.create(
+            customer_number="6000000001",
+            name="راننده قدیمی",
+            status=DriverStatus.ACTIVE.value,
+        )
+        DriverModel.objects.create(
+            customer_number="6000000002",
+            name="راننده اصلی",
+            status=DriverStatus.ACTIVE.value,
+        )
+        DriverModel.objects.create(
+            customer_number="6000000003",
+            name="کمک راننده",
+            status=DriverStatus.ACTIVE.value,
+        )
         VehicleDriverAssignmentHistoryModel.objects.create(
             sync_run_id=uuid.uuid4(),
             request_id="old-sync",
@@ -343,15 +358,26 @@ class TestVehicleAPI:
             driver_role=VehicleDriverAssignmentHistoryModel.DriverRole.DRIVER,
             driver_customer_number="6000000001",
         )
+        new_sync_run_id = uuid.uuid4()
         VehicleDriverAssignmentHistoryModel.objects.create(
-            sync_run_id=uuid.uuid4(),
+            sync_run_id=new_sync_run_id,
+            request_id="new-sync",
+            synced_at=datetime(2026, 7, 16, 8, 0, tzinfo=UTC),
+            vehicle_id=vehicle_id,
+            vehicle_number=vehicle["vehicle_number"],
+            license_plate=vehicle["license_plate"],
+            driver_role=VehicleDriverAssignmentHistoryModel.DriverRole.DRIVER,
+            driver_customer_number="6000000002",
+        )
+        VehicleDriverAssignmentHistoryModel.objects.create(
+            sync_run_id=new_sync_run_id,
             request_id="new-sync",
             synced_at=datetime(2026, 7, 16, 8, 0, tzinfo=UTC),
             vehicle_id=vehicle_id,
             vehicle_number=vehicle["vehicle_number"],
             license_plate=vehicle["license_plate"],
             driver_role=VehicleDriverAssignmentHistoryModel.DriverRole.ASSISTANT,
-            driver_customer_number="6000000002",
+            driver_customer_number="6000000003",
         )
 
         response = authenticated_client.get(
@@ -360,9 +386,20 @@ class TestVehicleAPI:
         )
 
         assert response.status_code == 200, response.data
-        assert [item["driver_customer_number"] for item in response.data] == [
-            "6000000002"
-        ]
+        assert len(response.data) == 1
+        assert response.data[0]["assigned_at"].startswith("2026-07-16T08:00:00")
+        assert response.data[0]["driver"] == {
+            "customer_number": "6000000002",
+            "name": "راننده اصلی",
+        }
+        assert response.data[0]["assistant"] == {
+            "customer_number": "6000000003",
+            "name": "کمک راننده",
+        }
+        assert "vehicle_id" not in response.data[0]
+        assert "request_id" not in response.data[0]
+        assert "sync_run_id" not in response.data[0]
+        assert "vehicle_number" not in response.data[0]
 
     def test_odometer_must_increase_by_at_least_10_km(
         self, authenticated_client: APIClient

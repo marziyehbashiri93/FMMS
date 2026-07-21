@@ -8,7 +8,7 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema
 from apps.vehicle.domain.entities import VehicleStatus
 from interfaces.api.v1.schema_tags import API_TAGS
 from interfaces.api.v1.vehicle.serializers import (
-    VehicleDriverAssignmentHistoryResponseSerializer,
+    VehicleDriverAssignmentSnapshotResponseSerializer,
     VehicleOdometerRecordSerializer,
     VehicleOdometerResponseSerializer,
     VehicleResponseSerializer,
@@ -116,5 +116,5 @@ odometer_history = extend_schema(
 driver_assignment_history = extend_schema(
     tags=[API_TAGS.vehicle],
     parameters=[vehicle_id_parameter, *date_range_parameters],
-    responses=VehicleDriverAssignmentHistoryResponseSerializer(many=True),
+    responses=VehicleDriverAssignmentSnapshotResponseSerializer(many=True),
 )

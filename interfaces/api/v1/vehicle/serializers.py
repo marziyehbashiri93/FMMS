@@ -103,3 +103,11 @@ class VehicleDriverAssignmentHistoryResponseSerializer(serializers.Serializer):
     license_plate = serializers.CharField()
     driver_role = serializers.ChoiceField(choices=["DRIVER", "ASSISTANT"])
     driver_customer_number = serializers.CharField(allow_null=True)
+
+
+class VehicleDriverAssignmentSnapshotResponseSerializer(serializers.Serializer):
+    """Serialize grouped driver-assignment snapshots for one vehicle."""
+
+    assigned_at = serializers.DateTimeField()
+    driver = VehicleAssignedDriverSerializer(allow_null=True)
+    assistant = VehicleAssignedDriverSerializer(allow_null=True)
