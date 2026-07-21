@@ -109,5 +109,5 @@ class VehicleDriverAssignmentSnapshotResponseSerializer(serializers.Serializer):
     """Serialize grouped driver-assignment snapshots for one vehicle."""
 
     assigned_at = serializers.DateTimeField()
-    driver = VehicleAssignedDriverSerializer(allow_null=True)
-    assistant = VehicleAssignedDriverSerializer(allow_null=True)
+    driver1 = VehicleAssignedDriverSerializer(allow_null=True)
+    driver2 = VehicleAssignedDriverSerializer(allow_null=True)

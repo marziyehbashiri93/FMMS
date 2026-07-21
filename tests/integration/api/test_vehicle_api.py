@@ -388,14 +388,16 @@ class TestVehicleAPI:
         assert response.status_code == 200, response.data
         assert len(response.data) == 1
         assert response.data[0]["assigned_at"].startswith("2026-07-16T08:00:00")
-        assert response.data[0]["driver"] == {
+        assert response.data[0]["driver1"] == {
             "customer_number": "6000000002",
             "name": "راننده اصلی",
         }
-        assert response.data[0]["assistant"] == {
+        assert response.data[0]["driver2"] == {
             "customer_number": "6000000003",
             "name": "کمک راننده",
         }
+        assert "driver" not in response.data[0]
+        assert "assistant" not in response.data[0]
         assert "vehicle_id" not in response.data[0]
         assert "request_id" not in response.data[0]
         assert "sync_run_id" not in response.data[0]

@@ -142,5 +142,5 @@ class VehicleDriverAssignmentSnapshotResponseDTO:
     """Output DTO for one vehicle driver-assignment snapshot."""
 
     assigned_at: datetime
-    driver: VehicleAssignedDriverDTO | None
-    assistant: VehicleAssignedDriverDTO | None
+    driver1: VehicleAssignedDriverDTO | None
+    driver2: VehicleAssignedDriverDTO | None

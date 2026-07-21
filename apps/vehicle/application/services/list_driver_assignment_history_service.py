@@ -154,11 +154,11 @@ def _to_vehicle_assignment_snapshots(
             ].synced_at
             if VehicleDriverAssignmentHistoryModel.DriverRole.DRIVER in role_rows
             else next(iter(role_rows.values())).synced_at,
-            driver=_history_driver(
+            driver1=_history_driver(
                 role_rows.get(VehicleDriverAssignmentHistoryModel.DriverRole.DRIVER),
                 drivers_by_customer_number,
             ),
-            assistant=_history_driver(
+            driver2=_history_driver(
                 role_rows.get(VehicleDriverAssignmentHistoryModel.DriverRole.ASSISTANT),
                 drivers_by_customer_number,
             ),
