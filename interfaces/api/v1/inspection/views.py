@@ -19,7 +19,11 @@ from apps.inspection.application.dto.inspection_dto import (
     SubmitInspectionDTO,
 )
 from apps.inspection.domain.entities import InspectionType
-from apps.inspection.domain.value_objects import ChecklistResult, FailureSeverity, OdometerUnit
+from apps.inspection.domain.value_objects import (
+    ChecklistResult,
+    FailureSeverity,
+    OdometerUnit,
+)
 from core.permissions import IsReadOnlyOrTechnicianOrAbove
 from interfaces.api.v1 import deps
 from interfaces.api.v1.inspection.serializers import (

@@ -5,7 +5,11 @@ from __future__ import annotations
 from rest_framework import serializers
 
 from apps.inspection.domain.entities import InspectionStatus, InspectionType
-from apps.inspection.domain.value_objects import ChecklistResult, FailureSeverity, OdometerUnit
+from apps.inspection.domain.value_objects import (
+    ChecklistResult,
+    FailureSeverity,
+    OdometerUnit,
+)
 
 
 class InspectionItemCreateSerializer(serializers.Serializer):

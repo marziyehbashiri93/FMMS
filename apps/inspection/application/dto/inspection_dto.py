@@ -13,7 +13,11 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from apps.inspection.domain.entities import InspectionStatus, InspectionType
-from apps.inspection.domain.value_objects import ChecklistResult, FailureSeverity, OdometerUnit
+from apps.inspection.domain.value_objects import (
+    ChecklistResult,
+    FailureSeverity,
+    OdometerUnit,
+)
 
 
 @dataclass(frozen=True)
