@@ -6,14 +6,29 @@ No mutations happen here.  These services are query-side only.
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 from apps.vehicle.application.dto.vehicle_dto import VehicleResponseDTO
 from apps.vehicle.domain.entities import VEHICLE_STATUS_LABELS, Vehicle, VehicleStatus
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
+from core.exceptions.base_exception import FMMSValidationError
 from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
 
 logger = get_structured_logger("vehicle", __name__)
+
+_VEHICLE_ORDERING_FIELDS = frozenset(
+    {
+        "vehicle_number",
+        "license_plate",
+        "status",
+        "created_at",
+        "updated_at",
+        "commissioning_date",
+        "driver1_customer_number",
+        "driver2_customer_number",
+    }
+)
 
 
 def _to_response_dto(vehicle: Vehicle) -> VehicleResponseDTO:
@@ -102,6 +117,7 @@ class ListVehiclesService:
     def execute(
         self,
         status: VehicleStatus | None = None,
+        ordering: str = "",
         request_id: str = "",
     ) -> list[VehicleResponseDTO]:
         """Return vehicles optionally filtered by lifecycle status.
@@ -112,6 +128,7 @@ class ListVehiclesService:
 
         Args:
             status: Optional status filter.
+            ordering: Optional ordering field. Prefix with ``-`` for descending.
             request_id: Optional correlation ID for structured logging.
 
         Returns:
@@ -125,6 +142,7 @@ class ListVehiclesService:
                 "operation": "execute",
                 "request_id": request_id,
                 "status_filter": status.value if status else "ACTIVE",
+                "ordering": ordering,
             },
         )
 
@@ -133,6 +151,7 @@ class ListVehiclesService:
             if status is not None
             else self._repo.list_active()
         )
+        vehicles = _sort_vehicles(vehicles, ordering)
 
         logger.info(
             "Vehicles listed",
@@ -147,3 +166,30 @@ class ListVehiclesService:
         )
 
         return [_to_response_dto(v) for v in vehicles]
+
+
+def _sort_vehicles(vehicles: list[Vehicle], ordering: str) -> list[Vehicle]:
+    """Return vehicles sorted by a whitelisted response field."""
+    if not ordering:
+        return vehicles
+    descending = ordering.startswith("-")
+    field_name = ordering[1:] if descending else ordering
+    if field_name not in _VEHICLE_ORDERING_FIELDS:
+        raise FMMSValidationError(
+            message=f"Unsupported vehicle ordering field: {field_name}.",
+            error_code="INVALID_ORDERING",
+            details={
+                "field": field_name,
+                "allowed_fields": sorted(_VEHICLE_ORDERING_FIELDS),
+            },
+        )
+    return sorted(
+        vehicles,
+        key=lambda vehicle: _sortable_value(getattr(vehicle, field_name)),
+        reverse=descending,
+    )
+
+
+def _sortable_value(value: Any) -> Any:
+    """Return a primitive value suitable for stable sorting."""
+    return getattr(value, "value", value) or ""

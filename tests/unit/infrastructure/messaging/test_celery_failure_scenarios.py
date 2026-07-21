@@ -25,12 +25,10 @@ from apps.preventive_maintenance.domain.value_objects import (
     TriggerCondition,
     TriggerType,
 )
-from core.exceptions.base_exception import FMMSNotFoundError
 from infrastructure.messaging.tasks.maintenance_tasks import (
     trigger_overdue_pm_work_orders,
 )
 from infrastructure.messaging.tasks.sap_retry_tasks import retry_failed_sap_transactions
-from infrastructure.messaging.tasks.sap_sync_tasks import sync_equipment_from_sap
 
 
 def _plan(next_due_at: datetime) -> PMPlan:
@@ -86,22 +84,6 @@ class TestCeleryFailureScenarios:
         assert any("task_id" in r.__dict__ for r in captured)
         assert any(r.__dict__.get("domain") == "integration" for r in captured)
         service.execute.assert_called_once_with(request_id="corr-log-1")
-
-    def test_sync_task_reraises_not_found(self) -> None:
-        """Single-equipment sync propagates FMMSNotFoundError."""
-        service = MagicMock()
-        service.execute.side_effect = FMMSNotFoundError(
-            message="No vehicle linked",
-            details={"vehicle_number": "999"},
-        )
-        with (
-            patch(
-                "interfaces.api.v1.deps.get_sync_sap_equipment_service",
-                return_value=service,
-            ),
-            pytest.raises(FMMSNotFoundError),
-        ):
-            sync_equipment_from_sap.run("999", correlation_id="corr-sync-nf")
 
     def test_overdue_task_reraises_service_failure(self) -> None:
         """Overdue PM task does not swallow top-level service failures."""

@@ -17,11 +17,9 @@ Optional environment variables:
     SAP_USE_MOCK        — Use MockSAPClient instead of real SAP (default: True)
     SAP_LANG            — SAP logon language (default: EN)
     SAP_VERIFY_SSL      — Verify SAP HTTPS certificates (default: True)
-    SAP_EQUIPMENT_SERVICE    — Equipment OData service (default: API_EQUIPMENT)
-    SAP_EQUIPMENT_ENTITY_SET — Equipment entity set (default: Equipment)
-    SAP_EQUIPMENT_PAGE_SIZE  — Page size for equipment list reads (default: 200)
-    SAP_EQUIPMENT_FILTER     — Optional extra OData filter for vehicle equipment.
-    SAP_EQUIPMENT_RESPONSE_FORMAT — json or xml (default: xml for Golestan view).
+    SAP_VEHICLE_DRIVER_SERVICE    — Vehicle-driver OData service
+        (default: ZC_VEHICLEDRIVER_CDS)
+    SAP_VEHICLE_DRIVER_ENTITY_SET — Vehicle-driver entity set (default: empty)
 """
 
 from __future__ import annotations
@@ -61,11 +59,8 @@ class SAPConfig:
     use_mock: bool
     lang: str
     verify_ssl: bool
-    equipment_service: str
-    equipment_entity_set: str
-    equipment_page_size: int
-    equipment_filter: str
-    equipment_response_format: str
+    vehicle_driver_service: str
+    vehicle_driver_entity_set: str
 
     @classmethod
     def from_env(cls) -> SAPConfig:
@@ -88,18 +83,14 @@ class SAPConfig:
         sysnr = os.environ.get("SAP_SYSNR", "00")
         lang = os.environ.get("SAP_LANG", "EN")
         verify_ssl = _env_bool("SAP_VERIFY_SSL", default=True)
-        equipment_service = os.environ.get(
-            "SAP_EQUIPMENT_SERVICE", "ZC_VEHICLEDRIVER_CDS"
+        vehicle_driver_service = os.environ.get(
+            "SAP_VEHICLE_DRIVER_SERVICE",
+            "ZC_VEHICLEDRIVER_CDS",
         )
-        equipment_entity_set = os.environ.get("SAP_EQUIPMENT_ENTITY_SET", "")
-        equipment_filter = os.environ.get("SAP_EQUIPMENT_FILTER", "")
-        equipment_response_format = os.environ.get(
-            "SAP_EQUIPMENT_RESPONSE_FORMAT", "xml"
-        ).lower()
-        if equipment_response_format not in {"json", "xml"}:
-            raise ImproperlyConfigured(
-                "SAP_EQUIPMENT_RESPONSE_FORMAT must be either 'json' or 'xml'."
-            )
+        vehicle_driver_entity_set = os.environ.get(
+            "SAP_VEHICLE_DRIVER_ENTITY_SET",
+            "",
+        )
 
         try:
             timeout_seconds = int(os.environ.get("SAP_TIMEOUT_SECONDS", "30"))
@@ -107,14 +98,6 @@ class SAPConfig:
             raise ImproperlyConfigured(
                 "SAP_TIMEOUT_SECONDS must be an integer."
             ) from exc
-        try:
-            equipment_page_size = int(os.environ.get("SAP_EQUIPMENT_PAGE_SIZE", "200"))
-        except ValueError as exc:
-            raise ImproperlyConfigured(
-                "SAP_EQUIPMENT_PAGE_SIZE must be an integer."
-            ) from exc
-        if equipment_page_size <= 0:
-            raise ImproperlyConfigured("SAP_EQUIPMENT_PAGE_SIZE must be positive.")
 
         if not use_mock:
             missing = [
@@ -145,11 +128,8 @@ class SAPConfig:
             use_mock=use_mock,
             lang=lang,
             verify_ssl=verify_ssl,
-            equipment_service=equipment_service,
-            equipment_entity_set=equipment_entity_set,
-            equipment_page_size=equipment_page_size,
-            equipment_filter=equipment_filter,
-            equipment_response_format=equipment_response_format,
+            vehicle_driver_service=vehicle_driver_service,
+            vehicle_driver_entity_set=vehicle_driver_entity_set,
         )
 
 

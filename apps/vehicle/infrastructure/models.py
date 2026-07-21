@@ -12,11 +12,15 @@ from infrastructure.database.base_model import BaseModel
 
 
 class VehicleModel(BaseModel):
-    """Persistence model for a fleet vehicle.
+    """Persistence model for a SAP-sourced fleet vehicle.
 
     Stores all vehicle attributes as flat fields. Cross-domain references
     (e.g. repair orders) are resolved at the repository or service layer —
     never through Django ForeignKey to other app models.
+
+    TODO: Split SAP master-data models from ``BaseModel`` once the shared audit
+    model is reviewed. Vehicles are never deleted by FMMS, so ``is_deleted`` is
+    inherited for now but must not drive business visibility.
 
     Attributes:
         vehicle_number: SAP ``VehicleNumber`` and unique vehicle identifier.
@@ -24,7 +28,7 @@ class VehicleModel(BaseModel):
         commissioning_date: SAP ``CommissioningDate`` in source format.
         driver1_customer_number: SAP customer number for the main driver.
         driver2_customer_number: SAP customer number for the assistant driver.
-        status: Current lifecycle status (ACTIVE, INACTIVE, UNDER_REPAIR, SUSPENDED).
+        status: Current lifecycle status.
     """
 
     vehicle_number = models.CharField(max_length=18, db_index=True)
@@ -46,19 +50,15 @@ class VehicleModel(BaseModel):
         constraints = [
             models.UniqueConstraint(
                 fields=["license_plate"],
-                condition=models.Q(is_deleted=False),
-                name="unique_active_license_plate",
+                name="unique_vehicle_license_plate",
             ),
             models.UniqueConstraint(
                 fields=["vehicle_number"],
-                condition=models.Q(is_deleted=False),
-                name="unique_active_vehicle_number",
+                name="unique_vehicle_number",
             ),
         ]
         indexes = [
-            models.Index(
-                fields=["status", "is_deleted"], name="vehicle_status_deleted_idx"
-            ),
+            models.Index(fields=["status"], name="vehicle_status_idx"),
             models.Index(fields=["vehicle_number"], name="vehicle_number_idx"),
         ]
 

@@ -170,14 +170,8 @@ from apps.vehicle.application.services.record_odometer_service import (
     ListVehicleOdometerHistoryService,
     RecordVehicleOdometerService,
 )
-from apps.vehicle.application.services.sync_sap_equipment_service import (
-    SyncSAPEquipmentService,
-)
 from apps.vehicle.application.services.sync_vehicles_from_sap_service import (
     SyncVehiclesFromSAPService,
-)
-from apps.vehicle.application.services.update_vehicle_service import (
-    UpdateVehicleService,
 )
 from apps.vehicle.infrastructure.repositories import DjangoVehicleRepository
 from infrastructure.sap.adapters.bapi.pm_notification_bapi_adapter import (
@@ -187,11 +181,11 @@ from infrastructure.sap.adapters.bapi.pm_order_bapi_adapter import PMOrderBAPIAd
 from infrastructure.sap.adapters.bapi.purchase_requisition_bapi_adapter import (
     PurchaseRequisitionBAPIAdapter,
 )
-from infrastructure.sap.adapters.odata.equipment_odata_adapter import (
-    EquipmentODataAdapter,
-)
 from infrastructure.sap.adapters.odata.object_part_catalog_odata_adapter import (
     ObjectPartCatalogODataAdapter,
+)
+from infrastructure.sap.adapters.odata.vehicle_driver_odata_adapter import (
+    VehicleDriverODataAdapter,
 )
 from infrastructure.sap.client.mock.mock_client import MockSAPClient
 from infrastructure.sap.client.odata_client import SAPODataClient
@@ -231,16 +225,13 @@ def _sap_odata_client() -> MockSAPClient | SAPODataClient:
     )
 
 
-def _equipment_adapter() -> EquipmentODataAdapter:
-    """Return the configured SAP equipment adapter."""
+def _vehicle_driver_adapter() -> VehicleDriverODataAdapter:
+    """Return the configured SAP vehicle-driver adapter."""
     config = SAPConfig.from_env()
-    return EquipmentODataAdapter(
+    return VehicleDriverODataAdapter(
         _sap_odata_client(),
-        service=config.equipment_service,
-        entity_set=config.equipment_entity_set,
-        page_size=config.equipment_page_size,
-        extra_filter=config.equipment_filter,
-        response_format=config.equipment_response_format,
+        service=config.vehicle_driver_service,
+        entity_set=config.vehicle_driver_entity_set,
     )
 
 
@@ -324,11 +315,6 @@ def get_sap_transaction_manager() -> SAPTransactionManager:
     return SAPTransactionManager(repository=get_sap_transaction_repository())
 
 
-def get_update_vehicle_service() -> UpdateVehicleService:
-    """Return UpdateVehicleService."""
-    return UpdateVehicleService(get_vehicle_repository())
-
-
 def get_user_profile_reader() -> DjangoUserProfileReader:
     """Return the FMMS user profile reader."""
     return DjangoUserProfileReader()
@@ -348,19 +334,11 @@ def get_activate_vehicle_service() -> ActivateVehicleService:
     )
 
 
-def get_sync_sap_equipment_service() -> SyncSAPEquipmentService:
-    """Return SyncSAPEquipmentService."""
-    return SyncSAPEquipmentService(
-        get_vehicle_repository(),
-        _equipment_adapter(),
-    )
-
-
 def get_sync_vehicles_from_sap_service() -> SyncVehiclesFromSAPService:
-    """Return SyncVehiclesFromSAPService for bulk equipment import."""
+    """Return SyncVehiclesFromSAPService for bulk vehicle-driver import."""
     return SyncVehiclesFromSAPService(
         get_vehicle_repository(),
-        _equipment_adapter(),
+        _vehicle_driver_adapter(),
         get_driver_repository(),
     )
 

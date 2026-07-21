@@ -21,20 +21,6 @@ class VehicleNotFoundError(VehicleDomainError, DomainNotFoundError):
         self.vehicle_id = vehicle_id
 
 
-class VehicleAlreadyExistsError(VehicleDomainError):
-    """Raised when attempting to register a vehicle with a duplicate plate number.
-
-    Args:
-        plate_number: The conflicting plate number.
-    """
-
-    def __init__(self, plate_number: str) -> None:
-        super().__init__(
-            f"A vehicle with plate number '{plate_number}' already exists."
-        )
-        self.plate_number = plate_number
-
-
 class VehicleInvalidStateTransitionError(VehicleDomainError, DomainStateError):
     """Raised when a vehicle status transition is not permitted.
 

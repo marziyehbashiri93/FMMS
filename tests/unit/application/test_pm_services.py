@@ -279,6 +279,14 @@ class FakeVehicleRepository(IVehicleRepository):
         self._store[vehicle.id] = vehicle
         return vehicle
 
+    def decommission_missing_from_sap(self, seen_vehicle_numbers: set[str]) -> int:
+        count = 0
+        for vehicle in self._store.values():
+            if vehicle.vehicle_number.value not in seen_vehicle_numbers:
+                vehicle.decommission()
+                count += 1
+        return count
+
     def delete(self, vehicle_id: uuid.UUID) -> None:
         self._store.pop(vehicle_id, None)
 

@@ -16,16 +16,6 @@ from apps.vehicle.domain.entities import VehicleStatus
 
 
 @dataclass(frozen=True)
-class UpdateVehicleDTO:
-    """Input DTO for FMMS-owned vehicle updates."""
-
-    vehicle_id: uuid.UUID
-    request_id: str
-    updated_by: uuid.UUID
-    status: VehicleStatus
-
-
-@dataclass(frozen=True)
 class DeactivateVehicleDTO:
     """Input DTO for deactivating a vehicle.
 
@@ -88,12 +78,13 @@ class VehicleResponseDTO:
 
 @dataclass(frozen=True)
 class VehicleSAPSyncResultDTO:
-    """Summary of a bulk SAP equipment → FMMS vehicle synchronisation.
+    """Summary of a bulk SAP vehicle-driver → FMMS synchronisation.
 
     Attributes:
-        total_received: Number of equipment records returned by SAP.
+        total_received: Number of vehicle-driver rows returned by SAP.
         created: Number of new FMMS vehicles created.
         updated: Number of existing FMMS vehicles updated.
+        decommissioned: Number of local vehicles no longer present in SAP.
         failed: Number of records that could not be synced.
     """
 

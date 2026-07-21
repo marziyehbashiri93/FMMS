@@ -71,9 +71,9 @@ class TestAPIErrorMapping:
     ) -> None:
         """Serializer validation failures return VALIDATION_ERROR."""
         vehicle = create_vehicle(authenticated_client, plate="12ERRVAL")
-        response = authenticated_client.patch(
-            f"/api/v1/vehicles/{vehicle['id']}/",
-            {"status": "BAD"},
+        response = authenticated_client.post(
+            f"/api/v1/vehicles/{vehicle['id']}/odometer/",
+            {"reading_date": "2026-07-15", "odometer_km": -1},
             format="json",
         )
         assert response.status_code == 400

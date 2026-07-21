@@ -1,4 +1,4 @@
-"""Synchronize FMMS vehicles from SAP equipment master data."""
+"""Synchronize FMMS vehicles and assigned drivers from SAP."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from interfaces.api.v1 import deps
 class Command(BaseCommand):
     """Run the existing vehicle SAP sync service from the command line."""
 
-    help = "Synchronize FMMS vehicles from SAP equipment master data."
+    help = "Synchronize FMMS vehicles and assigned drivers from SAP."
 
     def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
@@ -31,6 +31,7 @@ class Command(BaseCommand):
                 f"total={result.total_received}, "
                 f"created={result.created}, "
                 f"updated={result.updated}, "
+                f"decommissioned={result.decommissioned}, "
                 f"failed={result.failed}"
             )
         )

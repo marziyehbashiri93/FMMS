@@ -11,18 +11,11 @@ from infrastructure.sap.client.mock.mock_client import MockSAPClient, SAPMockSce
 class TestMockClientSuccess:
     """MockSAPClient returns valid canned responses in SUCCESS scenario."""
 
-    def test_odata_get_equipment_single_returns_dict_with_d_key(self) -> None:
+    def test_odata_get_vehicle_driver_xml_returns_fixture(self) -> None:
         client = MockSAPClient(scenario=SAPMockScenario.SUCCESS)
-        result = client.odata_get("API_EQUIPMENT", "Equipment('10000001')")
-        assert "d" in result
-        assert result["d"]["EquipmentId"] == "10000001"
-
-    def test_odata_get_equipment_list_returns_results_array(self) -> None:
-        client = MockSAPClient(scenario=SAPMockScenario.SUCCESS)
-        result = client.odata_get("API_EQUIPMENT", "EquipmentSet")
-        assert "d" in result
-        assert isinstance(result["d"]["results"], list)
-        assert len(result["d"]["results"]) >= 1
+        result = client.odata_get_xml("ZC_VEHICLEDRIVER_CDS")
+        assert "<Column Name=\"VehicleNumber\">" in result
+        assert "<Value>20320</Value>" in result
 
     def test_odata_get_defect_code_single(self) -> None:
         client = MockSAPClient(scenario=SAPMockScenario.SUCCESS)
@@ -98,8 +91,8 @@ class TestMockClientBAPIError:
     def test_odata_get_still_succeeds_in_bapi_error_scenario(self) -> None:
         """BAPI_ERROR scenario only affects BAPI calls; OData reads still succeed."""
         client = MockSAPClient(scenario=SAPMockScenario.BAPI_ERROR)
-        result = client.odata_get("API_EQUIPMENT", "EquipmentSet")
-        assert "d" in result
+        result = client.odata_get_xml("ZC_VEHICLEDRIVER_CDS")
+        assert "<Column Name=\"VehicleNumber\">" in result
 
 
 class TestMockClientTransportError:
@@ -108,12 +101,12 @@ class TestMockClientTransportError:
     def test_odata_get_raises_sap_client_error(self) -> None:
         client = MockSAPClient(scenario=SAPMockScenario.TRANSPORT_ERROR)
         with pytest.raises(SAPClientError, match="Transport error"):
-            client.odata_get("API_EQUIPMENT", "EquipmentSet")
+            client.odata_get_xml("ZC_VEHICLEDRIVER_CDS")
 
     def test_odata_post_raises_sap_client_error(self) -> None:
         client = MockSAPClient(scenario=SAPMockScenario.TRANSPORT_ERROR)
         with pytest.raises(SAPClientError, match="Transport error"):
-            client.odata_post("API_EQUIPMENT", "EquipmentSet", {})
+            client.odata_post("ZI_FLEET_CAT_B_CDS", "", {})
 
     def test_bapi_call_raises_sap_client_error(self) -> None:
         client = MockSAPClient(scenario=SAPMockScenario.TRANSPORT_ERROR)

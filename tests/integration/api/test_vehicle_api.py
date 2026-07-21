@@ -11,7 +11,7 @@ pytestmark = pytest.mark.django_db
 
 
 class TestVehicleAPI:
-    """Cover vehicle read, status, odometer, and auth endpoints."""
+    """Cover vehicle read, workflow, odometer, and auth endpoints."""
 
     def test_auth_required(self, api_client: APIClient) -> None:
         """Unauthenticated clients receive 401."""
@@ -36,10 +36,10 @@ class TestVehicleAPI:
         )
         assert response.status_code == 405
 
-    def test_list_retrieve_patch_status_deactivate(
+    def test_list_retrieve_no_manual_patch_and_deactivate(
         self, authenticated_client: APIClient
     ) -> None:
-        """Exercise the FMMS-owned vehicle endpoints."""
+        """Vehicle master data has no generic manual update endpoint."""
         created = create_vehicle(
             authenticated_client,
             plate="12VEH001",
@@ -62,8 +62,7 @@ class TestVehicleAPI:
             {"status": "SUSPENDED"},
             format="json",
         )
-        assert patched.status_code == 200
-        assert patched.data["status"] == "SUSPENDED"
+        assert patched.status_code == 405
 
         deactivated = authenticated_client.post(
             f"/api/v1/vehicles/{vehicle_id}/deactivate/",
@@ -72,6 +71,18 @@ class TestVehicleAPI:
         )
         assert deactivated.status_code == 200
         assert deactivated.data["status"] == "INACTIVE"
+
+    def test_list_supports_ordering(self, authenticated_client: APIClient) -> None:
+        create_vehicle(authenticated_client, plate="B-002", vin="1HGCM82633A004352")
+        create_vehicle(authenticated_client, plate="A-001", vin="1HGCM82633A004353")
+
+        response = authenticated_client.get("/api/v1/vehicles/?ordering=license_plate")
+
+        assert response.status_code == 200
+        assert [item["license_plate"] for item in response.data["results"]] == [
+            "A-001",
+            "B-002",
+        ]
 
     def test_record_odometer_upserts_daily_reading(
         self, authenticated_client: APIClient

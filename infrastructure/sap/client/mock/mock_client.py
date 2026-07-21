@@ -10,7 +10,7 @@ Simulates four scenarios configurable per-instance or per-call:
 Usage::
 
     client = MockSAPClient(scenario=SAPMockScenario.SUCCESS)
-    response = client.odata_get("API_EQUIPMENT", "Equipment('10000001')")
+    response = client.odata_get_xml("ZC_VEHICLEDRIVER_CDS")
 
     # Override scenario per call:
     response = client.bapi_call(
@@ -54,9 +54,6 @@ class SAPMockScenario(StrEnum):
 # ---------------------------------------------------------------------------
 
 _ODATA_GET_ROUTES: dict[tuple[str, str], dict] = {
-    ("API_EQUIPMENT", "Equipment("): sc.ODATA_EQUIPMENT_SINGLE,
-    ("API_EQUIPMENT", "EquipmentSet"): sc.ODATA_EQUIPMENT_LIST,
-    ("API_EQUIPMENT", "Equipment"): sc.ODATA_EQUIPMENT_LIST,
     ("API_DEFECTCODE_SRV", "DefectCode("): sc.ODATA_DEFECT_CODE_SINGLE,
     ("API_DEFECTCODE_SRV", "DefectCodeSet"): sc.ODATA_DEFECT_CODE_LIST,
     ("OBJECT_PART_CATALOG", "CatalogSet"): sc.ODATA_OBJECT_PART_LIST,
@@ -67,7 +64,7 @@ _ODATA_GET_ROUTES: dict[tuple[str, str], dict] = {
     ("API_MATERIAL_STOCK_SRV", "MatlStkInAcctMod"): sc.ODATA_STOCK_LIST,
 }
 
-_BASE_DIR = Path(__file__).resolve().parents[5]
+_BASE_DIR = Path(__file__).resolve().parents[4]
 _ODATA_XML_ROUTES: dict[str, Path] = {
     "ZC_VEHICLEDRIVER_CDS": _BASE_DIR
     / "docs"
@@ -185,8 +182,8 @@ class MockSAPClient(ISAPClient):
     Example::
 
         client = MockSAPClient(scenario=SAPMockScenario.SUCCESS)
-        result = client.odata_get("API_EQUIPMENT", "EquipmentSet")
-        assert "d" in result
+        result = client.odata_get_xml("ZC_VEHICLEDRIVER_CDS")
+        assert "VehicleNumber" in result
     """
 
     def __init__(self, scenario: SAPMockScenario = SAPMockScenario.SUCCESS) -> None:
@@ -205,7 +202,6 @@ class MockSAPClient(ISAPClient):
         for (svc, entity_prefix), response in _ODATA_GET_ROUTES.items():
             if svc == service and entity.startswith(entity_prefix):
                 return response
-        # Fall back to equipment list as a safe default for unknown entities
         logger.warning(
             "MockSAPClient: no route for OData GET",
             extra={"service": service, "entity": entity},

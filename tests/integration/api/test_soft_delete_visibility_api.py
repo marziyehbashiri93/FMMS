@@ -1,4 +1,4 @@
-"""P1 — Soft-delete visibility through repositories and API list endpoints."""
+"""P1 — Vehicle lifecycle visibility through repositories and API endpoints."""
 
 from __future__ import annotations
 
@@ -15,21 +15,22 @@ pytestmark = pytest.mark.django_db
 
 
 class TestSoftDeleteVisibility:
-    """Soft-deleted vehicles must disappear from active reads and list APIs."""
+    """SAP-decommissioned vehicles stay readable but leave active lists."""
 
-    def test_repository_soft_delete_hides_from_list_and_get(
+    def test_sap_decommission_keeps_detail_visible_but_not_active_list(
         self, authenticated_client: APIClient
     ) -> None:
-        """Repository soft-delete excludes the record from get/list."""
+        """SAP absence changes status without using soft-delete."""
         vehicle = create_vehicle(
             authenticated_client, plate="12SOFT01", vin="1HGCM82633A004370"
         )
         vehicle_id = UUID(vehicle["id"])
         repo = DjangoVehicleRepository()
-        repo.delete(vehicle_id)
+        repo.decommission_missing_from_sap(set())
 
         orm = VehicleModel.objects.get(id=vehicle_id)
-        assert orm.is_deleted is True
+        assert orm.is_deleted is False
+        assert orm.status == "DECOMMISSIONED"
 
         listed = authenticated_client.get("/api/v1/vehicles/")
         assert listed.status_code == 200
@@ -37,8 +38,8 @@ class TestSoftDeleteVisibility:
         assert vehicle["id"] not in ids
 
         detail = authenticated_client.get(f"/api/v1/vehicles/{vehicle['id']}/")
-        assert detail.status_code == 404
-        assert detail.data["error_code"] == "NOT_FOUND"
+        assert detail.status_code == 200
+        assert detail.data["status"] == "DECOMMISSIONED"
 
     def test_deactivate_does_not_soft_delete(
         self, authenticated_client: APIClient

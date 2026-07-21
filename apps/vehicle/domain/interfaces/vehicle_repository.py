@@ -12,7 +12,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 
 from apps.vehicle.domain.entities import Vehicle, VehicleStatus
-from apps.vehicle.domain.value_objects import PlateNumber, SAPVehicleNumber
+from apps.vehicle.domain.value_objects import SAPVehicleNumber
 
 
 class IVehicleRepository(ABC):
@@ -38,22 +38,8 @@ class IVehicleRepository(ABC):
         """
 
     @abstractmethod
-    def get_by_plate(self, plate_number: PlateNumber) -> Vehicle:
-        """Retrieve a vehicle by its plate number.
-
-        Args:
-            plate_number: The validated ``PlateNumber`` value object.
-
-        Returns:
-            The matching ``Vehicle`` aggregate.
-
-        Raises:
-            VehicleNotFoundError: If no vehicle exists with this plate number.
-        """
-
-    @abstractmethod
     def get_by_vehicle_number(
-        self, vehicle_number: SAPVehicleNumber, include_deleted: bool = False
+        self, vehicle_number: SAPVehicleNumber
     ) -> Vehicle | None:
         """Retrieve a vehicle by its SAP VehicleNumber, if linked.
 
@@ -63,10 +49,6 @@ class IVehicleRepository(ABC):
         Returns:
             The matching ``Vehicle`` aggregate, or ``None`` if not linked.
         """
-
-    def list_vehicle_numbers(self) -> set[str]:
-        """Return SAP VehicleNumber values stored locally, including soft-deleted rows."""
-        return set()
 
     @abstractmethod
     def list_active(self) -> list[Vehicle]:
@@ -88,17 +70,6 @@ class IVehicleRepository(ABC):
         """
 
     @abstractmethod
-    def exists_by_plate(self, plate_number: PlateNumber) -> bool:
-        """Check whether a vehicle with the given plate number already exists.
-
-        Args:
-            plate_number: The plate number to check for uniqueness.
-
-        Returns:
-            ``True`` if a vehicle with this plate number exists, else ``False``.
-        """
-
-    @abstractmethod
     def save(self, vehicle: Vehicle) -> Vehicle:
         """Persist a new or updated vehicle aggregate.
 
@@ -110,20 +81,8 @@ class IVehicleRepository(ABC):
         """
 
     @abstractmethod
-    def delete(self, vehicle_id: uuid.UUID) -> None:
-        """Soft-delete a vehicle record.
-
-        Args:
-            vehicle_id: The UUID of the vehicle to delete.
-
-        Raises:
-            VehicleNotFoundError: If no vehicle exists with this ID.
-        """
-
     def decommission_missing_from_sap(self, seen_vehicle_numbers: set[str]) -> int:
-        """Soft-delete vehicles whose SAP VehicleNumber is absent from a sync."""
-        del seen_vehicle_numbers
-        return 0
+        """Mark vehicles absent from a SAP sync as DECOMMISSIONED."""
 
     def record_driver_assignment_snapshot(
         self,

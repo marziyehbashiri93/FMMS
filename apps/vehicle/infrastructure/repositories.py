@@ -68,11 +68,7 @@ def _to_orm_dict(vehicle: Vehicle) -> dict[str, object]:
 
 
 class DjangoVehicleRepository(IVehicleRepository):
-    """Concrete repository for Vehicle aggregates backed by Django ORM.
-
-    Soft-delete is transparent: every read filters ``is_deleted=False``.
-    All public methods accept and return domain entities exclusively.
-    """
+    """Concrete repository for Vehicle aggregates backed by Django ORM."""
 
     def get_by_id(self, vehicle_id: uuid.UUID) -> Vehicle:
         """Retrieve a vehicle by UUID.
@@ -84,39 +80,16 @@ class DjangoVehicleRepository(IVehicleRepository):
             The matching ``Vehicle`` domain entity.
 
         Raises:
-            VehicleNotFoundError: If no active vehicle exists with this ID.
+            VehicleNotFoundError: If no vehicle exists with this ID.
         """
         logger.debug("get_by_id", extra={"vehicle_id": str(vehicle_id)})
         try:
-            orm = VehicleModel.objects.get(id=vehicle_id, is_deleted=False)
+            orm = VehicleModel.objects.get(id=vehicle_id)
         except VehicleModel.DoesNotExist:
             raise VehicleNotFoundError(vehicle_id) from None
         return _to_domain(orm)
 
-    def get_by_plate(self, plate_number: PlateNumber) -> Vehicle:
-        """Retrieve a vehicle by plate number.
-
-        Args:
-            plate_number: The validated ``PlateNumber`` value object.
-
-        Returns:
-            The matching ``Vehicle`` domain entity.
-
-        Raises:
-            VehicleNotFoundError: If no active vehicle with this plate exists.
-        """
-        logger.debug("get_by_plate", extra={"plate_number": plate_number.value})
-        try:
-            orm = VehicleModel.objects.get(
-                license_plate=plate_number.value, is_deleted=False
-            )
-        except VehicleModel.DoesNotExist:
-            raise VehicleNotFoundError(plate_number.value) from None
-        return _to_domain(orm)
-
-    def get_by_vehicle_number(
-        self, vehicle_number: SAPVehicleNumber, include_deleted: bool = False
-    ) -> Vehicle | None:
+    def get_by_vehicle_number(self, vehicle_number: SAPVehicleNumber) -> Vehicle | None:
         """Retrieve a vehicle by SAP VehicleNumber, if linked.
 
         Args:
@@ -130,18 +103,8 @@ class DjangoVehicleRepository(IVehicleRepository):
             extra={"vehicle_number": vehicle_number.value},
         )
         qs = VehicleModel.objects.filter(vehicle_number=vehicle_number.value)
-        if not include_deleted:
-            qs = qs.filter(is_deleted=False)
         orm = qs.first()
         return _to_domain(orm) if orm else None
-
-    def list_vehicle_numbers(self) -> set[str]:
-        """Return all non-empty SAP VehicleNumber values stored locally."""
-        return set(
-            VehicleModel.objects.exclude(vehicle_number="").values_list(
-                "vehicle_number", flat=True
-            )
-        )
 
     def list_active(self) -> list[Vehicle]:
         """Return all ACTIVE vehicles.
@@ -149,9 +112,7 @@ class DjangoVehicleRepository(IVehicleRepository):
         Returns:
             A list of active ``Vehicle`` domain entities.
         """
-        qs = VehicleModel.objects.filter(
-            status=VehicleStatus.ACTIVE.value, is_deleted=False
-        )
+        qs = VehicleModel.objects.filter(status=VehicleStatus.ACTIVE.value)
         return [_to_domain(orm) for orm in qs]
 
     def list_by_status(self, status: VehicleStatus) -> list[Vehicle]:
@@ -163,21 +124,8 @@ class DjangoVehicleRepository(IVehicleRepository):
         Returns:
             A list of matching ``Vehicle`` domain entities.
         """
-        qs = VehicleModel.objects.filter(status=status.value, is_deleted=False)
+        qs = VehicleModel.objects.filter(status=status.value)
         return [_to_domain(orm) for orm in qs]
-
-    def exists_by_plate(self, plate_number: PlateNumber) -> bool:
-        """Check whether a non-deleted vehicle with the given plate exists.
-
-        Args:
-            plate_number: The plate number to check.
-
-        Returns:
-            ``True`` if a vehicle with this plate exists.
-        """
-        return VehicleModel.objects.filter(
-            license_plate=plate_number.value, is_deleted=False
-        ).exists()
 
     def save(self, vehicle: Vehicle) -> Vehicle:
         """Persist a new or updated vehicle.
@@ -191,8 +139,7 @@ class DjangoVehicleRepository(IVehicleRepository):
             The same ``Vehicle`` entity (unchanged).
 
         Raises:
-            VehicleAlreadyExistsError: If a different vehicle already holds
-                this plate number (unique constraint violation).
+            IntegrityError: If another vehicle already holds the same SAP key.
         """
         logger.debug("save", extra={"vehicle_id": str(vehicle.id)})
         defaults = _to_orm_dict(vehicle)
@@ -209,33 +156,16 @@ class DjangoVehicleRepository(IVehicleRepository):
         )
         return vehicle
 
-    def delete(self, vehicle_id: uuid.UUID) -> None:
-        """Soft-delete a vehicle record.
-
-        Args:
-            vehicle_id: UUID of the vehicle to delete.
-
-        Raises:
-            VehicleNotFoundError: If no active vehicle exists with this ID.
-        """
-        logger.debug("delete", extra={"vehicle_id": str(vehicle_id)})
-        updated = VehicleModel.objects.filter(id=vehicle_id, is_deleted=False).update(
-            is_deleted=True,
-            deleted_at=datetime.now(tz=UTC),
-        )
-        if updated == 0:
-            raise VehicleNotFoundError(vehicle_id)
-
     def decommission_missing_from_sap(self, seen_vehicle_numbers: set[str]) -> int:
-        """Soft-delete vehicles whose SAP VehicleNumber was not returned by SAP."""
+        """Mark vehicles absent from SAP as DECOMMISSIONED without soft-delete."""
         now = datetime.now(tz=UTC)
-        qs = VehicleModel.objects.filter(is_deleted=False).exclude(vehicle_number="")
+        qs = VehicleModel.objects.exclude(
+            status=VehicleStatus.DECOMMISSIONED.value
+        ).exclude(vehicle_number="")
         if seen_vehicle_numbers:
             qs = qs.exclude(vehicle_number__in=seen_vehicle_numbers)
         return qs.update(
             status=VehicleStatus.DECOMMISSIONED.value,
-            is_deleted=True,
-            deleted_at=now,
             updated_at=now,
         )
 

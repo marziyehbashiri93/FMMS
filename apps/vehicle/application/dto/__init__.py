@@ -2,14 +2,12 @@
 
 from apps.vehicle.application.dto.vehicle_dto import (
     RecordVehicleOdometerDTO,
-    UpdateVehicleDTO,
     VehicleOdometerResponseDTO,
     VehicleResponseDTO,
 )
 
 __all__ = [
     "RecordVehicleOdometerDTO",
-    "UpdateVehicleDTO",
     "VehicleOdometerResponseDTO",
     "VehicleResponseDTO",
 ]

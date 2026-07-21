@@ -44,47 +44,6 @@ _SAP_DUPLICATE_RETURN: list[dict] = [
 ]
 
 # ---------------------------------------------------------------------------
-# OData — API_EQUIPMENT
-# ---------------------------------------------------------------------------
-
-ODATA_EQUIPMENT_SINGLE: dict = {
-    "d": {
-        "EquipmentId": "10000001",
-        "EquipmentDesc": "Fleet Vehicle — Toyota Land Cruiser",
-        "FunctionalLocation": "FLEET-001",
-        "Plant": "P001",
-        "SerialNumber": "SN-LC-2024-001",
-        "EquipmentCategory": "F",
-        "ObjectType": "VEHICLE",
-    }
-}
-
-ODATA_EQUIPMENT_LIST: dict = {
-    "d": {
-        "results": [
-            {
-                "EquipmentId": "10000001",
-                "EquipmentDesc": "Fleet Vehicle — Toyota Land Cruiser",
-                "FunctionalLocation": "FLEET-001",
-                "Plant": "P001",
-                "SerialNumber": "SN-LC-2024-001",
-                "EquipmentCategory": "F",
-                "ObjectType": "VEHICLE",
-            },
-            {
-                "EquipmentId": "10000002",
-                "EquipmentDesc": "Fleet Vehicle — Isuzu D-Max",
-                "FunctionalLocation": "FLEET-002",
-                "Plant": "P001",
-                "SerialNumber": "SN-DM-2024-002",
-                "EquipmentCategory": "F",
-                "ObjectType": "VEHICLE",
-            },
-        ]
-    }
-}
-
-# ---------------------------------------------------------------------------
 # OData — API_DEFECTCODE_SRV
 # ---------------------------------------------------------------------------
 

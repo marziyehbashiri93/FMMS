@@ -7,22 +7,6 @@ from rest_framework import serializers
 from apps.vehicle.domain.entities import VehicleStatus
 
 
-class VehicleUpdateSerializer(serializers.Serializer):
-    """Validate FMMS-owned vehicle status changes."""
-
-    status = serializers.ChoiceField(choices=[item.value for item in VehicleStatus])
-
-
-class VehicleSAPSyncResultSerializer(serializers.Serializer):
-    """Serialize bulk SAP vehicle sync result counts."""
-
-    total_received = serializers.IntegerField()
-    created = serializers.IntegerField()
-    updated = serializers.IntegerField()
-    decommissioned = serializers.IntegerField()
-    failed = serializers.IntegerField()
-
-
 class VehicleResponseSerializer(serializers.Serializer):
     """Serialize application vehicle response DTOs."""
 

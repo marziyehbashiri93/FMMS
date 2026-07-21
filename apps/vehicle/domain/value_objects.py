@@ -68,7 +68,7 @@ class SAPVehicleNumber:
             )
         if len(stripped) > 18:
             raise ValueError(
-                f"SAP Equipment Number must not exceed 18 digits, got {len(stripped)}."
+                f"SAP VehicleNumber must not exceed 18 digits, got {len(stripped)}."
             )
 
     def __str__(self) -> str:

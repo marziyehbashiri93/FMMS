@@ -1,8 +1,7 @@
 """Integration tests for DjangoVehicleRepository.
 
 These tests use the Django test database (SQLite in CI).
-They verify CRUD operations, soft-delete behaviour, status filtering,
-and the cross-domain vehicle-deactivation guard.
+They verify SAP-key persistence, status filtering, and assignment history.
 """
 
 from __future__ import annotations
@@ -16,7 +15,10 @@ from apps.vehicle.domain.entities import Vehicle, VehicleStatus
 from apps.vehicle.domain.exceptions import VehicleNotFoundError
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
 from apps.vehicle.domain.value_objects import PlateNumber, SAPVehicleNumber
-from apps.vehicle.infrastructure.models import VehicleDriverAssignmentHistoryModel
+from apps.vehicle.infrastructure.models import (
+    VehicleDriverAssignmentHistoryModel,
+    VehicleModel,
+)
 from apps.vehicle.infrastructure.repositories import DjangoVehicleRepository
 
 pytestmark = pytest.mark.django_db
@@ -62,17 +64,6 @@ class TestSaveAndRetrieve:
         with pytest.raises(VehicleNotFoundError):
             repo.get_by_id(uuid.uuid4())
 
-    def test_get_by_plate(self) -> None:
-        repo = DjangoVehicleRepository()
-        _make_vehicle(plate="99-X-001")
-        fetched = repo.get_by_plate(PlateNumber("99-X-001"))
-        assert fetched.license_plate.value == "99-X-001"
-
-    def test_get_by_plate_not_found_raises(self) -> None:
-        repo = DjangoVehicleRepository()
-        with pytest.raises(VehicleNotFoundError):
-            repo.get_by_plate(PlateNumber("00-X-999"))
-
     def test_save_is_idempotent(self) -> None:
         """Saving the same vehicle twice must not create a duplicate."""
         repo = DjangoVehicleRepository()
@@ -116,42 +107,18 @@ class TestListOperations:
         assert all(v.status == VehicleStatus.UNDER_REPAIR for v in under_repair)
         assert len(under_repair) >= 1
 
-    def test_exists_by_plate_true(self) -> None:
+class TestSAPDecommission:
+    def test_decommission_missing_from_sap_preserves_rows(self) -> None:
         repo = DjangoVehicleRepository()
-        _make_vehicle(plate="33-C-001")
-        assert repo.exists_by_plate(PlateNumber("33-C-001")) is True
+        kept = _make_vehicle(plate="55-E-001")
+        missing = _make_vehicle(plate="66-F-001")
 
-    def test_exists_by_plate_false(self) -> None:
-        repo = DjangoVehicleRepository()
-        assert repo.exists_by_plate(PlateNumber("99-Z-999")) is False
+        count = repo.decommission_missing_from_sap({kept.vehicle_number.value})
 
-
-class TestSoftDelete:
-    def test_delete_soft_deletes_record(self) -> None:
-        repo = DjangoVehicleRepository()
-        vehicle = _make_vehicle(plate="44-D-001")
-        repo.delete(vehicle.id)
-        with pytest.raises(VehicleNotFoundError):
-            repo.get_by_id(vehicle.id)
-
-    def test_delete_nonexistent_raises(self) -> None:
-        repo = DjangoVehicleRepository()
-        with pytest.raises(VehicleNotFoundError):
-            repo.delete(uuid.uuid4())
-
-    def test_soft_deleted_not_in_list_active(self) -> None:
-        repo = DjangoVehicleRepository()
-        vehicle = _make_vehicle(plate="55-E-001")
-        repo.delete(vehicle.id)
-        active_ids = {v.id for v in repo.list_active()}
-        assert vehicle.id not in active_ids
-
-    def test_exists_by_plate_returns_false_after_delete(self) -> None:
-        repo = DjangoVehicleRepository()
-        _make_vehicle(plate="66-F-001")
-        vehicle = DjangoVehicleRepository().get_by_plate(PlateNumber("66-F-001"))
-        repo.delete(vehicle.id)
-        assert repo.exists_by_plate(PlateNumber("66-F-001")) is False
+        assert count == 1
+        assert repo.get_by_id(kept.id).status == VehicleStatus.ACTIVE
+        assert repo.get_by_id(missing.id).status == VehicleStatus.DECOMMISSIONED
+        assert VehicleModel.objects.get(id=missing.id).is_deleted is False
 
 
 class TestDriverAssignmentHistory:

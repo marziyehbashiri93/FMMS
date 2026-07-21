@@ -57,7 +57,7 @@ class SAPODataClient(ISAPClient):
         """Execute a GET request against an SAP OData service.
 
         Args:
-            service: The OData service path segment (e.g. ``"API_EQUIPMENT"``)
+            service: The OData service path segment (e.g. ``"ZC_VEHICLEDRIVER_CDS"``)
             entity: The entity set or key expression.
             params: Optional OData query parameters.
 

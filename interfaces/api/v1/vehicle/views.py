@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import uuid
 
-from drf_spectacular.utils import extend_schema
 from rest_framework.decorators import action
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -14,17 +13,16 @@ from apps.vehicle.application.dto.vehicle_dto import (
     ActivateVehicleDTO,
     DeactivateVehicleDTO,
     RecordVehicleOdometerDTO,
-    UpdateVehicleDTO,
 )
 from apps.vehicle.domain.entities import VehicleStatus
 from core.permissions import IsReadOnlyOrTechnicianOrAbove, IsSupervisorOrAbove
 from interfaces.api.v1 import deps
 from interfaces.api.v1.utils import paginate_dto_list, request_id_from, user_id_from
+from interfaces.api.v1.vehicle import schema as vehicle_schema
 from interfaces.api.v1.vehicle.serializers import (
     VehicleOdometerRecordSerializer,
     VehicleOdometerResponseSerializer,
     VehicleResponseSerializer,
-    VehicleUpdateSerializer,
 )
 
 
@@ -33,7 +31,7 @@ class VehicleViewSet(GenericViewSet):
 
     permission_classes = [IsReadOnlyOrTechnicianOrAbove]
 
-    @extend_schema(responses=VehicleResponseSerializer)
+    @vehicle_schema.retrieve
     def retrieve(self, request: Request, pk: str | None = None) -> Response:
         """Retrieve one vehicle."""
         result = deps.get_get_vehicle_service().execute(
@@ -41,13 +39,16 @@ class VehicleViewSet(GenericViewSet):
         )
         return Response(VehicleResponseSerializer(result).data)
 
-    @extend_schema(responses=VehicleResponseSerializer(many=True))
+    @vehicle_schema.list
     def list(self, request: Request) -> Response:
         """List non-deleted vehicles, optionally filtered by status."""
         raw_status = request.query_params.get("status")
+        ordering = request.query_params.get("ordering", "")
         vehicle_status = VehicleStatus(raw_status) if raw_status else None
         items = deps.get_list_vehicles_service().execute(
-            vehicle_status, request_id_from(request)
+            vehicle_status,
+            ordering=ordering,
+            request_id=request_id_from(request),
         )
         page = paginate_dto_list(self, items)
         serializer = VehicleResponseSerializer(
@@ -59,23 +60,7 @@ class VehicleViewSet(GenericViewSet):
             else Response(serializer.data)
         )
 
-    @extend_schema(request=VehicleUpdateSerializer, responses=VehicleResponseSerializer)
-    def partial_update(self, request: Request, pk: str | None = None) -> Response:
-        """Update the FMMS-owned vehicle status."""
-        serializer = VehicleUpdateSerializer(data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        values = serializer.validated_data
-        result = deps.get_update_vehicle_service().execute(
-            UpdateVehicleDTO(
-                vehicle_id=uuid.UUID(str(pk)),
-                request_id=request_id_from(request),
-                updated_by=user_id_from(request),
-                status=VehicleStatus(values["status"]),
-            )
-        )
-        return Response(VehicleResponseSerializer(result).data)
-
-    @extend_schema(request=None, responses=VehicleResponseSerializer)
+    @vehicle_schema.deactivate
     @action(detail=True, methods=["post"], permission_classes=[IsSupervisorOrAbove])
     def deactivate(self, request: Request, pk: str | None = None) -> Response:
         """Deactivate a vehicle."""
@@ -86,7 +71,7 @@ class VehicleViewSet(GenericViewSet):
         )
         return Response(VehicleResponseSerializer(result).data)
 
-    @extend_schema(request=None, responses=VehicleResponseSerializer)
+    @vehicle_schema.activate
     @action(detail=True, methods=["post"], permission_classes=[IsSupervisorOrAbove])
     def activate(self, request: Request, pk: str | None = None) -> Response:
         """Re-activate a vehicle after maintenance when no open repairs remain."""
@@ -99,10 +84,8 @@ class VehicleViewSet(GenericViewSet):
         )
         return Response(VehicleResponseSerializer(result).data)
 
-    @extend_schema(
-        request=VehicleOdometerRecordSerializer,
-        responses=VehicleOdometerResponseSerializer,
-    )
+    @vehicle_schema.odometer_list
+    @vehicle_schema.odometer_record
     @action(detail=True, methods=["get", "post"], url_path="odometer")
     def odometer(self, request: Request, pk: str | None = None) -> Response:
         """List, create, or update vehicle daily odometer readings."""
