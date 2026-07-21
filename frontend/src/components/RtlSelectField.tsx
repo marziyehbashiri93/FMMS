@@ -28,13 +28,13 @@ export function RtlSelectField<T>({
           direction: 'rtl',
           textAlign: 'right',
           '& .MuiSelect-select': {
-            pr: 4.5,
-            pl: 1.75,
+            pl: 4.5,
+            pr: 1.75,
             textAlign: 'right',
           },
           '& .MuiSelect-icon': {
-            right: 12,
-            left: 'auto',
+            left: 12,
+            right: 'auto',
           },
         }}
       >

@@ -1,7 +1,6 @@
 import {
   Alert,
   Box,
-  Button,
   Card,
   CardContent,
   Divider,
@@ -30,6 +29,7 @@ import { RtlDataTable, type RtlDataTableColumn } from '../../components/RtlDataT
 import { RtlTextField } from '../../components/RtlTextField';
 import { FilterPanel } from '../../components/FilterPanel';
 import { RtlSelectField } from '../../components/RtlSelectField';
+import { Button } from '../../components/Button';
 import type { VehicleStatus } from '../../types/fmms';
 
 const statuses: VehicleStatus[] = ['ACTIVE', 'UNDER_REPAIR', 'INACTIVE', 'DECOMMISSIONED'];
@@ -140,6 +140,9 @@ export function ComponentShowcasePage() {
                       </Button>
                       <Button variant="outlined" fullWidth>
                         انصراف
+                      </Button>
+                      <Button variant="contained" loading fullWidth>
+                        در حال ثبت
                       </Button>
                     </Stack>
                   </Stack>
