@@ -90,11 +90,11 @@ change_status = extend_schema(
     responses=VehicleResponseSerializer,
 )
 
-odometer_list = extend_schema(
+odometer_current = extend_schema(
     tags=[API_TAGS.vehicle],
     methods=["GET"],
-    parameters=[vehicle_id_parameter, *date_range_parameters],
-    responses=VehicleOdometerResponseSerializer(many=True),
+    parameters=[vehicle_id_parameter],
+    responses=VehicleOdometerResponseSerializer,
 )
 
 odometer_record = extend_schema(
@@ -103,6 +103,12 @@ odometer_record = extend_schema(
     parameters=[vehicle_id_parameter],
     request=VehicleOdometerRecordSerializer,
     responses=VehicleOdometerResponseSerializer,
+)
+
+odometer_history = extend_schema(
+    tags=[API_TAGS.vehicle],
+    parameters=[vehicle_id_parameter, *date_range_parameters],
+    responses=VehicleOdometerResponseSerializer(many=True),
 )
 
 driver_assignment_history = extend_schema(

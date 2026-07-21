@@ -151,15 +151,17 @@ class TestVehicleAPI:
         assert updated.data["id"] == first.data["id"]
         assert updated.data["odometer_km"] == 1015
 
-        history = authenticated_client.get(url)
-        assert history.status_code == 200
-        assert len(history.data) == 1
+        current = authenticated_client.get(url)
+        assert current.status_code == 200
+        assert current.data["id"] == first.data["id"]
+        assert current.data["odometer_km"] == 1015
 
     def test_odometer_history_supports_date_filter(
         self, authenticated_client: APIClient
     ) -> None:
         vehicle = create_vehicle(authenticated_client)
         url = f"/api/v1/vehicles/{vehicle['id']}/odometer/"
+        history_url = f"/api/v1/vehicles/{vehicle['id']}/odometer-history/"
         authenticated_client.post(
             url,
             {"reading_date": "2026-07-15", "odometer_km": 1000},
@@ -171,10 +173,21 @@ class TestVehicleAPI:
             format="json",
         )
 
-        history = authenticated_client.get(f"{url}?from_date=2026-07-16")
+        history = authenticated_client.get(f"{history_url}?from_date=2026-07-16")
 
         assert history.status_code == 200
         assert [item["reading_date"] for item in history.data] == ["2026-07-16"]
+
+    def test_get_odometer_without_reading_returns_not_found(
+        self, authenticated_client: APIClient
+    ) -> None:
+        vehicle = create_vehicle(authenticated_client)
+
+        response = authenticated_client.get(
+            f"/api/v1/vehicles/{vehicle['id']}/odometer/"
+        )
+
+        assert response.status_code == 404
 
     def test_vehicle_driver_assignment_history_supports_date_filter(
         self, authenticated_client: APIClient

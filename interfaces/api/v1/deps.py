@@ -169,6 +169,7 @@ from apps.vehicle.application.services.list_driver_assignment_history_service im
     ListVehicleDriverAssignmentHistoryService,
 )
 from apps.vehicle.application.services.record_odometer_service import (
+    GetVehicleCurrentOdometerService,
     ListVehicleOdometerHistoryService,
     RecordVehicleOdometerService,
 )
@@ -348,6 +349,11 @@ def get_record_vehicle_odometer_service() -> RecordVehicleOdometerService:
 def get_list_vehicle_odometer_history_service() -> ListVehicleOdometerHistoryService:
     """Return ListVehicleOdometerHistoryService."""
     return ListVehicleOdometerHistoryService(get_vehicle_repository())
+
+
+def get_get_vehicle_current_odometer_service() -> GetVehicleCurrentOdometerService:
+    """Return GetVehicleCurrentOdometerService."""
+    return GetVehicleCurrentOdometerService(get_vehicle_repository())
 
 
 def get_list_vehicle_driver_assignment_history_service() -> (

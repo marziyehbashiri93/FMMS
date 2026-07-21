@@ -12,6 +12,7 @@ from apps.vehicle.application.services.list_driver_assignment_history_service im
     ListVehicleDriverAssignmentHistoryService,
 )
 from apps.vehicle.application.services.record_odometer_service import (
+    GetVehicleCurrentOdometerService,
     ListVehicleOdometerHistoryService,
     RecordVehicleOdometerService,
 )
@@ -22,6 +23,7 @@ from apps.vehicle.application.services.sync_vehicles_from_sap_service import (
 __all__ = [
     "ChangeVehicleStatusService",
     "GetVehicleService",
+    "GetVehicleCurrentOdometerService",
     "ListDriverVehicleAssignmentHistoryService",
     "ListVehicleDriverAssignmentHistoryService",
     "ListVehiclesService",

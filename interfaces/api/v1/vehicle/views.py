@@ -83,21 +83,17 @@ class VehicleViewSet(GenericViewSet):
         )
         return Response(VehicleResponseSerializer(result).data)
 
-    @vehicle_schema.odometer_list
+    @vehicle_schema.odometer_current
     @vehicle_schema.odometer_record
     @action(detail=True, methods=["get", "post"], url_path="odometer")
     def odometer(self, request: Request, pk: str | None = None) -> Response:
-        """List, create, or update vehicle daily odometer readings."""
+        """Retrieve current odometer, or create/update a daily reading."""
         if request.method == "GET":
-            filters = DateRangeFilterSerializer(data=request.query_params)
-            filters.is_valid(raise_exception=True)
-            result = deps.get_list_vehicle_odometer_history_service().execute(
+            result = deps.get_get_vehicle_current_odometer_service().execute(
                 uuid.UUID(str(pk)),
-                from_date=filters.validated_data.get("from_date"),
-                to_date=filters.validated_data.get("to_date"),
                 request_id=request_id_from(request),
             )
-            return Response(VehicleOdometerResponseSerializer(result, many=True).data)
+            return Response(VehicleOdometerResponseSerializer(result).data)
 
         serializer = VehicleOdometerRecordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -112,6 +108,20 @@ class VehicleViewSet(GenericViewSet):
             )
         )
         return Response(VehicleOdometerResponseSerializer(result).data)
+
+    @vehicle_schema.odometer_history
+    @action(detail=True, methods=["get"], url_path="odometer-history")
+    def odometer_history(self, request: Request, pk: str | None = None) -> Response:
+        """List vehicle odometer history with optional date filters."""
+        filters = DateRangeFilterSerializer(data=request.query_params)
+        filters.is_valid(raise_exception=True)
+        result = deps.get_list_vehicle_odometer_history_service().execute(
+            uuid.UUID(str(pk)),
+            from_date=filters.validated_data.get("from_date"),
+            to_date=filters.validated_data.get("to_date"),
+            request_id=request_id_from(request),
+        )
+        return Response(VehicleOdometerResponseSerializer(result, many=True).data)
 
     @vehicle_schema.driver_assignment_history
     @action(detail=True, methods=["get"], url_path="driver-assignment-history")

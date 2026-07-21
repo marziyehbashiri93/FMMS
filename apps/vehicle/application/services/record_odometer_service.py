@@ -121,6 +121,40 @@ class ListVehicleOdometerHistoryService:
         return [_to_response_dto(obj) for obj in qs]
 
 
+class GetVehicleCurrentOdometerService:
+    """Return the latest odometer reading for one vehicle."""
+
+    def __init__(self, vehicle_repository: IVehicleRepository) -> None:
+        self._vehicle_repo = vehicle_repository
+
+    def execute(
+        self,
+        vehicle_id: uuid.UUID,
+        request_id: str = "",
+    ) -> VehicleOdometerResponseDTO:
+        """Return the newest non-deleted odometer reading for ``vehicle_id``."""
+        del request_id
+        load_or_not_found(
+            lambda: self._vehicle_repo.get_by_id(vehicle_id),
+            message=f"Vehicle '{vehicle_id}' not found.",
+            details={"vehicle_id": str(vehicle_id)},
+        )
+        obj = (
+            VehicleOdometerReadingModel.objects.filter(
+                vehicle_id=vehicle_id,
+                is_deleted=False,
+            )
+            .order_by("-reading_date")
+            .first()
+        )
+        current = load_or_not_found(
+            lambda: obj,
+            message=f"Vehicle '{vehicle_id}' has no odometer reading.",
+            details={"vehicle_id": str(vehicle_id)},
+        )
+        return _to_response_dto(current)
+
+
 def _to_response_dto(
     obj: VehicleOdometerReadingModel,
 ) -> VehicleOdometerResponseDTO:
