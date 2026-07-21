@@ -254,10 +254,12 @@ def _assigned_driver(
         driver = driver_repository.get_by_customer_number(CustomerNumber(customer_number))
     except (DriverNotFoundError, ValueError):
         return VehicleAssignedDriverDTO(
+            id=None,
             customer_number=customer_number,
             name=None,
         )
     return VehicleAssignedDriverDTO(
+        id=driver.id,
         customer_number=driver.customer_number.value,
         name=driver.name,
     )
@@ -280,6 +282,7 @@ def _assigned_drivers_by_customer_number(
     drivers = driver_repository.list_by_customer_numbers(customer_numbers)
     return {
         driver.customer_number.value: VehicleAssignedDriverDTO(
+            id=driver.id,
             customer_number=driver.customer_number.value,
             name=driver.name,
         )
@@ -296,5 +299,5 @@ def _assigned_driver_from_map(
         return None
     return assigned_drivers.get(
         customer_number,
-        VehicleAssignedDriverDTO(customer_number=customer_number, name=None),
+        VehicleAssignedDriverDTO(id=None, customer_number=customer_number, name=None),
     )

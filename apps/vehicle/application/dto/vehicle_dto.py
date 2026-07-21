@@ -29,6 +29,7 @@ class ChangeVehicleStatusDTO:
 class VehicleAssignedDriverDTO:
     """Driver details displayed inside vehicle detail responses."""
 
+    id: uuid.UUID | None
     customer_number: str
     name: str | None
 

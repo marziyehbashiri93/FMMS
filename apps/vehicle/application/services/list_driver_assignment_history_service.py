@@ -128,6 +128,7 @@ def _drivers_by_customer_number(
     drivers = driver_repository.list_by_customer_numbers(customer_numbers)
     return {
         driver.customer_number.value: VehicleAssignedDriverDTO(
+            id=driver.id,
             customer_number=driver.customer_number.value,
             name=driver.name,
         )
@@ -177,6 +178,7 @@ def _history_driver(
     return drivers_by_customer_number.get(
         row.driver_customer_number,
         VehicleAssignedDriverDTO(
+            id=None,
             customer_number=row.driver_customer_number,
             name=None,
         ),

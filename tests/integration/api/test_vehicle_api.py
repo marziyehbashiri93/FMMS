@@ -63,12 +63,12 @@ class TestVehicleAPI:
         )
         vehicle_id = created["id"]
         assert created["status"] == "ACTIVE"
-        DriverModel.objects.create(
+        driver1 = DriverModel.objects.create(
             customer_number="6000000001",
             name="راننده اصلی",
             status=DriverStatus.ACTIVE.value,
         )
-        DriverModel.objects.create(
+        driver2 = DriverModel.objects.create(
             customer_number="6000000002",
             name="کمک راننده",
             status=DriverStatus.ACTIVE.value,
@@ -89,10 +89,12 @@ class TestVehicleAPI:
         assert "driver1_customer_number" not in retrieved.data
         assert "driver2_customer_number" not in retrieved.data
         assert retrieved.data["driver1"] == {
+            "id": str(driver1.id),
             "customer_number": "6000000001",
             "name": "راننده اصلی",
         }
         assert retrieved.data["driver2"] == {
+            "id": str(driver2.id),
             "customer_number": "6000000002",
             "name": "کمک راننده",
         }
@@ -123,12 +125,12 @@ class TestVehicleAPI:
             plate="A-001",
             vin="1HGCM82633A004353",
         )
-        DriverModel.objects.create(
+        list_driver1 = DriverModel.objects.create(
             customer_number="6000000101",
             name="راننده لیست",
             status=DriverStatus.ACTIVE.value,
         )
-        DriverModel.objects.create(
+        list_driver2 = DriverModel.objects.create(
             customer_number="6000000102",
             name="کمک راننده لیست",
             status=DriverStatus.ACTIVE.value,
@@ -149,10 +151,12 @@ class TestVehicleAPI:
         ]
         assert response.data["results"][0]["driver1"] is None
         assert response.data["results"][0]["driver2"] == {
+            "id": str(list_driver2.id),
             "customer_number": "6000000102",
             "name": "کمک راننده لیست",
         }
         assert response.data["results"][1]["driver1"] == {
+            "id": str(list_driver1.id),
             "customer_number": "6000000101",
             "name": "راننده لیست",
         }
@@ -338,12 +342,12 @@ class TestVehicleAPI:
             name="راننده قدیمی",
             status=DriverStatus.ACTIVE.value,
         )
-        DriverModel.objects.create(
+        history_driver1 = DriverModel.objects.create(
             customer_number="6000000002",
             name="راننده اصلی",
             status=DriverStatus.ACTIVE.value,
         )
-        DriverModel.objects.create(
+        history_driver2 = DriverModel.objects.create(
             customer_number="6000000003",
             name="کمک راننده",
             status=DriverStatus.ACTIVE.value,
@@ -389,10 +393,12 @@ class TestVehicleAPI:
         assert len(response.data) == 1
         assert response.data[0]["assigned_at"].startswith("2026-07-16T08:00:00")
         assert response.data[0]["driver1"] == {
+            "id": str(history_driver1.id),
             "customer_number": "6000000002",
             "name": "راننده اصلی",
         }
         assert response.data[0]["driver2"] == {
+            "id": str(history_driver2.id),
             "customer_number": "6000000003",
             "name": "کمک راننده",
         }

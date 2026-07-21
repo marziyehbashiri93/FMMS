@@ -10,6 +10,7 @@ from apps.vehicle.domain.entities import VehicleStatus
 class VehicleAssignedDriverSerializer(serializers.Serializer):
     """Serialize assigned driver details in vehicle responses."""
 
+    id = serializers.UUIDField(allow_null=True)
     customer_number = serializers.CharField()
     name = serializers.CharField(allow_null=True)
 
