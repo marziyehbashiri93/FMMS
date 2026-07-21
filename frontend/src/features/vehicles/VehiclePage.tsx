@@ -11,6 +11,7 @@ import {
   Grid,
   IconButton,
   InputAdornment,
+  InputLabel,
   MenuItem,
   Select,
   Stack,
@@ -456,7 +457,7 @@ export function VehiclePage() {
           gridTemplateColumns: {
             xs: 'repeat(2, minmax(0, 1fr))',
             md: 'repeat(3, minmax(0, 1fr))',
-            xl: 'repeat(5, minmax(0, 1fr))',
+            xl: 'repeat(6, minmax(0, 1fr))',
           },
           gap: 1.5,
         }}
@@ -464,7 +465,6 @@ export function VehiclePage() {
         <KpiCard label="کل ناوگان فعال" value={summaryLoading ? '...' : toFaNumber(summary?.active_fleet_count)} icon={DirectionsCar} />
         <KpiCard label="عملیاتی" value={summaryLoading ? '...' : toFaNumber(summary?.operational_fleet_count)} icon={TaskAlt} tone="success" />
         <KpiCard label="در تعمیر" value={summaryLoading ? '...' : toFaNumber(summary?.under_repair_fleet_count)} icon={Speed} tone="warning" />
-        <KpiCard label="غیرقابل استفاده" value={summaryLoading ? '...' : toFaNumber(summary?.unusable_fleet_count)} icon={ErrorIcon} tone="error" />
         <KpiCard label="میانگین کیلومتر" value={summaryLoading ? '...' : toFaNumber(summary?.average_odometer_km)} icon={Speed} tone="info" />
         <KpiCard label="میانگین خرابی ماه" value={summaryLoading ? '...' : toFaNumber(summary?.average_faults_last_30_days)} icon={ErrorIcon} tone="warning" />
         <KpiCard
@@ -478,7 +478,12 @@ export function VehiclePage() {
 
       <Card>
         <CardContent sx={{ p: { xs: 1.5, md: 2 }, '&:last-child': { pb: { xs: 1.5, md: 2 } } }}>
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.25} sx={{ direction: 'rtl' }}>
+          <Stack
+            direction={{ xs: 'column', md: 'row' }}
+            spacing={{ xs: 1.5, md: 2 }}
+            alignItems={{ xs: 'stretch', md: 'center' }}
+            sx={{ direction: 'rtl' }}
+          >
             <RtlTextField
               value={query}
               onChange={(event) => setQuery(event.target.value)}
@@ -487,7 +492,13 @@ export function VehiclePage() {
               InputProps={{ endAdornment: <InputAdornment position="end"><Search /></InputAdornment> }}
             />
             <FormControl sx={{ minWidth: { xs: '100%', md: 220 }, direction: 'rtl' }}>
-              <Select value={status} onChange={(event) => setStatus(event.target.value as '' | VehicleStatus)}>
+              <InputLabel id="vehicle-status-filter-label">وضعیت</InputLabel>
+              <Select
+                labelId="vehicle-status-filter-label"
+                value={status}
+                label="وضعیت"
+                onChange={(event) => setStatus(event.target.value as '' | VehicleStatus)}
+              >
                 {statusOptions.map((item) => (
                   <MenuItem key={item.value || 'all'} value={item.value}>{item.label}</MenuItem>
                 ))}
