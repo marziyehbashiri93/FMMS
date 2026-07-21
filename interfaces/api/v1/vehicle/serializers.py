@@ -22,8 +22,8 @@ class VehicleResponseSerializer(serializers.Serializer):
     driver2_customer_number = serializers.CharField(allow_null=True)
 
 
-class VehicleKPISerializer(serializers.Serializer):
-    """Serialize vehicle dashboard KPI values."""
+class VehicleSummarySerializer(serializers.Serializer):
+    """Serialize vehicle dashboard summary values."""
 
     active_fleet_count = serializers.IntegerField()
     operational_fleet_count = serializers.IntegerField()

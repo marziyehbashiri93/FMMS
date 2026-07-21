@@ -98,10 +98,10 @@ class TestVehicleAPI:
             "B-002",
         ]
 
-    def test_kpis_return_vehicle_dashboard_counts(
+    def test_summary_returns_vehicle_dashboard_counts(
         self, authenticated_client: APIClient, admin_user: Any
     ) -> None:
-        """Vehicle KPI endpoint returns dashboard card values."""
+        """Vehicle summary endpoint returns dashboard card values."""
         operational = create_vehicle(authenticated_client, plate="KPI-001")
         with_open_fault = create_vehicle(authenticated_client, plate="KPI-002")
         under_repair = create_vehicle(authenticated_client, plate="KPI-003")
@@ -156,7 +156,7 @@ class TestVehicleAPI:
             summary={"total_received": 5},
         )
 
-        response = authenticated_client.get("/api/v1/vehicles/kpis/")
+        response = authenticated_client.get("/api/v1/vehicles/summary/")
 
         assert response.status_code == 200, response.data
         assert response.data["active_fleet_count"] == 4

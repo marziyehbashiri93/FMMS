@@ -76,8 +76,8 @@ class VehicleSAPSyncResultDTO:
 
 
 @dataclass(frozen=True)
-class VehicleKPIDTO:
-    """Output DTO for vehicle dashboard KPI cards."""
+class VehicleSummaryDTO:
+    """Output DTO for vehicle dashboard summary cards."""
 
     active_fleet_count: int
     operational_fleet_count: int

@@ -167,8 +167,8 @@ from apps.vehicle.application.services.get_vehicle_service import (
     GetVehicleService,
     ListVehiclesService,
 )
-from apps.vehicle.application.services.get_vehicle_kpi_service import (
-    GetVehicleKPIService,
+from apps.vehicle.application.services.get_vehicle_summary_service import (
+    GetVehicleSummaryService,
 )
 from apps.vehicle.application.services.list_driver_assignment_history_service import (
     ListDriverVehicleAssignmentHistoryService,
@@ -386,9 +386,9 @@ def get_list_vehicles_service() -> ListVehiclesService:
     return ListVehiclesService(get_vehicle_repository())
 
 
-def get_get_vehicle_kpi_service() -> GetVehicleKPIService:
-    """Return GetVehicleKPIService."""
-    return GetVehicleKPIService()
+def get_get_vehicle_summary_service() -> GetVehicleSummaryService:
+    """Return GetVehicleSummaryService."""
+    return GetVehicleSummaryService()
 
 
 def get_get_driver_service() -> GetDriverService:

@@ -1,4 +1,4 @@
-"""Query-side service for vehicle dashboard KPI cards."""
+"""Query-side service for vehicle dashboard summary cards."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from apps.fault.infrastructure.models import FaultModel
 from apps.integration.infrastructure.models import SAPSyncRunItemModel
 from apps.repair.domain.entities import RepairOrderStatus
 from apps.repair.infrastructure.models import RepairOrderModel
-from apps.vehicle.application.dto.vehicle_dto import VehicleKPIDTO
+from apps.vehicle.application.dto.vehicle_dto import VehicleSummaryDTO
 from apps.vehicle.domain.entities import VehicleStatus
 from apps.vehicle.infrastructure.models import VehicleModel, VehicleOdometerReadingModel
 
@@ -36,11 +36,11 @@ _FAULT_LOOKBACK_DAYS = 30
 _ODOMETER_AVERAGE_DIGITS = 2
 
 
-class GetVehicleKPIService:
-    """Build KPI values required by the vehicle dashboard."""
+class GetVehicleSummaryService:
+    """Build summary values required by the vehicle dashboard."""
 
-    def execute(self) -> VehicleKPIDTO:
-        """Return vehicle dashboard KPI values."""
+    def execute(self) -> VehicleSummaryDTO:
+        """Return vehicle dashboard summary values."""
         active_fleet = VehicleModel.objects.filter(is_deleted=False).exclude(
             status__in=[status.value for status in _ACTIVE_FLEET_EXCLUDED_STATUSES]
         )
@@ -85,7 +85,7 @@ class GetVehicleKPIService:
             reported_at__gte=timezone.now() - timedelta(days=_FAULT_LOOKBACK_DAYS),
         ).count()
 
-        return VehicleKPIDTO(
+        return VehicleSummaryDTO(
             active_fleet_count=active_fleet_count,
             operational_fleet_count=operational_fleet_count,
             under_repair_fleet_count=active_fleet.filter(

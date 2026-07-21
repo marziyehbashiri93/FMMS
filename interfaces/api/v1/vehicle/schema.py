@@ -9,10 +9,10 @@ from apps.vehicle.domain.entities import VehicleStatus
 from interfaces.api.v1.schema_tags import API_TAGS
 from interfaces.api.v1.vehicle.serializers import (
     VehicleDriverAssignmentHistoryResponseSerializer,
-    VehicleKPISerializer,
     VehicleOdometerRecordSerializer,
     VehicleOdometerResponseSerializer,
     VehicleResponseSerializer,
+    VehicleSummarySerializer,
     VehicleStatusChangeSerializer,
 )
 
@@ -84,9 +84,9 @@ list = extend_schema(
     responses=VehicleResponseSerializer(many=True),
 )
 
-kpis = extend_schema(
+summary = extend_schema(
     tags=[API_TAGS.vehicle],
-    responses=VehicleKPISerializer,
+    responses=VehicleSummarySerializer,
 )
 
 change_status = extend_schema(
