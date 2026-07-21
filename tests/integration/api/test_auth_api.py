@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 import pytest
 from rest_framework.test import APIClient
 
@@ -24,6 +26,9 @@ class TestAuthTokenAPI:
         assert response.status_code == 200
         assert "access" in response.data
         assert "refresh" in response.data
+        assert response.data["token_type"] == "Bearer"
+        assert datetime.fromisoformat(response.data["access_expires_at"])
+        assert datetime.fromisoformat(response.data["refresh_expires_at"])
         assert response.data["user"]["username"] == user.username
 
     def test_obtain_token_rejects_invalid_credentials(
@@ -54,6 +59,8 @@ class TestAuthTokenAPI:
         )
         assert refresh.status_code == 200
         assert "access" in refresh.data
+        assert refresh.data["token_type"] == "Bearer"
+        assert datetime.fromisoformat(refresh.data["access_expires_at"])
 
     def test_current_user_profile(self, api_client: APIClient) -> None:
         """Return the authenticated user's profile."""

@@ -12,6 +12,9 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from interfaces.api.v1.auth.serializers import (
+    FMMSJWTTokenRefreshSerializer,
+    TokenObtainPairResponseSerializer,
+    TokenRefreshResponseSerializer,
     UsernameTokenObtainPairSerializer,
     UserProfileSerializer,
 )
@@ -23,7 +26,7 @@ class FMMSJWTTokenObtainPairView(TokenObtainPairView):
 
     serializer_class = UsernameTokenObtainPairSerializer
 
-    @extend_schema(tags=[API_TAGS.auth])
+    @extend_schema(tags=[API_TAGS.auth], responses=TokenObtainPairResponseSerializer)
     def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """Issue a JWT pair for valid username credentials."""
         return super().post(request, *args, **kwargs)
@@ -32,7 +35,9 @@ class FMMSJWTTokenObtainPairView(TokenObtainPairView):
 class FMMSJWTTokenRefreshView(TokenRefreshView):
     """Refresh an FMMS access token."""
 
-    @extend_schema(tags=[API_TAGS.auth])
+    serializer_class = FMMSJWTTokenRefreshSerializer
+
+    @extend_schema(tags=[API_TAGS.auth], responses=TokenRefreshResponseSerializer)
     def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """Issue a new access token from a refresh token."""
         return super().post(request, *args, **kwargs)

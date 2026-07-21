@@ -2,12 +2,24 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 
 from rest_framework import serializers
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.serializers import (
+    TokenObtainPairSerializer,
+    TokenRefreshSerializer,
+)
+from rest_framework_simplejwt.tokens import AccessToken, RefreshToken, Token
 
 from apps.authentication.infrastructure.models import FMMSUser
+
+_TOKEN_TYPE = "Bearer"
+
+
+def _expires_at(token: Token) -> str:
+    """Return the JWT expiration timestamp as an ISO-8601 UTC string."""
+    return datetime.fromtimestamp(int(token["exp"]), tz=UTC).isoformat()
 
 
 class UsernameTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -26,10 +38,43 @@ class UsernameTokenObtainPairSerializer(TokenObtainPairSerializer):
         return token
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
-        """Return tokens plus the authenticated user profile."""
+        """Return tokens, expiry metadata, and the authenticated user profile."""
         data = super().validate(attrs)
+        data["token_type"] = _TOKEN_TYPE
+        data["access_expires_at"] = _expires_at(AccessToken(data["access"]))
+        data["refresh_expires_at"] = _expires_at(RefreshToken(data["refresh"]))
         data["user"] = UserProfileSerializer(self.user).data
         return data
+
+
+class FMMSJWTTokenRefreshSerializer(TokenRefreshSerializer):
+    """Refresh access tokens and return frontend-friendly expiry metadata."""
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, str]:
+        """Return a refreshed access token plus its expiration timestamp."""
+        data = super().validate(attrs)
+        data["token_type"] = _TOKEN_TYPE
+        data["access_expires_at"] = _expires_at(AccessToken(data["access"]))
+        return data
+
+
+class TokenObtainPairResponseSerializer(serializers.Serializer):
+    """Document token obtain response fields."""
+
+    access = serializers.CharField()
+    refresh = serializers.CharField()
+    token_type = serializers.CharField()
+    access_expires_at = serializers.DateTimeField()
+    refresh_expires_at = serializers.DateTimeField()
+    user = serializers.DictField()
+
+
+class TokenRefreshResponseSerializer(serializers.Serializer):
+    """Document token refresh response fields."""
+
+    access = serializers.CharField()
+    token_type = serializers.CharField()
+    access_expires_at = serializers.DateTimeField()
 
 
 class UserProfileSerializer(serializers.Serializer):
