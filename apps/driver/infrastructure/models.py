@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from django.db import models
 
+from apps.driver.domain.entities import DriverStatus
 from infrastructure.database.base_model import BaseModel
 
 
@@ -21,7 +22,11 @@ class DriverModel(BaseModel):
     personnel_number = models.CharField(max_length=20, blank=True, default="")
     gender = models.CharField(max_length=20, blank=True, default="")
     nilofar_code = models.CharField(max_length=20, blank=True, default="")
-    status = models.CharField(max_length=20, db_index=True)
+    status = models.CharField(
+        max_length=20,
+        choices=[(status.value, status.value) for status in DriverStatus],
+        db_index=True,
+    )
 
     class Meta:
         app_label = "driver"

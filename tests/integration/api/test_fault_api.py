@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from rest_framework.test import APIClient
 
+from apps.vehicle.infrastructure.models import VehicleModel
 from tests.integration.api.conftest import create_vehicle
 
 pytestmark = pytest.mark.django_db
@@ -48,3 +49,25 @@ class TestFaultAPI:
         )
         assert closed.status_code == 200, closed.data
         assert closed.data["status"] == "CLOSED"
+
+    def test_report_fault_marks_active_vehicle_under_repair(
+        self, authenticated_client: APIClient
+    ) -> None:
+        """An open fault must be reflected in vehicle availability status."""
+        vehicle = create_vehicle(
+            authenticated_client, plate="12FLT002", vin="1HGCM82633A004356"
+        )
+
+        created = authenticated_client.post(
+            "/api/v1/faults/",
+            {
+                "vehicle_id": vehicle["id"],
+                "code": "ENG-01",
+                "description": "Engine failure",
+                "severity": "HIGH",
+            },
+            format="json",
+        )
+
+        assert created.status_code == 201, created.data
+        assert VehicleModel.objects.get(id=vehicle["id"]).status == "UNDER_REPAIR"

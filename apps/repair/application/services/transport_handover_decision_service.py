@@ -208,9 +208,10 @@ class RejectTransportHandoverService:
             message=f"Vehicle '{order.vehicle_id}' not found.",
             details={"vehicle_id": str(order.vehicle_id)},
         )
-        vehicle.mark_under_repair()
-        vehicle.updated_at = now
-        self._vehicle_repo.save(vehicle)
+        if vehicle.status != VehicleStatus.UNDER_REPAIR:
+            vehicle.mark_under_repair()
+            vehicle.updated_at = now
+            self._vehicle_repo.save(vehicle)
 
         description = _REJECT_MESSAGE
         if dto.comment:

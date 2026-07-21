@@ -46,6 +46,16 @@ class ActivateVehicleDTO:
 
 
 @dataclass(frozen=True)
+class ChangeVehicleStatusDTO:
+    """Input DTO for changing an FMMS-controlled vehicle status."""
+
+    vehicle_id: uuid.UUID
+    status: VehicleStatus
+    request_id: str
+    requested_by: uuid.UUID
+
+
+@dataclass(frozen=True)
 class VehicleResponseDTO:
     """Output DTO returned by all vehicle read and write operations.
 

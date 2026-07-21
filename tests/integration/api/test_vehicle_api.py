@@ -84,6 +84,46 @@ class TestVehicleAPI:
             "B-002",
         ]
 
+    def test_change_status_endpoint_updates_vehicle_status(
+        self, authenticated_client: APIClient
+    ) -> None:
+        vehicle = create_vehicle(authenticated_client)
+
+        response = authenticated_client.post(
+            f"/api/v1/vehicles/{vehicle['id']}/status/",
+            {"status": "UNDER_REPAIR"},
+            format="json",
+        )
+
+        assert response.status_code == 200, response.data
+        assert response.data["status"] == "UNDER_REPAIR"
+        assert response.data["status_label"] == "در تعمیر"
+
+    def test_change_status_to_active_rejects_open_fault(
+        self, authenticated_client: APIClient
+    ) -> None:
+        vehicle = create_vehicle(authenticated_client, plate="12OPN001")
+        created_fault = authenticated_client.post(
+            "/api/v1/faults/",
+            {
+                "vehicle_id": vehicle["id"],
+                "code": "ENG-01",
+                "description": "Engine failure",
+                "severity": "HIGH",
+            },
+            format="json",
+        )
+        assert created_fault.status_code == 201, created_fault.data
+
+        response = authenticated_client.post(
+            f"/api/v1/vehicles/{vehicle['id']}/status/",
+            {"status": "ACTIVE"},
+            format="json",
+        )
+
+        assert response.status_code == 409
+        assert response.data["error_code"] == "VEHICLE_HAS_OPEN_FAULTS"
+
     def test_record_odometer_upserts_daily_reading(
         self, authenticated_client: APIClient
     ) -> None:

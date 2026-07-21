@@ -22,6 +22,7 @@ from apps.fault.domain.entities import Fault, FaultStatus
 from apps.fault.domain.interfaces.fault_repository import IFaultRepository
 from apps.fault.domain.value_objects import FaultCode, FaultDescription
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
+from apps.vehicle.domain.entities import VehicleStatus
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
 from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
@@ -116,7 +117,7 @@ class ReportFaultService:
             },
         )
 
-        load_or_not_found(
+        vehicle = load_or_not_found(
             lambda: self._vehicle_repo.get_by_id(dto.vehicle_id),
             message=f"Vehicle '{dto.vehicle_id}' not found.",
             details={"vehicle_id": str(dto.vehicle_id)},
@@ -144,6 +145,11 @@ class ReportFaultService:
         )
 
         saved = self._fault_repo.save(fault)
+
+        if vehicle.status == VehicleStatus.ACTIVE:
+            vehicle.mark_under_repair()
+            vehicle.updated_at = now
+            self._vehicle_repo.save(vehicle)
 
         logger.info(
             "Fault reported successfully",

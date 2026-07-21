@@ -111,8 +111,7 @@ class FakeVehicleRepository(IVehicleRepository):
             (
                 v
                 for v in self._store.values()
-                if v.vehicle_number is not None
-                and v.vehicle_number == vehicle_number
+                if v.vehicle_number is not None and v.vehicle_number == vehicle_number
             ),
             None,
         )
@@ -726,14 +725,13 @@ class TestActivateVehicleService:
         with pytest.raises(FMMSConflictError):
             service.execute(self._dto(vehicle.id))
 
-    def test_returns_early_when_vehicle_already_active(self) -> None:
+    def test_rejects_already_active_vehicle_when_open_fault_exists(self) -> None:
         vehicle = _make_vehicle(status=VehicleStatus.ACTIVE)
         fault = _make_fault(vehicle.id, status=FaultStatus.OPEN)
         order = _make_completed_order(vehicle_id=vehicle.id, fault_id=fault.id)
         fault_repo = FakeFaultRepository([fault])
         service = self._service(vehicle, repair_orders=[order], faults=[fault])
 
-        result = service.execute(self._dto(vehicle.id))
-
-        assert result.status == VehicleStatus.ACTIVE
+        with pytest.raises(FMMSConflictError):
+            service.execute(self._dto(vehicle.id))
         assert fault_repo.get_by_id(fault.id).status == FaultStatus.OPEN

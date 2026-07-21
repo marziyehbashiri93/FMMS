@@ -6,10 +6,12 @@ from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from apps.vehicle.domain.entities import VehicleStatus
+from interfaces.api.v1.schema_tags import API_TAGS
 from interfaces.api.v1.vehicle.serializers import (
     VehicleOdometerRecordSerializer,
     VehicleOdometerResponseSerializer,
     VehicleResponseSerializer,
+    VehicleStatusChangeSerializer,
 )
 
 _VEHICLE_ORDERING_FIELDS = [
@@ -39,11 +41,13 @@ vehicle_id_parameter = OpenApiParameter(
 )
 
 retrieve = extend_schema(
+    tags=[API_TAGS.vehicle],
     parameters=[vehicle_id_parameter],
     responses=VehicleResponseSerializer,
 )
 
 list = extend_schema(
+    tags=[API_TAGS.vehicle],
     parameters=[
         OpenApiParameter(
             name="status",
@@ -64,24 +68,35 @@ list = extend_schema(
 )
 
 activate = extend_schema(
+    tags=[API_TAGS.vehicle],
     parameters=[vehicle_id_parameter],
     request=None,
     responses=VehicleResponseSerializer,
 )
 
 deactivate = extend_schema(
+    tags=[API_TAGS.vehicle],
     parameters=[vehicle_id_parameter],
     request=None,
     responses=VehicleResponseSerializer,
 )
 
+change_status = extend_schema(
+    tags=[API_TAGS.vehicle],
+    parameters=[vehicle_id_parameter],
+    request=VehicleStatusChangeSerializer,
+    responses=VehicleResponseSerializer,
+)
+
 odometer_list = extend_schema(
+    tags=[API_TAGS.vehicle],
     methods=["GET"],
     parameters=[vehicle_id_parameter],
     responses=VehicleOdometerResponseSerializer(many=True),
 )
 
 odometer_record = extend_schema(
+    tags=[API_TAGS.vehicle],
     methods=["POST"],
     parameters=[vehicle_id_parameter],
     request=VehicleOdometerRecordSerializer,

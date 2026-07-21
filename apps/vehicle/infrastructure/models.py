@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from django.db import models
 
+from apps.vehicle.domain.entities import VehicleStatus
 from infrastructure.database.base_model import BaseModel
 
 
@@ -40,7 +41,11 @@ class VehicleModel(BaseModel):
     driver2_customer_number = models.CharField(
         max_length=20, blank=True, default="", db_index=True
     )
-    status = models.CharField(max_length=30, db_index=True)
+    status = models.CharField(
+        max_length=30,
+        choices=[(status.value, status.value) for status in VehicleStatus],
+        db_index=True,
+    )
 
     class Meta:
         app_label = "vehicle"

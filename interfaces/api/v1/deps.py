@@ -159,6 +159,9 @@ from apps.repair.infrastructure.repositories import DjangoRepairOrderRepository
 from apps.vehicle.application.services.activate_vehicle_service import (
     ActivateVehicleService,
 )
+from apps.vehicle.application.services.change_vehicle_status_service import (
+    ChangeVehicleStatusService,
+)
 from apps.vehicle.application.services.deactivate_vehicle_service import (
     DeactivateVehicleService,
 )
@@ -328,6 +331,15 @@ def get_deactivate_vehicle_service() -> DeactivateVehicleService:
 def get_activate_vehicle_service() -> ActivateVehicleService:
     """Return ActivateVehicleService."""
     return ActivateVehicleService(
+        get_vehicle_repository(),
+        get_repair_order_repository(),
+        get_fault_repository(),
+    )
+
+
+def get_change_vehicle_status_service() -> ChangeVehicleStatusService:
+    """Return ChangeVehicleStatusService."""
+    return ChangeVehicleStatusService(
         get_vehicle_repository(),
         get_repair_order_repository(),
         get_fault_repository(),

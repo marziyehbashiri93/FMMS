@@ -113,6 +113,20 @@ def _close_open_fault(fault: Fault) -> None:
     fault.close()
 
 
+def _ensure_no_open_faults(
+    *,
+    vehicle_id: uuid.UUID,
+    fault_repository: IFaultRepository,
+) -> None:
+    """Reject activation while any unresolved fault remains on the vehicle."""
+    if fault_repository.has_open_fault_for_vehicle(vehicle_id):
+        raise FMMSConflictError(
+            message="Vehicle cannot be activated while it has open faults.",
+            error_code="VEHICLE_HAS_OPEN_FAULTS",
+            details={"vehicle_id": str(vehicle_id)},
+        )
+
+
 class ActivateVehicleService:
     """Re-activate a vehicle when no open repair orders block the transition.
 
@@ -169,9 +183,6 @@ class ActivateVehicleService:
             details={"vehicle_id": str(dto.vehicle_id)},
         )
 
-        if vehicle.status == VehicleStatus.ACTIVE:
-            return _to_response_dto(vehicle)
-
         active_orders = self._repair_repo.list_active_by_vehicle(dto.vehicle_id)
         if active_orders:
             raise FMMSConflictError(
@@ -183,9 +194,12 @@ class ActivateVehicleService:
                 },
             )
 
-        vehicle.activate()
-        vehicle.updated_at = datetime.now(tz=UTC)
-        saved = self._vehicle_repo.save(vehicle)
+        if vehicle.status == VehicleStatus.ACTIVE:
+            _ensure_no_open_faults(
+                vehicle_id=dto.vehicle_id,
+                fault_repository=self._fault_repo,
+            )
+            return _to_response_dto(vehicle)
 
         _close_faults_for_completed_repairs(
             vehicle_id=dto.vehicle_id,
@@ -193,6 +207,15 @@ class ActivateVehicleService:
             fault_repository=self._fault_repo,
             request_id=dto.request_id,
         )
+
+        _ensure_no_open_faults(
+            vehicle_id=dto.vehicle_id,
+            fault_repository=self._fault_repo,
+        )
+
+        vehicle.activate()
+        vehicle.updated_at = datetime.now(tz=UTC)
+        saved = self._vehicle_repo.save(vehicle)
 
         logger.info(
             "Vehicle activated successfully",

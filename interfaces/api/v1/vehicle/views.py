@@ -11,6 +11,7 @@ from rest_framework.viewsets import GenericViewSet
 
 from apps.vehicle.application.dto.vehicle_dto import (
     ActivateVehicleDTO,
+    ChangeVehicleStatusDTO,
     DeactivateVehicleDTO,
     RecordVehicleOdometerDTO,
 )
@@ -23,6 +24,7 @@ from interfaces.api.v1.vehicle.serializers import (
     VehicleOdometerRecordSerializer,
     VehicleOdometerResponseSerializer,
     VehicleResponseSerializer,
+    VehicleStatusChangeSerializer,
 )
 
 
@@ -78,6 +80,27 @@ class VehicleViewSet(GenericViewSet):
         result = deps.get_activate_vehicle_service().execute(
             ActivateVehicleDTO(
                 vehicle_id=uuid.UUID(str(pk)),
+                request_id=request_id_from(request),
+                requested_by=user_id_from(request),
+            )
+        )
+        return Response(VehicleResponseSerializer(result).data)
+
+    @vehicle_schema.change_status
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="status",
+        permission_classes=[IsSupervisorOrAbove],
+    )
+    def status(self, request: Request, pk: str | None = None) -> Response:
+        """Change an FMMS-controlled vehicle status."""
+        serializer = VehicleStatusChangeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        result = deps.get_change_vehicle_status_service().execute(
+            ChangeVehicleStatusDTO(
+                vehicle_id=uuid.UUID(str(pk)),
+                status=VehicleStatus(serializer.validated_data["status"]),
                 request_id=request_id_from(request),
                 requested_by=user_id_from(request),
             )

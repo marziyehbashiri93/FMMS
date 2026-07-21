@@ -113,9 +113,10 @@ class StartRepairService:
             message=f"Vehicle '{saved.vehicle_id}' not found.",
             details={"vehicle_id": str(saved.vehicle_id)},
         )
-        vehicle.mark_under_repair()
-        vehicle.updated_at = datetime.now(tz=UTC)
-        self._vehicle_repo.save(vehicle)
+        if vehicle.status != VehicleStatus.UNDER_REPAIR:
+            vehicle.mark_under_repair()
+            vehicle.updated_at = datetime.now(tz=UTC)
+            self._vehicle_repo.save(vehicle)
         record_repair_timeline_event(
             self._event_recorder,
             saved.id,
@@ -232,9 +233,10 @@ class CompleteRepairOrderService:
             vehicle.mark_under_repair()
             vehicle.updated_at = datetime.now(tz=UTC)
             self._vehicle_repo.save(vehicle)
-        vehicle.mark_waiting_driver_confirmation()
-        vehicle.updated_at = datetime.now(tz=UTC)
-        self._vehicle_repo.save(vehicle)
+        if vehicle.status != VehicleStatus.WAITING_DRIVER_CONFIRMATION:
+            vehicle.mark_waiting_driver_confirmation()
+            vehicle.updated_at = datetime.now(tz=UTC)
+            self._vehicle_repo.save(vehicle)
         self._create_handover_service.execute(
             repair_order_id=saved.id,
             vehicle_id=saved.vehicle_id,

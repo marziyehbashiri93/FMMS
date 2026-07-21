@@ -30,6 +30,18 @@ class VehicleOdometerRecordSerializer(serializers.Serializer):
     source = serializers.CharField(max_length=30, required=False, default="DRIVER")
 
 
+class VehicleStatusChangeSerializer(serializers.Serializer):
+    """Validate a vehicle status change requested from FMMS."""
+
+    status = serializers.ChoiceField(
+        choices=[
+            status.value
+            for status in VehicleStatus
+            if status != VehicleStatus.DECOMMISSIONED
+        ]
+    )
+
+
 class VehicleOdometerResponseSerializer(serializers.Serializer):
     """Serialize vehicle odometer history entries."""
 

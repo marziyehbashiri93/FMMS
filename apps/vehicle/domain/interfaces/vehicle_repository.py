@@ -38,9 +38,7 @@ class IVehicleRepository(ABC):
         """
 
     @abstractmethod
-    def get_by_vehicle_number(
-        self, vehicle_number: SAPVehicleNumber
-    ) -> Vehicle | None:
+    def get_by_vehicle_number(self, vehicle_number: SAPVehicleNumber) -> Vehicle | None:
         """Retrieve a vehicle by its SAP VehicleNumber, if linked.
 
         Args:

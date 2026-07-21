@@ -123,9 +123,7 @@ class SyncVehiclesFromSAPService:
 
         for sap_dto in sap_rows:
             try:
-                seen_vehicle_numbers.add(
-                    SAPVehicleNumber(sap_dto.vehicle_number).value
-                )
+                seen_vehicle_numbers.add(SAPVehicleNumber(sap_dto.vehicle_number).value)
                 seen_driver_customer_numbers.update(
                     _driver_customer_numbers_from_sap(sap_dto)
                 )

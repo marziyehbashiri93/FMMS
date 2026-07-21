@@ -1,0 +1,146 @@
+"""Service for changing FMMS-controlled vehicle status."""
+
+from __future__ import annotations
+
+import uuid
+from datetime import UTC, datetime
+
+from apps.fault.domain.interfaces.fault_repository import IFaultRepository
+from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
+from apps.vehicle.application.dto.vehicle_dto import (
+    ChangeVehicleStatusDTO,
+    VehicleResponseDTO,
+)
+from apps.vehicle.domain.entities import VEHICLE_STATUS_LABELS, Vehicle, VehicleStatus
+from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
+from core.exceptions.base_exception import FMMSConflictError, FMMSValidationError
+from core.exceptions.translation import load_or_not_found
+from core.logging.structured_logger import get_structured_logger
+
+logger = get_structured_logger("vehicle", __name__)
+
+
+_SAP_ONLY_STATUSES = frozenset({VehicleStatus.DECOMMISSIONED})
+
+
+class ChangeVehicleStatusService:
+    """Change vehicle status while enforcing cross-domain availability rules."""
+
+    def __init__(
+        self,
+        vehicle_repository: IVehicleRepository,
+        repair_order_repository: IRepairOrderRepository,
+        fault_repository: IFaultRepository,
+    ) -> None:
+        self._vehicle_repo = vehicle_repository
+        self._repair_repo = repair_order_repository
+        self._fault_repo = fault_repository
+
+    def execute(self, dto: ChangeVehicleStatusDTO) -> VehicleResponseDTO:
+        """Apply a status change requested from FMMS operations.
+
+        Args:
+            dto: Target vehicle and status.
+
+        Returns:
+            Updated vehicle response DTO.
+
+        Raises:
+            FMMSNotFoundError: If the vehicle does not exist.
+            FMMSValidationError: If the target status is SAP-owned.
+            FMMSConflictError: If ACTIVE is requested while open flows exist.
+            VehicleInvalidStateTransitionError: If the domain transition is invalid.
+        """
+        logger.info(
+            "Changing vehicle status",
+            extra={
+                "domain": "vehicle",
+                "service": "ChangeVehicleStatusService",
+                "operation": "execute",
+                "request_id": dto.request_id,
+                "entity_id": str(dto.vehicle_id),
+                "target_status": dto.status.value,
+                "user_id": str(dto.requested_by),
+            },
+        )
+
+        if dto.status in _SAP_ONLY_STATUSES:
+            raise FMMSValidationError(
+                message="This vehicle status is controlled by SAP sync.",
+                error_code="VEHICLE_STATUS_SAP_CONTROLLED",
+                details={
+                    "vehicle_id": str(dto.vehicle_id),
+                    "status": dto.status.value,
+                },
+            )
+
+        vehicle = load_or_not_found(
+            lambda: self._vehicle_repo.get_by_id(dto.vehicle_id),
+            message=f"Vehicle '{dto.vehicle_id}' not found.",
+            details={"vehicle_id": str(dto.vehicle_id)},
+        )
+
+        if vehicle.status == dto.status:
+            if dto.status == VehicleStatus.ACTIVE:
+                self._ensure_vehicle_can_be_active(dto.vehicle_id)
+            return _to_response_dto(vehicle)
+
+        if dto.status == VehicleStatus.ACTIVE:
+            self._ensure_vehicle_can_be_active(dto.vehicle_id)
+
+        vehicle.transition_to(dto.status)
+        vehicle.updated_at = datetime.now(tz=UTC)
+        saved = self._vehicle_repo.save(vehicle)
+
+        logger.info(
+            "Vehicle status changed successfully",
+            extra={
+                "domain": "vehicle",
+                "service": "ChangeVehicleStatusService",
+                "operation": "execute",
+                "request_id": dto.request_id,
+                "entity_id": str(saved.id),
+                "target_status": saved.status.value,
+                "result": "success",
+            },
+        )
+
+        return _to_response_dto(saved)
+
+    def _ensure_vehicle_can_be_active(self, vehicle_id: uuid.UUID) -> None:
+        """Reject ACTIVE status while fault or repair workflows are open."""
+        active_orders = self._repair_repo.list_active_by_vehicle(vehicle_id)
+        if active_orders:
+            raise FMMSConflictError(
+                message="Vehicle cannot be active while repair orders are still open.",
+                error_code="VEHICLE_HAS_ACTIVE_REPAIR_ORDERS",
+                details={
+                    "vehicle_id": str(vehicle_id),
+                    "active_repair_order_ids": [
+                        str(order.id) for order in active_orders
+                    ],
+                },
+            )
+
+        if self._fault_repo.has_open_fault_for_vehicle(vehicle_id):
+            raise FMMSConflictError(
+                message="Vehicle cannot be active while it has open faults.",
+                error_code="VEHICLE_HAS_OPEN_FAULTS",
+                details={"vehicle_id": str(vehicle_id)},
+            )
+
+
+def _to_response_dto(vehicle: Vehicle) -> VehicleResponseDTO:
+    """Map a vehicle entity to a response DTO."""
+    return VehicleResponseDTO(
+        id=vehicle.id,
+        vehicle_number=vehicle.vehicle_number.value,
+        license_plate=vehicle.license_plate.value,
+        status=vehicle.status,
+        status_label=VEHICLE_STATUS_LABELS[vehicle.status],
+        created_at=vehicle.created_at,
+        updated_at=vehicle.updated_at,
+        commissioning_date=vehicle.commissioning_date,
+        driver1_customer_number=vehicle.driver1_customer_number,
+        driver2_customer_number=vehicle.driver2_customer_number,
+    )
