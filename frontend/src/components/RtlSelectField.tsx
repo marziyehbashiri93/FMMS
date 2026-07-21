@@ -1,6 +1,6 @@
 import { FormControl, InputLabel, Select } from '@mui/material';
 import type { SelectProps } from '@mui/material';
-import { KeyboardArrowDown } from '@mui/icons-material';
+import { ArrowDropDown } from '@mui/icons-material';
 import { useId, type ReactNode } from 'react';
 
 type RtlSelectFieldProps<T> = Omit<SelectProps<T>, 'labelId'> & {
@@ -23,18 +23,19 @@ export function RtlSelectField<T>({
         {...props}
         labelId={labelId}
         label={label}
-        IconComponent={KeyboardArrowDown}
+        IconComponent={ArrowDropDown}
         sx={{
           direction: 'rtl',
           textAlign: 'right',
           '& .MuiSelect-select': {
-            pl: 4.5,
-            pr: 1.75,
+            pl: 1.75,
+            pr: 4.5,
             textAlign: 'right',
           },
           '& .MuiSelect-icon': {
             left: 12,
             right: 'auto',
+            fontSize: 28,
           },
         }}
       >
