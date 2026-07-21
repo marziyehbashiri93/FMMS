@@ -7,6 +7,7 @@ import type {
   RefreshTokenResponse,
   RepairOrder,
   Vehicle,
+  VehicleSummary,
   VehicleStatus,
 } from '../types/fmms';
 
@@ -185,8 +186,15 @@ export const api = {
     return request<AuthUser>('/auth/me/');
   },
 
-  listVehicles(status?: VehicleStatus | '') {
-    const query = status ? `?status=${encodeURIComponent(status)}` : '';
+  getVehicleSummary() {
+    return request<VehicleSummary>('/vehicles/summary/');
+  },
+
+  listVehicles(status?: VehicleStatus | '', ordering = '-created_at') {
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+    if (ordering) params.set('ordering', ordering);
+    const query = params.toString() ? `?${params.toString()}` : '';
     return request<Paginated<Vehicle>>(`/vehicles/${query}`);
   },
 
@@ -195,14 +203,14 @@ export const api = {
   },
 
   updateVehicleStatus(id: string, status: VehicleStatus) {
-    return request<Vehicle>(`/vehicles/${id}/`, {
-      method: 'PATCH',
+    return request<Vehicle>(`/vehicles/${id}/status/`, {
+      method: 'POST',
       body: JSON.stringify({ status }),
     });
   },
 
   getOdometerHistory(vehicleId: string) {
-    return request<OdometerReading[]>(`/vehicles/${vehicleId}/odometer/`);
+    return request<OdometerReading[]>(`/vehicles/${vehicleId}/odometer-history/`);
   },
 
   recordOdometer(vehicleId: string, payload: { reading_date: string; odometer_km: number }) {

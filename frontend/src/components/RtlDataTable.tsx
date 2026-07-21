@@ -10,17 +10,6 @@ import {
 } from '@mui/material';
 import type { ReactNode } from 'react';
 
-
-
-import { useTheme } from "@mui/material/styles";
-
-
-
-
-
-
-
-
 export interface RtlDataTableColumn<T, K extends string> {
   key: K;
   label: string;
@@ -48,25 +37,20 @@ export function RtlDataTable<T, K extends string>({
   order?: 'asc' | 'desc';
   onSort?: (key: K) => void;
 }) {
-
-    const theme = useTheme();
-
-  console.log(theme.direction);
-
   return (
-
     <TableContainer component={Card} dir="rtl">
-      <Table size="small" dir="rtl"
-  sx={(theme) => ({
-    minWidth,
-    direction: theme.direction,
-  })}
+      <Table
+        size="small"
+        dir="rtl"
+        sx={(theme) => ({
+          minWidth,
+          direction: theme.direction,
+        })}
       >
-        <TableHead >
-          <TableRow >
+        <TableHead>
+          <TableRow>
             {columns.map((column) => (
-              <TableCell key={column.key} align={column.align ?? 'left'} text-align
-              >
+              <TableCell key={column.key} align={column.align ?? 'left'}>
                 {column.sortable && onSort ? (
                   <TableSortLabel
                     active={orderBy === column.key}

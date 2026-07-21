@@ -39,20 +39,32 @@ export type VehicleStatus =
   | 'OUT_OF_SERVICE'
   | 'DECOMMISSIONED';
 
+export interface AssignedVehicleDriver {
+  customer_number: string;
+  name: string | null;
+}
+
 export interface Vehicle {
   id: string;
-  plate_number: string;
-  vin: string;
-  make: string;
-  model: string;
-  year: number;
-  category: string;
+  vehicle_number: string;
+  license_plate: string;
   status: VehicleStatus;
   status_label: string;
   created_at: string;
   updated_at: string;
-  chassis_number: string | null;
-  sap_equipment_number: string | null;
+  commissioning_date: string | null;
+  driver1: AssignedVehicleDriver | null;
+  driver2: AssignedVehicleDriver | null;
+}
+
+export interface VehicleSummary {
+  active_fleet_count: number;
+  operational_fleet_count: number;
+  under_repair_fleet_count: number;
+  unusable_fleet_count: number;
+  last_sap_sync_at: string | null;
+  average_odometer_km: number;
+  average_faults_last_30_days: number;
 }
 
 export interface OdometerReading {

@@ -35,7 +35,7 @@ import { PlainStatusBadge, VehicleStatusBadge } from '../../components/StatusBad
 import { PageHeader } from '../../components/PageHeader';
 import { RtlDataTable, type RtlDataTableColumn } from '../../components/RtlDataTable';
 import { RtlTextField } from '../../components/RtlTextField';
-import type { Fault, OdometerReading, RepairOrder, Vehicle, VehicleStatus } from '../../types/fmms';
+import type { Fault, OdometerReading, RepairOrder, Vehicle, VehicleStatus, VehicleSummary } from '../../types/fmms';
 import { formatDate, formatDateTime, toFaNumber } from '../../utils/format';
 
 const statusOptions: Array<{ value: '' | VehicleStatus; label: string }> = [
@@ -49,7 +49,28 @@ const statusOptions: Array<{ value: '' | VehicleStatus; label: string }> = [
   { value: 'DECOMMISSIONED', label: 'از رده خارج' },
 ];
 
-function useVehicles(status: '' | VehicleStatus) {
+function useVehicleSummary() {
+  const [summary, setSummary] = useState<VehicleSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const load = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      setSummary(await api.getVehicleSummary());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'خطا در دریافت خلاصه خودروها');
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => {
+    void load();
+  }, []);
+  return { summary, loading, error, reload: load };
+}
+
+function useVehicles(status: '' | VehicleStatus, ordering: string) {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -57,7 +78,7 @@ function useVehicles(status: '' | VehicleStatus) {
     setLoading(true);
     setError('');
     try {
-      const result = await api.listVehicles(status);
+      const result = await api.listVehicles(status, ordering);
       setVehicles(result.results);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'خطا در دریافت خودروها');
@@ -67,8 +88,13 @@ function useVehicles(status: '' | VehicleStatus) {
   };
   useEffect(() => {
     void load();
-  }, [status]);
+  }, [status, ordering]);
   return { vehicles, loading, error, reload: load };
+}
+
+function driverName(driver: Vehicle['driver1']): string {
+  if (!driver) return '—';
+  return driver.name || driver.customer_number;
 }
 
 function VehicleCard({ vehicle, onOpen }: { vehicle: Vehicle; onOpen: (vehicle: Vehicle) => void }) {
@@ -78,10 +104,10 @@ function VehicleCard({ vehicle, onOpen }: { vehicle: Vehicle; onOpen: (vehicle: 
         <Stack direction="row" justifyContent="space-between" gap={1.5} alignItems="flex-start">
           <Box minWidth={0}>
             <Typography fontWeight={900} noWrap>
-              {vehicle.plate_number}
+              {vehicle.license_plate}
             </Typography>
             <Typography variant="body2" color="text.secondary" noWrap>
-              {vehicle.make} {vehicle.model} · {toFaNumber(vehicle.year)}
+              شناسه خودرو: {vehicle.vehicle_number}
             </Typography>
           </Box>
           <VehicleStatusBadge status={vehicle.status} label={vehicle.status_label} />
@@ -89,12 +115,12 @@ function VehicleCard({ vehicle, onOpen }: { vehicle: Vehicle; onOpen: (vehicle: 
         <Divider sx={{ my: 1.25 }} />
         <Grid container spacing={1}>
           <Grid size={6}>
-            <Typography variant="caption" color="text.secondary">VIN</Typography>
-            <Typography variant="body2" noWrap>{vehicle.vin}</Typography>
+            <Typography variant="caption" color="text.secondary">راننده</Typography>
+            <Typography variant="body2" noWrap>{driverName(vehicle.driver1)}</Typography>
           </Grid>
           <Grid size={6}>
-            <Typography variant="caption" color="text.secondary">SAP</Typography>
-            <Typography variant="body2" noWrap>{vehicle.sap_equipment_number || '—'}</Typography>
+            <Typography variant="caption" color="text.secondary">کمک راننده</Typography>
+            <Typography variant="body2" noWrap>{driverName(vehicle.driver2)}</Typography>
           </Grid>
         </Grid>
       </CardContent>
@@ -102,52 +128,38 @@ function VehicleCard({ vehicle, onOpen }: { vehicle: Vehicle; onOpen: (vehicle: 
   );
 }
 
-type VehicleSortKey = 'plate_number' | 'vin' | 'model' | 'year' | 'status' | 'sap_equipment_number';
-type VehicleColumnKey = VehicleSortKey | 'actions';
+type VehicleSortKey = 'license_plate' | 'vehicle_number' | 'status';
+type VehicleColumnKey = VehicleSortKey | 'driver1' | 'driver2' | 'actions';
 
-function getVehicleSortValue(vehicle: Vehicle, key: VehicleSortKey) {
-  if (key === 'model') return `${vehicle.make} ${vehicle.model}`;
-  return vehicle[key] ?? '';
-}
-
-function VehicleTable({ vehicles, onOpen }: { vehicles: Vehicle[]; onOpen: (vehicle: Vehicle) => void }) {
-  const [orderBy, setOrderBy] = useState<VehicleSortKey>('plate_number');
-  const [order, setOrder] = useState<'asc' | 'desc'>('asc');
-  const sortedVehicles = useMemo(() => {
-    return [...vehicles].sort((a, b) => {
-      const aValue = getVehicleSortValue(a, orderBy);
-      const bValue = getVehicleSortValue(b, orderBy);
-      const result = String(aValue).localeCompare(String(bValue), 'fa', { numeric: true, sensitivity: 'base' });
-      return order === 'asc' ? result : -result;
-    });
-  }, [order, orderBy, vehicles]);
-
-  const changeSort = (key: VehicleSortKey) => {
-    if (orderBy === key) {
-      setOrder((current) => (current === 'asc' ? 'desc' : 'asc'));
-      return;
-    }
-    setOrderBy(key);
-    setOrder('asc');
-  };
-
+function VehicleTable({
+  vehicles,
+  onOpen,
+  orderBy,
+  order,
+  onSort,
+}: {
+  vehicles: Vehicle[];
+  onOpen: (vehicle: Vehicle) => void;
+  orderBy: VehicleSortKey;
+  order: 'asc' | 'desc';
+  onSort: (key: VehicleSortKey) => void;
+}) {
   const columns: Array<RtlDataTableColumn<Vehicle, VehicleColumnKey>> = [
     {
-      key: 'plate_number',
+      key: 'license_plate',
       label: 'پلاک',
       sortable: true,
-      render: (vehicle) => <Typography fontWeight={800}>{vehicle.plate_number}</Typography>,
+      render: (vehicle) => <Typography fontWeight={800}>{vehicle.license_plate}</Typography>,
     },
-    { key: 'vin', label: 'VIN', sortable: true, render: (vehicle) => vehicle.vin },
-    { key: 'model', label: 'مدل', sortable: true, render: (vehicle) => `${vehicle.make} ${vehicle.model}` },
-    { key: 'year', label: 'سال', sortable: true, render: (vehicle) => toFaNumber(vehicle.year) },
+    { key: 'vehicle_number', label: 'ای دی خودرو', sortable: true, render: (vehicle) => vehicle.vehicle_number },
     {
       key: 'status',
       label: 'وضعیت',
       sortable: true,
       render: (vehicle) => <VehicleStatusBadge status={vehicle.status} label={vehicle.status_label} />,
     },
-    { key: 'sap_equipment_number', label: 'SAP Equipment', sortable: true, render: (vehicle) => vehicle.sap_equipment_number || '—' },
+    { key: 'driver1', label: 'راننده', render: (vehicle) => driverName(vehicle.driver1) },
+    { key: 'driver2', label: 'کمک راننده', render: (vehicle) => driverName(vehicle.driver2) },
     {
       key: 'actions',
       label: 'اقدام',
@@ -159,13 +171,13 @@ function VehicleTable({ vehicles, onOpen }: { vehicles: Vehicle[]; onOpen: (vehi
   return (
     <RtlDataTable
       columns={columns}
-      rows={sortedVehicles}
+      rows={vehicles}
       getRowKey={(vehicle) => vehicle.id}
       minWidth={880}
       orderBy={orderBy}
       order={order}
       onSort={(key) => {
-        if (key !== 'actions') changeSort(key);
+        if (key !== 'actions' && key !== 'driver1' && key !== 'driver2') onSort(key);
       }}
     />
   );
@@ -244,6 +256,7 @@ function VehicleDetailDrawer({
   open: boolean;
   onClose: () => void;
 }) {
+  const [detail, setDetail] = useState<Vehicle | null>(null);
   const [odometer, setOdometer] = useState<OdometerReading[]>([]);
   const [faults, setFaults] = useState<Fault[]>([]);
   const [repairs, setRepairs] = useState<RepairOrder[]>([]);
@@ -255,11 +268,13 @@ function VehicleDetailDrawer({
     setLoading(true);
     setError('');
     try {
-      const [odo, vehicleFaults, vehicleRepairs] = await Promise.all([
+      const [vehicleDetail, odo, vehicleFaults, vehicleRepairs] = await Promise.all([
+        api.getVehicle(vehicle.id),
         api.getOdometerHistory(vehicle.id),
         api.listFaults(vehicle.id),
         api.listRepairOrders(vehicle.id),
       ]);
+      setDetail(vehicleDetail);
       setOdometer(odo);
       setFaults(vehicleFaults.results);
       setRepairs(vehicleRepairs.results);
@@ -271,21 +286,23 @@ function VehicleDetailDrawer({
   };
 
   useEffect(() => {
+    setDetail(null);
     if (open) void loadDetail();
   }, [open, vehicle?.id]);
 
+  const displayVehicle = detail ?? vehicle;
   const latestOdometer = odometer[0];
   const usedParts = repairs.flatMap((repair) => repair.parts ?? []);
 
   return (
     <Drawer anchor="left" open={open} onClose={onClose} PaperProps={{ sx: { width: { xs: '100%', sm: 520 } } }}>
-      {vehicle && (
+      {displayVehicle && (
         <Box p={{ xs: 2, sm: 2.5 }}>
           <Stack direction="row" justifyContent="space-between" alignItems="flex-start" gap={2} mb={2}>
             <Box minWidth={0}>
               <Typography variant="h2">جزئیات خودرو</Typography>
               <Typography color="text.secondary" noWrap>
-                {vehicle.plate_number} · {vehicle.make} {vehicle.model}
+                {displayVehicle.license_plate} · {displayVehicle.vehicle_number}
               </Typography>
             </Box>
             <IconButton onClick={onClose}><Close /></IconButton>
@@ -299,17 +316,18 @@ function VehicleDetailDrawer({
                 <CardContent>
                   <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
                     <Typography variant="h3">اطلاعات پایه</Typography>
-                    <VehicleStatusBadge status={vehicle.status} label={vehicle.status_label} />
+                    <VehicleStatusBadge status={displayVehicle.status} label={displayVehicle.status_label} />
                   </Stack>
-                  <DetailLine label="پلاک" value={<Typography fontWeight={800}>{vehicle.plate_number}</Typography>} />
-                  <DetailLine label="VIN" value={<Typography variant="body2">{vehicle.vin}</Typography>} />
-                  <DetailLine label="کد تجهیز SAP" value={<Typography variant="body2">{vehicle.sap_equipment_number || '—'}</Typography>} />
-                  <DetailLine label="سال ساخت" value={toFaNumber(vehicle.year)} />
+                  <DetailLine label="پلاک" value={<Typography fontWeight={800}>{displayVehicle.license_plate}</Typography>} />
+                  <DetailLine label="ای دی خودرو" value={<Typography variant="body2">{displayVehicle.vehicle_number}</Typography>} />
+                  <DetailLine label="راننده" value={<Typography variant="body2">{driverName(displayVehicle.driver1)}</Typography>} />
+                  <DetailLine label="کمک راننده" value={<Typography variant="body2">{driverName(displayVehicle.driver2)}</Typography>} />
+                  <DetailLine label="تاریخ بهره‌برداری" value={displayVehicle.commissioning_date || '—'} />
                   <DetailLine label="آخرین کیلومتر" value={latestOdometer ? `${toFaNumber(latestOdometer.odometer_km)} km` : '—'} />
                 </CardContent>
               </Card>
 
-              <OdometerForm vehicle={vehicle} onSaved={loadDetail} />
+              <OdometerForm vehicle={displayVehicle} onSaved={loadDetail} />
 
               <Card>
                 <CardContent>
@@ -385,15 +403,27 @@ export function VehiclePage() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [status, setStatus] = useState<'' | VehicleStatus>('');
+  const [orderBy, setOrderBy] = useState<VehicleSortKey>('license_plate');
+  const [order, setOrder] = useState<'asc' | 'desc'>('asc');
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<Vehicle | null>(null);
-  const { vehicles, loading, error, reload } = useVehicles(status);
+  const ordering = `${order === 'desc' ? '-' : ''}${orderBy}`;
+  const { summary, loading: summaryLoading, error: summaryError, reload: reloadSummary } = useVehicleSummary();
+  const { vehicles, loading, error, reload } = useVehicles(status, ordering);
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return vehicles;
     return vehicles.filter((vehicle) =>
-      [vehicle.plate_number, vehicle.vin, vehicle.make, vehicle.model, vehicle.sap_equipment_number]
+      [
+        vehicle.license_plate,
+        vehicle.vehicle_number,
+        vehicle.status_label,
+        vehicle.driver1?.customer_number,
+        vehicle.driver1?.name,
+        vehicle.driver2?.customer_number,
+        vehicle.driver2?.name,
+      ]
         .filter(Boolean)
         .join(' ')
         .toLowerCase()
@@ -401,9 +431,14 @@ export function VehiclePage() {
     );
   }, [query, vehicles]);
 
-  const activeCount = vehicles.filter((vehicle) => vehicle.status === 'ACTIVE').length;
-  const repairCount = vehicles.filter((vehicle) => vehicle.status === 'UNDER_REPAIR').length;
-  const unavailableCount = vehicles.filter((vehicle) => ['OUT_OF_SERVICE', 'DECOMMISSIONED'].includes(vehicle.status)).length;
+  const changeSort = (key: VehicleSortKey) => {
+    if (orderBy === key) {
+      setOrder((current) => (current === 'asc' ? 'desc' : 'asc'));
+      return;
+    }
+    setOrderBy(key);
+    setOrder('asc');
+  };
 
   return (
     <Stack spacing={{ xs: 1.5, md: 2.25 }} style={{ direction: 'rtl', textAlign: 'right' }}>
@@ -426,12 +461,20 @@ export function VehiclePage() {
           gap: 1.5,
         }}
       >
-        <KpiCard label="کل ناوگان" value={toFaNumber(vehicles.length)} icon={DirectionsCar} />
-        <KpiCard label="عملیاتی" value={toFaNumber(activeCount)} icon={TaskAlt} tone="success" />
-        <KpiCard label="در تعمیر" value={toFaNumber(repairCount)} icon={Speed} tone="warning" />
-        <KpiCard label="غیرقابل استفاده" value={toFaNumber(unavailableCount)} icon={ErrorIcon} tone="error" />
-        <KpiCard label="همگام‌سازی SAP" value="زمان‌بندی‌شده" helper="آخرین داده‌ها از SAP خوانده می‌شود" icon={Sync} tone="info" />
+        <KpiCard label="کل ناوگان فعال" value={summaryLoading ? '...' : toFaNumber(summary?.active_fleet_count)} icon={DirectionsCar} />
+        <KpiCard label="عملیاتی" value={summaryLoading ? '...' : toFaNumber(summary?.operational_fleet_count)} icon={TaskAlt} tone="success" />
+        <KpiCard label="در تعمیر" value={summaryLoading ? '...' : toFaNumber(summary?.under_repair_fleet_count)} icon={Speed} tone="warning" />
+        <KpiCard label="غیرقابل استفاده" value={summaryLoading ? '...' : toFaNumber(summary?.unusable_fleet_count)} icon={ErrorIcon} tone="error" />
+        <KpiCard label="میانگین کیلومتر" value={summaryLoading ? '...' : toFaNumber(summary?.average_odometer_km)} icon={Speed} tone="info" />
+        <KpiCard label="میانگین خرابی ماه" value={summaryLoading ? '...' : toFaNumber(summary?.average_faults_last_30_days)} icon={ErrorIcon} tone="warning" />
+        <KpiCard
+          label="آخرین همگام‌سازی SAP"
+          value={summaryLoading ? '...' : formatDateTime(summary?.last_sap_sync_at)}
+          icon={Sync}
+          tone="info"
+        />
       </Box>
+      {summaryError && <ErrorState message={summaryError} onRetry={reloadSummary} />}
 
       <Card>
         <CardContent sx={{ p: { xs: 1.5, md: 2 }, '&:last-child': { pb: { xs: 1.5, md: 2 } } }}>
@@ -439,7 +482,7 @@ export function VehiclePage() {
             <RtlTextField
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="جستجو بر اساس پلاک، VIN یا مدل"
+              placeholder="جستجو بر اساس پلاک، ای دی خودرو یا نام راننده"
               fullWidth
               InputProps={{ endAdornment: <InputAdornment position="end"><Search /></InputAdornment> }}
             />
@@ -463,7 +506,13 @@ export function VehiclePage() {
             {filtered.map((vehicle) => <VehicleCard key={vehicle.id} vehicle={vehicle} onOpen={setSelected} />)}
           </Stack>
         ) : (
-          <VehicleTable vehicles={filtered} onOpen={setSelected} />
+          <VehicleTable
+            vehicles={filtered}
+            onOpen={setSelected}
+            orderBy={orderBy}
+            order={order}
+            onSort={changeSort}
+          />
         )
       )}
 
