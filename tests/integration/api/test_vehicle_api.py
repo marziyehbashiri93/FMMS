@@ -4,11 +4,21 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 from rest_framework.test import APIClient
 
-from apps.vehicle.infrastructure.models import VehicleDriverAssignmentHistoryModel
+from apps.fault.domain.entities import FaultStatus
+from apps.fault.domain.value_objects import FaultSeverity
+from apps.fault.infrastructure.models import FaultModel
+from apps.integration.infrastructure.models import SAPSyncRunItemModel, SAPSyncRunModel
+from apps.vehicle.domain.entities import VehicleStatus
+from apps.vehicle.infrastructure.models import (
+    VehicleDriverAssignmentHistoryModel,
+    VehicleModel,
+    VehicleOdometerReadingModel,
+)
 from tests.integration.api.conftest import create_vehicle
 
 pytestmark = pytest.mark.django_db
@@ -87,6 +97,75 @@ class TestVehicleAPI:
             "A-001",
             "B-002",
         ]
+
+    def test_kpis_return_vehicle_dashboard_counts(
+        self, authenticated_client: APIClient, admin_user: Any
+    ) -> None:
+        """Vehicle KPI endpoint returns dashboard card values."""
+        operational = create_vehicle(authenticated_client, plate="KPI-001")
+        with_open_fault = create_vehicle(authenticated_client, plate="KPI-002")
+        under_repair = create_vehicle(authenticated_client, plate="KPI-003")
+        unusable = create_vehicle(authenticated_client, plate="KPI-004")
+        decommissioned = create_vehicle(authenticated_client, plate="KPI-005")
+        VehicleModel.objects.filter(id=under_repair["id"]).update(
+            status=VehicleStatus.UNDER_REPAIR.value
+        )
+        VehicleModel.objects.filter(id=unusable["id"]).update(
+            status=VehicleStatus.OUT_OF_SERVICE.value
+        )
+        VehicleModel.objects.filter(id=decommissioned["id"]).update(
+            status=VehicleStatus.DECOMMISSIONED.value
+        )
+        now = datetime.now(tz=UTC)
+        FaultModel.objects.create(
+            vehicle_id=with_open_fault["id"],
+            code="ENG-01",
+            description="Engine fault",
+            reported_at=now,
+            severity=FaultSeverity.HIGH.value,
+            status=FaultStatus.OPEN.value,
+            reported_by_id=admin_user.id,
+        )
+        VehicleOdometerReadingModel.objects.create(
+            vehicle_id=operational["id"],
+            reading_date="2026-07-20",
+            odometer_km=100,
+            recorded_by_id=admin_user.id,
+            recorded_at=now,
+        )
+        VehicleOdometerReadingModel.objects.create(
+            vehicle_id=with_open_fault["id"],
+            reading_date="2026-07-20",
+            odometer_km=300,
+            recorded_by_id=admin_user.id,
+            recorded_at=now,
+        )
+        sync_run = SAPSyncRunModel.objects.create(
+            trigger_source="API",
+            status="SUCCESS",
+            request_id="kpi-sync",
+            started_at=now,
+            finished_at=now,
+        )
+        SAPSyncRunItemModel.objects.create(
+            sync_run=sync_run,
+            name="vehicles",
+            status="SUCCESS",
+            started_at=now,
+            finished_at=now,
+            summary={"total_received": 5},
+        )
+
+        response = authenticated_client.get("/api/v1/vehicles/kpis/")
+
+        assert response.status_code == 200, response.data
+        assert response.data["active_fleet_count"] == 4
+        assert response.data["operational_fleet_count"] == 1
+        assert response.data["under_repair_fleet_count"] == 1
+        assert response.data["unusable_fleet_count"] == 1
+        assert response.data["last_sap_sync_at"] is not None
+        assert response.data["average_odometer_km"] == 200
+        assert response.data["average_faults_last_30_days"] == 0.25
 
     def test_change_status_endpoint_updates_vehicle_status(
         self, authenticated_client: APIClient

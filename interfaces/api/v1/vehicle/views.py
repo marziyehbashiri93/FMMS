@@ -21,6 +21,7 @@ from interfaces.api.v1.vehicle import schema as vehicle_schema
 from interfaces.api.v1.vehicle.serializers import (
     DateRangeFilterSerializer,
     VehicleDriverAssignmentHistoryResponseSerializer,
+    VehicleKPISerializer,
     VehicleOdometerRecordSerializer,
     VehicleOdometerResponseSerializer,
     VehicleResponseSerializer,
@@ -139,3 +140,11 @@ class VehicleViewSet(GenericViewSet):
         return Response(
             VehicleDriverAssignmentHistoryResponseSerializer(result, many=True).data
         )
+
+    @vehicle_schema.kpis
+    @action(detail=False, methods=["get"], url_path="kpis")
+    def kpis(self, request: Request) -> Response:
+        """Return KPI values for vehicle dashboard cards."""
+        del request
+        result = deps.get_get_vehicle_kpi_service().execute()
+        return Response(VehicleKPISerializer(result).data)

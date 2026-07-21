@@ -76,6 +76,19 @@ class VehicleSAPSyncResultDTO:
 
 
 @dataclass(frozen=True)
+class VehicleKPIDTO:
+    """Output DTO for vehicle dashboard KPI cards."""
+
+    active_fleet_count: int
+    operational_fleet_count: int
+    under_repair_fleet_count: int
+    unusable_fleet_count: int
+    last_sap_sync_at: datetime | None
+    average_odometer_km: float
+    average_faults_last_30_days: float
+
+
+@dataclass(frozen=True)
 class RecordVehicleOdometerDTO:
     """Input DTO for recording a vehicle daily odometer reading."""
 

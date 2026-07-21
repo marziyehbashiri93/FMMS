@@ -22,6 +22,18 @@ class VehicleResponseSerializer(serializers.Serializer):
     driver2_customer_number = serializers.CharField(allow_null=True)
 
 
+class VehicleKPISerializer(serializers.Serializer):
+    """Serialize vehicle dashboard KPI values."""
+
+    active_fleet_count = serializers.IntegerField()
+    operational_fleet_count = serializers.IntegerField()
+    under_repair_fleet_count = serializers.IntegerField()
+    unusable_fleet_count = serializers.IntegerField()
+    last_sap_sync_at = serializers.DateTimeField(allow_null=True)
+    average_odometer_km = serializers.FloatField()
+    average_faults_last_30_days = serializers.FloatField()
+
+
 class VehicleOdometerRecordSerializer(serializers.Serializer):
     """Validate a daily odometer reading."""
 
