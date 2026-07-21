@@ -21,6 +21,7 @@ from interfaces.api.v1.repair.serializers import (
     ExternalInvoiceResponseSerializer,
     ExternalInvoiceUploadSerializer,
 )
+from interfaces.api.v1.schema_tags import API_TAGS
 from interfaces.api.v1.utils import request_id_from, user_id_from
 
 
@@ -28,6 +29,7 @@ class RepairOrderExternalInvoiceMixin:
     """Mixin to upload external invoice from repair-order endpoint."""
 
     @extend_schema(
+        tags=[API_TAGS.repair],
         request=ExternalInvoiceUploadSerializer,
         responses=ExternalInvoiceResponseSerializer,
     )
@@ -58,13 +60,16 @@ class ExternalInvoiceViewSet(GenericViewSet):
 
     permission_classes = [IsReadOnlyOrTechnicianOrAbove]
 
-    @extend_schema(responses=ExternalInvoiceResponseSerializer(many=True))
+    @extend_schema(
+        tags=[API_TAGS.repair],
+        responses=ExternalInvoiceResponseSerializer(many=True),
+    )
     def list(self, request: Request) -> Response:
         """List external invoices."""
         items = deps.get_list_external_invoices_service().execute()
         return Response(ExternalInvoiceResponseSerializer(items, many=True).data)
 
-    @extend_schema(responses=ExternalInvoiceResponseSerializer)
+    @extend_schema(tags=[API_TAGS.repair], responses=ExternalInvoiceResponseSerializer)
     @action(
         detail=True,
         methods=["post"],

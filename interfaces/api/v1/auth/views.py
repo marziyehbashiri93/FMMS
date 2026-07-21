@@ -15,6 +15,7 @@ from interfaces.api.v1.auth.serializers import (
     UsernameTokenObtainPairSerializer,
     UserProfileSerializer,
 )
+from interfaces.api.v1.schema_tags import API_TAGS
 
 
 class FMMSJWTTokenObtainPairView(TokenObtainPairView):
@@ -22,7 +23,7 @@ class FMMSJWTTokenObtainPairView(TokenObtainPairView):
 
     serializer_class = UsernameTokenObtainPairSerializer
 
-    @extend_schema(tags=["auth"])
+    @extend_schema(tags=[API_TAGS.auth])
     def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """Issue a JWT pair for valid username credentials."""
         return super().post(request, *args, **kwargs)
@@ -31,7 +32,7 @@ class FMMSJWTTokenObtainPairView(TokenObtainPairView):
 class FMMSJWTTokenRefreshView(TokenRefreshView):
     """Refresh an FMMS access token."""
 
-    @extend_schema(tags=["auth"])
+    @extend_schema(tags=[API_TAGS.auth])
     def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """Issue a new access token from a refresh token."""
         return super().post(request, *args, **kwargs)
@@ -42,7 +43,7 @@ class CurrentUserView(APIView):
 
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(tags=["auth"], responses=UserProfileSerializer)
+    @extend_schema(tags=[API_TAGS.auth], responses=UserProfileSerializer)
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """Return the current user's session profile."""
         return Response(UserProfileSerializer(request.user).data)

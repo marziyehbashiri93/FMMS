@@ -7,6 +7,7 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from apps.driver.domain.entities import DriverStatus
 from interfaces.api.v1.driver.serializers import DriverResponseSerializer
+from interfaces.api.v1.schema_tags import API_TAGS
 
 _DRIVER_ORDERING_FIELDS = [
     "customer_number",
@@ -37,11 +38,13 @@ driver_id_parameter = OpenApiParameter(
 )
 
 retrieve = extend_schema(
+    tags=[API_TAGS.driver],
     parameters=[driver_id_parameter],
     responses=DriverResponseSerializer,
 )
 
 list = extend_schema(
+    tags=[API_TAGS.driver],
     parameters=[
         OpenApiParameter(
             name="status",

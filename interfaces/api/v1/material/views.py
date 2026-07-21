@@ -23,6 +23,7 @@ from interfaces.api.v1.material.serializers import (
     MaterialRequestCreateSerializer,
     MaterialRequestResponseSerializer,
 )
+from interfaces.api.v1.schema_tags import API_TAGS
 from interfaces.api.v1.utils import request_id_from, user_id_from
 
 
@@ -31,7 +32,10 @@ class MaterialRequestViewSet(GenericViewSet):
 
     permission_classes = [IsReadOnlyOrTechnicianOrAbove]
 
-    @extend_schema(responses=MaterialRequestResponseSerializer(many=True))
+    @extend_schema(
+        tags=[API_TAGS.material],
+        responses=MaterialRequestResponseSerializer(many=True),
+    )
     def list(self, request: Request) -> Response:
         """List material requests."""
         status_raw = request.query_params.get("status")
@@ -39,7 +43,9 @@ class MaterialRequestViewSet(GenericViewSet):
         items = deps.get_list_material_requests_service().execute(status=mr_status)
         return Response(MaterialRequestResponseSerializer(items, many=True).data)
 
-    @extend_schema(responses=MaterialRequestResponseSerializer)
+    @extend_schema(
+        tags=[API_TAGS.material], responses=MaterialRequestResponseSerializer
+    )
     @action(
         detail=True,
         methods=["post"],
@@ -56,7 +62,9 @@ class MaterialRequestViewSet(GenericViewSet):
         )
         return Response(MaterialRequestResponseSerializer(result).data)
 
-    @extend_schema(responses=MaterialRequestResponseSerializer)
+    @extend_schema(
+        tags=[API_TAGS.material], responses=MaterialRequestResponseSerializer
+    )
     @action(
         detail=True,
         methods=["post"],
@@ -78,6 +86,7 @@ class RepairOrderMaterialRequestMixin:
     """Mixin with repair-order scoped material request creation action."""
 
     @extend_schema(
+        tags=[API_TAGS.material],
         request=MaterialRequestCreateSerializer,
         responses=MaterialRequestResponseSerializer,
     )

@@ -50,6 +50,7 @@ from interfaces.api.v1.repair.serializers import (
     RepairSyncSAPSerializer,
     TransportHandoverRejectSerializer,
 )
+from interfaces.api.v1.schema_tags import API_TAGS
 from interfaces.api.v1.utils import paginate_dto_list, request_id_from, user_id_from
 
 
@@ -60,7 +61,7 @@ class RepairOrderViewSet(
 
     permission_classes = [IsReadOnlyOrTechnicianOrAbove]
 
-    @extend_schema(responses=RepairOrderResponseSerializer)
+    @extend_schema(tags=[API_TAGS.repair], responses=RepairOrderResponseSerializer)
     def retrieve(self, request: Request, pk: str | None = None) -> Response:
         """Retrieve one repair order."""
         result = deps.get_get_repair_order_service().execute(
@@ -68,7 +69,9 @@ class RepairOrderViewSet(
         )
         return Response(RepairOrderResponseSerializer(result).data)
 
-    @extend_schema(responses=RepairOrderResponseSerializer(many=True))
+    @extend_schema(
+        tags=[API_TAGS.repair], responses=RepairOrderResponseSerializer(many=True)
+    )
     def list(self, request: Request) -> Response:
         """List repair orders for a vehicle."""
         vehicle_id_raw = request.query_params.get("vehicle_id")
@@ -93,7 +96,9 @@ class RepairOrderViewSet(
         return Response(serializer.data)
 
     @extend_schema(
-        request=RepairOrderCreateSerializer, responses=RepairOrderResponseSerializer
+        tags=[API_TAGS.repair],
+        request=RepairOrderCreateSerializer,
+        responses=RepairOrderResponseSerializer,
     )
     def create(self, request: Request) -> Response:
         """Create a repair order."""
@@ -112,7 +117,11 @@ class RepairOrderViewSet(
             status=status.HTTP_201_CREATED,
         )
 
-    @extend_schema(request=None, responses=RepairDecisionResponseSerializer)
+    @extend_schema(
+        tags=[API_TAGS.repair],
+        request=None,
+        responses=RepairDecisionResponseSerializer,
+    )
     @action(detail=True, methods=["post"], permission_classes=[IsSupervisorOrAbove])
     def approve(self, request: Request, pk: str | None = None) -> Response:
         """Transport supervisor approves continuing the repair process."""
@@ -126,6 +135,7 @@ class RepairOrderViewSet(
         return Response(RepairDecisionResponseSerializer(result).data)
 
     @extend_schema(
+        tags=[API_TAGS.repair],
         request=RepairAssignWorkshopSerializer,
         responses=RepairDecisionResponseSerializer,
     )
@@ -150,7 +160,11 @@ class RepairOrderViewSet(
         )
         return Response(RepairDecisionResponseSerializer(result).data)
 
-    @extend_schema(request=None, responses=RepairDecisionResponseSerializer)
+    @extend_schema(
+        tags=[API_TAGS.repair],
+        request=None,
+        responses=RepairDecisionResponseSerializer,
+    )
     @action(detail=True, methods=["post"], permission_classes=[IsTechnicianOrAbove])
     def accept(self, request: Request, pk: str | None = None) -> Response:
         """Internal workshop accepts the repair order."""
@@ -161,7 +175,11 @@ class RepairOrderViewSet(
         )
         return Response(RepairDecisionResponseSerializer(result).data)
 
-    @extend_schema(request=None, responses=RepairDecisionResponseSerializer)
+    @extend_schema(
+        tags=[API_TAGS.repair],
+        request=None,
+        responses=RepairDecisionResponseSerializer,
+    )
     @action(detail=True, methods=["post"], permission_classes=[IsTechnicianOrAbove])
     def reject(self, request: Request, pk: str | None = None) -> Response:
         """Internal workshop rejects the repair order."""
@@ -173,7 +191,9 @@ class RepairOrderViewSet(
         return Response(RepairDecisionResponseSerializer(result).data)
 
     @extend_schema(
-        request=RepairAssignSerializer, responses=RepairOrderResponseSerializer
+        tags=[API_TAGS.repair],
+        request=RepairAssignSerializer,
+        responses=RepairOrderResponseSerializer,
     )
     @action(detail=True, methods=["post"])
     def assign(self, request: Request, pk: str | None = None) -> Response:
@@ -190,7 +210,9 @@ class RepairOrderViewSet(
         )
         return Response(RepairOrderResponseSerializer(result).data)
 
-    @extend_schema(request=None, responses=RepairOrderResponseSerializer)
+    @extend_schema(
+        tags=[API_TAGS.repair], request=None, responses=RepairOrderResponseSerializer
+    )
     @action(detail=True, methods=["post"])
     @transaction.atomic
     def start(self, request: Request, pk: str | None = None) -> Response:
@@ -202,7 +224,10 @@ class RepairOrderViewSet(
         )
         return Response(RepairOrderResponseSerializer(result).data)
 
-    @extend_schema(responses=RepairOrderTimelineEventSerializer(many=True))
+    @extend_schema(
+        tags=[API_TAGS.repair],
+        responses=RepairOrderTimelineEventSerializer(many=True),
+    )
     @action(detail=True, methods=["get"], url_path="timeline")
     def timeline(self, request: Request, pk: str | None = None) -> Response:
         """Return chronological workflow events for a repair order."""
@@ -213,7 +238,9 @@ class RepairOrderViewSet(
         return Response(RepairOrderTimelineEventSerializer(events, many=True).data)
 
     @extend_schema(
-        request=RepairCompleteSerializer, responses=RepairOrderResponseSerializer
+        tags=[API_TAGS.repair],
+        request=RepairCompleteSerializer,
+        responses=RepairOrderResponseSerializer,
     )
     @action(detail=True, methods=["post"])
     @transaction.atomic
@@ -231,7 +258,9 @@ class RepairOrderViewSet(
         )
         return Response(RepairOrderResponseSerializer(result).data)
 
-    @extend_schema(request=None, responses=RepairOrderResponseSerializer)
+    @extend_schema(
+        tags=[API_TAGS.repair], request=None, responses=RepairOrderResponseSerializer
+    )
     @action(detail=True, methods=["post"])
     def cancel(self, request: Request, pk: str | None = None) -> Response:
         """Cancel a repair order."""
@@ -245,7 +274,9 @@ class RepairOrderViewSet(
         return Response(RepairOrderResponseSerializer(result).data)
 
     @extend_schema(
-        request=RepairActivityCreateSerializer, responses=RepairOrderResponseSerializer
+        tags=[API_TAGS.repair],
+        request=RepairActivityCreateSerializer,
+        responses=RepairOrderResponseSerializer,
     )
     @action(detail=True, methods=["post"], url_path="activities")
     def activities(self, request: Request, pk: str | None = None) -> Response:
@@ -262,7 +293,9 @@ class RepairOrderViewSet(
         return Response(RepairOrderResponseSerializer(result).data)
 
     @extend_schema(
-        request=RepairPartCreateSerializer, responses=RepairOrderResponseSerializer
+        tags=[API_TAGS.repair],
+        request=RepairPartCreateSerializer,
+        responses=RepairOrderResponseSerializer,
     )
     @action(detail=True, methods=["post"], url_path="parts")
     def parts(self, request: Request, pk: str | None = None) -> Response:
@@ -278,7 +311,9 @@ class RepairOrderViewSet(
         )
         return Response(RepairOrderResponseSerializer(result).data)
 
-    @extend_schema(request=None, responses=RepairOrderResponseSerializer)
+    @extend_schema(
+        tags=[API_TAGS.repair], request=None, responses=RepairOrderResponseSerializer
+    )
     @action(
         detail=True,
         methods=["post"],
@@ -300,6 +335,7 @@ class RepairOrderViewSet(
         return Response(RepairOrderResponseSerializer(result).data)
 
     @extend_schema(
+        tags=[API_TAGS.repair],
         request=TransportHandoverRejectSerializer,
         responses=RepairOrderResponseSerializer,
     )
@@ -327,7 +363,9 @@ class RepairOrderViewSet(
         return Response(RepairOrderResponseSerializer(result).data)
 
     @extend_schema(
-        request=RepairSyncSAPSerializer, responses=RepairOrderResponseSerializer
+        tags=[API_TAGS.repair],
+        request=RepairSyncSAPSerializer,
+        responses=RepairOrderResponseSerializer,
     )
     @action(detail=True, methods=["post"], url_path="sync-sap")
     def sync_sap(self, request: Request, pk: str | None = None) -> Response:

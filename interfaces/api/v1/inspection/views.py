@@ -31,6 +31,7 @@ from interfaces.api.v1.inspection.serializers import (
     InspectionItemCreateSerializer,
     InspectionResponseSerializer,
 )
+from interfaces.api.v1.schema_tags import API_TAGS
 from interfaces.api.v1.utils import paginate_dto_list, request_id_from, user_id_from
 
 
@@ -39,7 +40,7 @@ class InspectionViewSet(GenericViewSet):
 
     permission_classes = [IsReadOnlyOrTechnicianOrAbove]
 
-    @extend_schema(responses=InspectionResponseSerializer)
+    @extend_schema(tags=[API_TAGS.inspection], responses=InspectionResponseSerializer)
     def retrieve(self, request: Request, pk: str | None = None) -> Response:
         """Retrieve one inspection."""
         result = deps.get_get_inspection_service().execute(
@@ -47,7 +48,10 @@ class InspectionViewSet(GenericViewSet):
         )
         return Response(InspectionResponseSerializer(result).data)
 
-    @extend_schema(responses=InspectionResponseSerializer(many=True))
+    @extend_schema(
+        tags=[API_TAGS.inspection],
+        responses=InspectionResponseSerializer(many=True),
+    )
     def list(self, request: Request) -> Response:
         """List inspections for a vehicle."""
         vehicle_id_raw = request.query_params.get("vehicle_id")
@@ -75,7 +79,9 @@ class InspectionViewSet(GenericViewSet):
         return Response(serializer.data)
 
     @extend_schema(
-        request=InspectionCreateSerializer, responses=InspectionResponseSerializer
+        tags=[API_TAGS.inspection],
+        request=InspectionCreateSerializer,
+        responses=InspectionResponseSerializer,
     )
     def create(self, request: Request) -> Response:
         """Create a draft inspection."""
@@ -113,7 +119,9 @@ class InspectionViewSet(GenericViewSet):
         )
 
     @extend_schema(
-        request=InspectionItemCreateSerializer, responses=InspectionResponseSerializer
+        tags=[API_TAGS.inspection],
+        request=InspectionItemCreateSerializer,
+        responses=InspectionResponseSerializer,
     )
     @action(detail=True, methods=["post"], url_path="items")
     def items(self, request: Request, pk: str | None = None) -> Response:
@@ -135,7 +143,9 @@ class InspectionViewSet(GenericViewSet):
         )
         return Response(InspectionResponseSerializer(result).data)
 
-    @extend_schema(request=None, responses=InspectionResponseSerializer)
+    @extend_schema(
+        tags=[API_TAGS.inspection], request=None, responses=InspectionResponseSerializer
+    )
     @action(detail=True, methods=["post"])
     def submit(self, request: Request, pk: str | None = None) -> Response:
         """Submit a draft inspection."""

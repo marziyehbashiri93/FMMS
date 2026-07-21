@@ -14,6 +14,7 @@ from interfaces.api.v1.inspection.template_serializers import (
     InspectionTemplateResponseSerializer,
     InspectionTemplateSyncResultSerializer,
 )
+from interfaces.api.v1.schema_tags import API_TAGS
 from interfaces.api.v1.utils import paginate_dto_list, request_id_from
 
 
@@ -22,7 +23,10 @@ class InspectionTemplateViewSet(GenericViewSet):
 
     permission_classes = [IsReadOnlyOrTechnicianOrAbove]
 
-    @extend_schema(responses=InspectionTemplateResponseSerializer(many=True))
+    @extend_schema(
+        tags=[API_TAGS.inspection],
+        responses=InspectionTemplateResponseSerializer(many=True),
+    )
     def list(self, request: Request) -> Response:
         """List active inspection checklist templates."""
         items = deps.get_list_inspection_templates_service().execute(
@@ -37,6 +41,7 @@ class InspectionTemplateViewSet(GenericViewSet):
         return Response(serializer.data)
 
     @extend_schema(
+        tags=[API_TAGS.inspection],
         request=None,
         responses=InspectionTemplateSyncResultSerializer,
     )

@@ -17,6 +17,7 @@ from interfaces.api.v1.handover.serializers import (
     VehicleHandoverConfirmSerializer,
     VehicleHandoverResponseSerializer,
 )
+from interfaces.api.v1.schema_tags import API_TAGS
 from interfaces.api.v1.utils import request_id_from, user_id_from
 
 
@@ -25,13 +26,17 @@ class VehicleHandoverViewSet(GenericViewSet):
 
     permission_classes = [IsReadOnlyOrTechnicianOrAbove]
 
-    @extend_schema(responses=VehicleHandoverResponseSerializer(many=True))
+    @extend_schema(
+        tags=[API_TAGS.handover],
+        responses=VehicleHandoverResponseSerializer(many=True),
+    )
     def list(self, request: Request) -> Response:
         """List all vehicle handovers."""
         items = deps.get_list_vehicle_handovers_service().execute()
         return Response(VehicleHandoverResponseSerializer(items, many=True).data)
 
     @extend_schema(
+        tags=[API_TAGS.handover],
         request=VehicleHandoverConfirmSerializer,
         responses=VehicleHandoverResponseSerializer,
     )

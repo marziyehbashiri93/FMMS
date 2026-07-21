@@ -29,6 +29,7 @@ from interfaces.api.v1.procurement.serializers import (
     ReceivePOFromSAPSerializer,
     SubmitPRToSAPSerializer,
 )
+from interfaces.api.v1.schema_tags import API_TAGS
 from interfaces.api.v1.utils import paginate_dto_list, request_id_from, user_id_from
 
 
@@ -37,7 +38,10 @@ class PurchaseRequisitionViewSet(GenericViewSet):
 
     permission_classes = [IsReadOnlyOrTechnicianOrAbove]
 
-    @extend_schema(responses=PurchaseRequisitionResponseSerializer)
+    @extend_schema(
+        tags=[API_TAGS.procurement],
+        responses=PurchaseRequisitionResponseSerializer,
+    )
     def retrieve(self, request: Request, pk: str | None = None) -> Response:
         """Retrieve one purchase requisition."""
         result = deps.get_get_purchase_requisition_service().execute(
@@ -45,7 +49,10 @@ class PurchaseRequisitionViewSet(GenericViewSet):
         )
         return Response(PurchaseRequisitionResponseSerializer(result).data)
 
-    @extend_schema(responses=PurchaseRequisitionResponseSerializer(many=True))
+    @extend_schema(
+        tags=[API_TAGS.procurement],
+        responses=PurchaseRequisitionResponseSerializer(many=True),
+    )
     def list(self, request: Request) -> Response:
         """List purchase requisitions with optional filters."""
         repair_order_raw = request.query_params.get("repair_order_id")
@@ -66,6 +73,7 @@ class PurchaseRequisitionViewSet(GenericViewSet):
         return Response(serializer.data)
 
     @extend_schema(
+        tags=[API_TAGS.procurement],
         request=PurchaseRequisitionCreateSerializer,
         responses=PurchaseRequisitionResponseSerializer,
     )
@@ -86,6 +94,7 @@ class PurchaseRequisitionViewSet(GenericViewSet):
         )
 
     @extend_schema(
+        tags=[API_TAGS.procurement],
         request=PRLineItemCreateSerializer,
         responses=PurchaseRequisitionResponseSerializer,
     )
@@ -104,6 +113,7 @@ class PurchaseRequisitionViewSet(GenericViewSet):
         return Response(PurchaseRequisitionResponseSerializer(result).data)
 
     @extend_schema(
+        tags=[API_TAGS.procurement],
         request=SubmitPRToSAPSerializer,
         responses=PurchaseRequisitionResponseSerializer,
     )
@@ -133,7 +143,10 @@ class PurchaseOrderViewSet(GenericViewSet):
 
     permission_classes = [IsReadOnlyOrTechnicianOrAbove]
 
-    @extend_schema(responses=PurchaseOrderResponseSerializer)
+    @extend_schema(
+        tags=[API_TAGS.procurement],
+        responses=PurchaseOrderResponseSerializer,
+    )
     def retrieve(self, request: Request, pk: str | None = None) -> Response:
         """Retrieve one purchase order."""
         result = deps.get_get_purchase_order_service().execute(
@@ -142,7 +155,9 @@ class PurchaseOrderViewSet(GenericViewSet):
         return Response(PurchaseOrderResponseSerializer(result).data)
 
     @extend_schema(
-        request=ReceivePOFromSAPSerializer, responses=PurchaseOrderResponseSerializer
+        tags=[API_TAGS.procurement],
+        request=ReceivePOFromSAPSerializer,
+        responses=PurchaseOrderResponseSerializer,
     )
     def create(self, request: Request) -> Response:
         """Receive a purchase order from SAP."""

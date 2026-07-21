@@ -13,6 +13,7 @@ from apps.integration.domain.entities import SAPTransactionStatus
 from core.permissions import IsFMMSAuthenticated
 from interfaces.api.v1 import deps
 from interfaces.api.v1.integration.serializers import SAPTransactionResponseSerializer
+from interfaces.api.v1.schema_tags import API_TAGS
 from interfaces.api.v1.utils import paginate_dto_list
 
 
@@ -21,14 +22,19 @@ class SAPTransactionViewSet(GenericViewSet):
 
     permission_classes = [IsFMMSAuthenticated]
 
-    @extend_schema(responses=SAPTransactionResponseSerializer)
+    @extend_schema(
+        tags=[API_TAGS.integration], responses=SAPTransactionResponseSerializer
+    )
     def retrieve(self, request: Request, pk: str | None = None) -> Response:
         """Retrieve one SAP transaction by id."""
         repo = deps.get_sap_transaction_repository()
         entity = repo.get_by_id(uuid.UUID(str(pk)))
         return Response(SAPTransactionResponseSerializer(entity).data)
 
-    @extend_schema(responses=SAPTransactionResponseSerializer(many=True))
+    @extend_schema(
+        tags=[API_TAGS.integration],
+        responses=SAPTransactionResponseSerializer(many=True),
+    )
     def list(self, request: Request) -> Response:
         """List SAP transactions, optionally filtered by status."""
         repo = deps.get_sap_transaction_repository()

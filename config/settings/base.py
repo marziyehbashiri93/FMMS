@@ -234,6 +234,25 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "Fleet Maintenance Management System REST API.",
     "VERSION": "v1",
     "SERVE_INCLUDE_SCHEMA": False,
+    "TAGS": [
+        {"name": "auth", "description": "Authentication and current user APIs."},
+        {"name": "vehicle", "description": "Vehicle master data and odometer APIs."},
+        {"name": "driver", "description": "Driver master data APIs."},
+        {
+            "name": "inspection",
+            "description": "Inspection and checklist template APIs.",
+        },
+        {"name": "fault", "description": "Fault registration and workflow APIs."},
+        {"name": "repair", "description": "Repair order workflow APIs."},
+        {"name": "material", "description": "Material request APIs."},
+        {"name": "handover", "description": "Vehicle handover APIs."},
+        {
+            "name": "preventive-maintenance",
+            "description": "Preventive maintenance plan and work-order APIs.",
+        },
+        {"name": "procurement", "description": "Purchase requisition and order APIs."},
+        {"name": "integration", "description": "SAP integration transaction APIs."},
+    ],
 }
 
 # ──────────────────────────────────────────────────────────────────────────────

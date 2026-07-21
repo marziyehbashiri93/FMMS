@@ -27,6 +27,7 @@ from interfaces.api.v1.preventive_maintenance.serializers import (
     PMTriggerSerializer,
     PMWorkOrderResponseSerializer,
 )
+from interfaces.api.v1.schema_tags import API_TAGS
 from interfaces.api.v1.utils import paginate_dto_list, request_id_from, user_id_from
 
 
@@ -35,7 +36,10 @@ class PMPlanViewSet(GenericViewSet):
 
     permission_classes = [IsReadOnlyOrTechnicianOrAbove]
 
-    @extend_schema(responses=PMPlanResponseSerializer)
+    @extend_schema(
+        tags=[API_TAGS.preventive_maintenance],
+        responses=PMPlanResponseSerializer,
+    )
     def retrieve(self, request: Request, pk: str | None = None) -> Response:
         """Retrieve one PM plan."""
         result = deps.get_get_pm_plan_service().execute(
@@ -43,7 +47,10 @@ class PMPlanViewSet(GenericViewSet):
         )
         return Response(PMPlanResponseSerializer(result).data)
 
-    @extend_schema(responses=PMPlanResponseSerializer(many=True))
+    @extend_schema(
+        tags=[API_TAGS.preventive_maintenance],
+        responses=PMPlanResponseSerializer(many=True),
+    )
     def list(self, request: Request) -> Response:
         """List PM plans for a vehicle."""
         vehicle_id_raw = request.query_params.get("vehicle_id")
@@ -67,7 +74,11 @@ class PMPlanViewSet(GenericViewSet):
             return self.get_paginated_response(serializer.data)
         return Response(serializer.data)
 
-    @extend_schema(request=PMPlanCreateSerializer, responses=PMPlanResponseSerializer)
+    @extend_schema(
+        tags=[API_TAGS.preventive_maintenance],
+        request=PMPlanCreateSerializer,
+        responses=PMPlanResponseSerializer,
+    )
     def create(self, request: Request) -> Response:
         """Create a PM plan."""
         serializer = PMPlanCreateSerializer(data=request.data)
@@ -89,7 +100,11 @@ class PMPlanViewSet(GenericViewSet):
             status=status.HTTP_201_CREATED,
         )
 
-    @extend_schema(request=PMTriggerSerializer, responses=PMWorkOrderResponseSerializer)
+    @extend_schema(
+        tags=[API_TAGS.preventive_maintenance],
+        request=PMTriggerSerializer,
+        responses=PMWorkOrderResponseSerializer,
+    )
     @action(detail=True, methods=["post"])
     def trigger(self, request: Request, pk: str | None = None) -> Response:
         """Trigger a PM work order from a plan."""
@@ -114,7 +129,10 @@ class PMWorkOrderViewSet(GenericViewSet):
 
     permission_classes = [IsReadOnlyOrTechnicianOrAbove]
 
-    @extend_schema(responses=PMWorkOrderResponseSerializer(many=True))
+    @extend_schema(
+        tags=[API_TAGS.preventive_maintenance],
+        responses=PMWorkOrderResponseSerializer(many=True),
+    )
     def list(self, request: Request) -> Response:
         """List PM work orders for a plan."""
         plan_id_raw = request.query_params.get("plan_id")
@@ -139,7 +157,9 @@ class PMWorkOrderViewSet(GenericViewSet):
         return Response(serializer.data)
 
     @extend_schema(
-        request=PMCompleteSerializer, responses=PMWorkOrderResponseSerializer
+        tags=[API_TAGS.preventive_maintenance],
+        request=PMCompleteSerializer,
+        responses=PMWorkOrderResponseSerializer,
     )
     @action(detail=True, methods=["post"])
     def complete(self, request: Request, pk: str | None = None) -> Response:

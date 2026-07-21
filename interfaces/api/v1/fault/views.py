@@ -24,6 +24,7 @@ from interfaces.api.v1.fault.serializers import (
     FaultCreateSerializer,
     FaultResponseSerializer,
 )
+from interfaces.api.v1.schema_tags import API_TAGS
 from interfaces.api.v1.utils import paginate_dto_list, request_id_from, user_id_from
 
 
@@ -32,7 +33,7 @@ class FaultViewSet(GenericViewSet):
 
     permission_classes = [IsReadOnlyOrTechnicianOrAbove]
 
-    @extend_schema(responses=FaultResponseSerializer)
+    @extend_schema(tags=[API_TAGS.fault], responses=FaultResponseSerializer)
     def retrieve(self, request: Request, pk: str | None = None) -> Response:
         """Retrieve one fault."""
         result = deps.get_get_fault_service().execute(
@@ -40,7 +41,7 @@ class FaultViewSet(GenericViewSet):
         )
         return Response(FaultResponseSerializer(result).data)
 
-    @extend_schema(responses=FaultResponseSerializer(many=True))
+    @extend_schema(tags=[API_TAGS.fault], responses=FaultResponseSerializer(many=True))
     def list(self, request: Request) -> Response:
         """List faults filtered by vehicle or open severity."""
         vehicle_id_raw = request.query_params.get("vehicle_id")
@@ -60,7 +61,11 @@ class FaultViewSet(GenericViewSet):
             return self.get_paginated_response(serializer.data)
         return Response(serializer.data)
 
-    @extend_schema(request=FaultCreateSerializer, responses=FaultResponseSerializer)
+    @extend_schema(
+        tags=[API_TAGS.fault],
+        request=FaultCreateSerializer,
+        responses=FaultResponseSerializer,
+    )
     def create(self, request: Request) -> Response:
         """Report a new fault."""
         serializer = FaultCreateSerializer(data=request.data)
@@ -80,7 +85,11 @@ class FaultViewSet(GenericViewSet):
             status=status.HTTP_201_CREATED,
         )
 
-    @extend_schema(request=FaultAssignSerializer, responses=FaultResponseSerializer)
+    @extend_schema(
+        tags=[API_TAGS.fault],
+        request=FaultAssignSerializer,
+        responses=FaultResponseSerializer,
+    )
     @action(detail=True, methods=["post"])
     def assign(self, request: Request, pk: str | None = None) -> Response:
         """Assign a fault to a technician."""
@@ -96,7 +105,9 @@ class FaultViewSet(GenericViewSet):
         )
         return Response(FaultResponseSerializer(result).data)
 
-    @extend_schema(request=None, responses=FaultResponseSerializer)
+    @extend_schema(
+        tags=[API_TAGS.fault], request=None, responses=FaultResponseSerializer
+    )
     @action(detail=True, methods=["post"])
     def close(self, request: Request, pk: str | None = None) -> Response:
         """Close a fault."""
