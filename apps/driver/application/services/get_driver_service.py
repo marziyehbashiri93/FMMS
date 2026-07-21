@@ -6,14 +6,30 @@ No mutations happen here. These services are query-side only.
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 from apps.driver.application.dto.driver_dto import DriverResponseDTO
 from apps.driver.domain.entities import Driver, DriverStatus
 from apps.driver.domain.interfaces.driver_repository import IDriverRepository
+from core.exceptions.base_exception import FMMSValidationError
 from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
 
 logger = get_structured_logger("driver", __name__)
+
+_DRIVER_ORDERING_FIELDS = frozenset(
+    {
+        "customer_number",
+        "name",
+        "mobile",
+        "personnel_number",
+        "gender",
+        "nilofar_code",
+        "status",
+        "created_at",
+        "updated_at",
+    }
+)
 
 
 def _to_response_dto(driver: Driver) -> DriverResponseDTO:
@@ -99,15 +115,15 @@ class ListDriversService:
 
     def execute(
         self,
-        status: DriverStatus = DriverStatus.ACTIVE,
+        status: DriverStatus | None = None,
+        ordering: str = "",
         request_id: str = "",
     ) -> list[DriverResponseDTO]:
-        """Return drivers filtered by lifecycle status.
-
-        Defaults to returning only ACTIVE drivers.
+        """Return drivers, optionally filtered by lifecycle status.
 
         Args:
-            status: Status filter (defaults to ``ACTIVE``).
+            status: Optional status filter. When ``None``, all statuses are returned.
+            ordering: Optional ordering field. Prefix with ``-`` for descending.
             request_id: Optional correlation ID for structured logging.
 
         Returns:
@@ -120,11 +136,13 @@ class ListDriversService:
                 "service": "ListDriversService",
                 "operation": "execute",
                 "request_id": request_id,
-                "status_filter": status.value,
+                "status_filter": status.value if status else None,
+                "ordering": ordering,
             },
         )
 
-        drivers = self._repo.list_by_status(status)
+        drivers = self._repo.list_by_status(status) if status else self._repo.list_all()
+        drivers = _sort_drivers(drivers, ordering)
 
         logger.info(
             "Drivers listed",
@@ -139,3 +157,30 @@ class ListDriversService:
         )
 
         return [_to_response_dto(d) for d in drivers]
+
+
+def _sort_drivers(drivers: list[Driver], ordering: str) -> list[Driver]:
+    """Return drivers sorted by a whitelisted response field."""
+    if not ordering:
+        return drivers
+    descending = ordering.startswith("-")
+    field_name = ordering[1:] if descending else ordering
+    if field_name not in _DRIVER_ORDERING_FIELDS:
+        raise FMMSValidationError(
+            message=f"Unsupported driver ordering field: {field_name}.",
+            error_code="INVALID_ORDERING",
+            details={
+                "field": field_name,
+                "allowed_fields": sorted(_DRIVER_ORDERING_FIELDS),
+            },
+        )
+    return sorted(
+        drivers,
+        key=lambda driver: _sortable_value(getattr(driver, field_name)),
+        reverse=descending,
+    )
+
+
+def _sortable_value(value: Any) -> Any:
+    """Return a primitive value suitable for stable sorting."""
+    return getattr(value, "value", value) or ""

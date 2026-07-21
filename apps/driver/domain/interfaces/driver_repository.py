@@ -52,6 +52,10 @@ class IDriverRepository(ABC):
         """
 
     @abstractmethod
+    def list_all(self) -> list[Driver]:
+        """Return all drivers, regardless of lifecycle status."""
+
+    @abstractmethod
     def decommission_missing_from_sap(self, seen_customer_numbers: set[str]) -> int:
         """Mark drivers absent from a SAP sync as DECOMMISSIONED."""
 

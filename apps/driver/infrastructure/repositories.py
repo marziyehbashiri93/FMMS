@@ -69,6 +69,10 @@ class DjangoDriverRepository(IDriverRepository):
         qs = DriverModel.objects.filter(status=status.value)
         return [_to_domain(orm) for orm in qs]
 
+    def list_all(self) -> list[Driver]:
+        """Return all drivers regardless of status."""
+        return [_to_domain(orm) for orm in DriverModel.objects.all()]
+
     def decommission_missing_from_sap(self, seen_customer_numbers: set[str]) -> int:
         """Mark drivers absent from SAP as DECOMMISSIONED without soft-delete."""
         now = datetime.now(tz=UTC)

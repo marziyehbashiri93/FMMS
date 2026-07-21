@@ -69,3 +69,75 @@ class TestDriverAPI:
             format="json",
         )
         assert suspended.status_code == 404
+
+    def test_list_without_status_filter_returns_all_statuses(
+        self,
+        authenticated_client: APIClient,
+    ) -> None:
+        active = DriverModel.objects.create(
+            customer_number="6000002234",
+            name="Active Driver",
+            status=DriverStatus.ACTIVE.value,
+        )
+        decommissioned = DriverModel.objects.create(
+            customer_number="6000002235",
+            name="Decommissioned Driver",
+            status=DriverStatus.DECOMMISSIONED.value,
+        )
+
+        response = authenticated_client.get("/api/v1/drivers/")
+
+        assert response.status_code == 200
+        customer_numbers = {
+            item["customer_number"] for item in response.data["results"]
+        }
+        assert active.customer_number in customer_numbers
+        assert decommissioned.customer_number in customer_numbers
+
+    def test_list_with_status_filter_returns_matching_status_only(
+        self,
+        authenticated_client: APIClient,
+    ) -> None:
+        DriverModel.objects.create(
+            customer_number="6000003234",
+            name="Active Driver",
+            status=DriverStatus.ACTIVE.value,
+        )
+        decommissioned = DriverModel.objects.create(
+            customer_number="6000003235",
+            name="Decommissioned Driver",
+            status=DriverStatus.DECOMMISSIONED.value,
+        )
+
+        response = authenticated_client.get(
+            f"/api/v1/drivers/?status={DriverStatus.DECOMMISSIONED.value}"
+        )
+
+        assert response.status_code == 200
+        customer_numbers = {
+            item["customer_number"] for item in response.data["results"]
+        }
+        assert customer_numbers == {decommissioned.customer_number}
+
+    def test_list_supports_ordering(
+        self,
+        authenticated_client: APIClient,
+    ) -> None:
+        DriverModel.objects.create(
+            customer_number="6000004234",
+            name="Ali Driver",
+            status=DriverStatus.ACTIVE.value,
+        )
+        DriverModel.objects.create(
+            customer_number="6000004235",
+            name="Reza Driver",
+            status=DriverStatus.ACTIVE.value,
+        )
+
+        response = authenticated_client.get("/api/v1/drivers/?ordering=-name")
+
+        assert response.status_code == 200
+        assert [item["name"] for item in response.data["results"]] == [
+            "Reza Driver",
+            "Ali Driver",
+        ]

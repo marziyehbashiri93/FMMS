@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import uuid
 
-from drf_spectacular.utils import extend_schema
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
@@ -12,6 +11,7 @@ from rest_framework.viewsets import GenericViewSet
 from apps.driver.domain.entities import DriverStatus
 from core.permissions import IsReadOnlyOrTechnicianOrAbove
 from interfaces.api.v1 import deps
+from interfaces.api.v1.driver import schema as driver_schema
 from interfaces.api.v1.driver.serializers import DriverResponseSerializer
 from interfaces.api.v1.utils import paginate_dto_list, request_id_from
 
@@ -21,7 +21,7 @@ class DriverViewSet(GenericViewSet):
 
     permission_classes = [IsReadOnlyOrTechnicianOrAbove]
 
-    @extend_schema(responses=DriverResponseSerializer)
+    @driver_schema.retrieve
     def retrieve(self, request: Request, pk: str | None = None) -> Response:
         """Retrieve one driver."""
         result = deps.get_get_driver_service().execute(
@@ -29,13 +29,16 @@ class DriverViewSet(GenericViewSet):
         )
         return Response(DriverResponseSerializer(result).data)
 
-    @extend_schema(responses=DriverResponseSerializer(many=True))
+    @driver_schema.list
     def list(self, request: Request) -> Response:
         """List drivers, optionally filtered by status."""
         raw_status = request.query_params.get("status")
-        driver_status = DriverStatus(raw_status) if raw_status else DriverStatus.ACTIVE
+        ordering = request.query_params.get("ordering", "")
+        driver_status = DriverStatus(raw_status) if raw_status else None
         items = deps.get_list_drivers_service().execute(
-            driver_status, request_id_from(request)
+            driver_status,
+            ordering=ordering,
+            request_id=request_id_from(request),
         )
         page = paginate_dto_list(self, items)
         serializer = DriverResponseSerializer(

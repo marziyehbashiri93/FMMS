@@ -25,7 +25,7 @@ from apps.driver.domain.entities import Driver, DriverStatus
 from apps.driver.domain.exceptions import DriverNotFoundError
 from apps.driver.domain.interfaces.driver_repository import IDriverRepository
 from apps.driver.domain.value_objects import CustomerNumber
-from core.exceptions.base_exception import FMMSNotFoundError
+from core.exceptions.base_exception import FMMSNotFoundError, FMMSValidationError
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -71,6 +71,9 @@ class FakeDriverRepository(IDriverRepository):
     def list_by_status(self, status: DriverStatus) -> list[Driver]:
         return [d for d in self._store.values() if d.status == status]
 
+    def list_all(self) -> list[Driver]:
+        return list(self._store.values())
+
     def decommission_missing_from_sap(self, seen_customer_numbers: set[str]) -> int:
         count = 0
         for driver in self._store.values():
@@ -110,7 +113,7 @@ class TestGetDriverService:
 
 
 class TestListDriversService:
-    def test_lists_active_drivers_by_default(self) -> None:
+    def test_lists_all_drivers_by_default(self) -> None:
         active = _make_driver(customer_num="6000001001")
         decommissioned = _make_driver(
             customer_num="6000001002",
@@ -120,8 +123,11 @@ class TestListDriversService:
 
         results = ListDriversService(repo).execute()
 
-        assert len(results) == 1
-        assert results[0].customer_number == active.customer_number.value
+        assert len(results) == 2
+        assert {item.customer_number for item in results} == {
+            active.customer_number.value,
+            decommissioned.customer_number.value,
+        }
 
     def test_filters_by_decommissioned_status(self) -> None:
         active = _make_driver(customer_num="6000001003")
@@ -135,6 +141,23 @@ class TestListDriversService:
 
         assert len(results) == 1
         assert results[0].status == DriverStatus.DECOMMISSIONED
+
+    def test_orders_by_name_descending(self) -> None:
+        first = _make_driver(customer_num="6000001005")
+        first.name = "Ali"
+        second = _make_driver(customer_num="6000001006")
+        second.name = "Reza"
+        repo = FakeDriverRepository(initial=[first, second])
+
+        results = ListDriversService(repo).execute(ordering="-name")
+
+        assert [item.name for item in results] == ["Reza", "Ali"]
+
+    def test_rejects_unsupported_ordering_field(self) -> None:
+        repo = FakeDriverRepository(initial=[_make_driver()])
+
+        with pytest.raises(FMMSValidationError, match="Unsupported driver ordering"):
+            ListDriversService(repo).execute(ordering="assigned_vehicle_id")
 
     def test_returns_empty_list_when_none_match(self) -> None:
         repo = FakeDriverRepository()
