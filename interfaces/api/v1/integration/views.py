@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 
 from drf_spectacular.utils import extend_schema
+from rest_framework.decorators import action
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
@@ -13,11 +14,12 @@ from apps.integration.domain.entities import SAPTransactionStatus
 from core.permissions import IsFMMSAuthenticated, IsSupervisorOrAbove
 from interfaces.api.v1 import deps
 from interfaces.api.v1.integration.serializers import (
+    SAPSyncRunHistorySerializer,
     SAPSyncRunResponseSerializer,
     SAPTransactionResponseSerializer,
 )
 from interfaces.api.v1.schema_tags import API_TAGS
-from interfaces.api.v1.utils import paginate_dto_list, request_id_from
+from interfaces.api.v1.utils import paginate_dto_list, request_id_from, user_id_from
 
 
 class SAPTransactionViewSet(GenericViewSet):
@@ -70,6 +72,26 @@ class SAPSyncViewSet(GenericViewSet):
     def create(self, request: Request) -> Response:
         """Run every supported SAP read sync."""
         result = deps.get_run_sap_sync_service().execute(
-            request_id=request_id_from(request)
+            request_id=request_id_from(request),
+            trigger_source="API",
+            triggered_by=user_id_from(request),
         )
         return Response(SAPSyncRunResponseSerializer(result).data)
+
+    @extend_schema(
+        tags=[API_TAGS.integration],
+        responses=SAPSyncRunHistorySerializer(many=True),
+    )
+    @action(detail=False, methods=["get"], url_path="history")
+    def history(self, request: Request) -> Response:
+        """List persisted SAP read-sync runs."""
+        items = deps.get_list_sap_sync_runs_service().execute()
+        page = paginate_dto_list(self, items)
+        serializer = SAPSyncRunHistorySerializer(
+            page if page is not None else items, many=True
+        )
+        return (
+            self.get_paginated_response(serializer.data)
+            if page is not None
+            else Response(serializer.data)
+        )

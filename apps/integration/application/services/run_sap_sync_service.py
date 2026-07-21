@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+from django.db import transaction
+
 from apps.inspection.application.services.sync_inspection_templates_from_sap_service import (
     SyncInspectionTemplatesFromSAPService,
 )
+from apps.integration.infrastructure.models import SAPSyncRunItemModel, SAPSyncRunModel
 from apps.vehicle.application.services.sync_vehicles_from_sap_service import (
     SyncVehiclesFromSAPService,
 )
@@ -20,6 +24,13 @@ logger = get_structured_logger("integration", __name__)
 SAP_SYNC_SUCCESS = "SUCCESS"
 SAP_SYNC_FAILED = "FAILED"
 SAP_SYNC_PARTIAL_SUCCESS = "PARTIAL_SUCCESS"
+SAP_SYNC_IN_PROGRESS = "IN_PROGRESS"
+SAP_SYNC_TRIGGER_API = "API"
+SAP_SYNC_TRIGGER_CELERY = "CELERY"
+SAP_SYNC_TRIGGER_JOB = "JOB"
+SAP_SYNC_TRIGGER_SOURCES = frozenset(
+    {SAP_SYNC_TRIGGER_API, SAP_SYNC_TRIGGER_CELERY, SAP_SYNC_TRIGGER_JOB}
+)
 
 
 @dataclass(frozen=True)
@@ -28,6 +39,8 @@ class SAPSyncItemResultDTO:
 
     name: str
     status: str
+    started_at: datetime
+    finished_at: datetime
     summary: dict[str, Any]
     error: str | None = None
 
@@ -36,6 +49,8 @@ class SAPSyncItemResultDTO:
 class RunSAPSyncResultDTO:
     """Result of the global SAP read synchronisation run."""
 
+    id: str
+    trigger_source: str
     status: str
     started_at: datetime
     finished_at: datetime
@@ -58,16 +73,34 @@ class RunSAPSyncService:
         self._vehicle_sync_service = vehicle_sync_service
         self._inspection_template_sync_service = inspection_template_sync_service
 
-    def execute(self, *, request_id: str = "") -> RunSAPSyncResultDTO:
+    def execute(
+        self,
+        *,
+        request_id: str = "",
+        trigger_source: str = SAP_SYNC_TRIGGER_API,
+        triggered_by: uuid.UUID | None = None,
+    ) -> RunSAPSyncResultDTO:
         """Run all SAP read syncs and return a per-sync status summary.
 
         Args:
             request_id: Correlation id for structured logging.
+            trigger_source: Caller type: API, CELERY, or JOB.
+            triggered_by: Optional user UUID for API-triggered syncs.
 
         Returns:
             A ``RunSAPSyncResultDTO`` containing global and item-level statuses.
         """
+        if trigger_source not in SAP_SYNC_TRIGGER_SOURCES:
+            trigger_source = SAP_SYNC_TRIGGER_JOB
         started_at = datetime.now(tz=UTC)
+        sync_run = SAPSyncRunModel.objects.create(
+            trigger_source=trigger_source,
+            status=SAP_SYNC_IN_PROGRESS,
+            request_id=request_id,
+            triggered_by_id=triggered_by,
+            started_at=started_at,
+            summary={},
+        )
         logger.info(
             "Running global SAP read sync",
             extra={
@@ -79,10 +112,12 @@ class RunSAPSyncService:
         )
         items = [
             self._run_item(
+                sync_run=sync_run,
                 name="vehicles",
                 sync=lambda: self._vehicle_sync_service.execute(request_id=request_id),
             ),
             self._run_item(
+                sync_run=sync_run,
                 name="inspection_templates",
                 sync=lambda: self._inspection_template_sync_service.execute(
                     request_id=request_id
@@ -91,6 +126,22 @@ class RunSAPSyncService:
         ]
         finished_at = datetime.now(tz=UTC)
         status = _global_status(items)
+        sync_run.status = status
+        sync_run.finished_at = finished_at
+        sync_run.summary = {
+            "items": {item.name: item.summary for item in items},
+            "failed_items": [item.name for item in items if item.error],
+        }
+        sync_run.error_message = "\n".join(item.error or "" for item in items).strip()
+        sync_run.save(
+            update_fields=[
+                "status",
+                "finished_at",
+                "summary",
+                "error_message",
+                "updated_at",
+            ]
+        )
         logger.info(
             "Global SAP read sync completed",
             extra={
@@ -102,6 +153,8 @@ class RunSAPSyncService:
             },
         )
         return RunSAPSyncResultDTO(
+            id=str(sync_run.id),
+            trigger_source=trigger_source,
             status=status,
             started_at=started_at,
             finished_at=finished_at,
@@ -111,13 +164,25 @@ class RunSAPSyncService:
     def _run_item(
         self,
         *,
+        sync_run: SAPSyncRunModel,
         name: str,
         sync: Callable[[], object],
     ) -> SAPSyncItemResultDTO:
         """Run one sync and isolate its failure from the remaining syncs."""
+        started_at = datetime.now(tz=UTC)
         try:
             result = sync()
         except Exception as exc:  # noqa: BLE001 - global sync must continue.
+            finished_at = datetime.now(tz=UTC)
+            _save_item(
+                sync_run=sync_run,
+                name=name,
+                status=SAP_SYNC_FAILED,
+                started_at=started_at,
+                finished_at=finished_at,
+                summary={},
+                error_message=str(exc),
+            )
             logger.error(
                 "SAP read sync item failed",
                 extra={
@@ -132,13 +197,28 @@ class RunSAPSyncService:
             return SAPSyncItemResultDTO(
                 name=name,
                 status=SAP_SYNC_FAILED,
+                started_at=started_at,
+                finished_at=finished_at,
                 summary={},
                 error=str(exc),
             )
+        finished_at = datetime.now(tz=UTC)
+        summary = asdict(result) if hasattr(result, "__dataclass_fields__") else {}
+        _save_item(
+            sync_run=sync_run,
+            name=name,
+            status=SAP_SYNC_SUCCESS,
+            started_at=started_at,
+            finished_at=finished_at,
+            summary=summary,
+            error_message="",
+        )
         return SAPSyncItemResultDTO(
             name=name,
             status=SAP_SYNC_SUCCESS,
-            summary=asdict(result) if hasattr(result, "__dataclass_fields__") else {},
+            started_at=started_at,
+            finished_at=finished_at,
+            summary=summary,
         )
 
 
@@ -150,3 +230,26 @@ def _global_status(items: list[SAPSyncItemResultDTO]) -> str:
     if succeeded == 0:
         return SAP_SYNC_FAILED
     return SAP_SYNC_PARTIAL_SUCCESS
+
+
+@transaction.atomic
+def _save_item(
+    *,
+    sync_run: SAPSyncRunModel,
+    name: str,
+    status: str,
+    started_at: datetime,
+    finished_at: datetime,
+    summary: dict[str, Any],
+    error_message: str,
+) -> None:
+    """Persist one sync item result."""
+    SAPSyncRunItemModel.objects.create(
+        sync_run=sync_run,
+        name=name,
+        status=status,
+        started_at=started_at,
+        finished_at=finished_at,
+        summary=summary,
+        error_message=error_message,
+    )

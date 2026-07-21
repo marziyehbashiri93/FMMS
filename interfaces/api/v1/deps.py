@@ -52,6 +52,9 @@ from apps.inspection.infrastructure.template_repositories import (
 from apps.integration.application.services.retry_failed_sap_transactions_service import (
     RetryFailedSAPTransactionsService,
 )
+from apps.integration.application.services.list_sap_sync_runs_service import (
+    ListSAPSyncRunsService,
+)
 from apps.integration.application.services.run_sap_sync_service import RunSAPSyncService
 from apps.integration.infrastructure.repositories import DjangoSAPTransactionRepository
 from apps.material.application.services.material_request_service import (
@@ -456,6 +459,11 @@ def get_run_sap_sync_service() -> RunSAPSyncService:
         get_sync_vehicles_from_sap_service(),
         get_sync_inspection_templates_from_sap_service(),
     )
+
+
+def get_list_sap_sync_runs_service() -> ListSAPSyncRunsService:
+    """Return ListSAPSyncRunsService."""
+    return ListSAPSyncRunsService()
 
 
 def get_report_fault_service() -> ReportFaultService:

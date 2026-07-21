@@ -13,6 +13,7 @@ from apps.integration.domain.entities import (
     SAPTransaction,
     SAPTransactionStatus,
 )
+from apps.integration.infrastructure.models import SAPSyncRunModel
 from apps.integration.infrastructure.repositories import DjangoSAPTransactionRepository
 from apps.vehicle.infrastructure.models import VehicleModel
 
@@ -68,3 +69,29 @@ class TestIntegrationAPI:
         assert items["inspection_templates"]["summary"]["total_received"] >= 4
         assert items["inspection_templates"]["summary"]["failed"] == 0
         assert VehicleModel.objects.exists()
+        assert SAPSyncRunModel.objects.filter(
+            id=response.data["id"],
+            trigger_source="API",
+            status="SUCCESS",
+        ).exists()
+
+    def test_global_sap_sync_history_is_listed(
+        self, authenticated_client: APIClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Expose persisted SAP read-sync history for API and job runs."""
+        monkeypatch.setenv("SAP_USE_MOCK", "True")
+        created = authenticated_client.post("/api/v1/sap-sync/", {}, format="json")
+        assert created.status_code == 200, created.data
+
+        response = authenticated_client.get("/api/v1/sap-sync/history/")
+
+        assert response.status_code == 200, response.data
+        assert response.data["count"] >= 1
+        first = response.data["results"][0]
+        assert first["id"] == created.data["id"]
+        assert first["trigger_source"] == "API"
+        assert first["status"] == "SUCCESS"
+        assert {item["name"] for item in first["items"]} == {
+            "vehicles",
+            "inspection_templates",
+        }

@@ -35,6 +35,8 @@ class SAPSyncItemResultSerializer(serializers.Serializer):
 
     name = serializers.CharField()
     status = serializers.ChoiceField(choices=["SUCCESS", "FAILED", "PARTIAL_SUCCESS"])
+    started_at = serializers.DateTimeField()
+    finished_at = serializers.DateTimeField()
     summary = serializers.DictField()
     error = serializers.CharField(allow_null=True)
 
@@ -42,7 +44,26 @@ class SAPSyncItemResultSerializer(serializers.Serializer):
 class SAPSyncRunResponseSerializer(serializers.Serializer):
     """Serialize the global SAP read-sync run result."""
 
+    id = serializers.CharField()
+    trigger_source = serializers.ChoiceField(choices=["API", "CELERY", "JOB"])
     status = serializers.ChoiceField(choices=["SUCCESS", "FAILED", "PARTIAL_SUCCESS"])
     started_at = serializers.DateTimeField()
     finished_at = serializers.DateTimeField()
+    items = SAPSyncItemResultSerializer(many=True)
+
+
+class SAPSyncRunHistorySerializer(serializers.Serializer):
+    """Serialize a persisted SAP read-sync run."""
+
+    id = serializers.CharField()
+    trigger_source = serializers.ChoiceField(choices=["API", "CELERY", "JOB"])
+    status = serializers.ChoiceField(
+        choices=["IN_PROGRESS", "SUCCESS", "FAILED", "PARTIAL_SUCCESS"]
+    )
+    request_id = serializers.CharField()
+    triggered_by = serializers.CharField(allow_null=True)
+    started_at = serializers.DateTimeField()
+    finished_at = serializers.DateTimeField(allow_null=True)
+    summary = serializers.DictField()
+    error = serializers.CharField(allow_null=True)
     items = SAPSyncItemResultSerializer(many=True)
