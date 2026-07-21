@@ -156,14 +156,8 @@ from apps.repair.infrastructure.invoice_repositories import (
     DjangoExternalRepairInvoiceRepository,
 )
 from apps.repair.infrastructure.repositories import DjangoRepairOrderRepository
-from apps.vehicle.application.services.activate_vehicle_service import (
-    ActivateVehicleService,
-)
 from apps.vehicle.application.services.change_vehicle_status_service import (
     ChangeVehicleStatusService,
-)
-from apps.vehicle.application.services.deactivate_vehicle_service import (
-    DeactivateVehicleService,
 )
 from apps.vehicle.application.services.get_vehicle_service import (
     GetVehicleService,
@@ -321,20 +315,6 @@ def get_sap_transaction_manager() -> SAPTransactionManager:
 def get_user_profile_reader() -> DjangoUserProfileReader:
     """Return the FMMS user profile reader."""
     return DjangoUserProfileReader()
-
-
-def get_deactivate_vehicle_service() -> DeactivateVehicleService:
-    """Return DeactivateVehicleService."""
-    return DeactivateVehicleService(get_vehicle_repository())
-
-
-def get_activate_vehicle_service() -> ActivateVehicleService:
-    """Return ActivateVehicleService."""
-    return ActivateVehicleService(
-        get_vehicle_repository(),
-        get_repair_order_repository(),
-        get_fault_repository(),
-    )
 
 
 def get_change_vehicle_status_service() -> ChangeVehicleStatusService:

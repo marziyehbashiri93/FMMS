@@ -88,7 +88,9 @@ def _confirm_driver_handover(
     """Confirm the handover for a repair order."""
     handovers = client.get("/api/v1/vehicle-handovers/")
     assert handovers.status_code == 200, handovers.data
-    target = next(item for item in handovers.data if item["repair_order_id"] == order_id)
+    target = next(
+        item for item in handovers.data if item["repair_order_id"] == order_id
+    )
     payload: dict = {"accepted": True, "comment": "ok"}
     if invoice:
         payload.update(invoice)
@@ -388,7 +390,9 @@ class TestMaintenanceWorkflowV2API:
             format="json",
         )
         assert missing_invoice.status_code == 422, missing_invoice.data
-        assert missing_invoice.data["error_code"] == "EXTERNAL_HANDOVER_INVOICE_REQUIRED"
+        assert (
+            missing_invoice.data["error_code"] == "EXTERNAL_HANDOVER_INVOICE_REQUIRED"
+        )
 
         _confirm_driver_handover(
             technician_client,
@@ -398,7 +402,9 @@ class TestMaintenanceWorkflowV2API:
         repair_after_handover = authenticated_client.get(
             f"/api/v1/repair-orders/{order['id']}/"
         )
-        assert repair_after_handover.data["status"] == "WAITING_TRANSPORT_FINAL_APPROVAL"
+        assert (
+            repair_after_handover.data["status"] == "WAITING_TRANSPORT_FINAL_APPROVAL"
+        )
 
         listed = authenticated_client.get("/api/v1/external-invoices/")
         assert listed.status_code == 200, listed.data
@@ -658,7 +664,9 @@ class TestMaintenanceWorkflowV2API:
         assert submitted.data["has_failures"] is True
 
         deactivated = authenticated_client.post(
-            f"/api/v1/vehicles/{vehicle['id']}/deactivate/", {}, format="json"
+            f"/api/v1/vehicles/{vehicle['id']}/status/",
+            {"status": "INACTIVE"},
+            format="json",
         )
         assert deactivated.status_code == 200, deactivated.data
         assert deactivated.data["status"] == "INACTIVE"

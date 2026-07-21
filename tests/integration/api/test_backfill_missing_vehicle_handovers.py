@@ -53,7 +53,9 @@ class TestBackfillMissingVehicleHandoversCommand:
         assert submitted.status_code == 200, submitted.data
 
         deactivated = authenticated_client.post(
-            f"/api/v1/vehicles/{vehicle['id']}/deactivate/", {}, format="json"
+            f"/api/v1/vehicles/{vehicle['id']}/status/",
+            {"status": "INACTIVE"},
+            format="json",
         )
         assert deactivated.status_code == 200, deactivated.data
 

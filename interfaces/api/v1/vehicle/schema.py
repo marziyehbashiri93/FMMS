@@ -67,20 +67,6 @@ list = extend_schema(
     responses=VehicleResponseSerializer(many=True),
 )
 
-activate = extend_schema(
-    tags=[API_TAGS.vehicle],
-    parameters=[vehicle_id_parameter],
-    request=None,
-    responses=VehicleResponseSerializer,
-)
-
-deactivate = extend_schema(
-    tags=[API_TAGS.vehicle],
-    parameters=[vehicle_id_parameter],
-    request=None,
-    responses=VehicleResponseSerializer,
-)
-
 change_status = extend_schema(
     tags=[API_TAGS.vehicle],
     parameters=[vehicle_id_parameter],

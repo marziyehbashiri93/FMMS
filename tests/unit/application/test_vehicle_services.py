@@ -28,14 +28,10 @@ from apps.repair.domain.entities import RepairOrder, RepairOrderStatus
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
 from apps.repair.domain.value_objects import TechnicianAssignment
 from apps.vehicle.application.dto.vehicle_dto import (
-    ActivateVehicleDTO,
-    DeactivateVehicleDTO,
+    ChangeVehicleStatusDTO,
 )
-from apps.vehicle.application.services.activate_vehicle_service import (
-    ActivateVehicleService,
-)
-from apps.vehicle.application.services.deactivate_vehicle_service import (
-    DeactivateVehicleService,
+from apps.vehicle.application.services.change_vehicle_status_service import (
+    ChangeVehicleStatusService,
 )
 from apps.vehicle.application.services.get_vehicle_service import (
     GetVehicleService,
@@ -45,7 +41,6 @@ from apps.vehicle.application.services.sync_vehicles_from_sap_service import (
     SyncVehiclesFromSAPService,
 )
 from apps.vehicle.domain.entities import Vehicle, VehicleStatus
-from apps.vehicle.domain.exceptions import VehicleInvalidStateTransitionError
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
 from apps.vehicle.domain.value_objects import PlateNumber, SAPVehicleNumber
 from core.exceptions.base_exception import (
@@ -330,58 +325,62 @@ class FakeSAPVehicleDriverPort(ISAPVehicleDriverPort):
 
 
 # ---------------------------------------------------------------------------
-# DeactivateVehicleService
+# ChangeVehicleStatusService
 # ---------------------------------------------------------------------------
 
 
-class TestDeactivateVehicleService:
+class TestChangeVehicleStatusService:
     def _make_service(
         self,
         vehicle: Vehicle,
-    ) -> DeactivateVehicleService:
-        return DeactivateVehicleService(
+        *,
+        repair_orders: list[RepairOrder] | None = None,
+        faults: list[Fault] | None = None,
+    ) -> ChangeVehicleStatusService:
+        return ChangeVehicleStatusService(
             vehicle_repository=FakeVehicleRepository(initial=[vehicle]),
+            repair_order_repository=FakeRepairOrderRepository(repair_orders),
+            fault_repository=FakeFaultRepository(faults),
         )
 
-    def test_deactivates_vehicle(self) -> None:
+    def _dto(
+        self,
+        vehicle_id: uuid.UUID,
+        status: VehicleStatus,
+    ) -> ChangeVehicleStatusDTO:
+        return ChangeVehicleStatusDTO(
+            vehicle_id=vehicle_id,
+            status=status,
+            request_id="req-status",
+            requested_by=uuid.uuid4(),
+        )
+
+    def test_changes_vehicle_to_inactive(self) -> None:
         vehicle = _make_vehicle()
         service = self._make_service(vehicle)
 
-        result = service.execute(
-            DeactivateVehicleDTO(
-                vehicle_id=vehicle.id,
-                request_id="req-deact-repair",
-                requested_by=uuid.uuid4(),
-            )
-        )
+        result = service.execute(self._dto(vehicle.id, VehicleStatus.INACTIVE))
 
         assert result.status == VehicleStatus.INACTIVE
 
     def test_raises_not_found_for_missing_vehicle(self) -> None:
         repo = FakeVehicleRepository()
-        service = DeactivateVehicleService(vehicle_repository=repo)
+        service = ChangeVehicleStatusService(
+            vehicle_repository=repo,
+            repair_order_repository=FakeRepairOrderRepository(),
+            fault_repository=FakeFaultRepository(),
+        )
 
         with pytest.raises(FMMSNotFoundError):
-            service.execute(
-                DeactivateVehicleDTO(
-                    vehicle_id=uuid.uuid4(),
-                    request_id="req-ghost",
-                    requested_by=uuid.uuid4(),
-                )
-            )
+            service.execute(self._dto(uuid.uuid4(), VehicleStatus.INACTIVE))
 
-    def test_raises_state_error_when_already_inactive(self) -> None:
+    def test_same_status_is_idempotent(self) -> None:
         vehicle = _make_vehicle(status=VehicleStatus.INACTIVE)
         service = self._make_service(vehicle)
 
-        with pytest.raises(VehicleInvalidStateTransitionError):
-            service.execute(
-                DeactivateVehicleDTO(
-                    vehicle_id=vehicle.id,
-                    request_id="req-already",
-                    requested_by=uuid.uuid4(),
-                )
-            )
+        result = service.execute(self._dto(vehicle.id, VehicleStatus.INACTIVE))
+
+        assert result.status == VehicleStatus.INACTIVE
 
 
 # ---------------------------------------------------------------------------
@@ -601,7 +600,7 @@ class TestSyncVehiclesFromSAPService:
 
 
 # ---------------------------------------------------------------------------
-# ActivateVehicleService
+# ChangeVehicleStatusService activation behavior
 # ---------------------------------------------------------------------------
 
 
@@ -644,23 +643,24 @@ def _make_completed_order(*, vehicle_id: uuid.UUID, fault_id: uuid.UUID) -> Repa
     return order
 
 
-class TestActivateVehicleService:
+class TestChangeVehicleStatusActivation:
     def _service(
         self,
         vehicle: Vehicle,
         *,
         repair_orders: list[RepairOrder] | None = None,
         faults: list[Fault] | None = None,
-    ) -> ActivateVehicleService:
-        return ActivateVehicleService(
+    ) -> ChangeVehicleStatusService:
+        return ChangeVehicleStatusService(
             vehicle_repository=FakeVehicleRepository(initial=[vehicle]),
             repair_order_repository=FakeRepairOrderRepository(repair_orders),
             fault_repository=FakeFaultRepository(faults),
         )
 
-    def _dto(self, vehicle_id: uuid.UUID) -> ActivateVehicleDTO:
-        return ActivateVehicleDTO(
+    def _dto(self, vehicle_id: uuid.UUID) -> ChangeVehicleStatusDTO:
+        return ChangeVehicleStatusDTO(
             vehicle_id=vehicle_id,
+            status=VehicleStatus.ACTIVE,
             request_id="req-activate",
             requested_by=uuid.uuid4(),
         )
@@ -670,7 +670,7 @@ class TestActivateVehicleService:
         fault = _make_fault(vehicle.id, status=FaultStatus.OPEN)
         order = _make_completed_order(vehicle_id=vehicle.id, fault_id=fault.id)
         fault_repo = FakeFaultRepository([fault])
-        service = ActivateVehicleService(
+        service = ChangeVehicleStatusService(
             FakeVehicleRepository([vehicle]),
             FakeRepairOrderRepository([order]),
             fault_repo,
@@ -728,9 +728,8 @@ class TestActivateVehicleService:
     def test_rejects_already_active_vehicle_when_open_fault_exists(self) -> None:
         vehicle = _make_vehicle(status=VehicleStatus.ACTIVE)
         fault = _make_fault(vehicle.id, status=FaultStatus.OPEN)
-        order = _make_completed_order(vehicle_id=vehicle.id, fault_id=fault.id)
         fault_repo = FakeFaultRepository([fault])
-        service = self._service(vehicle, repair_orders=[order], faults=[fault])
+        service = self._service(vehicle, faults=[fault])
 
         with pytest.raises(FMMSConflictError):
             service.execute(self._dto(vehicle.id))

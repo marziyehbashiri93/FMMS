@@ -15,9 +15,7 @@ pytestmark = pytest.mark.django_db
 
 def _create_order(client: APIClient, *, plate: str, vin: str) -> tuple[dict, str]:
     """Create a vehicle+fault+repair order; return (vehicle, order_id)."""
-    vehicle = create_vehicle(
-        client, plate=plate, vin=vin, vehicle_number="100010"
-    )
+    vehicle = create_vehicle(client, plate=plate, vin=vin, vehicle_number="100010")
     fault = client.post(
         "/api/v1/faults/",
         {

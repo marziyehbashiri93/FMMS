@@ -94,7 +94,9 @@ class TestViewerPermissions:
 class TestTechnicianVsSupervisorActions:
     """Supervisor-gated actions reject technicians."""
 
-    def test_technician_cannot_create_vehicle(self, technician_client: APIClient) -> None:
+    def test_technician_cannot_create_vehicle(
+        self, technician_client: APIClient
+    ) -> None:
         """Vehicle creation is SAP-only; manual API create is unavailable."""
         response = technician_client.post(
             "/api/v1/vehicles/",
@@ -110,30 +112,30 @@ class TestTechnicianVsSupervisorActions:
         )
         assert response.status_code == 405
 
-    def test_technician_cannot_deactivate_vehicle(
+    def test_technician_cannot_change_vehicle_status(
         self, authenticated_client: APIClient, technician_client: APIClient
     ) -> None:
-        """Deactivate requires SUPERVISOR or ADMIN."""
+        """Vehicle status changes require SUPERVISOR or ADMIN."""
         vehicle = create_vehicle(
             authenticated_client, plate="12TECH02", vin="1HGCM82633A004396"
         )
         response = technician_client.post(
-            f"/api/v1/vehicles/{vehicle['id']}/deactivate/",
-            {},
+            f"/api/v1/vehicles/{vehicle['id']}/status/",
+            {"status": "INACTIVE"},
             format="json",
         )
         assert response.status_code == 403
 
-    def test_supervisor_can_deactivate_vehicle(
+    def test_supervisor_can_change_vehicle_status(
         self, authenticated_client: APIClient, supervisor_client: APIClient
     ) -> None:
-        """SUPERVISOR may deactivate vehicles."""
+        """SUPERVISOR may change vehicle status."""
         vehicle = create_vehicle(
             authenticated_client, plate="12SUP001", vin="1HGCM82633A004395"
         )
         response = supervisor_client.post(
-            f"/api/v1/vehicles/{vehicle['id']}/deactivate/",
-            {},
+            f"/api/v1/vehicles/{vehicle['id']}/status/",
+            {"status": "INACTIVE"},
             format="json",
         )
         assert response.status_code == 200

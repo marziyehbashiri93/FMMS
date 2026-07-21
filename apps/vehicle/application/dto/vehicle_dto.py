@@ -16,36 +16,6 @@ from apps.vehicle.domain.entities import VehicleStatus
 
 
 @dataclass(frozen=True)
-class DeactivateVehicleDTO:
-    """Input DTO for deactivating a vehicle.
-
-    Attributes:
-        vehicle_id: Target vehicle to deactivate.
-        request_id: Correlation ID for tracing.
-        requested_by: UUID of the user requesting deactivation.
-    """
-
-    vehicle_id: uuid.UUID
-    request_id: str
-    requested_by: uuid.UUID
-
-
-@dataclass(frozen=True)
-class ActivateVehicleDTO:
-    """Input DTO for re-activating a vehicle after maintenance.
-
-    Attributes:
-        vehicle_id: Target vehicle to activate.
-        request_id: Correlation ID for tracing.
-        requested_by: UUID of the supervisor/admin performing activation.
-    """
-
-    vehicle_id: uuid.UUID
-    request_id: str
-    requested_by: uuid.UUID
-
-
-@dataclass(frozen=True)
 class ChangeVehicleStatusDTO:
     """Input DTO for changing an FMMS-controlled vehicle status."""
 

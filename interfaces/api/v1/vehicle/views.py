@@ -10,9 +10,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
 from apps.vehicle.application.dto.vehicle_dto import (
-    ActivateVehicleDTO,
     ChangeVehicleStatusDTO,
-    DeactivateVehicleDTO,
     RecordVehicleOdometerDTO,
 )
 from apps.vehicle.domain.entities import VehicleStatus
@@ -61,30 +59,6 @@ class VehicleViewSet(GenericViewSet):
             if page is not None
             else Response(serializer.data)
         )
-
-    @vehicle_schema.deactivate
-    @action(detail=True, methods=["post"], permission_classes=[IsSupervisorOrAbove])
-    def deactivate(self, request: Request, pk: str | None = None) -> Response:
-        """Deactivate a vehicle."""
-        result = deps.get_deactivate_vehicle_service().execute(
-            DeactivateVehicleDTO(
-                uuid.UUID(str(pk)), request_id_from(request), user_id_from(request)
-            )
-        )
-        return Response(VehicleResponseSerializer(result).data)
-
-    @vehicle_schema.activate
-    @action(detail=True, methods=["post"], permission_classes=[IsSupervisorOrAbove])
-    def activate(self, request: Request, pk: str | None = None) -> Response:
-        """Re-activate a vehicle after maintenance when no open repairs remain."""
-        result = deps.get_activate_vehicle_service().execute(
-            ActivateVehicleDTO(
-                vehicle_id=uuid.UUID(str(pk)),
-                request_id=request_id_from(request),
-                requested_by=user_id_from(request),
-            )
-        )
-        return Response(VehicleResponseSerializer(result).data)
 
     @vehicle_schema.change_status
     @action(

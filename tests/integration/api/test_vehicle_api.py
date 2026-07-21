@@ -65,8 +65,8 @@ class TestVehicleAPI:
         assert patched.status_code == 405
 
         deactivated = authenticated_client.post(
-            f"/api/v1/vehicles/{vehicle_id}/deactivate/",
-            {},
+            f"/api/v1/vehicles/{vehicle_id}/status/",
+            {"status": "INACTIVE"},
             format="json",
         )
         assert deactivated.status_code == 200

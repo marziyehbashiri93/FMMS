@@ -185,8 +185,8 @@ class TestDriverInspectionWorkflowAPI:
         assert detail.data["status"] == VehicleStatus.ACTIVE.value
 
         deactivated = authenticated_client.post(
-            f"/api/v1/vehicles/{vehicle['id']}/deactivate/",
-            {},
+            f"/api/v1/vehicles/{vehicle['id']}/status/",
+            {"status": VehicleStatus.INACTIVE.value},
             format="json",
         )
         assert deactivated.status_code == 200, deactivated.data

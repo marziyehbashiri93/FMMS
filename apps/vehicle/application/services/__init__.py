@@ -1,10 +1,7 @@
-"""Vehicle application services — orchestration without business rules."""
+"""Vehicle application services - orchestration without business rules."""
 
-from apps.vehicle.application.services.activate_vehicle_service import (
-    ActivateVehicleService,
-)
-from apps.vehicle.application.services.deactivate_vehicle_service import (
-    DeactivateVehicleService,
+from apps.vehicle.application.services.change_vehicle_status_service import (
+    ChangeVehicleStatusService,
 )
 from apps.vehicle.application.services.get_vehicle_service import (
     GetVehicleService,
@@ -19,8 +16,7 @@ from apps.vehicle.application.services.sync_vehicles_from_sap_service import (
 )
 
 __all__ = [
-    "ActivateVehicleService",
-    "DeactivateVehicleService",
+    "ChangeVehicleStatusService",
     "GetVehicleService",
     "ListVehiclesService",
     "ListVehicleOdometerHistoryService",

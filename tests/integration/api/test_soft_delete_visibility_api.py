@@ -49,8 +49,8 @@ class TestSoftDeleteVisibility:
             authenticated_client, plate="12SOFT02", vin="1HGCM82633A004371"
         )
         deactivated = authenticated_client.post(
-            f"/api/v1/vehicles/{vehicle['id']}/deactivate/",
-            {},
+            f"/api/v1/vehicles/{vehicle['id']}/status/",
+            {"status": "INACTIVE"},
             format="json",
         )
         assert deactivated.status_code == 200

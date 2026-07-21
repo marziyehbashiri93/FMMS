@@ -58,8 +58,8 @@ def _workshop_assigned_order(client: APIClient, plate: str, vin: str) -> dict:
     return assigned.data
 
 
-class TestVehicleActivateAPI:
-    """Cover POST /api/v1/vehicles/{id}/activate/."""
+class TestVehicleStatusAPI:
+    """Cover POST /api/v1/vehicles/{id}/status/."""
 
     def test_supervisor_can_activate_after_maintenance(
         self, authenticated_client: APIClient, supervisor_client: APIClient
@@ -68,13 +68,17 @@ class TestVehicleActivateAPI:
             authenticated_client, plate="12ACT001", vin="1HGCM82633A004401"
         )
         deactivated = authenticated_client.post(
-            f"/api/v1/vehicles/{vehicle['id']}/deactivate/", {}, format="json"
+            f"/api/v1/vehicles/{vehicle['id']}/status/",
+            {"status": VehicleStatus.INACTIVE.value},
+            format="json",
         )
         assert deactivated.status_code == 200
         assert deactivated.data["status"] == VehicleStatus.INACTIVE.value
 
         activated = supervisor_client.post(
-            f"/api/v1/vehicles/{vehicle['id']}/activate/", {}, format="json"
+            f"/api/v1/vehicles/{vehicle['id']}/status/",
+            {"status": VehicleStatus.ACTIVE.value},
+            format="json",
         )
         assert activated.status_code == 200, activated.data
         assert activated.data["status"] == VehicleStatus.ACTIVE.value
@@ -87,12 +91,16 @@ class TestVehicleActivateAPI:
             authenticated_client, "12ACT002", "1HGCM82633A004402"
         )
         deactivated = authenticated_client.post(
-            f"/api/v1/vehicles/{vehicle['id']}/deactivate/", {}, format="json"
+            f"/api/v1/vehicles/{vehicle['id']}/status/",
+            {"status": VehicleStatus.INACTIVE.value},
+            format="json",
         )
         assert deactivated.status_code == 200
 
         response = authenticated_client.post(
-            f"/api/v1/vehicles/{vehicle['id']}/activate/", {}, format="json"
+            f"/api/v1/vehicles/{vehicle['id']}/status/",
+            {"status": VehicleStatus.ACTIVE.value},
+            format="json",
         )
         assert response.status_code == 409
 
@@ -103,10 +111,14 @@ class TestVehicleActivateAPI:
             authenticated_client, plate="12ACT003", vin="1HGCM82633A004403"
         )
         authenticated_client.post(
-            f"/api/v1/vehicles/{vehicle['id']}/deactivate/", {}, format="json"
+            f"/api/v1/vehicles/{vehicle['id']}/status/",
+            {"status": VehicleStatus.INACTIVE.value},
+            format="json",
         )
         response = viewer_client.post(
-            f"/api/v1/vehicles/{vehicle['id']}/activate/", {}, format="json"
+            f"/api/v1/vehicles/{vehicle['id']}/status/",
+            {"status": VehicleStatus.ACTIVE.value},
+            format="json",
         )
         assert response.status_code == 403
 

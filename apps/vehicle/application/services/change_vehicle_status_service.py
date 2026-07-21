@@ -5,7 +5,10 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
+from apps.fault.domain.entities import Fault, FaultStatus
+from apps.fault.domain.exceptions import FaultNotFoundError
 from apps.fault.domain.interfaces.fault_repository import IFaultRepository
+from apps.repair.domain.entities import RepairOrderStatus
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
 from apps.vehicle.application.dto.vehicle_dto import (
     ChangeVehicleStatusDTO,
@@ -21,6 +24,61 @@ logger = get_structured_logger("vehicle", __name__)
 
 
 _SAP_ONLY_STATUSES = frozenset({VehicleStatus.DECOMMISSIONED})
+
+
+def _close_faults_for_completed_repairs(
+    *,
+    vehicle_id: uuid.UUID,
+    repair_order_repository: IRepairOrderRepository,
+    fault_repository: IFaultRepository,
+    request_id: str,
+) -> None:
+    """Close open faults linked to completed repair orders for a vehicle."""
+    finished_orders: list = []
+    for status in (
+        RepairOrderStatus.COMPLETED,
+        RepairOrderStatus.ACCEPTED_BY_DRIVER,
+    ):
+        finished_orders.extend(
+            repair_order_repository.list_by_vehicle(vehicle_id, status=status)
+        )
+    closed_fault_ids: set[uuid.UUID] = set()
+
+    for order in finished_orders:
+        if order.fault_id in closed_fault_ids:
+            continue
+
+        try:
+            fault = fault_repository.get_by_id(order.fault_id)
+        except FaultNotFoundError:
+            logger.warning(
+                "Skipping fault closure; fault not found for completed repair",
+                extra={
+                    "domain": "vehicle",
+                    "service": "ChangeVehicleStatusService",
+                    "operation": "close_completed_repair_faults",
+                    "request_id": request_id,
+                    "entity_id": str(order.fault_id),
+                    "repair_order_id": str(order.id),
+                },
+            )
+            continue
+
+        if fault.status == FaultStatus.CLOSED:
+            closed_fault_ids.add(fault.id)
+            continue
+
+        _close_open_fault(fault)
+        fault.updated_at = datetime.now(tz=UTC)
+        fault_repository.save(fault)
+        closed_fault_ids.add(fault.id)
+
+
+def _close_open_fault(fault: Fault) -> None:
+    """Close a non-closed fault through valid fault state transitions."""
+    if fault.status == FaultStatus.ASSIGNED:
+        fault.start_repair()
+    fault.close()
 
 
 class ChangeVehicleStatusService:
@@ -80,13 +138,11 @@ class ChangeVehicleStatusService:
             details={"vehicle_id": str(dto.vehicle_id)},
         )
 
-        if vehicle.status == dto.status:
-            if dto.status == VehicleStatus.ACTIVE:
-                self._ensure_vehicle_can_be_active(dto.vehicle_id)
-            return _to_response_dto(vehicle)
-
         if dto.status == VehicleStatus.ACTIVE:
-            self._ensure_vehicle_can_be_active(dto.vehicle_id)
+            self._prepare_for_active_status(dto.vehicle_id, dto.request_id)
+
+        if vehicle.status == dto.status:
+            return _to_response_dto(vehicle)
 
         vehicle.transition_to(dto.status)
         vehicle.updated_at = datetime.now(tz=UTC)
@@ -107,8 +163,10 @@ class ChangeVehicleStatusService:
 
         return _to_response_dto(saved)
 
-    def _ensure_vehicle_can_be_active(self, vehicle_id: uuid.UUID) -> None:
-        """Reject ACTIVE status while fault or repair workflows are open."""
+    def _prepare_for_active_status(
+        self, vehicle_id: uuid.UUID, request_id: str
+    ) -> None:
+        """Resolve completed repair faults and reject remaining open workflows."""
         active_orders = self._repair_repo.list_active_by_vehicle(vehicle_id)
         if active_orders:
             raise FMMSConflictError(
@@ -121,6 +179,13 @@ class ChangeVehicleStatusService:
                     ],
                 },
             )
+
+        _close_faults_for_completed_repairs(
+            vehicle_id=vehicle_id,
+            repair_order_repository=self._repair_repo,
+            fault_repository=self._fault_repo,
+            request_id=request_id,
+        )
 
         if self._fault_repo.has_open_fault_for_vehicle(vehicle_id):
             raise FMMSConflictError(
