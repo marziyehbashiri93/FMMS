@@ -113,8 +113,32 @@ class TestVehicleAPI:
         assert deactivated.data["status"] == "INACTIVE"
 
     def test_list_supports_ordering(self, authenticated_client: APIClient) -> None:
-        create_vehicle(authenticated_client, plate="B-002", vin="1HGCM82633A004352")
-        create_vehicle(authenticated_client, plate="A-001", vin="1HGCM82633A004353")
+        first = create_vehicle(
+            authenticated_client,
+            plate="B-002",
+            vin="1HGCM82633A004352",
+        )
+        second = create_vehicle(
+            authenticated_client,
+            plate="A-001",
+            vin="1HGCM82633A004353",
+        )
+        DriverModel.objects.create(
+            customer_number="6000000101",
+            name="راننده لیست",
+            status=DriverStatus.ACTIVE.value,
+        )
+        DriverModel.objects.create(
+            customer_number="6000000102",
+            name="کمک راننده لیست",
+            status=DriverStatus.ACTIVE.value,
+        )
+        VehicleModel.objects.filter(id=first["id"]).update(
+            driver1_customer_number="6000000101"
+        )
+        VehicleModel.objects.filter(id=second["id"]).update(
+            driver2_customer_number="6000000102"
+        )
 
         response = authenticated_client.get("/api/v1/vehicles/?ordering=license_plate")
 
@@ -123,6 +147,16 @@ class TestVehicleAPI:
             "A-001",
             "B-002",
         ]
+        assert response.data["results"][0]["driver1"] is None
+        assert response.data["results"][0]["driver2"] == {
+            "customer_number": "6000000102",
+            "name": "کمک راننده لیست",
+        }
+        assert response.data["results"][1]["driver1"] == {
+            "customer_number": "6000000101",
+            "name": "راننده لیست",
+        }
+        assert response.data["results"][1]["driver2"] is None
 
     def test_summary_returns_vehicle_dashboard_counts(
         self, authenticated_client: APIClient, admin_user: Any

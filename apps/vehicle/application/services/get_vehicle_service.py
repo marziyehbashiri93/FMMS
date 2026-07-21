@@ -134,10 +134,16 @@ class ListVehiclesService:
 
     Args:
         vehicle_repository: Concrete ``IVehicleRepository``.
+        driver_repository: Concrete ``IDriverRepository``.
     """
 
-    def __init__(self, vehicle_repository: IVehicleRepository) -> None:
+    def __init__(
+        self,
+        vehicle_repository: IVehicleRepository,
+        driver_repository: IDriverRepository,
+    ) -> None:
         self._repo = vehicle_repository
+        self._driver_repo = driver_repository
 
     def execute(
         self,
@@ -190,7 +196,24 @@ class ListVehiclesService:
             },
         )
 
-        return [_to_response_dto(v) for v in vehicles]
+        assigned_drivers = _assigned_drivers_by_customer_number(
+            self._driver_repo,
+            vehicles,
+        )
+        return [
+            _to_response_dto(
+                vehicle,
+                driver1=_assigned_driver_from_map(
+                    assigned_drivers,
+                    vehicle.driver1_customer_number,
+                ),
+                driver2=_assigned_driver_from_map(
+                    assigned_drivers,
+                    vehicle.driver2_customer_number,
+                ),
+            )
+            for vehicle in vehicles
+        ]
 
 
 def _sort_vehicles(vehicles: list[Vehicle], ordering: str) -> list[Vehicle]:
@@ -237,4 +260,41 @@ def _assigned_driver(
     return VehicleAssignedDriverDTO(
         customer_number=driver.customer_number.value,
         name=driver.name,
+    )
+
+
+def _assigned_drivers_by_customer_number(
+    driver_repository: IDriverRepository,
+    vehicles: list[Vehicle],
+) -> dict[str, VehicleAssignedDriverDTO]:
+    """Return assigned driver DTOs for all vehicle driver customer numbers."""
+    customer_numbers = {
+        customer_number
+        for vehicle in vehicles
+        for customer_number in (
+            vehicle.driver1_customer_number,
+            vehicle.driver2_customer_number,
+        )
+        if customer_number
+    }
+    drivers = driver_repository.list_by_customer_numbers(customer_numbers)
+    return {
+        driver.customer_number.value: VehicleAssignedDriverDTO(
+            customer_number=driver.customer_number.value,
+            name=driver.name,
+        )
+        for driver in drivers
+    }
+
+
+def _assigned_driver_from_map(
+    assigned_drivers: dict[str, VehicleAssignedDriverDTO],
+    customer_number: str | None,
+) -> VehicleAssignedDriverDTO | None:
+    """Return assigned driver from a prepared lookup map."""
+    if not customer_number:
+        return None
+    return assigned_drivers.get(
+        customer_number,
+        VehicleAssignedDriverDTO(customer_number=customer_number, name=None),
     )

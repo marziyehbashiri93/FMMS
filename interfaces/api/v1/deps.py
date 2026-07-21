@@ -383,7 +383,7 @@ def get_get_vehicle_service() -> GetVehicleService:
 
 def get_list_vehicles_service() -> ListVehiclesService:
     """Return ListVehiclesService."""
-    return ListVehiclesService(get_vehicle_repository())
+    return ListVehiclesService(get_vehicle_repository(), get_driver_repository())
 
 
 def get_get_vehicle_summary_service() -> GetVehicleSummaryService:

@@ -191,6 +191,11 @@ class FakeDriverRepository(IDriverRepository):
     def list_all(self) -> list[Driver]:
         return list(self._store.values())
 
+    def list_by_customer_numbers(self, customer_numbers: set[str]) -> list[Driver]:
+        return [
+            d for d in self._store.values() if d.customer_number.value in customer_numbers
+        ]
+
     def exists_by_customer_number(self, customer_number: CustomerNumber) -> bool:
         return any(d.customer_number == customer_number for d in self._store.values())
 
@@ -391,37 +396,54 @@ class TestChangeVehicleStatusService:
 class TestGetVehicleService:
     def test_returns_dto_for_existing_vehicle(self) -> None:
         vehicle = _make_vehicle()
+        vehicle.driver1_customer_number = "6000000001"
         repo = FakeVehicleRepository(initial=[vehicle])
+        driver_repo = FakeDriverRepository(
+            initial=[_make_driver(customer_number="6000000001")]
+        )
 
-        result = GetVehicleService(repo).execute(vehicle.id, request_id="req-get")
+        result = GetVehicleService(repo, driver_repo).execute(
+            vehicle.id,
+            request_id="req-get",
+        )
 
         assert result.id == vehicle.id
         assert result.license_plate == vehicle.license_plate.value
+        assert result.driver1 is not None
+        assert result.driver1.customer_number == "6000000001"
 
     def test_raises_not_found_for_missing_vehicle(self) -> None:
         repo = FakeVehicleRepository()
 
         with pytest.raises(FMMSNotFoundError):
-            GetVehicleService(repo).execute(uuid.uuid4())
+            GetVehicleService(repo, FakeDriverRepository()).execute(uuid.uuid4())
 
 
 class TestListVehiclesService:
     def test_lists_active_vehicles_by_default(self) -> None:
         active = _make_vehicle(plate="ACTIVE001", status=VehicleStatus.ACTIVE)
+        active.driver1_customer_number = "6000000002"
         inactive = _make_vehicle(plate="INACT0001", status=VehicleStatus.INACTIVE)
         repo = FakeVehicleRepository(initial=[active, inactive])
+        driver_repo = FakeDriverRepository(
+            initial=[_make_driver(customer_number="6000000002")]
+        )
 
-        results = ListVehiclesService(repo).execute()
+        results = ListVehiclesService(repo, driver_repo).execute()
 
         assert len(results) == 1
         assert results[0].license_plate == "ACTIVE001"
+        assert results[0].driver1 is not None
+        assert results[0].driver1.customer_number == "6000000002"
 
     def test_filters_by_status(self) -> None:
         v1 = _make_vehicle(plate="ACT00001", status=VehicleStatus.ACTIVE)
         v2 = _make_vehicle(plate="SUSPENDED", status=VehicleStatus.SUSPENDED)
         repo = FakeVehicleRepository(initial=[v1, v2])
 
-        results = ListVehiclesService(repo).execute(status=VehicleStatus.SUSPENDED)
+        results = ListVehiclesService(repo, FakeDriverRepository()).execute(
+            status=VehicleStatus.SUSPENDED
+        )
 
         assert len(results) == 1
         assert results[0].status == VehicleStatus.SUSPENDED
@@ -431,7 +453,9 @@ class TestListVehiclesService:
         first = _make_vehicle(plate="A-001", sap_eq="1001")
         repo = FakeVehicleRepository(initial=[second, first])
 
-        results = ListVehiclesService(repo).execute(ordering="license_plate")
+        results = ListVehiclesService(repo, FakeDriverRepository()).execute(
+            ordering="license_plate"
+        )
 
         assert [item.license_plate for item in results] == ["A-001", "B-002"]
 
@@ -439,12 +463,12 @@ class TestListVehiclesService:
         repo = FakeVehicleRepository(initial=[_make_vehicle()])
 
         with pytest.raises(FMMSValidationError, match="Unsupported vehicle ordering"):
-            ListVehiclesService(repo).execute(ordering="make")
+            ListVehiclesService(repo, FakeDriverRepository()).execute(ordering="make")
 
     def test_returns_empty_list_when_none_match(self) -> None:
         repo = FakeVehicleRepository()
 
-        results = ListVehiclesService(repo).execute()
+        results = ListVehiclesService(repo, FakeDriverRepository()).execute()
 
         assert results == []
 
