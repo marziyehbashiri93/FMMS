@@ -5,11 +5,8 @@ import {
   Card,
   CardContent,
   Divider,
-  FormControl,
   Grid,
-  InputLabel,
   MenuItem,
-  Select,
   Stack,
   Typography,
 } from '@mui/material';
@@ -31,6 +28,8 @@ import { EmptyState, ErrorState, LoadingState } from '../../components/States';
 import { PlainStatusBadge, VehicleStatusBadge } from '../../components/StatusBadge';
 import { RtlDataTable, type RtlDataTableColumn } from '../../components/RtlDataTable';
 import { RtlTextField } from '../../components/RtlTextField';
+import { FilterPanel } from '../../components/FilterPanel';
+import { RtlSelectField } from '../../components/RtlSelectField';
 import type { VehicleStatus } from '../../types/fmms';
 
 const statuses: VehicleStatus[] = ['ACTIVE', 'UNDER_REPAIR', 'INACTIVE', 'DECOMMISSIONED'];
@@ -120,32 +119,33 @@ export function ComponentShowcasePage() {
       <Grid container spacing={1.5}>
         <Grid size={{ xs: 12, lg: 5 }}>
           <Section title="فرم و فیلتر">
-            <Card>
-              <CardContent>
-                <Stack spacing={1.5}>
-                  <RtlTextField label="جست‌وجوی پلاک یا کد SAP" fullWidth InputProps={{ startAdornment: <Search fontSize="small" /> }} />
-                  <FormControl fullWidth>
-                    <InputLabel id="status-demo-label">وضعیت خودرو</InputLabel>
-                    <Select labelId="status-demo-label" label="وضعیت خودرو" defaultValue="ACTIVE">
-                      {statuses.map((status) => (
-                        <MenuItem key={status} value={status}>
-                          <VehicleStatusBadge status={status} />
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                  <RtlTextField label="کیلومتر امروز" defaultValue="128430" fullWidth />
-                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-                    <Button variant="contained" startIcon={<Sync />} fullWidth>
-                      ثبت تغییر
-                    </Button>
-                    <Button variant="outlined" fullWidth>
-                      انصراف
-                    </Button>
+            <Stack spacing={1.5}>
+              <FilterPanel>
+                <RtlTextField label="جست‌وجوی پلاک یا کد SAP" fullWidth InputProps={{ startAdornment: <Search fontSize="small" /> }} />
+                <RtlSelectField<VehicleStatus> label="وضعیت خودرو" defaultValue="ACTIVE">
+                  {statuses.map((status) => (
+                    <MenuItem key={status} value={status}>
+                      <VehicleStatusBadge status={status} />
+                    </MenuItem>
+                  ))}
+                </RtlSelectField>
+              </FilterPanel>
+              <Card>
+                <CardContent>
+                  <Stack spacing={1.5}>
+                    <RtlTextField label="کیلومتر امروز" defaultValue="128430" fullWidth />
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+                      <Button variant="contained" startIcon={<Sync />} fullWidth>
+                        ثبت تغییر
+                      </Button>
+                      <Button variant="outlined" fullWidth>
+                        انصراف
+                      </Button>
+                    </Stack>
                   </Stack>
-                </Stack>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </Stack>
           </Section>
         </Grid>
 

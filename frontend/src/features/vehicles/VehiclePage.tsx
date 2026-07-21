@@ -7,13 +7,10 @@ import {
   CardContent,
   Divider,
   Drawer,
-  FormControl,
   Grid,
   IconButton,
   InputAdornment,
-  InputLabel,
   MenuItem,
-  Select,
   Stack,
   Typography,
   useMediaQuery,
@@ -24,6 +21,7 @@ import {
   DirectionsCar,
   Error as ErrorIcon,
   Inbox,
+  RestartAlt,
   Speed,
   Search,
   Sync,
@@ -36,6 +34,8 @@ import { PlainStatusBadge, VehicleStatusBadge } from '../../components/StatusBad
 import { PageHeader } from '../../components/PageHeader';
 import { RtlDataTable, type RtlDataTableColumn } from '../../components/RtlDataTable';
 import { RtlTextField } from '../../components/RtlTextField';
+import { FilterPanel } from '../../components/FilterPanel';
+import { RtlSelectField } from '../../components/RtlSelectField';
 import type { Fault, OdometerReading, RepairOrder, Vehicle, VehicleStatus, VehicleSummary } from '../../types/fmms';
 import { formatDate, formatDateTime, toFaNumber } from '../../utils/format';
 
@@ -98,6 +98,10 @@ function driverName(driver: Vehicle['driver1']): string {
   return driver.name || driver.customer_number;
 }
 
+function vehicleDisplayName(vehicle: Vehicle): string {
+  return vehicle.license_plate || vehicle.vehicle_number;
+}
+
 function VehicleCard({ vehicle, onOpen }: { vehicle: Vehicle; onOpen: (vehicle: Vehicle) => void }) {
   return (
     <Card onClick={() => onOpen(vehicle)} sx={{ cursor: 'pointer' }}>
@@ -146,13 +150,13 @@ function VehicleTable({
   onSort: (key: VehicleSortKey) => void;
 }) {
   const columns: Array<RtlDataTableColumn<Vehicle, VehicleColumnKey>> = [
+    { key: 'vehicle_number', label: 'ای دی خودرو', sortable: true, render: (vehicle) => vehicle.vehicle_number },
     {
       key: 'license_plate',
       label: 'پلاک',
       sortable: true,
       render: (vehicle) => <Typography fontWeight={800}>{vehicle.license_plate}</Typography>,
     },
-    { key: 'vehicle_number', label: 'ای دی خودرو', sortable: true, render: (vehicle) => vehicle.vehicle_number },
     {
       key: 'status',
       label: 'وضعیت',
@@ -404,7 +408,7 @@ export function VehiclePage() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [status, setStatus] = useState<'' | VehicleStatus>('');
-  const [orderBy, setOrderBy] = useState<VehicleSortKey>('license_plate');
+  const [orderBy, setOrderBy] = useState<VehicleSortKey>('vehicle_number');
   const [order, setOrder] = useState<'asc' | 'desc'>('asc');
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<Vehicle | null>(null);
@@ -417,13 +421,8 @@ export function VehiclePage() {
     if (!needle) return vehicles;
     return vehicles.filter((vehicle) =>
       [
-        vehicle.license_plate,
+        vehicleDisplayName(vehicle),
         vehicle.vehicle_number,
-        vehicle.status_label,
-        vehicle.driver1?.customer_number,
-        vehicle.driver1?.name,
-        vehicle.driver2?.customer_number,
-        vehicle.driver2?.name,
       ]
         .filter(Boolean)
         .join(' ')
@@ -440,6 +439,15 @@ export function VehiclePage() {
     setOrderBy(key);
     setOrder('asc');
   };
+
+  const resetFilters = () => {
+    setQuery('');
+    setStatus('');
+    setOrderBy('vehicle_number');
+    setOrder('asc');
+  };
+
+  const hasActiveFilters = query.trim() !== '' || status !== '' || orderBy !== 'vehicle_number' || order !== 'asc';
 
   return (
     <Stack spacing={{ xs: 1.5, md: 2.25 }} style={{ direction: 'rtl', textAlign: 'right' }}>
@@ -476,37 +484,34 @@ export function VehiclePage() {
       </Box>
       {summaryError && <ErrorState message={summaryError} onRetry={reloadSummary} />}
 
-      <Card>
-        <CardContent sx={{ p: { xs: 1.5, md: 2 }, '&:last-child': { pb: { xs: 1.5, md: 2 } } }}>
-          <Stack
-            direction={{ xs: 'column', md: 'row' }}
-            spacing={{ xs: 1.5, md: 2 }}
-            alignItems={{ xs: 'stretch', md: 'center' }}
-            sx={{ direction: 'rtl' }}
-          >
-            <RtlTextField
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="جستجو بر اساس پلاک، ای دی خودرو یا نام راننده"
-              fullWidth
-              InputProps={{ endAdornment: <InputAdornment position="end"><Search /></InputAdornment> }}
-            />
-            <FormControl sx={{ minWidth: { xs: '100%', md: 220 }, direction: 'rtl' }}>
-              <InputLabel id="vehicle-status-filter-label">وضعیت</InputLabel>
-              <Select
-                labelId="vehicle-status-filter-label"
-                value={status}
-                label="وضعیت"
-                onChange={(event) => setStatus(event.target.value as '' | VehicleStatus)}
-              >
-                {statusOptions.map((item) => (
-                  <MenuItem key={item.value || 'all'} value={item.value}>{item.label}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Stack>
-        </CardContent>
-      </Card>
+      <FilterPanel>
+        <RtlTextField
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          label="جستجو"
+          placeholder="نام خودرو یا ای دی خودرو"
+          fullWidth
+          InputProps={{ endAdornment: <InputAdornment position="end"><Search /></InputAdornment> }}
+        />
+        <RtlSelectField<'' | VehicleStatus>
+          value={status}
+          label="وضعیت"
+          onChange={(event) => setStatus(event.target.value as '' | VehicleStatus)}
+        >
+          {statusOptions.map((item) => (
+            <MenuItem key={item.value || 'all'} value={item.value}>{item.label}</MenuItem>
+          ))}
+        </RtlSelectField>
+        <Button
+          variant="outlined"
+          startIcon={<RestartAlt />}
+          onClick={resetFilters}
+          disabled={!hasActiveFilters}
+          sx={{ minWidth: { xs: '100%', md: 150 }, height: 48 }}
+        >
+          بازنشانی
+        </Button>
+      </FilterPanel>
 
       {loading && <LoadingState />}
       {error && <ErrorState message={error} onRetry={reload} />}

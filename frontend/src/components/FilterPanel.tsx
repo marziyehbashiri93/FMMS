@@ -1,0 +1,19 @@
+import { Card, CardContent, Stack } from '@mui/material';
+import type { ReactNode } from 'react';
+
+export function FilterPanel({ children }: { children: ReactNode }) {
+  return (
+    <Card>
+      <CardContent sx={{ p: { xs: 1.5, md: 2 }, '&:last-child': { pb: { xs: 1.5, md: 2 } } }}>
+        <Stack
+          direction={{ xs: 'column', md: 'row' }}
+          spacing={{ xs: 1.5, md: 2 }}
+          alignItems={{ xs: 'stretch', md: 'center' }}
+          sx={{ direction: 'rtl' }}
+        >
+          {children}
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
