@@ -9,9 +9,13 @@ from __future__ import annotations
 from apps.authentication.infrastructure.user_profile_reader import (
     DjangoUserProfileReader,
 )
+from apps.driver.application.services.exit_center_service import DriverExitCenterService
 from apps.driver.application.services.get_driver_service import (
     GetDriverService,
     ListDriversService,
+)
+from apps.driver.application.services.get_driver_summary_service import (
+    GetDriverSummaryService,
 )
 from apps.driver.infrastructure.repositories import DjangoDriverRepository
 from apps.fault.application.services.assign_fault_service import AssignFaultService
@@ -49,11 +53,11 @@ from apps.inspection.infrastructure.repositories import DjangoInspectionReposito
 from apps.inspection.infrastructure.template_repositories import (
     DjangoInspectionTemplateRepository,
 )
-from apps.integration.application.services.retry_failed_sap_transactions_service import (
-    RetryFailedSAPTransactionsService,
-)
 from apps.integration.application.services.list_sap_sync_runs_service import (
     ListSAPSyncRunsService,
+)
+from apps.integration.application.services.retry_failed_sap_transactions_service import (
+    RetryFailedSAPTransactionsService,
 )
 from apps.integration.application.services.run_sap_sync_service import RunSAPSyncService
 from apps.integration.infrastructure.repositories import DjangoSAPTransactionRepository
@@ -402,6 +406,20 @@ def get_get_driver_service() -> GetDriverService:
 def get_list_drivers_service() -> ListDriversService:
     """Return ListDriversService."""
     return ListDriversService(get_driver_repository())
+
+
+def get_get_driver_summary_service() -> GetDriverSummaryService:
+    """Return GetDriverSummaryService."""
+    return GetDriverSummaryService()
+
+
+def get_driver_exit_center_service() -> DriverExitCenterService:
+    """Return DriverExitCenterService."""
+    return DriverExitCenterService(
+        get_driver_repository(),
+        get_vehicle_repository(),
+        get_inspection_repository(),
+    )
 
 
 def get_create_inspection_service() -> CreateInspectionService:

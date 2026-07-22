@@ -1,7 +1,7 @@
 """Unit tests for Driver application services.
 
 All repository dependencies are replaced with lightweight in-memory fakes —
-no database, no network.
+no database, no network. Vehicle enrichment uses ORM and requires ``django_db``.
 
 Fakes:
 - ``FakeDriverRepository``: in-memory dict keyed by UUID.
@@ -26,6 +26,8 @@ from apps.driver.domain.exceptions import DriverNotFoundError
 from apps.driver.domain.interfaces.driver_repository import IDriverRepository
 from apps.driver.domain.value_objects import CustomerNumber
 from core.exceptions.base_exception import FMMSNotFoundError, FMMSValidationError
+
+pytestmark = pytest.mark.django_db
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -73,6 +75,13 @@ class FakeDriverRepository(IDriverRepository):
 
     def list_all(self) -> list[Driver]:
         return list(self._store.values())
+
+    def list_by_customer_numbers(self, customer_numbers: set[str]) -> list[Driver]:
+        return [
+            driver
+            for driver in self._store.values()
+            if driver.customer_number.value in customer_numbers
+        ]
 
     def decommission_missing_from_sap(self, seen_customer_numbers: set[str]) -> int:
         count = 0

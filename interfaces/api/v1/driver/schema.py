@@ -6,11 +6,16 @@ from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from apps.driver.domain.entities import DriverStatus
-from interfaces.api.v1.driver.serializers import DriverResponseSerializer
+from interfaces.api.v1.driver.serializers import (
+    DriverExitCenterSerializer,
+    DriverResponseSerializer,
+    DriverSummarySerializer,
+)
 from interfaces.api.v1.schema_tags import API_TAGS
 from interfaces.api.v1.vehicle.schema import date_range_parameters
 from interfaces.api.v1.vehicle.serializers import (
     VehicleDriverAssignmentHistoryResponseSerializer,
+    VehicleResponseSerializer,
 )
 
 _DRIVER_ORDERING_FIELDS = [
@@ -64,8 +69,33 @@ list = extend_schema(
             type=str,
             enum=_DRIVER_ORDERING_FIELDS,
         ),
+        OpenApiParameter(
+            name="search",
+            description="Case-insensitive contains filter on name or personnel_number.",
+            required=False,
+            type=str,
+        ),
+        OpenApiParameter(
+            name="role",
+            description="Filter by current vehicle assignment role.",
+            required=False,
+            type=str,
+            enum=["DRIVER", "ASSISTANT"],
+        ),
     ],
     responses=DriverResponseSerializer(many=True),
+)
+
+summary = extend_schema(
+    tags=[API_TAGS.driver],
+    responses=DriverSummarySerializer,
+)
+
+exit_center = extend_schema(
+    tags=[API_TAGS.driver],
+    parameters=[driver_id_parameter],
+    request=DriverExitCenterSerializer,
+    responses=VehicleResponseSerializer,
 )
 
 vehicle_assignment_history = extend_schema(
