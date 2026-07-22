@@ -7,6 +7,7 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from apps.vehicle.domain.entities import VehicleStatus
 from interfaces.api.v1.schema_tags import API_TAGS
+from interfaces.api.v1.inspection.serializers import InspectionResponseSerializer
 from interfaces.api.v1.vehicle.serializers import (
     VehicleDriverAssignmentSnapshotResponseSerializer,
     VehicleOdometerRecordSerializer,
@@ -76,6 +77,12 @@ list = extend_schema(
             type=str,
             enum=_VEHICLE_ORDERING_FIELDS,
         ),
+        OpenApiParameter(
+            name="search",
+            description="Case-insensitive contains filter on license_plate or vehicle_number.",
+            required=False,
+            type=str,
+        ),
     ],
     responses=VehicleResponseSerializer(many=True),
 )
@@ -117,4 +124,24 @@ driver_assignment_history = extend_schema(
     tags=[API_TAGS.vehicle],
     parameters=[vehicle_id_parameter, *date_range_parameters],
     responses=VehicleDriverAssignmentSnapshotResponseSerializer(many=True),
+)
+
+checklist_history = extend_schema(
+    tags=[API_TAGS.vehicle],
+    parameters=[vehicle_id_parameter, *date_range_parameters],
+    responses=InspectionResponseSerializer(many=True),
+)
+
+checklist_detail = extend_schema(
+    tags=[API_TAGS.vehicle],
+    parameters=[
+        vehicle_id_parameter,
+        OpenApiParameter(
+            name="inspection_id",
+            location=OpenApiParameter.PATH,
+            required=True,
+            type=OpenApiTypes.UUID,
+        ),
+    ],
+    responses=InspectionResponseSerializer,
 )

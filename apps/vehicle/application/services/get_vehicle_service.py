@@ -149,6 +149,7 @@ class ListVehiclesService:
         self,
         status: VehicleStatus | None = None,
         ordering: str = "",
+        search: str = "",
         request_id: str = "",
     ) -> list[VehicleResponseDTO]:
         """Return vehicles optionally filtered by lifecycle status.
@@ -160,6 +161,7 @@ class ListVehiclesService:
         Args:
             status: Optional status filter.
             ordering: Optional ordering field. Prefix with ``-`` for descending.
+            search: Optional search text for license plate or SAP vehicle number.
             request_id: Optional correlation ID for structured logging.
 
         Returns:
@@ -174,6 +176,7 @@ class ListVehiclesService:
                 "request_id": request_id,
                 "status_filter": status.value if status else "ACTIVE",
                 "ordering": ordering,
+                "search": search,
             },
         )
 
@@ -182,6 +185,7 @@ class ListVehiclesService:
             if status is not None
             else self._repo.list_active()
         )
+        vehicles = _filter_vehicles_by_search(vehicles, search)
         vehicles = _sort_vehicles(vehicles, ordering)
 
         logger.info(
@@ -214,6 +218,19 @@ class ListVehiclesService:
             )
             for vehicle in vehicles
         ]
+
+
+def _filter_vehicles_by_search(vehicles: list[Vehicle], search: str) -> list[Vehicle]:
+    """Return vehicles matching plate or SAP vehicle number search text."""
+    needle = search.strip().casefold()
+    if not needle:
+        return vehicles
+    return [
+        vehicle
+        for vehicle in vehicles
+        if needle in vehicle.license_plate.value.casefold()
+        or needle in vehicle.vehicle_number.value.casefold()
+    ]
 
 
 def _sort_vehicles(vehicles: list[Vehicle], ordering: str) -> list[Vehicle]:

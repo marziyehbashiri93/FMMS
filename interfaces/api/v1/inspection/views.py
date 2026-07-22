@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime, time
 
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
@@ -33,6 +33,20 @@ from interfaces.api.v1.inspection.serializers import (
 )
 from interfaces.api.v1.schema_tags import API_TAGS
 from interfaces.api.v1.utils import paginate_dto_list, request_id_from, user_id_from
+from interfaces.api.v1.vehicle.serializers import DateRangeFilterSerializer
+
+
+def _date_range_to_datetimes(
+    filters: DateRangeFilterSerializer,
+) -> tuple[datetime | None, datetime | None]:
+    """Convert validated date filters to inclusive UTC datetime bounds."""
+    from_date = filters.validated_data.get("from_date")
+    to_date = filters.validated_data.get("to_date")
+    from_datetime = (
+        datetime.combine(from_date, time.min, tzinfo=UTC) if from_date else None
+    )
+    to_datetime = datetime.combine(to_date, time.max, tzinfo=UTC) if to_date else None
+    return from_datetime, to_datetime
 
 
 class InspectionViewSet(GenericViewSet):
@@ -53,21 +67,16 @@ class InspectionViewSet(GenericViewSet):
         responses=InspectionResponseSerializer(many=True),
     )
     def list(self, request: Request) -> Response:
-        """List inspections for a vehicle."""
+        """List inspections; optionally filter by vehicle and date range."""
         vehicle_id_raw = request.query_params.get("vehicle_id")
-        if not vehicle_id_raw:
-            return Response(
-                {"detail": "vehicle_id query parameter is required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        from_date_raw = request.query_params.get("from_date")
-        to_date_raw = request.query_params.get("to_date")
-        from_date = datetime.fromisoformat(from_date_raw) if from_date_raw else None
-        to_date = datetime.fromisoformat(to_date_raw) if to_date_raw else None
+        vehicle_id = uuid.UUID(vehicle_id_raw) if vehicle_id_raw else None
+        filters = DateRangeFilterSerializer(data=request.query_params)
+        filters.is_valid(raise_exception=True)
+        from_datetime, to_datetime = _date_range_to_datetimes(filters)
         items = deps.get_list_inspections_service().execute(
-            uuid.UUID(vehicle_id_raw),
-            from_date=from_date,
-            to_date=to_date,
+            vehicle_id,
+            from_date=from_datetime,
+            to_date=to_datetime,
             request_id=request_id_from(request),
         )
         page = paginate_dto_list(self, items)

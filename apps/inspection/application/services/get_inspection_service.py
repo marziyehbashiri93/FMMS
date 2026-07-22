@@ -99,7 +99,7 @@ class GetInspectionService:
 
 
 class ListInspectionsService:
-    """Fetch inspections for a vehicle, optionally filtered by date range.
+    """Fetch inspections, optionally filtered by vehicle and date range.
 
     Args:
         inspection_repository: Concrete ``IInspectionRepository``.
@@ -119,19 +119,18 @@ class ListInspectionsService:
 
     def execute(
         self,
-        vehicle_id: uuid.UUID,
+        vehicle_id: uuid.UUID | None = None,
         from_date: datetime | None = None,
         to_date: datetime | None = None,
         request_id: str = "",
     ) -> list[InspectionResponseDTO]:
-        """Return inspections for ``vehicle_id``, with optional date filtering.
+        """Return inspections with optional vehicle and date filtering.
 
-        When both ``from_date`` and ``to_date`` are provided the repository's
-        ``list_by_date_range()`` is used; otherwise ``list_by_vehicle()``
-        returns all inspections for the vehicle.
+        When ``vehicle_id`` is omitted, all inspections are returned.
+        Date bounds filter ``inspected_at`` inclusively when provided.
 
         Args:
-            vehicle_id: Target vehicle UUID.
+            vehicle_id: Optional target vehicle UUID.
             from_date: Optional inclusive start of date range.
             to_date: Optional inclusive end of date range.
             request_id: Optional correlation ID for structured logging.
@@ -146,18 +145,27 @@ class ListInspectionsService:
                 "service": "ListInspectionsService",
                 "operation": "execute",
                 "request_id": request_id,
-                "vehicle_id": str(vehicle_id),
+                "vehicle_id": str(vehicle_id) if vehicle_id else None,
             },
         )
 
-        if from_date is not None and to_date is not None:
-            all_in_range = self._repo.list_by_date_range(
-                start=from_date,
-                end=to_date,
-            )
-            inspections = [i for i in all_in_range if i.vehicle_id == vehicle_id]
-        else:
-            inspections = self._repo.list_by_vehicle(vehicle_id)
+        inspections = (
+            self._repo.list_by_vehicle(vehicle_id)
+            if vehicle_id is not None
+            else self._repo.list_all()
+        )
+        if from_date is not None:
+            inspections = [
+                inspection
+                for inspection in inspections
+                if inspection.inspected_at >= from_date
+            ]
+        if to_date is not None:
+            inspections = [
+                inspection
+                for inspection in inspections
+                if inspection.inspected_at <= to_date
+            ]
 
         logger.info(
             "Inspections listed",

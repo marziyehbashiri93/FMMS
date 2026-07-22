@@ -133,6 +133,9 @@ class FakeInspectionRepository(IInspectionRepository):
     def list_by_vehicle(self, vehicle_id: uuid.UUID) -> list[Inspection]:
         return [i for i in self._store.values() if i.vehicle_id == vehicle_id]
 
+    def list_all(self, status=None) -> list[Inspection]:
+        return list(self._store.values())
+
     def list_by_date_range(
         self,
         start: datetime,
@@ -627,6 +630,15 @@ class TestListInspectionsService:
         repo = FakeInspectionRepository()
         results = ListInspectionsService(repo).execute(vehicle_id=uuid.uuid4())
         assert results == []
+
+    def test_lists_all_inspections_without_vehicle_filter(self) -> None:
+        i1 = _make_inspection()
+        i2 = _make_inspection()
+        repo = FakeInspectionRepository(initial=[i1, i2])
+
+        results = ListInspectionsService(repo).execute()
+
+        assert len(results) == 2
 
 
 # ---------------------------------------------------------------------------

@@ -162,6 +162,38 @@ class TestVehicleAPI:
         }
         assert response.data["results"][1]["driver2"] is None
 
+    def test_list_supports_search_by_plate_or_vehicle_number(
+        self, authenticated_client: APIClient
+    ) -> None:
+        """Vehicle list search matches license plate or SAP vehicle number."""
+        by_plate = create_vehicle(
+            authenticated_client,
+            vehicle_number="203299901",
+            plate="SEARCH-PLATE",
+            vin="1HGCM82633A004452",
+        )
+        by_number = create_vehicle(
+            authenticated_client,
+            vehicle_number="203299902",
+            plate="OTHER-PLATE",
+            vin="1HGCM82633A004453",
+        )
+
+        plate_response = authenticated_client.get("/api/v1/vehicles/?search=plate")
+        assert plate_response.status_code == 200
+        assert {item["id"] for item in plate_response.data["results"]} == {
+            by_plate["id"],
+            by_number["id"],
+        }
+
+        number_response = authenticated_client.get(
+            "/api/v1/vehicles/?search=203299902"
+        )
+        assert number_response.status_code == 200
+        assert {item["id"] for item in number_response.data["results"]} == {
+            by_number["id"]
+        }
+
     def test_summary_returns_vehicle_dashboard_counts(
         self, authenticated_client: APIClient, admin_user: Any
     ) -> None:
@@ -408,6 +440,86 @@ class TestVehicleAPI:
         assert "request_id" not in response.data[0]
         assert "sync_run_id" not in response.data[0]
         assert "vehicle_number" not in response.data[0]
+
+    def test_vehicle_checklist_history_and_detail(
+        self, authenticated_client: APIClient
+    ) -> None:
+        """Vehicle nested checklist endpoints expose inspection history and detail."""
+        vehicle = create_vehicle(authenticated_client, plate="CHK-001")
+        other_vehicle = create_vehicle(authenticated_client, plate="CHK-002")
+
+        older = authenticated_client.post(
+            "/api/v1/inspections/",
+            {
+                "vehicle_id": vehicle["id"],
+                "inspection_type": "PRE_TRIP",
+                "odometer_value": 1000,
+                "odometer_unit": "KM",
+                "inspected_at": datetime(2026, 7, 14, 8, 0, tzinfo=UTC).isoformat(),
+                "items": [
+                    {
+                        "category": "روشنایی",
+                        "description": "چراغ جلو",
+                        "result": "PASS",
+                    }
+                ],
+            },
+            format="json",
+        )
+        assert older.status_code == 201, older.data
+        newer = authenticated_client.post(
+            "/api/v1/inspections/",
+            {
+                "vehicle_id": vehicle["id"],
+                "inspection_type": "PRE_TRIP",
+                "odometer_value": 1020,
+                "odometer_unit": "KM",
+                "inspected_at": datetime(2026, 7, 16, 8, 0, tzinfo=UTC).isoformat(),
+                "items": [
+                    {
+                        "category": "ترمز",
+                        "description": "لنت ترمز",
+                        "result": "FAIL",
+                        "notes": "نیازمند بررسی",
+                        "severity": "HIGH",
+                    }
+                ],
+            },
+            format="json",
+        )
+        assert newer.status_code == 201, newer.data
+
+        history = authenticated_client.get(
+            f"/api/v1/vehicles/{vehicle['id']}/checklists/?from_date=2026-07-16"
+        )
+
+        assert history.status_code == 200, history.data
+        assert history.data["count"] == 1
+        assert history.data["results"][0]["id"] == newer.data["id"]
+        assert history.data["results"][0]["overall_result"] == "FAIL"
+
+        detail = authenticated_client.get(
+            f"/api/v1/vehicles/{vehicle['id']}/checklists/{newer.data['id']}/"
+        )
+
+        assert detail.status_code == 200, detail.data
+        assert detail.data["id"] == newer.data["id"]
+        assert detail.data["vehicle_id"] == vehicle["id"]
+        assert detail.data["items"] == [
+            {
+                "id": newer.data["items"][0]["id"],
+                "category": "ترمز",
+                "description": "لنت ترمز",
+                "result": "FAIL",
+                "notes": "نیازمند بررسی",
+                "severity": "HIGH",
+            }
+        ]
+
+        wrong_vehicle = authenticated_client.get(
+            f"/api/v1/vehicles/{other_vehicle['id']}/checklists/{newer.data['id']}/"
+        )
+        assert wrong_vehicle.status_code == 404
 
     def test_odometer_must_increase_by_at_least_10_km(
         self, authenticated_client: APIClient

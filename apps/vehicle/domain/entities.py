@@ -24,6 +24,7 @@ class VehicleStatus(StrEnum):
         ACTIVE: Vehicle is operational and available for assignment.
         INACTIVE: Vehicle has been decommissioned or removed from service.
         UNDER_REPAIR: Vehicle is currently being repaired and unavailable.
+        EXITED_CENTER: Vehicle has left the fleet center after daily checklist.
         SUSPENDED: Vehicle is temporarily suspended (e.g. pending inspection).
         OUT_OF_SERVICE: Vehicle failed inspection and is not operational.
     """
@@ -32,6 +33,7 @@ class VehicleStatus(StrEnum):
     INACTIVE = "INACTIVE"
     UNDER_REPAIR = "UNDER_REPAIR"
     WAITING_DRIVER_CONFIRMATION = "WAITING_DRIVER_CONFIRMATION"
+    EXITED_CENTER = "EXITED_CENTER"
     SUSPENDED = "SUSPENDED"
     OUT_OF_SERVICE = "OUT_OF_SERVICE"
     DECOMMISSIONED = "DECOMMISSIONED"
@@ -42,6 +44,7 @@ VEHICLE_STATUS_LABELS: dict[VehicleStatus, str] = {
     VehicleStatus.INACTIVE: "غیرفعال",
     VehicleStatus.UNDER_REPAIR: "در تعمیر",
     VehicleStatus.WAITING_DRIVER_CONFIRMATION: "منتظر تایید راننده",
+    VehicleStatus.EXITED_CENTER: "خروج از مرکز",
     VehicleStatus.SUSPENDED: "تعلیق‌شده",
     VehicleStatus.OUT_OF_SERVICE: "خارج از سرویس",
     VehicleStatus.DECOMMISSIONED: "از رده خارج",
@@ -55,6 +58,7 @@ _ALLOWED_TRANSITIONS: dict[VehicleStatus, frozenset[VehicleStatus]] = {
             VehicleStatus.INACTIVE,
             VehicleStatus.UNDER_REPAIR,
             VehicleStatus.WAITING_DRIVER_CONFIRMATION,
+            VehicleStatus.EXITED_CENTER,
             VehicleStatus.SUSPENDED,
             VehicleStatus.OUT_OF_SERVICE,
         }
@@ -83,6 +87,16 @@ _ALLOWED_TRANSITIONS: dict[VehicleStatus, frozenset[VehicleStatus]] = {
             VehicleStatus.INACTIVE,
             VehicleStatus.UNDER_REPAIR,
             VehicleStatus.WAITING_DRIVER_CONFIRMATION,
+            VehicleStatus.OUT_OF_SERVICE,
+        }
+    ),
+    VehicleStatus.EXITED_CENTER: frozenset(
+        {
+            VehicleStatus.ACTIVE,
+            VehicleStatus.INACTIVE,
+            VehicleStatus.UNDER_REPAIR,
+            VehicleStatus.WAITING_DRIVER_CONFIRMATION,
+            VehicleStatus.SUSPENDED,
             VehicleStatus.OUT_OF_SERVICE,
         }
     ),

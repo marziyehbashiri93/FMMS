@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime, time
 
+from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -16,6 +18,7 @@ from apps.vehicle.application.dto.vehicle_dto import (
 from apps.vehicle.domain.entities import VehicleStatus
 from core.permissions import IsReadOnlyOrTechnicianOrAbove, IsSupervisorOrAbove
 from interfaces.api.v1 import deps
+from interfaces.api.v1.inspection.serializers import InspectionResponseSerializer
 from interfaces.api.v1.utils import paginate_dto_list, request_id_from, user_id_from
 from interfaces.api.v1.vehicle import schema as vehicle_schema
 from interfaces.api.v1.vehicle.serializers import (
@@ -27,6 +30,19 @@ from interfaces.api.v1.vehicle.serializers import (
     VehicleSummarySerializer,
     VehicleStatusChangeSerializer,
 )
+
+
+def _date_range_to_datetimes(
+    filters: DateRangeFilterSerializer,
+) -> tuple[datetime | None, datetime | None]:
+    """Convert validated date filters to inclusive UTC datetime bounds."""
+    from_date = filters.validated_data.get("from_date")
+    to_date = filters.validated_data.get("to_date")
+    from_datetime = (
+        datetime.combine(from_date, time.min, tzinfo=UTC) if from_date else None
+    )
+    to_datetime = datetime.combine(to_date, time.max, tzinfo=UTC) if to_date else None
+    return from_datetime, to_datetime
 
 
 class VehicleViewSet(GenericViewSet):
@@ -47,10 +63,12 @@ class VehicleViewSet(GenericViewSet):
         """List non-deleted vehicles, optionally filtered by status."""
         raw_status = request.query_params.get("status")
         ordering = request.query_params.get("ordering", "")
+        search = request.query_params.get("search", "").strip()
         vehicle_status = VehicleStatus(raw_status) if raw_status else None
         items = deps.get_list_vehicles_service().execute(
             vehicle_status,
             ordering=ordering,
+            search=search,
             request_id=request_id_from(request),
         )
         page = paginate_dto_list(self, items)
@@ -140,6 +158,60 @@ class VehicleViewSet(GenericViewSet):
         return Response(
             VehicleDriverAssignmentSnapshotResponseSerializer(result, many=True).data
         )
+
+    @vehicle_schema.checklist_history
+    @action(detail=True, methods=["get"], url_path="checklists")
+    def checklists(self, request: Request, pk: str | None = None) -> Response:
+        """List registered checklist inspections for one vehicle."""
+        vehicle_id = uuid.UUID(str(pk))
+        deps.get_get_vehicle_service().execute(
+            vehicle_id,
+            request_id=request_id_from(request),
+        )
+        filters = DateRangeFilterSerializer(data=request.query_params)
+        filters.is_valid(raise_exception=True)
+        from_datetime, to_datetime = _date_range_to_datetimes(filters)
+        result = deps.get_list_inspections_service().execute(
+            vehicle_id,
+            from_date=from_datetime,
+            to_date=to_datetime,
+            request_id=request_id_from(request),
+        )
+        page = paginate_dto_list(self, result)
+        serializer = InspectionResponseSerializer(
+            page if page is not None else result,
+            many=True,
+        )
+        return (
+            self.get_paginated_response(serializer.data)
+            if page is not None
+            else Response(serializer.data)
+        )
+
+    @vehicle_schema.checklist_detail
+    @action(
+        detail=True,
+        methods=["get"],
+        url_path=r"checklists/(?P<inspection_id>[^/.]+)",
+    )
+    def checklist_detail(
+        self,
+        request: Request,
+        pk: str | None = None,
+        inspection_id: str | None = None,
+    ) -> Response:
+        """Retrieve one registered checklist inspection for one vehicle."""
+        vehicle_id = uuid.UUID(str(pk))
+        result = deps.get_get_inspection_service().execute(
+            uuid.UUID(str(inspection_id)),
+            request_id=request_id_from(request),
+        )
+        if result.vehicle_id != vehicle_id:
+            return Response(
+                {"detail": "Checklist inspection was not found for this vehicle."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(InspectionResponseSerializer(result).data)
 
     @vehicle_schema.summary
     @action(detail=False, methods=["get"], url_path="summary")

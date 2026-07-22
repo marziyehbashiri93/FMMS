@@ -100,6 +100,17 @@ class DjangoInspectionRepository(IInspectionRepository):
         qs = qs.order_by("-inspected_at")
         return [_to_domain(orm, list(orm.items.all())) for orm in qs]
 
+    def list_all(
+        self,
+        status: InspectionStatus | None = None,
+    ) -> list[Inspection]:
+        """Return all non-deleted inspections, optionally filtered by status."""
+        qs = InspectionModel.objects.filter(is_deleted=False)
+        if status is not None:
+            qs = qs.filter(status=status.value)
+        qs = qs.order_by("-inspected_at")
+        return [_to_domain(orm, list(orm.items.all())) for orm in qs]
+
     def save(self, inspection: Inspection) -> Inspection:
         """Persist the inspection aggregate atomically.
 
