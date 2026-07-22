@@ -1,8 +1,13 @@
 import {
-  Box, Paper, Skeleton, Table, TableBody, TableCell,
-  TableContainer, TableHead, TableRow, TableSortLabel, Typography,
+  Paper, Skeleton, Table, TableBody, TableCell,
+  TableContainer, TableHead, TableRow, TableSortLabel,
 } from '@mui/material';
+import { Inbox } from '@mui/icons-material';
+import type { SvgIconComponent } from '@mui/icons-material';
 import { useState, type ReactNode } from 'react';
+import { EmptyState } from './States';
+
+export type RtlDataTableSkeleton = 'text' | 'badge' | 'button';
 
 export type RtlDataTableColumn<T, K extends string = string> = {
   key: K;
@@ -10,6 +15,7 @@ export type RtlDataTableColumn<T, K extends string = string> = {
   align?: 'right' | 'left' | 'center';
   minWidth?: number;
   sortable?: boolean;
+  skeleton?: RtlDataTableSkeleton;
   render?: (row: T) => ReactNode;
 };
 
@@ -24,9 +30,71 @@ type Props<T, K extends string = string> = {
   loading?: boolean;
   skeletonRows?: number;
   emptyMessage?: string;
+  emptySubtitle?: string;
+  emptyIcon?: SvgIconComponent;
 };
 
 export type Column<T, K extends string = string> = RtlDataTableColumn<T, K>;
+
+const TEXT_WIDTHS = ['72%', '88%', '64%', '80%', '56%', '70%'];
+
+function resolveSkeleton(column: RtlDataTableColumn<unknown, string>): RtlDataTableSkeleton {
+  if (column.skeleton) return column.skeleton;
+  if (column.key === 'status' || column.key.includes('status')) return 'badge';
+  if (column.key === 'actions' || column.align === 'center') return 'button';
+  return 'text';
+}
+
+function SkeletonCell({
+  column,
+  columnIndex,
+}: {
+  column: RtlDataTableColumn<unknown, string>;
+  columnIndex: number;
+}) {
+  const variant = resolveSkeleton(column);
+  const align = column.align ?? 'right';
+
+  if (variant === 'badge') {
+    return (
+      <Skeleton
+        variant="rounded"
+        width={96}
+        height={28}
+        animation="wave"
+        sx={{
+          borderRadius: (t) => t.radius('lg'),
+          ...(align === 'center' ? { mx: 'auto' } : align === 'left' ? { mr: 'auto' } : { ml: 'auto' }),
+        }}
+      />
+    );
+  }
+
+  if (variant === 'button') {
+    return (
+      <Skeleton
+        variant="rounded"
+        width={76}
+        height={32}
+        animation="wave"
+        sx={{ borderRadius: (t) => t.radius('md'), mx: 'auto' }}
+      />
+    );
+  }
+
+  return (
+    <Skeleton
+      variant="rounded"
+      width={TEXT_WIDTHS[columnIndex % TEXT_WIDTHS.length]}
+      height={16}
+      animation="wave"
+      sx={{
+        borderRadius: (t) => t.radius('sm'),
+        ...(align === 'center' ? { mx: 'auto' } : align === 'left' ? { mr: 'auto' } : { ml: 'auto' }),
+      }}
+    />
+  );
+}
 
 export function RtlDataTable<T, K extends string = string>({
   columns,
@@ -37,8 +105,10 @@ export function RtlDataTable<T, K extends string = string>({
   order = 'asc',
   onSort,
   loading = false,
-  skeletonRows = 5,
+  skeletonRows = 6,
   emptyMessage = 'داده‌ای یافت نشد',
+  emptySubtitle,
+  emptyIcon = Inbox,
 }: Props<T, K>) {
   const [internalOrderBy, setInternalOrderBy] = useState<K | ''>('');
   const [internalOrder, setInternalOrder] = useState<'asc' | 'desc'>('asc');
@@ -61,7 +131,14 @@ export function RtlDataTable<T, K extends string = string>({
   };
 
   return (
-    <Paper>
+    <Paper
+      elevation={0}
+      sx={{
+        border: '1px solid #b8c5bc',
+        borderRadius: (t) => t.radius('md'),
+        overflow: 'hidden',
+      }}
+    >
       <TableContainer sx={{ overflowX: 'auto' }}>
         <Table dir="rtl" sx={{ minWidth }}>
           <TableHead>
@@ -72,7 +149,7 @@ export function RtlDataTable<T, K extends string = string>({
                   align={col.align ?? 'right'}
                   sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}
                 >
-                  {col.sortable ? (
+                  {col.sortable && !loading ? (
                     <TableSortLabel
                       active={activeOrderBy === col.key}
                       direction={activeOrderBy === col.key ? activeOrder : 'asc'}
@@ -88,21 +165,37 @@ export function RtlDataTable<T, K extends string = string>({
           </TableHead>
           <TableBody>
             {loading ? (
-              Array.from({ length: skeletonRows }).map((_, i) => (
-                <TableRow key={i}>
-                  {columns.map((col) => (
-                    <TableCell key={col.key} align={col.align ?? 'right'} sx={{ minWidth: col.minWidth }}>
-                      <Skeleton variant="text" width="80%" />
+              Array.from({ length: skeletonRows }).map((_, rowIndex) => (
+                <TableRow key={`skeleton-${rowIndex}`}>
+                  {columns.map((col, columnIndex) => (
+                    <TableCell
+                      key={col.key}
+                      align={col.align ?? 'right'}
+                      sx={{ minWidth: col.minWidth, py: 1.75 }}
+                    >
+                      <SkeletonCell
+                        column={col as RtlDataTableColumn<unknown, string>}
+                        columnIndex={columnIndex + rowIndex}
+                      />
                     </TableCell>
                   ))}
                 </TableRow>
               ))
             ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={columns.length}>
-                  <Box sx={{ py: 6, textAlign: 'center' }}>
-                    <Typography color="text.secondary">{emptyMessage}</Typography>
-                  </Box>
+                <TableCell
+                  colSpan={columns.length}
+                  sx={{
+                    borderBottom: 'none',
+                    py: 0,
+                    '&:hover': { backgroundColor: 'transparent' },
+                  }}
+                >
+                  <EmptyState
+                    title={emptyMessage}
+                    subtitle={emptySubtitle}
+                    icon={emptyIcon}
+                  />
                 </TableCell>
               </TableRow>
             ) : (

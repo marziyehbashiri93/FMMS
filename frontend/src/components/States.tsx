@@ -1,6 +1,7 @@
-import { Alert, Box, Button, CircularProgress, Typography } from '@mui/material';
+import { Alert, Box, CircularProgress, Typography } from '@mui/material';
 import { Inbox, Refresh } from '@mui/icons-material';
 import type { SvgIconComponent } from '@mui/icons-material';
+import { Button } from './Button';
 
 export function LoadingState({ label = 'در حال دریافت اطلاعات' }: { label?: string }) {
   return (
@@ -41,7 +42,7 @@ export function EmptyState({
         sx={{
           width: 52,
           height: 52,
-          borderRadius: 2,
+          borderRadius: (t) => t.radius('xl'),
           bgcolor: 'primary.light',
           color: 'primary.main',
           display: 'grid',

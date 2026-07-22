@@ -35,7 +35,7 @@ export function KpiCard({
             sx={{
               width: 44,
               height: 44,
-              borderRadius: 1.5,
+              borderRadius: (t) => t.radius('lg'),
               bgcolor: `${tone}.light`,
               color: `${tone}.dark`,
               display: 'grid',

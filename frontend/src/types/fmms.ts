@@ -40,8 +40,101 @@ export type VehicleStatus =
   | 'DECOMMISSIONED';
 
 export interface AssignedVehicleDriver {
+  id: string | null;
   customer_number: string;
   name: string | null;
+}
+
+export type DriverStatus = 'ACTIVE' | 'DECOMMISSIONED';
+
+export interface DriverAssignedVehicle {
+  id: string;
+  vehicle_number: string;
+  license_plate: string;
+}
+
+export interface Driver {
+  id: string;
+  customer_number: string;
+  name: string;
+  status: DriverStatus | string;
+  created_at: string;
+  updated_at: string;
+  mobile: string | null;
+  personnel_number: string | null;
+  gender: string | null;
+  nilofar_code: string | null;
+  current_vehicle_as_driver?: DriverAssignedVehicle | null;
+  current_vehicle_as_assistant?: DriverAssignedVehicle | null;
+}
+
+export interface DriverSummary {
+  active_count: number;
+  decommissioned_count: number;
+  with_vehicle_count: number;
+  last_sap_sync_at: string | null;
+}
+
+export interface DriverVehicleAssignmentHistoryItem {
+  id: string;
+  sync_run_id: string;
+  request_id: string;
+  synced_at: string;
+  vehicle_id: string;
+  vehicle_number: string;
+  license_plate: string;
+  driver_role: 'DRIVER' | 'ASSISTANT' | string;
+  driver_customer_number: string | null;
+}
+
+export interface InspectionTemplate {
+  id: string;
+  sap_code: string;
+  code_group: string;
+  category: string;
+  description: string;
+  catalog_type: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ChecklistResult = 'PASS' | 'FAIL' | 'NOT_APPLICABLE' | 'NA';
+export type FailureSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+export type InspectionType = 'PRE_TRIP' | 'POST_TRIP' | 'PERIODIC' | 'UNSCHEDULED';
+export type InspectionStatus = 'DRAFT' | 'SUBMITTED' | 'REVIEWED' | string;
+
+export interface InspectionItemInput {
+  category: string;
+  description: string;
+  result: ChecklistResult;
+  notes?: string | null;
+  severity?: FailureSeverity | null;
+}
+
+export interface Inspection {
+  id: string;
+  vehicle_id: string;
+  inspection_type: InspectionType | string;
+  odometer_value: number;
+  odometer_unit: string;
+  status: InspectionStatus;
+  inspected_at: string;
+  created_at: string;
+  updated_at: string;
+  items: Array<{
+    id: string;
+    category: string;
+    description: string;
+    result: ChecklistResult | string;
+    notes: string | null;
+    severity: FailureSeverity | string | null;
+  }>;
+  driver_id: string | null;
+  has_failures: boolean;
+  overall_result: 'PASS' | 'FAIL' | string;
+  related_fault_ids: string[];
+  driver?: { id: string; name: string } | null;
 }
 
 export interface Vehicle {
@@ -76,6 +169,12 @@ export interface OdometerReading {
   recorded_by: string;
   recorded_at: string;
   updated_at: string;
+}
+
+export interface VehicleDriverAssignmentHistory {
+  assigned_at: string;
+  driver1: AssignedVehicleDriver | null;
+  driver2: AssignedVehicleDriver | null;
 }
 
 export interface Fault {

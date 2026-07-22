@@ -28,7 +28,7 @@ export function RtlTextField({
       InputLabelProps={{
         ...InputLabelProps,
         sx: {
-          right: 14,
+          right: 28,
           left: 'auto',
           transformOrigin: 'top right',
           textAlign: 'right',
@@ -42,8 +42,12 @@ export function RtlTextField({
         direction: 'rtl',
         '& .MuiOutlinedInput-root': {
           direction: 'rtl',
+           paddingRight: '14px',
         },
         '& .MuiOutlinedInput-notchedOutline': {
+          textAlign: 'right',
+        },
+        '& .MuiOutlinedInput-notchedOutline legend': {
           textAlign: 'right',
         },
         '& .MuiInputAdornment-root': {
@@ -56,9 +60,6 @@ export function RtlTextField({
         '& .MuiInputAdornment-positionEnd': {
           marginRight: 1,
           marginLeft: 0,
-        },
-        '& legend': {
-          textAlign: 'right',
         },
         ...sx,
       }}

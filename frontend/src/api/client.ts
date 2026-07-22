@@ -1,12 +1,20 @@
 import type {
   AuthUser,
+  Driver,
+  DriverSummary,
+  DriverVehicleAssignmentHistoryItem,
   Fault,
+  Inspection,
+  InspectionItemInput,
+  InspectionTemplate,
+  InspectionType,
   LoginResponse,
   OdometerReading,
   Paginated,
   RefreshTokenResponse,
   RepairOrder,
   Vehicle,
+  VehicleDriverAssignmentHistory,
   VehicleSummary,
   VehicleStatus,
 } from '../types/fmms';
@@ -190,10 +198,17 @@ export const api = {
     return request<VehicleSummary>('/vehicles/summary/');
   },
 
-  listVehicles(status?: VehicleStatus | '', ordering = '-created_at') {
+  listVehicles(
+    status?: VehicleStatus | '',
+    ordering = '-created_at',
+    options?: { page?: number; pageSize?: number; search?: string },
+  ) {
     const params = new URLSearchParams();
     if (status) params.set('status', status);
     if (ordering) params.set('ordering', ordering);
+    if (options?.search?.trim()) params.set('search', options.search.trim());
+    if (options?.page) params.set('page', String(options.page));
+    if (options?.pageSize) params.set('page_size', String(options.pageSize));
     const query = params.toString() ? `?${params.toString()}` : '';
     return request<Paginated<Vehicle>>(`/vehicles/${query}`);
   },
@@ -209,8 +224,22 @@ export const api = {
     });
   },
 
-  getOdometerHistory(vehicleId: string) {
-    return request<OdometerReading[]>(`/vehicles/${vehicleId}/odometer-history/`);
+  getOdometerHistory(vehicleId: string, options?: { fromDate?: string; toDate?: string }) {
+    const params = new URLSearchParams();
+    if (options?.fromDate) params.set('from_date', options.fromDate);
+    if (options?.toDate) params.set('to_date', options.toDate);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return request<OdometerReading[]>(`/vehicles/${vehicleId}/odometer-history/${query}`);
+  },
+
+  getDriverAssignmentHistory(vehicleId: string, options?: { fromDate?: string; toDate?: string }) {
+    const params = new URLSearchParams();
+    if (options?.fromDate) params.set('from_date', options.fromDate);
+    if (options?.toDate) params.set('to_date', options.toDate);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return request<VehicleDriverAssignmentHistory[]>(
+      `/vehicles/${vehicleId}/driver-assignment-history/${query}`,
+    );
   },
 
   recordOdometer(vehicleId: string, payload: { reading_date: string; odometer_km: number }) {
@@ -226,6 +255,114 @@ export const api = {
 
   listRepairOrders(vehicleId: string) {
     return request<Paginated<RepairOrder>>(`/repair-orders/?vehicle_id=${vehicleId}`);
+  },
+
+  listDrivers(options?: {
+    status?: string;
+    ordering?: string;
+    search?: string;
+    role?: 'DRIVER' | 'ASSISTANT' | '';
+    page?: number;
+    pageSize?: number;
+  }) {
+    const params = new URLSearchParams();
+    if (options?.status) params.set('status', options.status);
+    if (options?.ordering) params.set('ordering', options.ordering);
+    if (options?.search?.trim()) params.set('search', options.search.trim());
+    if (options?.role) params.set('role', options.role);
+    if (options?.page) params.set('page', String(options.page));
+    if (options?.pageSize) params.set('page_size', String(options.pageSize));
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return request<Paginated<Driver>>(`/drivers/${query}`);
+  },
+
+  getDriver(id: string) {
+    return request<Driver>(`/drivers/${id}/`);
+  },
+
+  getDriverSummary() {
+    return request<DriverSummary>('/drivers/summary/');
+  },
+
+  getDriverVehicleAssignmentHistory(
+    driverId: string,
+    options?: { fromDate?: string; toDate?: string },
+  ) {
+    const params = new URLSearchParams();
+    if (options?.fromDate) params.set('from_date', options.fromDate);
+    if (options?.toDate) params.set('to_date', options.toDate);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return request<DriverVehicleAssignmentHistoryItem[]>(
+      `/drivers/${driverId}/vehicle-assignment-history/${query}`,
+    );
+  },
+
+  listInspectionTemplates() {
+    return request<Paginated<InspectionTemplate> | InspectionTemplate[]>(
+      '/inspection-templates/',
+    );
+  },
+
+  listVehicleChecklists(
+    vehicleId: string,
+    options?: { fromDate?: string; toDate?: string; page?: number; pageSize?: number },
+  ) {
+    const params = new URLSearchParams();
+    if (options?.fromDate) params.set('from_date', options.fromDate);
+    if (options?.toDate) params.set('to_date', options.toDate);
+    if (options?.page) params.set('page', String(options.page));
+    if (options?.pageSize) params.set('page_size', String(options.pageSize));
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return request<Paginated<Inspection> | Inspection[]>(
+      `/vehicles/${vehicleId}/checklists/${query}`,
+    );
+  },
+
+  getVehicleChecklist(vehicleId: string, inspectionId: string) {
+    return request<Inspection>(`/vehicles/${vehicleId}/checklists/${inspectionId}/`);
+  },
+
+  listInspections(options?: {
+    vehicleId?: string;
+    fromDate?: string;
+    toDate?: string;
+    page?: number;
+    pageSize?: number;
+  }) {
+    const params = new URLSearchParams();
+    if (options?.vehicleId) params.set('vehicle_id', options.vehicleId);
+    if (options?.fromDate) params.set('from_date', options.fromDate);
+    if (options?.toDate) params.set('to_date', options.toDate);
+    if (options?.page) params.set('page', String(options.page));
+    if (options?.pageSize) params.set('page_size', String(options.pageSize));
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return request<Paginated<Inspection> | Inspection[]>(`/inspections/${query}`);
+  },
+
+  getInspection(id: string) {
+    return request<Inspection>(`/inspections/${id}/`);
+  },
+
+  createInspection(payload: {
+    vehicle_id: string;
+    inspection_type: InspectionType;
+    odometer_value: number;
+    odometer_unit: 'KM' | 'MILES';
+    inspected_at: string;
+    driver_id?: string | null;
+    items?: InspectionItemInput[];
+  }) {
+    return request<Inspection>('/inspections/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  submitInspection(id: string) {
+    return request<Inspection>(`/inspections/${id}/submit/`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
   },
 
   setAccessToken,

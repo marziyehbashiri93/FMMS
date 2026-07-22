@@ -131,7 +131,7 @@ export function LoginPage() {
                                         sx={{
                                             width: 36,
                                             height: 36,
-                                            borderRadius: 2,
+                                            borderRadius: (t) => t.radius('xl'),
                                             bgcolor: 'primary.main',
                                             display: 'grid',
                                             placeItems: 'center',
