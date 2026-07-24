@@ -35,6 +35,7 @@ export type VehicleStatus =
   | 'INACTIVE'
   | 'UNDER_REPAIR'
   | 'WAITING_DRIVER_CONFIRMATION'
+  | 'EXITED_CENTER'
   | 'SUSPENDED'
   | 'OUT_OF_SERVICE'
   | 'DECOMMISSIONED';
@@ -89,10 +90,12 @@ export interface DriverVehicleAssignmentHistoryItem {
 
 export interface InspectionTemplate {
   id: string;
-  sap_code: string;
   code_group: string;
-  category: string;
-  description: string;
+  code: string;
+  group_text: string;
+  code_text: string;
+  defect_class: string;
+  defect_class_text: string;
   catalog_type: string;
   is_active: boolean;
   created_at: string;
@@ -184,6 +187,7 @@ export interface Fault {
   description: string;
   severity: string;
   status: string;
+  inspection_id?: string | null;
   reported_at?: string;
   created_at?: string;
 }

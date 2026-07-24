@@ -41,7 +41,7 @@ export function isNavGroup(entry: NavEntry): entry is NavGroup {
 export const modules: AppModule[] = [
   { key: 'dashboard', label: 'داشبورد', path: '/dashboard', icon: Dashboard, enabled: false },
   { key: 'vehicles', label: 'لیست خودروها', path: '/vehicles', icon: DirectionsCar, enabled: true },
-  { key: 'checklists', label: 'لیست چک‌لیست‌ها', path: '/checklists', icon: FactCheck, enabled: true },
+  { key: 'checklists', label: 'لیست بازرسی روزانه', path: '/checklists', icon: FactCheck, enabled: true },
   { key: 'components', label: 'کامپوننت‌ها', path: '/components', icon: Widgets, enabled: true },
   { key: 'drivers', label: 'لیست راننده‌ها', path: '/drivers', icon: PeopleAlt, enabled: true },
   { key: 'inspections', label: 'بازرسی روزانه', path: '/inspections', icon: ReportProblem, enabled: true },

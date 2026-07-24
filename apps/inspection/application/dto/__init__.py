@@ -5,6 +5,7 @@ from apps.inspection.application.dto.inspection_dto import (
     CreateInspectionDTO,
     InspectionItemResponseDTO,
     InspectionResponseDTO,
+    ReportInspectionFaultDTO,
     SubmitInspectionDTO,
 )
 
@@ -12,6 +13,7 @@ __all__ = [
     "CreateInspectionDTO",
     "AddInspectionItemDTO",
     "SubmitInspectionDTO",
+    "ReportInspectionFaultDTO",
     "InspectionResponseDTO",
     "InspectionItemResponseDTO",
 ]

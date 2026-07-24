@@ -26,10 +26,12 @@ def _to_response_dto(template: InspectionTemplate) -> InspectionTemplateResponse
     """Map domain template → response DTO."""
     return InspectionTemplateResponseDTO(
         id=template.id,
-        sap_code=template.sap_code,
         code_group=template.code_group,
-        category=template.category,
-        description=template.description,
+        code=template.code,
+        group_text=template.group_text,
+        code_text=template.code_text,
+        defect_class=template.defect_class,
+        defect_class_text=template.defect_class_text,
         catalog_type=template.catalog_type,
         is_active=template.is_active,
         created_at=template.created_at,
@@ -103,7 +105,7 @@ class SyncInspectionTemplatesFromSAPService:
     ) -> InspectionTemplateSyncResultDTO:
         """Synchronise SAP catalog entries into FMMS inspection templates.
 
-        Matching key is ``(sap_code, code_group, catalog_type)``. Existing
+        Matching key is ``(code, code_group, catalog_type)``. Existing
         templates are updated; missing ones are created.
 
         Args:
@@ -144,7 +146,7 @@ class SyncInspectionTemplatesFromSAPService:
                         "service": "SyncInspectionTemplatesFromSAPService",
                         "operation": "execute",
                         "request_id": request_id,
-                        "sap_code": sap_dto.code,
+                        "code": sap_dto.code,
                         "code_group": sap_dto.code_group,
                         "exception": str(exc),
                     },
@@ -187,8 +189,10 @@ class SyncInspectionTemplatesFromSAPService:
         )
         now = datetime.now(tz=UTC)
         if existing is not None:
-            existing.category = sap_dto.code_group
-            existing.description = sap_dto.description
+            existing.group_text = sap_dto.group_text
+            existing.code_text = sap_dto.code_text
+            existing.defect_class = sap_dto.defect_class
+            existing.defect_class_text = sap_dto.defect_class_text
             existing.catalog_type = sap_dto.catalog_type
             existing.is_active = True
             existing.updated_at = now
@@ -197,10 +201,12 @@ class SyncInspectionTemplatesFromSAPService:
 
         template = InspectionTemplate(
             id=uuid.uuid4(),
-            sap_code=sap_dto.code,
             code_group=sap_dto.code_group,
-            category=sap_dto.code_group,
-            description=sap_dto.description,
+            code=sap_dto.code,
+            group_text=sap_dto.group_text,
+            code_text=sap_dto.code_text,
+            defect_class=sap_dto.defect_class,
+            defect_class_text=sap_dto.defect_class_text,
             catalog_type=sap_dto.catalog_type or _DEFAULT_CATALOG_TYPE,
             is_active=True,
             created_at=now,

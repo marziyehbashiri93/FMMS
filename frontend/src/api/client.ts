@@ -120,11 +120,15 @@ async function refreshAccessToken(): Promise<string> {
   })
     .then(async (response) => {
       const text = await response.text();
-      const data = text ? JSON.parse(text) : null;
+      const data = parseResponseBody(text) as RefreshTokenResponse | null;
       if (!response.ok) {
         clearAuthTokens();
-        const message = data?.message ?? data?.detail ?? 'نشست کاربری منقضی شده است.';
+        const message = extractErrorMessage(response.status, data) || 'نشست کاربری منقضی شده است.';
         throw new ApiError(response.status, message, data);
+      }
+      if (!data || typeof data !== 'object' || !('access' in data)) {
+        clearAuthTokens();
+        throw new ApiError(response.status, 'پاسخ نامعتبر از سرور دریافت شد.', text);
       }
       const payload = data as RefreshTokenResponse;
       setAccessToken(payload.access);
@@ -145,6 +149,34 @@ async function getValidAccessToken(): Promise<string> {
   return getAccessToken();
 }
 
+function parseResponseBody(text: string): unknown {
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+function extractErrorMessage(status: number, data: unknown): string {
+  if (data && typeof data === 'object') {
+    const payload = data as Record<string, unknown>;
+    if (typeof payload.message === 'string' && payload.message.trim()) return payload.message;
+    if (typeof payload.detail === 'string' && payload.detail.trim()) return payload.detail;
+    if (Array.isArray(payload.messages) && typeof payload.messages[0] === 'string') {
+      return payload.messages[0];
+    }
+    for (const value of Object.values(payload)) {
+      if (typeof value === 'string' && value.trim()) return value;
+      if (Array.isArray(value) && typeof value[0] === 'string' && value[0].trim()) {
+        return value[0];
+      }
+    }
+  }
+  if (status >= 500) return 'خطای داخلی سرور. مقدار ورودی را بررسی کنید یا بعداً تلاش کنید.';
+  return `خطای ${status} در ارتباط با سرور`;
+}
+
 async function request<T>(path: string, init: ApiRequestInit = {}): Promise<T> {
   const { auth = true, retryOnUnauthorized = true, ...fetchInit } = init;
   const token = auth ? await getValidAccessToken() : '';
@@ -157,7 +189,7 @@ async function request<T>(path: string, init: ApiRequestInit = {}): Promise<T> {
     headers,
   });
   const text = await response.text();
-  const data = text ? JSON.parse(text) : null;
+  const data = parseResponseBody(text);
   if (response.status === 401 && auth && retryOnUnauthorized && getRefreshToken()) {
     const refreshedToken = await refreshAccessToken();
     return request<T>(path, {
@@ -171,12 +203,10 @@ async function request<T>(path: string, init: ApiRequestInit = {}): Promise<T> {
     });
   }
   if (!response.ok) {
-    const message =
-      data?.message ??
-      data?.detail ??
-      data?.messages?.[0] ??
-      `خطای ${response.status} در ارتباط با سرور`;
-    throw new ApiError(response.status, message, data);
+    throw new ApiError(response.status, extractErrorMessage(response.status, data), data);
+  }
+  if (text && data === null) {
+    throw new ApiError(response.status, 'پاسخ نامعتبر از سرور دریافت شد.', text);
   }
   return data as T;
 }
@@ -284,6 +314,13 @@ export const api = {
     return request<DriverSummary>('/drivers/summary/');
   },
 
+  driverExitCenter(driverId: string, payload: { vehicle_id: string; inspection_id: string }) {
+    return request<Vehicle>(`/drivers/${driverId}/exit-center/`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
   getDriverVehicleAssignmentHistory(
     driverId: string,
     options?: { fromDate?: string; toDate?: string },
@@ -360,6 +397,13 @@ export const api = {
 
   submitInspection(id: string) {
     return request<Inspection>(`/inspections/${id}/submit/`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  },
+
+  reportInspectionFault(id: string) {
+    return request<Fault>(`/inspections/${id}/report-fault/`, {
       method: 'POST',
       body: JSON.stringify({}),
     });

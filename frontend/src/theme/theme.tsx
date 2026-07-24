@@ -126,10 +126,28 @@ export const theme = createTheme({
             },
         },
         MuiDialog: {
+            defaultProps: {
+                disableScrollLock: true,
+            },
             styleOverrides: {
                 paper: ({theme: t}) => ({
                     borderRadius: t.radii.md,
                 }),
+            },
+        },
+        MuiModal: {
+            defaultProps: {
+                disableScrollLock: true,
+            },
+        },
+        MuiPopover: {
+            defaultProps: {
+                disableScrollLock: true,
+            },
+        },
+        MuiMenu: {
+            defaultProps: {
+                disableScrollLock: true,
             },
         },
         MuiPaper: {
@@ -208,6 +226,7 @@ export function ThemeProvider({children}: { children: ReactNode }) {
                         html: {
                             direction: 'rtl !important',
                             scrollbarGutter: 'stable',
+                            overflowY: 'scroll',
                         },
                         ':root': {
                             '--palette-primary-mainChannel': '0 167 111',
@@ -222,12 +241,17 @@ export function ThemeProvider({children}: { children: ReactNode }) {
                             minWidth: 320,
                             background: '#f4f6f8',
                         },
-                        // Prevent MUI Modal scroll-lock padding from shifting fixed sidebar in RTL
-                        'body[data-scroll-locked]': {
+                        // Keep layout stable if any overlay still toggles body scroll lock
+                        'body[data-scroll-locked], html[data-scroll-locked]': {
                             paddingLeft: '0 !important',
                             paddingRight: '0 !important',
                             marginLeft: '0 !important',
                             marginRight: '0 !important',
+                            '--removed-body-scroll-bar-size': '0px',
+                        },
+                        'body[style*="padding-right"], body[style*="padding-left"]': {
+                            paddingLeft: '0 !important',
+                            paddingRight: '0 !important',
                         },
                         '#root': {minHeight: '100vh', direction: 'rtl !important'},
                         '*': {boxSizing: 'border-box'},

@@ -21,7 +21,9 @@ class TestObjectPartCatalogODataAdapter:
         result = adapter.get_catalog("B")
 
         assert len(result) >= 4
-        descriptions = {item.description for item in result}
-        assert "ترمز جلو" in descriptions
-        assert "چراغ جلو" in descriptions
+        code_texts = {item.code_text for item in result}
+        assert "ترمز ضعیف" in code_texts
+        assert "چراغ جلو معیوب" in code_texts
+        assert {item.group_text for item in result}
+        assert {item.defect_class for item in result}
         assert {item.catalog_type for item in result} == {"B"}

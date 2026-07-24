@@ -8,6 +8,7 @@ const statusStyles: Record<VehicleStatus, { bg: string; softBg: string; border: 
   INACTIVE: { bg: '#647067', softBg: 'rgba(100, 112, 103, 0.12)', border: 'rgba(100, 112, 103, 0.35)', label: 'غیرفعال' },
   UNDER_REPAIR: { bg: '#d28a20', softBg: 'rgba(210, 138, 32, 0.14)', border: 'rgba(210, 138, 32, 0.42)', label: 'در تعمیر' },
   WAITING_DRIVER_CONFIRMATION: { bg: '#2d6f95', softBg: 'rgba(45, 111, 149, 0.12)', border: 'rgba(45, 111, 149, 0.36)', label: 'منتظر تایید راننده' },
+  EXITED_CENTER: { bg: '#007867', softBg: 'rgba(0, 120, 103, 0.12)', border: 'rgba(0, 120, 103, 0.36)', label: 'خارج شده از مرکز' },
   SUSPENDED: { bg: '#647067', softBg: 'rgba(100, 112, 103, 0.12)', border: 'rgba(100, 112, 103, 0.35)', label: 'تعلیق‌شده' },
   OUT_OF_SERVICE: { bg: '#c94132', softBg: 'rgba(201, 65, 50, 0.12)', border: 'rgba(201, 65, 50, 0.36)', label: 'خارج از سرویس' },
   DECOMMISSIONED: { bg: '#9f2f27', softBg: 'rgba(159, 47, 39, 0.12)', border: 'rgba(159, 47, 39, 0.36)', label: 'از رده خارج' },
@@ -39,15 +40,51 @@ export function VehicleStatusBadge({
   );
 }
 
-export function PlainStatusBadge({ label, appearance = 'soft' }: { label: string; appearance?: BadgeAppearance }) {
+export function PlainStatusBadge({
+  label,
+  appearance = 'soft',
+  tone = 'success',
+}: {
+  label: string;
+  appearance?: BadgeAppearance;
+  tone?: 'success' | 'error' | 'warning' | 'neutral';
+}) {
+  const palette = {
+    success: {
+      solid: '#155f3d',
+      softBg: 'rgba(21, 95, 61, 0.1)',
+      softFg: '#155f3d',
+      border: 'rgba(21, 95, 61, 0.28)',
+    },
+    error: {
+      solid: '#c94132',
+      softBg: 'rgba(201, 65, 50, 0.12)',
+      softFg: '#c94132',
+      border: 'rgba(201, 65, 50, 0.36)',
+    },
+    warning: {
+      solid: '#d28a20',
+      softBg: 'rgba(210, 138, 32, 0.14)',
+      softFg: '#b57412',
+      border: 'rgba(210, 138, 32, 0.42)',
+    },
+    neutral: {
+      solid: '#647067',
+      softBg: 'rgba(100, 112, 103, 0.12)',
+      softFg: '#647067',
+      border: 'rgba(100, 112, 103, 0.35)',
+    },
+  }[tone];
+
   return (
     <Chip
       size="small"
       label={label}
       sx={{
-        bgcolor: appearance === 'solid' ? '#155f3d' : 'rgba(21, 95, 61, 0.1)',
-        color: appearance === 'solid' ? '#ffffff' : '#155f3d',
-        border: '1px solid rgba(21, 95, 61, 0.28)',
+        bgcolor: appearance === 'solid' ? palette.solid : palette.softBg,
+        color: appearance === 'solid' ? '#ffffff' : palette.softFg,
+        border: '1px solid',
+        borderColor: appearance === 'solid' ? palette.solid : palette.border,
       }}
     />
   );

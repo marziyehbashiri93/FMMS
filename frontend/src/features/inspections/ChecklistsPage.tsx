@@ -31,6 +31,11 @@ import { RtlDataTable, type RtlDataTableColumn } from '../../components/RtlDataT
 import { RtlSelectField } from '../../components/RtlSelectField';
 import type { Inspection, Vehicle } from '../../types/fmms';
 import { formatDateTime, toFaNumber } from '../../utils/format';
+import {
+  checklistOverallLabel,
+  checklistOverallTone,
+  sortChecklistItems,
+} from './checklistDisplay';
 
 const PAGE_SIZE = 20;
 
@@ -237,9 +242,7 @@ export function ChecklistsPage() {
       label: 'کیلومتر',
       sortable: true,
       render: (row) =>
-        row.odometer_value != null
-          ? `${toFaNumber(row.odometer_value)} ${row.odometer_unit === 'MILES' ? 'mi' : 'km'}`
-          : '—',
+        row.odometer_value != null ? toFaNumber(row.odometer_value) : '—',
     },
     {
       key: 'status',
@@ -255,11 +258,8 @@ export function ChecklistsPage() {
       sortable: true,
       render: (row) => (
         <PlainStatusBadge
-          label={
-            row.has_failures
-              ? 'دارای خرابی'
-              : CHECKLIST_RESULT_LABELS[row.overall_result] ?? row.overall_result ?? '—'
-          }
+          tone={checklistOverallTone(row.has_failures, row.overall_result)}
+          label={checklistOverallLabel(row.has_failures, row.overall_result, CHECKLIST_RESULT_LABELS)}
         />
       ),
     },
@@ -284,23 +284,44 @@ export function ChecklistsPage() {
     {
       key: 'result',
       label: 'نتیجه',
-      render: (row) => CHECKLIST_RESULT_LABELS[row.result] ?? row.result,
+      render: (row) => (
+        <PlainStatusBadge
+          tone={row.result === 'FAIL' ? 'error' : row.result === 'PASS' ? 'success' : 'neutral'}
+          label={CHECKLIST_RESULT_LABELS[row.result] ?? row.result}
+        />
+      ),
     },
     {
       key: 'severity',
       label: 'شدت',
-      render: (row) => (row.severity ? SEVERITY_LABELS[row.severity] ?? row.severity : '—'),
+      render: (row) =>
+        row.severity ? (
+          <Typography fontWeight={row.result === 'FAIL' ? 800 : 500} color={row.result === 'FAIL' ? 'error.main' : 'inherit'}>
+            {SEVERITY_LABELS[row.severity] ?? row.severity}
+          </Typography>
+        ) : (
+          '—'
+        ),
     },
-    { key: 'notes', label: 'یادداشت', render: (row) => row.notes || '—' },
+    {
+      key: 'notes',
+      label: 'یادداشت',
+      render: (row) =>
+        row.notes ? (
+          <Typography fontWeight={row.result === 'FAIL' ? 700 : 400}>{row.notes}</Typography>
+        ) : (
+          '—'
+        ),
+    },
   ];
 
   return (
     <Stack spacing={{ xs: 1.5, md: 2.25 }} style={{ direction: 'rtl', textAlign: 'right' }}>
       <PageHeader
-        title="لیست چک‌لیست‌ها"
+        title="لیست بازرسی روزانه"
         breadcrumbs={[
           { label: 'مدیریت ناوگان', to: '/vehicles' },
-          { label: 'لیست چک‌لیست‌ها' },
+          { label: 'لیست بازرسی روزانه' },
         ]}
       />
 
@@ -396,11 +417,12 @@ export function ChecklistsPage() {
                       </Typography>
                     </Box>
                     <PlainStatusBadge
-                      label={
-                        row.has_failures
-                          ? 'دارای خرابی'
-                          : CHECKLIST_RESULT_LABELS[row.overall_result] ?? row.overall_result ?? '—'
-                      }
+                      tone={checklistOverallTone(row.has_failures, row.overall_result)}
+                      label={checklistOverallLabel(
+                        row.has_failures,
+                        row.overall_result,
+                        CHECKLIST_RESULT_LABELS,
+                      )}
                     />
                   </Stack>
                   <Divider sx={{ my: 1.25 }} />
@@ -510,13 +532,12 @@ export function ChecklistsPage() {
                   label="نتیجه کلی"
                   value={
                     <PlainStatusBadge
-                      label={
-                        selected.has_failures
-                          ? 'دارای خرابی'
-                          : CHECKLIST_RESULT_LABELS[selected.overall_result] ??
-                            selected.overall_result ??
-                            '—'
-                      }
+                      tone={checklistOverallTone(selected.has_failures, selected.overall_result)}
+                      label={checklistOverallLabel(
+                        selected.has_failures,
+                        selected.overall_result,
+                        CHECKLIST_RESULT_LABELS,
+                      )}
                     />
                   }
                 />
@@ -526,7 +547,7 @@ export function ChecklistsPage() {
               </Box>
               <RtlDataTable
                 columns={itemColumns}
-                rows={selected.items ?? []}
+                rows={sortChecklistItems(selected.items)}
                 getRowKey={(row) => row.id}
                 emptyMessage="آیتمی برای این چک‌لیست ثبت نشده است"
                 minWidth={640}

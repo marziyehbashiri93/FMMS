@@ -14,13 +14,19 @@ class SAPObjectPartDTO:
     """A single object part entry from the SAP catalog.
 
     Attributes:
-        code: The object part code identifier.
-        code_group: The grouping code within the catalog.
-        description: Human-readable description of the part/component.
-        catalog_type: The SAP catalog type (e.g. "B" for object parts).
+        code_group: SAP ``CodeGroup``.
+        code: SAP ``Code``.
+        group_text: SAP ``GroupText``.
+        code_text: SAP ``CodeText``.
+        defect_class: SAP ``DefectClass``.
+        defect_class_text: SAP ``DefectClassText``.
+        catalog_type: The SAP catalog type (e.g. "B").
     """
 
-    code: str
     code_group: str
-    description: str
+    code: str
+    group_text: str
+    code_text: str
+    defect_class: str
+    defect_class_text: str
     catalog_type: str

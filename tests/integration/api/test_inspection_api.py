@@ -7,6 +7,8 @@ from datetime import UTC, datetime
 import pytest
 from rest_framework.test import APIClient
 
+from apps.fault.infrastructure.models import FaultModel
+from apps.repair.infrastructure.models import RepairOrderModel
 from tests.integration.api.conftest import create_vehicle
 
 pytestmark = pytest.mark.django_db
@@ -60,3 +62,56 @@ class TestInspectionAPI:
         )
         assert listed.status_code == 200
         assert listed.data["count"] >= 1
+
+    def test_failed_checklist_requires_explicit_fault_report(
+        self, authenticated_client: APIClient
+    ) -> None:
+        """Submitting a failed checklist does not create a fault until requested."""
+        vehicle = create_vehicle(
+            authenticated_client,
+            plate="12FAIL01",
+            vin="1HGCM82633A004355",
+        )
+        created = authenticated_client.post(
+            "/api/v1/inspections/",
+            {
+                "vehicle_id": vehicle["id"],
+                "inspection_type": "PRE_TRIP",
+                "odometer_value": 12000,
+                "odometer_unit": "KM",
+                "inspected_at": datetime.now(tz=UTC).isoformat(),
+                "items": [
+                    {
+                        "category": "Brakes",
+                        "description": "Pad thickness",
+                        "result": "FAIL",
+                        "notes": "Pad worn",
+                        "severity": "HIGH",
+                    }
+                ],
+            },
+            format="json",
+        )
+        assert created.status_code == 201, created.data
+        inspection_id = created.data["id"]
+
+        submitted = authenticated_client.post(
+            f"/api/v1/inspections/{inspection_id}/submit/",
+            {},
+            format="json",
+        )
+        assert submitted.status_code == 200, submitted.data
+        assert submitted.data["has_failures"] is True
+        assert FaultModel.objects.filter(inspection_id=inspection_id).count() == 0
+
+        reported = authenticated_client.post(
+            f"/api/v1/inspections/{inspection_id}/report-fault/",
+            {},
+            format="json",
+        )
+
+        assert reported.status_code == 201, reported.data
+        assert reported.data["inspection_id"] == inspection_id
+        assert len(reported.data["items"]) == 1
+        assert FaultModel.objects.filter(inspection_id=inspection_id).count() == 1
+        assert RepairOrderModel.objects.filter(fault_id=reported.data["id"]).count() == 1

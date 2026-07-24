@@ -42,6 +42,9 @@ from apps.inspection.application.services.get_inspection_service import (
     GetInspectionService,
     ListInspectionsService,
 )
+from apps.inspection.application.services.report_inspection_fault_service import (
+    ReportInspectionFaultService,
+)
 from apps.inspection.application.services.submit_inspection_service import (
     SubmitInspectionService,
 )
@@ -456,6 +459,15 @@ def get_add_inspection_item_service() -> AddInspectionItemService:
 def get_submit_inspection_service() -> SubmitInspectionService:
     """Return SubmitInspectionService."""
     return SubmitInspectionService(
+        get_inspection_repository(),
+        get_fault_repository(),
+        get_repair_order_repository(),
+    )
+
+
+def get_report_inspection_fault_service() -> ReportInspectionFaultService:
+    """Return ReportInspectionFaultService."""
+    return ReportInspectionFaultService(
         get_inspection_repository(),
         get_fault_repository(),
         get_repair_order_repository(),

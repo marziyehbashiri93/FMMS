@@ -29,13 +29,13 @@ class FakeTemplateRepository(IInspectionTemplateRepository):
         return self._store.get(template_id)
 
     def get_by_sap_key(
-        self, sap_code: str, code_group: str, catalog_type: str
+        self, code: str, code_group: str, catalog_type: str
     ) -> InspectionTemplate | None:
         return next(
             (
                 t
                 for t in self._store.values()
-                if t.sap_code == sap_code
+                if t.code == code
                 and t.code_group == code_group
                 and t.catalog_type == catalog_type
             ),
@@ -73,9 +73,12 @@ class FakeObjectPartCatalogPort(ISAPObjectPartCatalogPort):
 
 def _entry(code: str, group: str, text: str) -> SAPObjectPartDTO:
     return SAPObjectPartDTO(
-        code=code,
         code_group=group,
-        description=text,
+        code=code,
+        group_text=group,
+        code_text=text,
+        defect_class="S2",
+        defect_class_text="Major / جدی",
         catalog_type="B",
     )
 
@@ -104,10 +107,12 @@ class TestSyncInspectionTemplatesFromSAPService:
         now = datetime.now(tz=UTC)
         existing = InspectionTemplate(
             id=uuid.uuid4(),
-            sap_code="SEAT",
             code_group="SAFETY",
-            category="SAFETY",
-            description="Old seat belt text",
+            code="SEAT",
+            group_text="SAFETY",
+            code_text="Old seat belt text",
+            defect_class="S3",
+            defect_class_text="Minor / جزئی",
             catalog_type="B",
             is_active=True,
             created_at=now,
@@ -120,7 +125,8 @@ class TestSyncInspectionTemplatesFromSAPService:
 
         assert result.created == 0
         assert result.updated == 1
-        assert repo.get_by_id(existing.id).description == "Seat belt"
+        assert repo.get_by_id(existing.id).code_text == "Seat belt"
+        assert repo.get_by_id(existing.id).defect_class == "S2"
 
     def test_sync_is_idempotent(self) -> None:
         repo = FakeTemplateRepository()
@@ -141,10 +147,12 @@ class TestListInspectionTemplatesService:
         now = datetime.now(tz=UTC)
         active = InspectionTemplate(
             id=uuid.uuid4(),
-            sap_code="SEAT",
             code_group="SAFETY",
-            category="SAFETY",
-            description="Seat belt",
+            code="SEAT",
+            group_text="SAFETY",
+            code_text="Seat belt",
+            defect_class="S2",
+            defect_class_text="Major / جدی",
             catalog_type="B",
             is_active=True,
             created_at=now,
@@ -152,10 +160,12 @@ class TestListInspectionTemplatesService:
         )
         inactive = InspectionTemplate(
             id=uuid.uuid4(),
-            sap_code="OLD",
             code_group="SAFETY",
-            category="SAFETY",
-            description="Retired item",
+            code="OLD",
+            group_text="SAFETY",
+            code_text="Retired item",
+            defect_class="S3",
+            defect_class_text="Minor / جزئی",
             catalog_type="B",
             is_active=False,
             created_at=now,
@@ -166,4 +176,4 @@ class TestListInspectionTemplatesService:
         result = ListInspectionTemplatesService(repo).execute()
 
         assert len(result) == 1
-        assert result[0].description == "Seat belt"
+        assert result[0].code_text == "Seat belt"

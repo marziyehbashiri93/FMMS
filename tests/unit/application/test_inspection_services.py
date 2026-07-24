@@ -3,7 +3,8 @@
 All repository dependencies are replaced with in-memory fakes — no DB, no network.
 
 Key workflow tested:
-- SubmitInspectionService: FAIL items → one Fault with FaultItem children.
+- SubmitInspectionService: finalizes checklist without creating faults.
+- ReportInspectionFaultService: FAIL items → one Fault with FaultItem children.
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ from apps.inspection.application.dto.inspection_dto import (
     AddInspectionItemDTO,
     CreateInspectionDTO,
     InspectionResponseDTO,
+    ReportInspectionFaultDTO,
     SubmitInspectionDTO,
 )
 from apps.inspection.application.services.add_inspection_item_service import (
@@ -31,6 +33,9 @@ from apps.inspection.application.services.create_inspection_service import (
 from apps.inspection.application.services.get_inspection_service import (
     GetInspectionService,
     ListInspectionsService,
+)
+from apps.inspection.application.services.report_inspection_fault_service import (
+    ReportInspectionFaultService,
 )
 from apps.inspection.application.services.submit_inspection_service import (
     SubmitInspectionService,
@@ -416,7 +421,7 @@ class TestSubmitInspectionService:
 
         assert result.status == InspectionStatus.SUBMITTED
 
-    def test_creates_one_fault_with_item_per_fail(self) -> None:
+    def test_submit_does_not_create_fault_for_failed_items(self) -> None:
         vehicle = _make_vehicle()
         inspection = _make_inspection(vehicle_id=vehicle.id)
         inspection.items.append(_make_fail_item("Brakes", "Brake fluid low"))
@@ -428,10 +433,10 @@ class TestSubmitInspectionService:
 
         service.execute(self._dto(inspection.id))
 
-        assert len(fault_repo.saved) == 1
-        assert len(fault_repo.saved[0].items) == 2
+        assert inspection.status == InspectionStatus.SUBMITTED
+        assert len(fault_repo.saved) == 0
 
-    def test_creates_one_repair_order_for_failed_inspection(self) -> None:
+    def test_submit_does_not_create_repair_order_for_failed_inspection(self) -> None:
         vehicle = _make_vehicle()
         inspection = _make_inspection(vehicle_id=vehicle.id)
         inspection.items.append(_make_fail_item("Brakes", "Brake fluid low"))
@@ -442,9 +447,9 @@ class TestSubmitInspectionService:
 
         service.execute(self._dto(inspection.id))
 
-        assert len(repair_repo.saved) == 1
-        assert repair_repo.saved[0].status == RepairOrderStatus.CREATED
-        assert repair_repo.saved[0].fault_id == fault_repo.saved[0].id
+        assert inspection.status == InspectionStatus.SUBMITTED
+        assert len(fault_repo.saved) == 0
+        assert len(repair_repo.saved) == 0
 
     def test_keeps_vehicle_active_on_fail(self) -> None:
         vehicle = _make_vehicle()
@@ -472,42 +477,20 @@ class TestSubmitInspectionService:
         assert len(repair_repo.saved) == 0
         assert vehicle_repo.get_by_id(vehicle.id).status == VehicleStatus.ACTIVE
 
-    def test_auto_created_faults_are_open_and_linked_to_inspection(self) -> None:
+    def test_submit_allows_failed_items_without_open_flow_check(self) -> None:
         vehicle = _make_vehicle()
         inspection = _make_inspection(vehicle_id=vehicle.id)
-        inspection.items.append(_make_fail_item("Engine", "Oil level critical"))
-        service, fault_repo, _, _ = self._service(
-            inspections=[inspection], vehicles=[vehicle]
+        inspection.items.append(_make_fail_item("Brakes", "Brake fluid low"))
+        open_fault = _make_open_fault(vehicle.id)
+        service, _, _, _ = self._service(
+            inspections=[inspection],
+            vehicles=[vehicle],
+            faults=[open_fault],
         )
 
-        service.execute(self._dto(inspection.id))
+        result = service.execute(self._dto(inspection.id))
 
-        fault = fault_repo.saved[0]
-        assert fault.status == FaultStatus.OPEN
-        assert fault.inspection_id == inspection.id
-        assert fault.vehicle_id == inspection.vehicle_id
-        assert len(fault.items) == 1
-        assert fault.items[0].component == "Oil level critical"
-
-    def test_submit_propagates_item_severity_to_fault(self) -> None:
-        vehicle = _make_vehicle()
-        inspection = _make_inspection(vehicle_id=vehicle.id)
-        inspection.items.append(
-            _make_fail_item("Brakes", "Pad worn", FailureSeverity.LOW)
-        )
-        inspection.items.append(
-            _make_fail_item("Engine", "Oil leak", FailureSeverity.CRITICAL)
-        )
-        service, fault_repo, _, _ = self._service(
-            inspections=[inspection], vehicles=[vehicle]
-        )
-
-        service.execute(self._dto(inspection.id))
-
-        fault = fault_repo.saved[0]
-        assert fault.severity == FaultSeverity.CRITICAL
-        severities = {item.severity for item in fault.items}
-        assert severities == {FaultSeverity.LOW, FaultSeverity.CRITICAL}
+        assert result.status == InspectionStatus.SUBMITTED
 
     def test_raises_not_found_for_missing_inspection(self) -> None:
         service, _, _, _ = self._service()
@@ -523,14 +506,83 @@ class TestSubmitInspectionService:
         with pytest.raises(InspectionItemRequiredError):
             service.execute(self._dto(inspection.id))
 
+
+# ---------------------------------------------------------------------------
+# ReportInspectionFaultService
+# ---------------------------------------------------------------------------
+
+
+class TestReportInspectionFaultService:
+    def _service(
+        self,
+        inspections: list[Inspection] | None = None,
+        faults: list[Fault] | None = None,
+        repair_orders: list[RepairOrder] | None = None,
+    ) -> tuple[
+        ReportInspectionFaultService,
+        FakeFaultRepository,
+        FakeRepairOrderRepository,
+    ]:
+        fault_repo = FakeFaultRepository()
+        for fault in faults or []:
+            fault_repo.saved.append(fault)
+        repair_repo = FakeRepairOrderRepository()
+        for order in repair_orders or []:
+            repair_repo.saved.append(order)
+        service = ReportInspectionFaultService(
+            inspection_repository=FakeInspectionRepository(initial=inspections or []),
+            fault_repository=fault_repo,
+            repair_order_repository=repair_repo,
+        )
+        return service, fault_repo, repair_repo
+
+    def _dto(self, inspection_id: uuid.UUID) -> ReportInspectionFaultDTO:
+        return ReportInspectionFaultDTO(
+            inspection_id=inspection_id,
+            request_id="req-report-fault",
+            reported_by=uuid.uuid4(),
+        )
+
+    def test_creates_one_fault_with_item_per_fail(self) -> None:
+        vehicle = _make_vehicle()
+        inspection = _make_inspection(
+            vehicle_id=vehicle.id,
+            status=InspectionStatus.SUBMITTED,
+        )
+        inspection.items.append(_make_fail_item("Brakes", "Brake fluid low"))
+        inspection.items.append(_make_fail_item("Lights", "Left headlight broken"))
+        service, fault_repo, _ = self._service(inspections=[inspection])
+
+        service.execute(self._dto(inspection.id))
+
+        assert len(fault_repo.saved) == 1
+        assert len(fault_repo.saved[0].items) == 2
+
+    def test_creates_one_repair_order_for_failed_inspection(self) -> None:
+        vehicle = _make_vehicle()
+        inspection = _make_inspection(
+            vehicle_id=vehicle.id,
+            status=InspectionStatus.SUBMITTED,
+        )
+        inspection.items.append(_make_fail_item("Brakes", "Brake fluid low"))
+        service, fault_repo, repair_repo = self._service(inspections=[inspection])
+
+        service.execute(self._dto(inspection.id))
+
+        assert len(repair_repo.saved) == 1
+        assert repair_repo.saved[0].status == RepairOrderStatus.CREATED
+        assert repair_repo.saved[0].fault_id == fault_repo.saved[0].id
+
     def test_raises_when_vehicle_has_open_fault(self) -> None:
         vehicle = _make_vehicle()
-        inspection = _make_inspection(vehicle_id=vehicle.id)
+        inspection = _make_inspection(
+            vehicle_id=vehicle.id,
+            status=InspectionStatus.SUBMITTED,
+        )
         inspection.items.append(_make_fail_item("Brakes", "Brake fluid low"))
         open_fault = _make_open_fault(vehicle.id)
-        service, _, _, _ = self._service(
+        service, _, _ = self._service(
             inspections=[inspection],
-            vehicles=[vehicle],
             faults=[open_fault],
         )
 
@@ -539,16 +591,17 @@ class TestSubmitInspectionService:
 
         assert exc_info.value.error_code == VEHICLE_OPEN_FLOW_ERROR_CODE
         assert exc_info.value.message == VEHICLE_OPEN_FLOW_MESSAGE
-        assert inspection.status == InspectionStatus.DRAFT
 
     def test_raises_when_vehicle_has_open_repair_order(self) -> None:
         vehicle = _make_vehicle()
-        inspection = _make_inspection(vehicle_id=vehicle.id)
+        inspection = _make_inspection(
+            vehicle_id=vehicle.id,
+            status=InspectionStatus.SUBMITTED,
+        )
         inspection.items.append(_make_fail_item("Brakes", "Brake fluid low"))
         open_order = _make_open_repair_order(vehicle.id)
-        service, fault_repo, _, _ = self._service(
+        service, fault_repo, _ = self._service(
             inspections=[inspection],
-            vehicles=[vehicle],
             repair_orders=[open_order],
         )
 
@@ -556,7 +609,45 @@ class TestSubmitInspectionService:
             service.execute(self._dto(inspection.id))
 
         assert len(fault_repo.saved) == 0
-        assert inspection.status == InspectionStatus.DRAFT
+
+    def test_reported_faults_are_open_and_linked_to_inspection(self) -> None:
+        vehicle = _make_vehicle()
+        inspection = _make_inspection(
+            vehicle_id=vehicle.id,
+            status=InspectionStatus.SUBMITTED,
+        )
+        inspection.items.append(_make_fail_item("Engine", "Oil level critical"))
+        service, fault_repo, _ = self._service(inspections=[inspection])
+
+        service.execute(self._dto(inspection.id))
+
+        fault = fault_repo.saved[0]
+        assert fault.status == FaultStatus.OPEN
+        assert fault.inspection_id == inspection.id
+        assert fault.vehicle_id == inspection.vehicle_id
+        assert len(fault.items) == 1
+        assert fault.items[0].component == "Oil level critical"
+
+    def test_report_propagates_item_severity_to_fault(self) -> None:
+        vehicle = _make_vehicle()
+        inspection = _make_inspection(
+            vehicle_id=vehicle.id,
+            status=InspectionStatus.SUBMITTED,
+        )
+        inspection.items.append(
+            _make_fail_item("Brakes", "Pad worn", FailureSeverity.LOW)
+        )
+        inspection.items.append(
+            _make_fail_item("Engine", "Oil leak", FailureSeverity.CRITICAL)
+        )
+        service, fault_repo, _ = self._service(inspections=[inspection])
+
+        service.execute(self._dto(inspection.id))
+
+        fault = fault_repo.saved[0]
+        assert fault.severity == FaultSeverity.CRITICAL
+        severities = {item.severity for item in fault.items}
+        assert severities == {FaultSeverity.LOW, FaultSeverity.CRITICAL}
 
 
 # ---------------------------------------------------------------------------

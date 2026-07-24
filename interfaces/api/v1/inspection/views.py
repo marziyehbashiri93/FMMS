@@ -5,7 +5,6 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime, time
 
-from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.request import Request
@@ -16,6 +15,7 @@ from apps.inspection.application.dto.inspection_dto import (
     AddInspectionItemDTO,
     CreateInspectionDTO,
     CreateInspectionItemInputDTO,
+    ReportInspectionFaultDTO,
     SubmitInspectionDTO,
 )
 from apps.inspection.domain.entities import InspectionType
@@ -26,12 +26,13 @@ from apps.inspection.domain.value_objects import (
 )
 from core.permissions import IsReadOnlyOrTechnicianOrAbove
 from interfaces.api.v1 import deps
+from interfaces.api.v1.fault.serializers import FaultResponseSerializer
+from interfaces.api.v1.inspection import schema as inspection_schema
 from interfaces.api.v1.inspection.serializers import (
     InspectionCreateSerializer,
     InspectionItemCreateSerializer,
     InspectionResponseSerializer,
 )
-from interfaces.api.v1.schema_tags import API_TAGS
 from interfaces.api.v1.utils import paginate_dto_list, request_id_from, user_id_from
 from interfaces.api.v1.vehicle.serializers import DateRangeFilterSerializer
 
@@ -54,7 +55,7 @@ class InspectionViewSet(GenericViewSet):
 
     permission_classes = [IsReadOnlyOrTechnicianOrAbove]
 
-    @extend_schema(tags=[API_TAGS.inspection], responses=InspectionResponseSerializer)
+    @inspection_schema.retrieve
     def retrieve(self, request: Request, pk: str | None = None) -> Response:
         """Retrieve one inspection."""
         result = deps.get_get_inspection_service().execute(
@@ -62,10 +63,7 @@ class InspectionViewSet(GenericViewSet):
         )
         return Response(InspectionResponseSerializer(result).data)
 
-    @extend_schema(
-        tags=[API_TAGS.inspection],
-        responses=InspectionResponseSerializer(many=True),
-    )
+    @inspection_schema.list
     def list(self, request: Request) -> Response:
         """List inspections; optionally filter by vehicle and date range."""
         vehicle_id_raw = request.query_params.get("vehicle_id")
@@ -87,11 +85,7 @@ class InspectionViewSet(GenericViewSet):
             return self.get_paginated_response(serializer.data)
         return Response(serializer.data)
 
-    @extend_schema(
-        tags=[API_TAGS.inspection],
-        request=InspectionCreateSerializer,
-        responses=InspectionResponseSerializer,
-    )
+    @inspection_schema.create
     def create(self, request: Request) -> Response:
         """Create a draft inspection."""
         serializer = InspectionCreateSerializer(data=request.data)
@@ -127,11 +121,7 @@ class InspectionViewSet(GenericViewSet):
             status=status.HTTP_201_CREATED,
         )
 
-    @extend_schema(
-        tags=[API_TAGS.inspection],
-        request=InspectionItemCreateSerializer,
-        responses=InspectionResponseSerializer,
-    )
+    @inspection_schema.items
     @action(detail=True, methods=["post"], url_path="items")
     def items(self, request: Request, pk: str | None = None) -> Response:
         """Add a checklist item to a draft inspection."""
@@ -152,9 +142,7 @@ class InspectionViewSet(GenericViewSet):
         )
         return Response(InspectionResponseSerializer(result).data)
 
-    @extend_schema(
-        tags=[API_TAGS.inspection], request=None, responses=InspectionResponseSerializer
-    )
+    @inspection_schema.submit
     @action(detail=True, methods=["post"])
     def submit(self, request: Request, pk: str | None = None) -> Response:
         """Submit a draft inspection."""
@@ -166,3 +154,19 @@ class InspectionViewSet(GenericViewSet):
             )
         )
         return Response(InspectionResponseSerializer(result).data)
+
+    @inspection_schema.report_fault
+    @action(detail=True, methods=["post"], url_path="report-fault")
+    def report_fault(self, request: Request, pk: str | None = None) -> Response:
+        """Report failed checklist items as a fault."""
+        result = deps.get_report_inspection_fault_service().execute(
+            ReportInspectionFaultDTO(
+                inspection_id=uuid.UUID(str(pk)),
+                request_id=request_id_from(request),
+                reported_by=user_id_from(request),
+            )
+        )
+        return Response(
+            FaultResponseSerializer(result).data,
+            status=status.HTTP_201_CREATED,
+        )

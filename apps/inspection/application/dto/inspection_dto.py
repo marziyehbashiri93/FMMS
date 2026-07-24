@@ -110,6 +110,15 @@ class SubmitInspectionDTO:
 
 
 @dataclass(frozen=True)
+class ReportInspectionFaultDTO:
+    """Input DTO for explicitly reporting a fault from failed checklist items."""
+
+    inspection_id: uuid.UUID
+    request_id: str
+    reported_by: uuid.UUID
+
+
+@dataclass(frozen=True)
 class InspectionDriverSummaryDTO:
     """Driver summary nested under inspection history responses."""
 

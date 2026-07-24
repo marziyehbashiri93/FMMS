@@ -10,6 +10,9 @@ from apps.inspection.application.services.get_inspection_service import (
     GetInspectionService,
     ListInspectionsService,
 )
+from apps.inspection.application.services.report_inspection_fault_service import (
+    ReportInspectionFaultService,
+)
 from apps.inspection.application.services.submit_inspection_service import (
     SubmitInspectionService,
 )
@@ -22,6 +25,7 @@ __all__ = [
     "CreateInspectionService",
     "AddInspectionItemService",
     "SubmitInspectionService",
+    "ReportInspectionFaultService",
     "GetInspectionService",
     "ListInspectionsService",
     "ListInspectionTemplatesService",

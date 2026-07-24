@@ -55,12 +55,18 @@ import type {
   VehicleSummary,
 } from '../../types/fmms';
 import { formatDate, formatDateTime, toFaNumber } from '../../utils/format';
+import {
+  checklistOverallLabel,
+  checklistOverallTone,
+  sortChecklistItems,
+} from '../inspections/checklistDisplay';
 
 const statusOptions: Array<{ value: '' | VehicleStatus; label: string }> = [
   { value: '', label: 'همه وضعیت‌ها' },
   { value: 'ACTIVE', label: 'عملیاتی' },
   { value: 'UNDER_REPAIR', label: 'در تعمیر' },
   { value: 'WAITING_DRIVER_CONFIRMATION', label: 'منتظر تایید راننده' },
+  { value: 'EXITED_CENTER', label: 'خارج شده از مرکز' },
   { value: 'OUT_OF_SERVICE', label: 'خارج از سرویس' },
   { value: 'SUSPENDED', label: 'تعلیق‌شده' },
   { value: 'INACTIVE', label: 'غیرفعال' },
@@ -526,7 +532,7 @@ function VehicleDetailModal({
       key: 'odometer_km',
       label: 'کیلومتر',
       sortable: true,
-      render: (row) => `${toFaNumber(row.odometer_km)} km`,
+      render: (row) => toFaNumber(row.odometer_km),
     },
     {
       key: 'source',
@@ -601,9 +607,7 @@ function VehicleDetailModal({
       label: 'کیلومتر',
       sortable: true,
       render: (row) =>
-        row.odometer_value != null
-          ? `${toFaNumber(row.odometer_value)} ${row.odometer_unit === 'MILES' ? 'mi' : 'km'}`
-          : '—',
+        row.odometer_value != null ? toFaNumber(row.odometer_value) : '—',
     },
     {
       key: 'status',
@@ -619,11 +623,8 @@ function VehicleDetailModal({
       sortable: true,
       render: (row) => (
         <PlainStatusBadge
-          label={
-            row.has_failures
-              ? 'دارای خرابی'
-              : CHECKLIST_RESULT_LABELS[row.overall_result] ?? row.overall_result ?? '—'
-          }
+          tone={checklistOverallTone(row.has_failures, row.overall_result)}
+          label={checklistOverallLabel(row.has_failures, row.overall_result, CHECKLIST_RESULT_LABELS)}
         />
       ),
     },
@@ -655,17 +656,37 @@ function VehicleDetailModal({
     {
       key: 'result',
       label: 'نتیجه',
-      render: (row) => CHECKLIST_RESULT_LABELS[row.result] ?? row.result,
+      render: (row) => (
+        <PlainStatusBadge
+          tone={row.result === 'FAIL' ? 'error' : row.result === 'PASS' ? 'success' : 'neutral'}
+          label={CHECKLIST_RESULT_LABELS[row.result] ?? row.result}
+        />
+      ),
     },
     {
       key: 'severity',
       label: 'شدت',
-      render: (row) => (row.severity ? SEVERITY_LABELS[row.severity] ?? row.severity : '—'),
+      render: (row) =>
+        row.severity ? (
+          <Typography
+            fontWeight={row.result === 'FAIL' ? 800 : 500}
+            color={row.result === 'FAIL' ? 'error.main' : 'inherit'}
+          >
+            {SEVERITY_LABELS[row.severity] ?? row.severity}
+          </Typography>
+        ) : (
+          '—'
+        ),
     },
     {
       key: 'notes',
       label: 'یادداشت',
-      render: (row) => row.notes || '—',
+      render: (row) =>
+        row.notes ? (
+          <Typography fontWeight={row.result === 'FAIL' ? 700 : 400}>{row.notes}</Typography>
+        ) : (
+          '—'
+        ),
     },
   ];
 
@@ -971,20 +992,22 @@ function VehicleDetailModal({
                   label="نتیجه کلی"
                   value={
                     <PlainStatusBadge
-                      label={
-                        selectedChecklist.has_failures
-                          ? 'دارای خرابی'
-                          : CHECKLIST_RESULT_LABELS[selectedChecklist.overall_result] ??
-                            selectedChecklist.overall_result ??
-                            '—'
-                      }
+                      tone={checklistOverallTone(
+                        selectedChecklist.has_failures,
+                        selectedChecklist.overall_result,
+                      )}
+                      label={checklistOverallLabel(
+                        selectedChecklist.has_failures,
+                        selectedChecklist.overall_result,
+                        CHECKLIST_RESULT_LABELS,
+                      )}
                     />
                   }
                 />
               </Box>
               <RtlDataTable
                 columns={checklistItemColumns}
-                rows={selectedChecklist.items ?? []}
+                rows={sortChecklistItems(selectedChecklist.items)}
                 getRowKey={(row) => row.id}
                 emptyMessage="آیتمی برای این چک‌لیست ثبت نشده است"
                 minWidth={640}

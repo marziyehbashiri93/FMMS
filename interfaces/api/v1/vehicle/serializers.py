@@ -46,7 +46,7 @@ class VehicleOdometerRecordSerializer(serializers.Serializer):
     """Validate a daily odometer reading."""
 
     reading_date = serializers.DateField()
-    odometer_km = serializers.IntegerField(min_value=0)
+    odometer_km = serializers.IntegerField(min_value=0, max_value=2_147_483_647)
     source = serializers.CharField(max_length=30, required=False, default="DRIVER")
 
 

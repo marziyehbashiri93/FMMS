@@ -48,7 +48,7 @@ class InspectionCreateSerializer(serializers.Serializer):
     inspection_type = serializers.ChoiceField(
         choices=[item.value for item in InspectionType]
     )
-    odometer_value = serializers.IntegerField(min_value=0)
+    odometer_value = serializers.IntegerField(min_value=0, max_value=2_147_483_647)
     odometer_unit = serializers.ChoiceField(
         choices=[item.value for item in OdometerUnit]
     )
