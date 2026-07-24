@@ -8,6 +8,7 @@ from drf_spectacular.utils import extend_schema
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
@@ -25,6 +26,8 @@ class FMMSJWTTokenObtainPairView(TokenObtainPairView):
     """Issue an access and refresh JWT pair."""
 
     serializer_class = UsernameTokenObtainPairSerializer
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "auth_token_obtain"
 
     @extend_schema(tags=[API_TAGS.auth], responses=TokenObtainPairResponseSerializer)
     def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
@@ -36,6 +39,8 @@ class FMMSJWTTokenRefreshView(TokenRefreshView):
     """Refresh an FMMS access token."""
 
     serializer_class = FMMSJWTTokenRefreshSerializer
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "auth_token_refresh"
 
     @extend_schema(tags=[API_TAGS.auth], responses=TokenRefreshResponseSerializer)
     def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:

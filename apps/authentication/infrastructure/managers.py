@@ -19,8 +19,8 @@ class FMMSUserManager(BaseUserManager["FMMSUser"]):
     """
     Custom manager for the FMMSUser model.
 
-    Replaces Django's default UserManager to enforce email-based
-    authentication and FMMS role assignment.
+    Replaces Django's default UserManager to enforce username-based login,
+    contact email storage, and FMMS role assignment.
     """
 
     def create_user(
@@ -94,7 +94,9 @@ class FMMSUserManager(BaseUserManager["FMMSUser"]):
         """
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
-        extra_fields.setdefault("role", "ADMIN")
+        from apps.authentication.infrastructure.models import FMMSUserRole
+
+        extra_fields.setdefault("role", FMMSUserRole.ADMIN)
 
         if extra_fields.get("is_staff") is not True:
             raise ValueError("Superuser must have is_staff=True.")

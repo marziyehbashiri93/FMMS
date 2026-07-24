@@ -12,8 +12,6 @@ from rest_framework_simplejwt.serializers import (
 )
 from rest_framework_simplejwt.tokens import AccessToken, RefreshToken, Token
 
-from apps.authentication.infrastructure.models import FMMSUser
-
 _TOKEN_TYPE = "Bearer"
 
 
@@ -26,16 +24,6 @@ class UsernameTokenObtainPairSerializer(TokenObtainPairSerializer):
     """Obtain JWTs using FMMS username credentials."""
 
     username_field = "username"
-
-    @classmethod
-    def get_token(cls, user: FMMSUser) -> Any:
-        """Add stable FMMS claims to issued JWTs."""
-        token = super().get_token(user)
-        token["username"] = user.username
-        token["email"] = user.email
-        token["full_name"] = user.full_name
-        token["role"] = user.role
-        return token
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         """Return tokens, expiry metadata, and the authenticated user profile."""
@@ -50,31 +38,12 @@ class UsernameTokenObtainPairSerializer(TokenObtainPairSerializer):
 class FMMSJWTTokenRefreshSerializer(TokenRefreshSerializer):
     """Refresh access tokens and return frontend-friendly expiry metadata."""
 
-    def validate(self, attrs: dict[str, Any]) -> dict[str, str]:
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         """Return a refreshed access token plus its expiration timestamp."""
         data = super().validate(attrs)
         data["token_type"] = _TOKEN_TYPE
         data["access_expires_at"] = _expires_at(AccessToken(data["access"]))
         return data
-
-
-class TokenObtainPairResponseSerializer(serializers.Serializer):
-    """Document token obtain response fields."""
-
-    access = serializers.CharField()
-    refresh = serializers.CharField()
-    token_type = serializers.CharField()
-    access_expires_at = serializers.DateTimeField()
-    refresh_expires_at = serializers.DateTimeField()
-    user = serializers.DictField()
-
-
-class TokenRefreshResponseSerializer(serializers.Serializer):
-    """Document token refresh response fields."""
-
-    access = serializers.CharField()
-    token_type = serializers.CharField()
-    access_expires_at = serializers.DateTimeField()
 
 
 class UserProfileSerializer(serializers.Serializer):
@@ -87,3 +56,22 @@ class UserProfileSerializer(serializers.Serializer):
     role = serializers.CharField(read_only=True)
     is_staff = serializers.BooleanField(read_only=True)
     is_superuser = serializers.BooleanField(read_only=True)
+
+
+class TokenObtainPairResponseSerializer(serializers.Serializer):
+    """Document token obtain response fields."""
+
+    access = serializers.CharField()
+    refresh = serializers.CharField()
+    token_type = serializers.CharField()
+    access_expires_at = serializers.DateTimeField()
+    refresh_expires_at = serializers.DateTimeField()
+    user = UserProfileSerializer()
+
+
+class TokenRefreshResponseSerializer(serializers.Serializer):
+    """Document token refresh response fields."""
+
+    access = serializers.CharField()
+    token_type = serializers.CharField()
+    access_expires_at = serializers.DateTimeField()

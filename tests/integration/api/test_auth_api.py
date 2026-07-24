@@ -6,7 +6,12 @@ from datetime import datetime
 
 import pytest
 from rest_framework.test import APIClient
+from rest_framework_simplejwt.tokens import AccessToken
 
+from interfaces.api.v1.auth.views import (
+    FMMSJWTTokenObtainPairView,
+    FMMSJWTTokenRefreshView,
+)
 from tests.factories.user_factory import FMMSUserFactory
 
 pytestmark = pytest.mark.django_db
@@ -30,6 +35,12 @@ class TestAuthTokenAPI:
         assert datetime.fromisoformat(response.data["access_expires_at"])
         assert datetime.fromisoformat(response.data["refresh_expires_at"])
         assert response.data["user"]["username"] == user.username
+        claims = AccessToken(response.data["access"])
+        assert claims["user_id"] == str(user.id)
+        assert "username" not in claims
+        assert "email" not in claims
+        assert "full_name" not in claims
+        assert "role" not in claims
 
     def test_obtain_token_rejects_invalid_credentials(
         self, api_client: APIClient
@@ -75,3 +86,8 @@ class TestAuthTokenAPI:
         assert response.status_code == 200
         assert response.data["username"] == user.username
         assert response.data["role"] == "SUPERVISOR"
+
+    def test_auth_token_views_have_scoped_throttling(self) -> None:
+        """Token endpoints use dedicated throttle scopes."""
+        assert FMMSJWTTokenObtainPairView.throttle_scope == "auth_token_obtain"
+        assert FMMSJWTTokenRefreshView.throttle_scope == "auth_token_refresh"
