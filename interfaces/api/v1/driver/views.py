@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import uuid
 
-from rest_framework import serializers
 from rest_framework.decorators import action
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -12,14 +11,15 @@ from rest_framework.viewsets import GenericViewSet
 
 from apps.driver.application.dto.driver_dto import (
     DriverExitCenterDTO,
-    DriverResponseDTO,
 )
+from apps.driver.application.services.get_driver_service import DriverAssignmentRole
 from apps.driver.domain.entities import DriverStatus
 from core.permissions import IsReadOnlyOrTechnicianOrAbove
 from interfaces.api.v1 import deps
 from interfaces.api.v1.driver import schema as driver_schema
 from interfaces.api.v1.driver.serializers import (
     DriverExitCenterSerializer,
+    DriverListQuerySerializer,
     DriverResponseSerializer,
     DriverSummarySerializer,
 )
@@ -29,52 +29,6 @@ from interfaces.api.v1.vehicle.serializers import (
     VehicleDriverAssignmentHistoryResponseSerializer,
     VehicleResponseSerializer,
 )
-
-_DRIVER_ROLE_FILTERS = frozenset({"DRIVER", "ASSISTANT"})
-
-
-def _filter_drivers_by_search(
-    items: list[DriverResponseDTO],
-    search: str,
-) -> list[DriverResponseDTO]:
-    """Filter driver DTOs by case-insensitive contains on searchable fields.
-
-    Args:
-        items: Driver response DTOs to filter.
-        search: Free-text search term.
-
-    Returns:
-        Drivers whose name or personnel_number contain ``search``
-        (case-insensitive).
-    """
-    needle = search.casefold()
-    return [
-        item
-        for item in items
-        if needle in item.name.casefold()
-        or (item.personnel_number is not None and needle in item.personnel_number.casefold())
-    ]
-
-
-def _filter_drivers_by_role(
-    items: list[DriverResponseDTO],
-    role: str,
-) -> list[DriverResponseDTO]:
-    """Filter driver DTOs by their current vehicle assignment role."""
-    if not role:
-        return items
-    if role not in _DRIVER_ROLE_FILTERS:
-        raise serializers.ValidationError(
-            {
-                "role": (
-                    "Unsupported role filter. Allowed values are DRIVER "
-                    "and ASSISTANT."
-                )
-            }
-        )
-    if role == "DRIVER":
-        return [item for item in items if item.current_vehicle_as_driver is not None]
-    return [item for item in items if item.current_vehicle_as_assistant is not None]
 
 
 class DriverViewSet(GenericViewSet):
@@ -93,19 +47,18 @@ class DriverViewSet(GenericViewSet):
     @driver_schema.list
     def list(self, request: Request) -> Response:
         """List drivers, optionally filtered by status and search text."""
-        raw_status = request.query_params.get("status")
-        ordering = request.query_params.get("ordering", "")
-        search = request.query_params.get("search", "").strip()
-        role = request.query_params.get("role", "").strip().upper()
-        driver_status = DriverStatus(raw_status) if raw_status else None
+        query = DriverListQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        filters = query.validated_data
+        raw_status = filters.get("status")
+        raw_role = filters.get("role")
         items = deps.get_list_drivers_service().execute(
-            driver_status,
-            ordering=ordering,
+            DriverStatus(raw_status) if raw_status else None,
+            ordering=filters.get("ordering", ""),
+            search=filters.get("search", ""),
+            role=DriverAssignmentRole(raw_role) if raw_role else None,
             request_id=request_id_from(request),
         )
-        if search:
-            items = _filter_drivers_by_search(items, search)
-        items = _filter_drivers_by_role(items, role)
         page = paginate_dto_list(self, items)
         serializer = DriverResponseSerializer(
             page if page is not None else items, many=True
@@ -134,7 +87,7 @@ class DriverViewSet(GenericViewSet):
                 vehicle_id=serializer.validated_data["vehicle_id"],
                 inspection_id=serializer.validated_data["inspection_id"],
                 request_id=request_id_from(request),
-                requested_by=user_id_from(request),
+                requested_by_user_id=user_id_from(request),
             )
         )
         return Response(VehicleResponseSerializer(result).data)

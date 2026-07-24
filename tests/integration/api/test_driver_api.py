@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from rest_framework.test import APIClient
@@ -246,6 +246,38 @@ class TestDriverAPI:
 
         invalid = authenticated_client.get("/api/v1/drivers/?role=UNKNOWN")
         assert invalid.status_code == 400
+
+    def test_duplicate_current_assignment_uses_latest_vehicle(
+        self,
+        authenticated_client: APIClient,
+    ) -> None:
+        """Duplicate current assignments resolve deterministically by updated_at."""
+        driver = DriverModel.objects.create(
+            customer_number="6000009237",
+            name="Duplicate Assignment Driver",
+            status=DriverStatus.ACTIVE.value,
+        )
+        older = VehicleModel.objects.create(
+            vehicle_number="203200302",
+            license_plate="44د302",
+            status=VehicleStatus.ACTIVE.value,
+            driver1_customer_number=driver.customer_number,
+        )
+        latest = VehicleModel.objects.create(
+            vehicle_number="203200303",
+            license_plate="44د303",
+            status=VehicleStatus.ACTIVE.value,
+            driver1_customer_number=driver.customer_number,
+        )
+        VehicleModel.objects.filter(id=older.id).update(
+            updated_at=datetime.now(tz=UTC) - timedelta(days=1)
+        )
+        VehicleModel.objects.filter(id=latest.id).update(updated_at=datetime.now(tz=UTC))
+
+        response = authenticated_client.get(f"/api/v1/drivers/{driver.id}/")
+
+        assert response.status_code == 200
+        assert response.data["current_vehicle_as_driver"]["id"] == str(latest.id)
 
     def test_driver_can_mark_assigned_vehicle_exited_center_after_checklist(
         self,

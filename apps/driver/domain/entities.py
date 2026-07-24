@@ -65,7 +65,6 @@ class Driver:
         personnel_number: str | None = None,
         gender: str | None = None,
         nilofar_code: str | None = None,
-        **_: object,
     ) -> None:
         self.id = id
         if customer_number is None:

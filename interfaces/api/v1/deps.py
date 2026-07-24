@@ -18,6 +18,10 @@ from apps.driver.application.services.get_driver_summary_service import (
     GetDriverSummaryService,
 )
 from apps.driver.infrastructure.repositories import DjangoDriverRepository
+from apps.driver.infrastructure.summary_readers import DjangoDriverSummaryReader
+from apps.driver.infrastructure.vehicle_assignment_reader import (
+    DjangoDriverVehicleAssignmentReader,
+)
 from apps.fault.application.services.assign_fault_service import AssignFaultService
 from apps.fault.application.services.close_fault_service import CloseFaultService
 from apps.fault.application.services.get_fault_service import (
@@ -418,17 +422,23 @@ def get_get_vehicle_summary_service() -> GetVehicleSummaryService:
 
 def get_get_driver_service() -> GetDriverService:
     """Return GetDriverService."""
-    return GetDriverService(get_driver_repository())
+    return GetDriverService(
+        get_driver_repository(),
+        DjangoDriverVehicleAssignmentReader(),
+    )
 
 
 def get_list_drivers_service() -> ListDriversService:
     """Return ListDriversService."""
-    return ListDriversService(get_driver_repository())
+    return ListDriversService(
+        get_driver_repository(),
+        DjangoDriverVehicleAssignmentReader(),
+    )
 
 
 def get_get_driver_summary_service() -> GetDriverSummaryService:
     """Return GetDriverSummaryService."""
-    return GetDriverSummaryService()
+    return GetDriverSummaryService(DjangoDriverSummaryReader())
 
 
 def get_driver_exit_center_service() -> DriverExitCenterService:

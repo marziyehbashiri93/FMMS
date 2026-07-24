@@ -5,6 +5,8 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
+from django.db.models import Q
+
 from apps.driver.domain.entities import Driver, DriverStatus
 from apps.driver.domain.exceptions import DriverNotFoundError
 from apps.driver.domain.interfaces.driver_repository import IDriverRepository
@@ -78,6 +80,26 @@ class DjangoDriverRepository(IDriverRepository):
         if not customer_numbers:
             return []
         qs = DriverModel.objects.filter(customer_number__in=customer_numbers)
+        return [_to_domain(orm) for orm in qs]
+
+    def list_filtered(
+        self,
+        *,
+        status: DriverStatus | None = None,
+        ordering: str = "",
+        search: str = "",
+    ) -> list[Driver]:
+        """Return drivers filtered and ordered by database query."""
+        qs = DriverModel.objects.all()
+        if status is not None:
+            qs = qs.filter(status=status.value)
+        needle = search.strip()
+        if needle:
+            qs = qs.filter(
+                Q(name__icontains=needle) | Q(personnel_number__icontains=needle)
+            )
+        if ordering:
+            qs = qs.order_by(ordering)
         return [_to_domain(orm) for orm in qs]
 
     def decommission_missing_from_sap(self, seen_customer_numbers: set[str]) -> int:

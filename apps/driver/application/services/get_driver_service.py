@@ -6,17 +6,18 @@ No mutations happen here. These services are query-side only.
 from __future__ import annotations
 
 import uuid
-from typing import Any
-
-from django.db.models import Q
+from enum import StrEnum
+from typing import Any, Protocol
 
 from apps.driver.application.dto.driver_dto import (
     DriverAssignedVehicleDTO,
     DriverResponseDTO,
 )
+from apps.driver.application.interfaces.vehicle_assignment_reader import (
+    IDriverVehicleAssignmentReader,
+)
 from apps.driver.domain.entities import Driver, DriverStatus
-from apps.driver.domain.interfaces.driver_repository import IDriverRepository
-from apps.vehicle.infrastructure.models import VehicleModel
+from apps.driver.domain.value_objects import CustomerNumber
 from core.exceptions.base_exception import FMMSValidationError
 from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
@@ -38,13 +39,60 @@ _DRIVER_ORDERING_FIELDS = frozenset(
 )
 
 
+class DriverAssignmentRole(StrEnum):
+    """Supported current-vehicle assignment roles for driver list filtering."""
+
+    DRIVER = "DRIVER"
+    ASSISTANT = "ASSISTANT"
+
+
+class IDriverReadRepository(Protocol):
+    """Read-only driver repository capability required by query services."""
+
+    def get_by_id(self, driver_id: uuid.UUID) -> Driver:
+        """Retrieve a driver by UUID."""
+
+    def get_by_customer_number(self, customer_number: CustomerNumber) -> Driver:
+        """Retrieve a driver by SAP customer number."""
+
+    def list_by_status(self, status: DriverStatus) -> list[Driver]:
+        """Return all drivers matching a given status."""
+
+    def list_all(self) -> list[Driver]:
+        """Return all drivers."""
+
+    def list_filtered(
+        self,
+        *,
+        status: DriverStatus | None = None,
+        ordering: str = "",
+        search: str = "",
+    ) -> list[Driver]:
+        """Return drivers filtered and ordered by the backing store."""
+
+
+class NullDriverVehicleAssignmentReader(IDriverVehicleAssignmentReader):
+    """No-op assignment reader used by isolated unit tests."""
+
+    def vehicles_by_driver_customer_numbers(
+        self,
+        customer_numbers: set[str],
+    ) -> tuple[
+        dict[str, DriverAssignedVehicleDTO],
+        dict[str, DriverAssignedVehicleDTO],
+    ]:
+        """Return empty assignment maps."""
+        del customer_numbers
+        return {}, {}
+
+
 def _to_response_dto(
     driver: Driver,
     *,
     current_vehicle_as_driver: DriverAssignedVehicleDTO | None = None,
     current_vehicle_as_assistant: DriverAssignedVehicleDTO | None = None,
 ) -> DriverResponseDTO:
-    """Map domain entity → response DTO."""
+    """Map domain entity to response DTO."""
     return DriverResponseDTO(
         id=driver.id,
         customer_number=driver.customer_number.value,
@@ -61,71 +109,21 @@ def _to_response_dto(
     )
 
 
-def _assigned_vehicle_dto(vehicle: VehicleModel) -> DriverAssignedVehicleDTO:
-    """Map a vehicle ORM row to the assigned-vehicle response DTO."""
-    return DriverAssignedVehicleDTO(
-        id=vehicle.id,
-        vehicle_number=vehicle.vehicle_number,
-        license_plate=vehicle.license_plate,
-    )
-
-
-def _vehicles_by_driver_customer_numbers(
-    customer_numbers: set[str],
-) -> tuple[
-    dict[str, DriverAssignedVehicleDTO],
-    dict[str, DriverAssignedVehicleDTO],
-]:
-    """Batch-load current vehicles keyed by driver customer number.
-
-    Builds two maps from a single query:
-
-    - ``as_driver``: customer number → vehicle where the driver is ``driver1``
-    - ``as_assistant``: customer number → vehicle where the driver is ``driver2``
-
-    When a customer number appears on multiple vehicles for the same role, the
-    most recently updated vehicle wins.
-
-    Args:
-        customer_numbers: SAP customer numbers to resolve.
-
-    Returns:
-        Tuple of ``(as_driver, as_assistant)`` maps.
-    """
-    if not customer_numbers:
-        return {}, {}
-
-    vehicles = (
-        VehicleModel.objects.filter(is_deleted=False)
-        .filter(
-            Q(driver1_customer_number__in=customer_numbers)
-            | Q(driver2_customer_number__in=customer_numbers)
-        )
-        .order_by("-updated_at")
-    )
-
-    as_driver: dict[str, DriverAssignedVehicleDTO] = {}
-    as_assistant: dict[str, DriverAssignedVehicleDTO] = {}
-    for vehicle in vehicles:
-        dto = _assigned_vehicle_dto(vehicle)
-        driver1 = vehicle.driver1_customer_number
-        driver2 = vehicle.driver2_customer_number
-        if driver1 and driver1 in customer_numbers and driver1 not in as_driver:
-            as_driver[driver1] = dto
-        if driver2 and driver2 in customer_numbers and driver2 not in as_assistant:
-            as_assistant[driver2] = dto
-    return as_driver, as_assistant
-
-
 class GetDriverService:
     """Fetch a single driver by its UUID.
 
     Args:
-        driver_repository: Concrete ``IDriverRepository``.
+        driver_repository: Concrete driver read repository.
+        assignment_reader: Read model for current vehicle assignments.
     """
 
-    def __init__(self, driver_repository: IDriverRepository) -> None:
+    def __init__(
+        self,
+        driver_repository: IDriverReadRepository,
+        assignment_reader: IDriverVehicleAssignmentReader | None = None,
+    ) -> None:
         self._repo = driver_repository
+        self._assignment_reader = assignment_reader or NullDriverVehicleAssignmentReader()
 
     def execute(self, driver_id: uuid.UUID, request_id: str = "") -> DriverResponseDTO:
         """Return the driver identified by ``driver_id``.
@@ -169,10 +167,12 @@ class GetDriverService:
             },
         )
 
-        as_driver, as_assistant = _vehicles_by_driver_customer_numbers(
-            {driver.customer_number.value}
-        )
         customer_number = driver.customer_number.value
+        as_driver, as_assistant = (
+            self._assignment_reader.vehicles_by_driver_customer_numbers(
+                {customer_number}
+            )
+        )
         return _to_response_dto(
             driver,
             current_vehicle_as_driver=as_driver.get(customer_number),
@@ -184,16 +184,24 @@ class ListDriversService:
     """Fetch a filtered list of drivers.
 
     Args:
-        driver_repository: Concrete ``IDriverRepository``.
+        driver_repository: Concrete driver read repository.
+        assignment_reader: Read model for current vehicle assignments.
     """
 
-    def __init__(self, driver_repository: IDriverRepository) -> None:
+    def __init__(
+        self,
+        driver_repository: IDriverReadRepository,
+        assignment_reader: IDriverVehicleAssignmentReader | None = None,
+    ) -> None:
         self._repo = driver_repository
+        self._assignment_reader = assignment_reader or NullDriverVehicleAssignmentReader()
 
     def execute(
         self,
         status: DriverStatus | None = None,
         ordering: str = "",
+        search: str = "",
+        role: DriverAssignmentRole | None = None,
         request_id: str = "",
     ) -> list[DriverResponseDTO]:
         """Return drivers, optionally filtered by lifecycle status.
@@ -201,6 +209,8 @@ class ListDriversService:
         Args:
             status: Optional status filter. When ``None``, all statuses are returned.
             ordering: Optional ordering field. Prefix with ``-`` for descending.
+            search: Optional case-insensitive text filter.
+            role: Optional current-vehicle assignment role filter.
             request_id: Optional correlation ID for structured logging.
 
         Returns:
@@ -215,11 +225,22 @@ class ListDriversService:
                 "request_id": request_id,
                 "status_filter": status.value if status else None,
                 "ordering": ordering,
+                "search": search,
+                "role": role.value if role else None,
             },
         )
 
-        drivers = self._repo.list_by_status(status) if status else self._repo.list_all()
-        drivers = _sort_drivers(drivers, ordering)
+        _validate_ordering(ordering)
+        if hasattr(self._repo, "list_filtered"):
+            drivers = self._repo.list_filtered(
+                status=status,
+                ordering=ordering,
+                search=search,
+            )
+        else:
+            drivers = self._repo.list_by_status(status) if status else self._repo.list_all()
+            drivers = _filter_drivers_by_search(drivers, search)
+            drivers = _sort_drivers(drivers, ordering)
 
         logger.info(
             "Drivers listed",
@@ -234,8 +255,10 @@ class ListDriversService:
         )
 
         customer_numbers = {driver.customer_number.value for driver in drivers}
-        as_driver, as_assistant = _vehicles_by_driver_customer_numbers(customer_numbers)
-        return [
+        as_driver, as_assistant = (
+            self._assignment_reader.vehicles_by_driver_customer_numbers(customer_numbers)
+        )
+        items = [
             _to_response_dto(
                 driver,
                 current_vehicle_as_driver=as_driver.get(driver.customer_number.value),
@@ -245,14 +268,14 @@ class ListDriversService:
             )
             for driver in drivers
         ]
+        return _filter_driver_dtos_by_role(items, role)
 
 
-def _sort_drivers(drivers: list[Driver], ordering: str) -> list[Driver]:
-    """Return drivers sorted by a whitelisted response field."""
+def _validate_ordering(ordering: str) -> None:
+    """Validate driver ordering against the response field allowlist."""
     if not ordering:
-        return drivers
-    descending = ordering.startswith("-")
-    field_name = ordering[1:] if descending else ordering
+        return
+    field_name = ordering.removeprefix("-")
     if field_name not in _DRIVER_ORDERING_FIELDS:
         raise FMMSValidationError(
             message=f"Unsupported driver ordering field: {field_name}.",
@@ -262,11 +285,48 @@ def _sort_drivers(drivers: list[Driver], ordering: str) -> list[Driver]:
                 "allowed_fields": sorted(_DRIVER_ORDERING_FIELDS),
             },
         )
+
+
+def _sort_drivers(drivers: list[Driver], ordering: str) -> list[Driver]:
+    """Return drivers sorted by a whitelisted response field."""
+    if not ordering:
+        return drivers
+    _validate_ordering(ordering)
+    descending = ordering.startswith("-")
+    field_name = ordering[1:] if descending else ordering
     return sorted(
         drivers,
         key=lambda driver: _sortable_value(getattr(driver, field_name)),
         reverse=descending,
     )
+
+
+def _filter_drivers_by_search(drivers: list[Driver], search: str) -> list[Driver]:
+    """Return drivers matching a case-insensitive name/personnel search."""
+    needle = search.strip().casefold()
+    if not needle:
+        return drivers
+    return [
+        driver
+        for driver in drivers
+        if needle in driver.name.casefold()
+        or (
+            driver.personnel_number is not None
+            and needle in driver.personnel_number.casefold()
+        )
+    ]
+
+
+def _filter_driver_dtos_by_role(
+    items: list[DriverResponseDTO],
+    role: DriverAssignmentRole | None,
+) -> list[DriverResponseDTO]:
+    """Return driver DTOs matching a current vehicle assignment role."""
+    if role is None:
+        return items
+    if role is DriverAssignmentRole.DRIVER:
+        return [item for item in items if item.current_vehicle_as_driver is not None]
+    return [item for item in items if item.current_vehicle_as_assistant is not None]
 
 
 def _sortable_value(value: Any) -> Any:

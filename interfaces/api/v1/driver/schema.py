@@ -7,6 +7,8 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from apps.driver.domain.entities import DriverStatus
 from interfaces.api.v1.driver.serializers import (
+    DRIVER_ORDERING_CHOICES,
+    DRIVER_ROLE_CHOICES,
     DriverExitCenterSerializer,
     DriverResponseSerializer,
     DriverSummarySerializer,
@@ -17,27 +19,6 @@ from interfaces.api.v1.vehicle.serializers import (
     VehicleDriverAssignmentHistoryResponseSerializer,
     VehicleResponseSerializer,
 )
-
-_DRIVER_ORDERING_FIELDS = [
-    "customer_number",
-    "-customer_number",
-    "name",
-    "-name",
-    "mobile",
-    "-mobile",
-    "personnel_number",
-    "-personnel_number",
-    "gender",
-    "-gender",
-    "nilofar_code",
-    "-nilofar_code",
-    "status",
-    "-status",
-    "created_at",
-    "-created_at",
-    "updated_at",
-    "-updated_at",
-]
 
 driver_id_parameter = OpenApiParameter(
     name="id",
@@ -67,7 +48,7 @@ list = extend_schema(
             description="Sort drivers by a supported field. Prefix with '-' for descending order.",
             required=False,
             type=str,
-            enum=_DRIVER_ORDERING_FIELDS,
+            enum=DRIVER_ORDERING_CHOICES,
         ),
         OpenApiParameter(
             name="search",
@@ -80,7 +61,7 @@ list = extend_schema(
             description="Filter by current vehicle assignment role.",
             required=False,
             type=str,
-            enum=["DRIVER", "ASSISTANT"],
+            enum=DRIVER_ROLE_CHOICES,
         ),
     ],
     responses=DriverResponseSerializer(many=True),

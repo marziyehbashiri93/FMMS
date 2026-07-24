@@ -17,13 +17,21 @@ from apps.driver.domain.entities import DriverStatus
 
 @dataclass(frozen=True)
 class DriverExitCenterDTO:
-    """Input DTO for a driver requesting vehicle exit from the fleet center."""
+    """Input DTO for a driver requesting vehicle exit from the fleet center.
+
+    Attributes:
+        driver_id: Driver requesting the exit workflow.
+        vehicle_id: Assigned vehicle that should leave the fleet center.
+        inspection_id: Submitted daily checklist required for exit.
+        request_id: Correlation ID for structured logs.
+        requested_by_user_id: Authenticated FMMS user recorded in logs only.
+    """
 
     driver_id: uuid.UUID
     vehicle_id: uuid.UUID
     inspection_id: uuid.UUID
     request_id: str
-    requested_by: uuid.UUID
+    requested_by_user_id: uuid.UUID
 
 
 @dataclass(frozen=True)

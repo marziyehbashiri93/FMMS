@@ -11,7 +11,8 @@ from apps.inspection.domain.interfaces.inspection_repository import (
     IInspectionRepository,
 )
 from apps.vehicle.application.dto.vehicle_dto import VehicleResponseDTO
-from apps.vehicle.domain.entities import VEHICLE_STATUS_LABELS, Vehicle, VehicleStatus
+from apps.vehicle.application.mappers import vehicle_to_response_dto
+from apps.vehicle.domain.entities import VehicleStatus
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
 from core.exceptions.base_exception import FMMSConflictError, FMMSValidationError
 from core.exceptions.translation import load_or_not_found
@@ -65,7 +66,7 @@ class DriverExitCenterService:
                 "driver_id": str(dto.driver_id),
                 "vehicle_id": str(dto.vehicle_id),
                 "inspection_id": str(dto.inspection_id),
-                "user_id": str(dto.requested_by),
+                "user_id": str(dto.requested_by_user_id),
             },
         )
 
@@ -147,18 +148,4 @@ class DriverExitCenterService:
                 "result": "success",
             },
         )
-        return _to_response_dto(saved)
-
-
-def _to_response_dto(vehicle: Vehicle) -> VehicleResponseDTO:
-    """Map vehicle entity to the response DTO used by vehicle APIs."""
-    return VehicleResponseDTO(
-        id=vehicle.id,
-        vehicle_number=vehicle.vehicle_number.value,
-        license_plate=vehicle.license_plate.value,
-        status=vehicle.status,
-        status_label=VEHICLE_STATUS_LABELS[vehicle.status],
-        created_at=vehicle.created_at,
-        updated_at=vehicle.updated_at,
-        commissioning_date=vehicle.commissioning_date,
-    )
+        return vehicle_to_response_dto(saved)
