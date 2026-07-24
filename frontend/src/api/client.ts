@@ -308,6 +308,12 @@ export const api = {
     description: string;
     severity: FailureSeverity;
     inspection_id?: string | null;
+    items?: Array<{
+      code: string;
+      description: string;
+      severity: FailureSeverity;
+      component?: string;
+    }>;
   }) {
     return request<Fault>('/faults/', {
       method: 'POST',
