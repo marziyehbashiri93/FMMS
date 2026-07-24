@@ -46,17 +46,18 @@ class TestInspectionTemplateSAPSyncAPI:
         listed = authenticated_client.get("/api/v1/inspection-templates/")
         assert listed.status_code == 200
         results = listed.data["results"] if "results" in listed.data else listed.data
-        descriptions = {item["CodeText"] for item in results}
-        assert all("GroupText" in item and "CodeText" in item for item in results)
-        assert all("group_text" not in item and "code_text" not in item for item in results)
-        assert all("CodeGroup" in item and "Code" in item for item in results)
+        descriptions = {item["code_text"] for item in results}
+        assert all("group_text" in item and "code_text" in item for item in results)
+        assert all("code_group" in item and "code" in item for item in results)
+        assert all("GroupText" not in item and "CodeText" not in item for item in results)
+        assert all("CodeGroup" not in item and "Code" not in item for item in results)
         assert "ترمز جلو" in descriptions
         assert "چراغ جلو" in descriptions
         assert "موتور اصلی" in descriptions
         assert "باتری/دینام" in descriptions
-        for group_text in {item["GroupText"] for item in results}:
+        for group_text in {item["group_text"] for item in results}:
             group_codes = [
-                item["Code"] for item in results if item["GroupText"] == group_text
+                item["code"] for item in results if item["group_text"] == group_text
             ]
             assert group_codes == sorted(group_codes)
 

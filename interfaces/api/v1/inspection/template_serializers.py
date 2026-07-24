@@ -9,10 +9,10 @@ class InspectionTemplateResponseSerializer(serializers.Serializer):
     """Serialize inspection checklist template DTOs."""
 
     id = serializers.UUIDField()
-    CodeGroup = serializers.CharField(source="code_group")
-    Code = serializers.CharField(source="code")
-    GroupText = serializers.CharField(source="group_text")
-    CodeText = serializers.CharField(source="code_text")
+    code_group = serializers.CharField()
+    code = serializers.CharField()
+    group_text = serializers.CharField()
+    code_text = serializers.CharField()
     is_active = serializers.BooleanField()
     created_at = serializers.DateTimeField()
     updated_at = serializers.DateTimeField()

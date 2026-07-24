@@ -90,10 +90,10 @@ export interface DriverVehicleAssignmentHistoryItem {
 
 export interface InspectionTemplate {
   id: string;
-  CodeGroup: string;
-  Code: string;
-  GroupText: string;
-  CodeText: string;
+  code_group: string;
+  code: string;
+  group_text: string;
+  code_text: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;

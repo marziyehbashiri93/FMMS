@@ -72,8 +72,8 @@ function normalizeTemplates(
   const items = Array.isArray(payload) ? payload : (payload.results ?? []);
   return [...items].sort(
     (a, b) =>
-      a.GroupText.localeCompare(b.GroupText, 'fa') ||
-      a.Code.localeCompare(b.Code, 'en', { numeric: true }),
+      a.group_text.localeCompare(b.group_text, 'fa') ||
+      a.code.localeCompare(b.code, 'en', { numeric: true }),
   );
 }
 
@@ -369,9 +369,9 @@ export function InspectionPage() {
         setItems(
           nextTemplates.map((template) => ({
             templateId: template.id,
-            category: template.GroupText,
-            code: template.Code,
-            description: template.CodeText,
+            category: template.group_text,
+            code: template.code,
+            description: template.code_text,
             result: '',
             notes: '',
             severity: '',
