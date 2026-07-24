@@ -72,13 +72,9 @@ function normalizeTemplates(
   const items = Array.isArray(payload) ? payload : (payload.results ?? []);
   return [...items].sort(
     (a, b) =>
-      templateGroupText(a).localeCompare(templateGroupText(b), 'fa') ||
-      a.code.localeCompare(b.code, 'en', { numeric: true }),
+      a.GroupText.localeCompare(b.GroupText, 'fa') ||
+      a.Code.localeCompare(b.Code, 'en', { numeric: true }),
   );
-}
-
-function templateGroupText(template: InspectionTemplate): string {
-  return template.GroupText || template.group_text || '';
 }
 
 function hasAssignedDriver(vehicle: Vehicle): boolean {
@@ -373,9 +369,9 @@ export function InspectionPage() {
         setItems(
           nextTemplates.map((template) => ({
             templateId: template.id,
-            category: templateGroupText(template),
-            code: template.code,
-            description: template.code_text,
+            category: template.GroupText,
+            code: template.Code,
+            description: template.CodeText,
             result: '',
             notes: '',
             severity: '',
