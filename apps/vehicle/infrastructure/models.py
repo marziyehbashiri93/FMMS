@@ -19,9 +19,9 @@ class VehicleModel(BaseModel):
     (e.g. repair orders) are resolved at the repository or service layer —
     never through Django ForeignKey to other app models.
 
-    TODO: Split SAP master-data models from ``BaseModel`` once the shared audit
-    model is reviewed. Vehicles are never deleted by FMMS, so ``is_deleted`` is
-    inherited for now but must not drive business visibility.
+    Vehicles are SAP-owned master data. ``BaseModel`` audit fields are retained
+    for consistency, but FMMS workflow visibility is controlled by ``status``;
+    SAP decommissioning must not soft-delete rows.
 
     Attributes:
         vehicle_number: SAP ``VehicleNumber`` and unique vehicle identifier.

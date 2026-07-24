@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
+from datetime import UTC, date, datetime, time
 from typing import Any
 
 from django.db.models import QuerySet
@@ -92,9 +92,9 @@ def _apply_sync_date_filters(
 ) -> QuerySet[Any, VehicleDriverAssignmentHistoryModel]:
     """Apply optional date filters to a driver-assignment queryset."""
     if from_date is not None:
-        qs = qs.filter(synced_at__date__gte=from_date)
+        qs = qs.filter(synced_at__gte=datetime.combine(from_date, time.min, tzinfo=UTC))
     if to_date is not None:
-        qs = qs.filter(synced_at__date__lte=to_date)
+        qs = qs.filter(synced_at__lte=datetime.combine(to_date, time.max, tzinfo=UTC))
     return qs
 
 

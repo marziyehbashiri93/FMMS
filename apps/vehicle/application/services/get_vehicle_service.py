@@ -15,7 +15,8 @@ from apps.vehicle.application.dto.vehicle_dto import (
     VehicleAssignedDriverDTO,
     VehicleResponseDTO,
 )
-from apps.vehicle.domain.entities import VEHICLE_STATUS_LABELS, Vehicle, VehicleStatus
+from apps.vehicle.application.mappers import vehicle_to_response_dto
+from apps.vehicle.domain.entities import Vehicle, VehicleStatus
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
 from core.exceptions.base_exception import FMMSValidationError
 from core.exceptions.translation import load_or_not_found
@@ -33,27 +34,6 @@ _VEHICLE_ORDERING_FIELDS = frozenset(
         "commissioning_date",
     }
 )
-
-
-def _to_response_dto(
-    vehicle: Vehicle,
-    *,
-    driver1: VehicleAssignedDriverDTO | None = None,
-    driver2: VehicleAssignedDriverDTO | None = None,
-) -> VehicleResponseDTO:
-    """Map domain entity → response DTO."""
-    return VehicleResponseDTO(
-        id=vehicle.id,
-        vehicle_number=vehicle.vehicle_number.value,
-        license_plate=vehicle.license_plate.value,
-        status=vehicle.status,
-        status_label=VEHICLE_STATUS_LABELS[vehicle.status],
-        created_at=vehicle.created_at,
-        updated_at=vehicle.updated_at,
-        commissioning_date=vehicle.commissioning_date,
-        driver1=driver1,
-        driver2=driver2,
-    )
 
 
 class GetVehicleService:
@@ -116,7 +96,7 @@ class GetVehicleService:
             },
         )
 
-        return _to_response_dto(
+        return vehicle_to_response_dto(
             vehicle,
             driver1=_assigned_driver(
                 self._driver_repo,
@@ -180,13 +160,20 @@ class ListVehiclesService:
             },
         )
 
-        vehicles = (
-            self._repo.list_by_status(status)
-            if status is not None
-            else self._repo.list_active()
-        )
-        vehicles = _filter_vehicles_by_search(vehicles, search)
-        vehicles = _sort_vehicles(vehicles, ordering)
+        if hasattr(self._repo, "list_filtered"):
+            vehicles = self._repo.list_filtered(  # type: ignore[attr-defined]
+                status=status,
+                ordering=ordering,
+                search=search,
+            )
+        else:
+            vehicles = (
+                self._repo.list_by_status(status)
+                if status is not None
+                else self._repo.list_active()
+            )
+            vehicles = _filter_vehicles_by_search(vehicles, search)
+            vehicles = _sort_vehicles(vehicles, ordering)
 
         logger.info(
             "Vehicles listed",
@@ -205,7 +192,7 @@ class ListVehiclesService:
             vehicles,
         )
         return [
-            _to_response_dto(
+            vehicle_to_response_dto(
                 vehicle,
                 driver1=_assigned_driver_from_map(
                     assigned_drivers,

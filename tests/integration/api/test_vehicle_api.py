@@ -278,6 +278,19 @@ class TestVehicleAPI:
         assert response.data["status"] == "UNDER_REPAIR"
         assert response.data["status_label"] == "در تعمیر"
 
+    def test_change_status_rejects_workflow_owned_status(
+        self, authenticated_client: APIClient
+    ) -> None:
+        vehicle = create_vehicle(authenticated_client)
+
+        response = authenticated_client.post(
+            f"/api/v1/vehicles/{vehicle['id']}/status/",
+            {"status": "WAITING_DRIVER_CONFIRMATION"},
+            format="json",
+        )
+
+        assert response.status_code == 400
+
     def test_change_status_to_active_rejects_open_fault(
         self, authenticated_client: APIClient
     ) -> None:
@@ -330,6 +343,15 @@ class TestVehicleAPI:
         assert current.status_code == 200
         assert current.data["id"] == first.data["id"]
         assert current.data["odometer_km"] == 1015
+
+        corrected = authenticated_client.post(
+            url,
+            {"reading_date": "2026-07-15", "odometer_km": 900},
+            format="json",
+        )
+        assert corrected.status_code == 200, corrected.data
+        assert corrected.data["id"] == first.data["id"]
+        assert corrected.data["odometer_km"] == 900
 
     def test_odometer_history_supports_date_filter(
         self, authenticated_client: APIClient

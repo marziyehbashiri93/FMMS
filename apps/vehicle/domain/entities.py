@@ -61,6 +61,7 @@ _ALLOWED_TRANSITIONS: dict[VehicleStatus, frozenset[VehicleStatus]] = {
             VehicleStatus.EXITED_CENTER,
             VehicleStatus.SUSPENDED,
             VehicleStatus.OUT_OF_SERVICE,
+            VehicleStatus.DECOMMISSIONED,
         }
     ),
     VehicleStatus.UNDER_REPAIR: frozenset(
@@ -70,6 +71,7 @@ _ALLOWED_TRANSITIONS: dict[VehicleStatus, frozenset[VehicleStatus]] = {
             VehicleStatus.WAITING_DRIVER_CONFIRMATION,
             VehicleStatus.SUSPENDED,
             VehicleStatus.OUT_OF_SERVICE,
+            VehicleStatus.DECOMMISSIONED,
         }
     ),
     VehicleStatus.WAITING_DRIVER_CONFIRMATION: frozenset(
@@ -79,6 +81,7 @@ _ALLOWED_TRANSITIONS: dict[VehicleStatus, frozenset[VehicleStatus]] = {
             VehicleStatus.OUT_OF_SERVICE,
             VehicleStatus.SUSPENDED,
             VehicleStatus.INACTIVE,
+            VehicleStatus.DECOMMISSIONED,
         }
     ),
     VehicleStatus.SUSPENDED: frozenset(
@@ -88,6 +91,7 @@ _ALLOWED_TRANSITIONS: dict[VehicleStatus, frozenset[VehicleStatus]] = {
             VehicleStatus.UNDER_REPAIR,
             VehicleStatus.WAITING_DRIVER_CONFIRMATION,
             VehicleStatus.OUT_OF_SERVICE,
+            VehicleStatus.DECOMMISSIONED,
         }
     ),
     VehicleStatus.EXITED_CENTER: frozenset(
@@ -98,6 +102,7 @@ _ALLOWED_TRANSITIONS: dict[VehicleStatus, frozenset[VehicleStatus]] = {
             VehicleStatus.WAITING_DRIVER_CONFIRMATION,
             VehicleStatus.SUSPENDED,
             VehicleStatus.OUT_OF_SERVICE,
+            VehicleStatus.DECOMMISSIONED,
         }
     ),
     VehicleStatus.OUT_OF_SERVICE: frozenset(
@@ -164,7 +169,6 @@ class Vehicle:
         commissioning_date: str | None = None,
         driver1_customer_number: str | None = None,
         driver2_customer_number: str | None = None,
-        **_: object,
     ) -> None:
         self.id = id
         if vehicle_number is None:
@@ -176,7 +180,7 @@ class Vehicle:
         self.status = status
         self.created_at = created_at
         self.updated_at = updated_at
-        self.commissioning_date = commissioning_date
+        self.commissioning_date = _validated_commissioning_date(commissioning_date)
         self.driver1_customer_number = driver1_customer_number
         self.driver2_customer_number = driver2_customer_number
 
@@ -263,9 +267,21 @@ class Vehicle:
 
     def decommission(self) -> None:
         """Mark the vehicle as removed from SAP fleet master data."""
-        self.status = VehicleStatus.DECOMMISSIONED
+        self.transition_to(VehicleStatus.DECOMMISSIONED)
 
     @property
     def is_available(self) -> bool:
         """Return True if the vehicle is ACTIVE and available for assignment."""
         return self.status == VehicleStatus.ACTIVE
+
+
+def _validated_commissioning_date(value: str | None) -> str | None:
+    """Return a validated SAP YYYYMMDD commissioning date."""
+    if value is None:
+        return None
+    stripped = value.strip()
+    if not stripped:
+        return None
+    if len(stripped) != 8 or not stripped.isdigit():
+        raise ValueError("commissioning_date must be an 8-digit SAP YYYYMMDD value.")
+    return stripped

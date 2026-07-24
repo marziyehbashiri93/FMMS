@@ -44,8 +44,8 @@ class GetVehicleSummaryService:
         active_fleet = VehicleModel.objects.filter(is_deleted=False).exclude(
             status__in=[status.value for status in _ACTIVE_FLEET_EXCLUDED_STATUSES]
         )
-        active_vehicle_ids = list(active_fleet.values_list("id", flat=True))
-        active_fleet_count = len(active_vehicle_ids)
+        active_vehicle_ids = active_fleet.values_list("id", flat=True)
+        active_fleet_count = active_fleet.count()
 
         open_fault_vehicle_ids = set(
             FaultModel.objects.filter(

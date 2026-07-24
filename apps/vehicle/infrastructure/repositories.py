@@ -10,6 +10,8 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
+from django.db.models import Q
+
 from apps.vehicle.domain.entities import Vehicle, VehicleStatus
 from apps.vehicle.domain.exceptions import VehicleNotFoundError
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
@@ -70,6 +72,8 @@ def _to_orm_dict(vehicle: Vehicle) -> dict[str, object]:
 class DjangoVehicleRepository(IVehicleRepository):
     """Concrete repository for Vehicle aggregates backed by Django ORM."""
 
+    uses_transactions = True
+
     def get_by_id(self, vehicle_id: uuid.UUID) -> Vehicle:
         """Retrieve a vehicle by UUID.
 
@@ -125,6 +129,29 @@ class DjangoVehicleRepository(IVehicleRepository):
             A list of matching ``Vehicle`` domain entities.
         """
         qs = VehicleModel.objects.filter(status=status.value)
+        return [_to_domain(orm) for orm in qs]
+
+    def list_filtered(
+        self,
+        *,
+        status: VehicleStatus | None = None,
+        ordering: str = "",
+        search: str = "",
+    ) -> list[Vehicle]:
+        """Return vehicles filtered and ordered by database query."""
+        qs = (
+            VehicleModel.objects.filter(status=status.value)
+            if status is not None
+            else VehicleModel.objects.filter(status=VehicleStatus.ACTIVE.value)
+        )
+        needle = search.strip()
+        if needle:
+            qs = qs.filter(
+                Q(license_plate__icontains=needle)
+                | Q(vehicle_number__icontains=needle)
+            )
+        if ordering:
+            qs = qs.order_by(ordering)
         return [_to_domain(orm) for orm in qs]
 
     def save(self, vehicle: Vehicle) -> Vehicle:

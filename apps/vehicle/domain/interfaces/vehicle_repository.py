@@ -82,6 +82,7 @@ class IVehicleRepository(ABC):
     def decommission_missing_from_sap(self, seen_vehicle_numbers: set[str]) -> int:
         """Mark vehicles absent from a SAP sync as DECOMMISSIONED."""
 
+    @abstractmethod
     def record_driver_assignment_snapshot(
         self,
         *,

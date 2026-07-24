@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import uuid
+from contextlib import nullcontext
 from datetime import UTC, datetime
+
+from django.db import transaction
 
 from apps.fault.domain.entities import Fault, FaultStatus
 from apps.fault.domain.exceptions import FaultNotFoundError
@@ -14,7 +17,8 @@ from apps.vehicle.application.dto.vehicle_dto import (
     ChangeVehicleStatusDTO,
     VehicleResponseDTO,
 )
-from apps.vehicle.domain.entities import VEHICLE_STATUS_LABELS, Vehicle, VehicleStatus
+from apps.vehicle.application.mappers import vehicle_to_response_dto
+from apps.vehicle.domain.entities import VehicleStatus
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
 from core.exceptions.base_exception import FMMSConflictError, FMMSValidationError
 from core.exceptions.translation import load_or_not_found
@@ -23,7 +27,15 @@ from core.logging.structured_logger import get_structured_logger
 logger = get_structured_logger("vehicle", __name__)
 
 
-_SAP_ONLY_STATUSES = frozenset({VehicleStatus.DECOMMISSIONED})
+_MANUAL_STATUS_CHANGE_ALLOWED_STATUSES = frozenset(
+    {
+        VehicleStatus.ACTIVE,
+        VehicleStatus.INACTIVE,
+        VehicleStatus.UNDER_REPAIR,
+        VehicleStatus.SUSPENDED,
+        VehicleStatus.OUT_OF_SERVICE,
+    }
+)
 
 
 def _close_faults_for_completed_repairs(
@@ -122,31 +134,37 @@ class ChangeVehicleStatusService:
             },
         )
 
-        if dto.status in _SAP_ONLY_STATUSES:
+        if dto.status not in _MANUAL_STATUS_CHANGE_ALLOWED_STATUSES:
             raise FMMSValidationError(
-                message="This vehicle status is controlled by SAP sync.",
-                error_code="VEHICLE_STATUS_SAP_CONTROLLED",
+                message="This vehicle status is controlled by a dedicated workflow.",
+                error_code="VEHICLE_STATUS_WORKFLOW_CONTROLLED",
                 details={
                     "vehicle_id": str(dto.vehicle_id),
                     "status": dto.status.value,
                 },
             )
 
-        vehicle = load_or_not_found(
-            lambda: self._vehicle_repo.get_by_id(dto.vehicle_id),
-            message=f"Vehicle '{dto.vehicle_id}' not found.",
-            details={"vehicle_id": str(dto.vehicle_id)},
+        atomic = (
+            transaction.atomic()
+            if getattr(self._vehicle_repo, "uses_transactions", False)
+            else nullcontext()
         )
+        with atomic:
+            vehicle = load_or_not_found(
+                lambda: self._vehicle_repo.get_by_id(dto.vehicle_id),
+                message=f"Vehicle '{dto.vehicle_id}' not found.",
+                details={"vehicle_id": str(dto.vehicle_id)},
+            )
 
-        if dto.status == VehicleStatus.ACTIVE:
-            self._prepare_for_active_status(dto.vehicle_id, dto.request_id)
+            if dto.status == VehicleStatus.ACTIVE:
+                self._prepare_for_active_status(dto.vehicle_id, dto.request_id)
 
-        if vehicle.status == dto.status:
-            return _to_response_dto(vehicle)
+            if vehicle.status == dto.status:
+                return vehicle_to_response_dto(vehicle)
 
-        vehicle.transition_to(dto.status)
-        vehicle.updated_at = datetime.now(tz=UTC)
-        saved = self._vehicle_repo.save(vehicle)
+            vehicle.transition_to(dto.status)
+            vehicle.updated_at = datetime.now(tz=UTC)
+            saved = self._vehicle_repo.save(vehicle)
 
         logger.info(
             "Vehicle status changed successfully",
@@ -161,7 +179,7 @@ class ChangeVehicleStatusService:
             },
         )
 
-        return _to_response_dto(saved)
+        return vehicle_to_response_dto(saved)
 
     def _prepare_for_active_status(
         self, vehicle_id: uuid.UUID, request_id: str
@@ -193,17 +211,3 @@ class ChangeVehicleStatusService:
                 error_code="VEHICLE_HAS_OPEN_FAULTS",
                 details={"vehicle_id": str(vehicle_id)},
             )
-
-
-def _to_response_dto(vehicle: Vehicle) -> VehicleResponseDTO:
-    """Map a vehicle entity to a response DTO."""
-    return VehicleResponseDTO(
-        id=vehicle.id,
-        vehicle_number=vehicle.vehicle_number.value,
-        license_plate=vehicle.license_plate.value,
-        status=vehicle.status,
-        status_label=VEHICLE_STATUS_LABELS[vehicle.status],
-        created_at=vehicle.created_at,
-        updated_at=vehicle.updated_at,
-        commissioning_date=vehicle.commissioning_date,
-    )

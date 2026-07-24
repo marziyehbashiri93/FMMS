@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, date, datetime
+from enum import StrEnum
 
 from django.db import transaction
 
@@ -20,6 +21,15 @@ from core.logging.structured_logger import get_structured_logger
 logger = get_structured_logger("vehicle", __name__)
 
 _MIN_DAILY_DELTA_KM = 10
+_MAX_ODOMETER_KM = 2_147_483_647
+
+
+class VehicleOdometerSource(StrEnum):
+    """Supported sources for vehicle odometer readings."""
+
+    DRIVER = "DRIVER"
+    TECHNICIAN = "TECHNICIAN"
+    ADMIN = "ADMIN"
 
 
 class RecordVehicleOdometerService:
@@ -36,15 +46,28 @@ class RecordVehicleOdometerService:
             message=f"Vehicle '{dto.vehicle_id}' not found.",
             details={"vehicle_id": str(dto.vehicle_id)},
         )
-        previous = (
-            VehicleOdometerReadingModel.objects.filter(
+        current = (
+            VehicleOdometerReadingModel.objects.select_for_update()
+            .filter(
                 vehicle_id=dto.vehicle_id,
-                reading_date__lt=dto.reading_date,
+                reading_date=dto.reading_date,
                 is_deleted=False,
             )
-            .order_by("-reading_date")
             .first()
         )
+        if current is not None:
+            previous = None
+        else:
+            previous = (
+                VehicleOdometerReadingModel.objects.filter(
+                    vehicle_id=dto.vehicle_id,
+                    reading_date__lt=dto.reading_date,
+                    is_deleted=False,
+                )
+                .order_by("-reading_date")
+                .first()
+            )
+
         if previous is not None:
             minimum = previous.odometer_km + _MIN_DAILY_DELTA_KM
             if dto.odometer_km < minimum:
@@ -63,17 +86,34 @@ class RecordVehicleOdometerService:
                 )
 
         now = datetime.now(tz=UTC)
-        obj, created = VehicleOdometerReadingModel.objects.update_or_create(
-            vehicle_id=dto.vehicle_id,
-            reading_date=dto.reading_date,
-            is_deleted=False,
-            defaults={
-                "odometer_km": dto.odometer_km,
-                "source": dto.source,
-                "recorded_by_id": dto.recorded_by,
-                "recorded_at": now,
-            },
-        )
+        if current is None:
+            obj, created = VehicleOdometerReadingModel.objects.update_or_create(
+                vehicle_id=dto.vehicle_id,
+                reading_date=dto.reading_date,
+                is_deleted=False,
+                defaults={
+                    "odometer_km": dto.odometer_km,
+                    "source": dto.source,
+                    "recorded_by_id": dto.recorded_by,
+                    "recorded_at": now,
+                },
+            )
+        else:
+            current.odometer_km = dto.odometer_km
+            current.source = dto.source
+            current.recorded_by_id = dto.recorded_by
+            current.recorded_at = now
+            current.save(
+                update_fields=[
+                    "odometer_km",
+                    "source",
+                    "recorded_by_id",
+                    "recorded_at",
+                    "updated_at",
+                ]
+            )
+            obj = current
+            created = False
         logger.info(
             "Vehicle odometer recorded",
             extra={

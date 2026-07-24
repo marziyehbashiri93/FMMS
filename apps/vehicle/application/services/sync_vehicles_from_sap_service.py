@@ -7,7 +7,10 @@ and creates or updates local vehicle and driver records idempotently.
 from __future__ import annotations
 
 import uuid
+from contextlib import AbstractContextManager, nullcontext
 from datetime import UTC, datetime
+
+from django.db import IntegrityError, transaction
 
 from apps.driver.domain.entities import Driver, DriverStatus
 from apps.driver.domain.exceptions import DriverNotFoundError
@@ -123,23 +126,24 @@ class SyncVehiclesFromSAPService:
 
         for sap_dto in sap_rows:
             try:
-                seen_vehicle_numbers.add(SAPVehicleNumber(sap_dto.vehicle_number).value)
-                seen_driver_customer_numbers.update(
-                    _driver_customer_numbers_from_sap(sap_dto)
-                )
-                was_created, vehicle = self._sync_one(sap_dto)
-                self._repo.record_driver_assignment_snapshot(
-                    vehicle=vehicle,
-                    sync_run_id=sync_run_id,
-                    synced_at=synced_at,
-                    request_id=request_id,
-                )
-                if was_created:
-                    created += 1
-                else:
-                    updated += 1
-                self._sync_drivers(sap_dto)
-            except Exception as exc:  # noqa: BLE001 — per-record isolation
+                with self._atomic_if_supported():
+                    seen_vehicle_numbers.add(SAPVehicleNumber(sap_dto.vehicle_number).value)
+                    seen_driver_customer_numbers.update(
+                        _driver_customer_numbers_from_sap(sap_dto)
+                    )
+                    was_created, vehicle = self._sync_one(sap_dto)
+                    self._repo.record_driver_assignment_snapshot(
+                        vehicle=vehicle,
+                        sync_run_id=sync_run_id,
+                        synced_at=synced_at,
+                        request_id=request_id,
+                    )
+                    if was_created:
+                        created += 1
+                    else:
+                        updated += 1
+                    self._sync_drivers(sap_dto)
+            except (ValueError, IntegrityError) as exc:
                 failed += 1
                 logger.error(
                     "Failed to sync SAP vehicle-driver row",
@@ -154,11 +158,14 @@ class SyncVehiclesFromSAPService:
                     exc_info=True,
                 )
 
-        decommissioned = self._repo.decommission_missing_from_sap(seen_vehicle_numbers)
-        if self._driver_repo is not None:
-            self._driver_repo.decommission_missing_from_sap(
-                seen_driver_customer_numbers
+        with self._atomic_if_supported():
+            decommissioned = self._repo.decommission_missing_from_sap(
+                seen_vehicle_numbers
             )
+            if self._driver_repo is not None:
+                self._driver_repo.decommission_missing_from_sap(
+                    seen_driver_customer_numbers
+                )
 
         result = VehicleSAPSyncResultDTO(
             total_received=len(sap_rows),
@@ -270,3 +277,9 @@ class SyncVehiclesFromSAPService:
                 driver.reactivate()
             driver.updated_at = datetime.now(tz=UTC)
             self._driver_repo.save(driver)
+
+    def _atomic_if_supported(self) -> AbstractContextManager[object]:
+        """Use database transactions only for repositories backed by Django ORM."""
+        if getattr(self._repo, "uses_transactions", False):
+            return transaction.atomic()
+        return nullcontext()

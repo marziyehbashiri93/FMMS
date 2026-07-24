@@ -200,6 +200,9 @@ class FakeVehicleRepository(IVehicleRepository):
                 count += 1
         return count
 
+    def record_driver_assignment_snapshot(self, **kwargs: object) -> None:
+        return None
+
     def delete(self, vehicle_id: uuid.UUID) -> None:
         self._store.pop(vehicle_id, None)
 

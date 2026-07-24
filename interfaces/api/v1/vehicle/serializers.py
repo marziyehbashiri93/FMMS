@@ -4,7 +4,34 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
+from apps.vehicle.application.services.record_odometer_service import (
+    _MAX_ODOMETER_KM,
+    VehicleOdometerSource,
+)
 from apps.vehicle.domain.entities import VehicleStatus
+
+VEHICLE_STATUS_CHOICES = [item.value for item in VehicleStatus]
+MANUAL_VEHICLE_STATUS_CHOICES = [
+    VehicleStatus.ACTIVE.value,
+    VehicleStatus.INACTIVE.value,
+    VehicleStatus.UNDER_REPAIR.value,
+    VehicleStatus.SUSPENDED.value,
+    VehicleStatus.OUT_OF_SERVICE.value,
+]
+VEHICLE_ORDERING_CHOICES = [
+    "vehicle_number",
+    "-vehicle_number",
+    "license_plate",
+    "-license_plate",
+    "status",
+    "-status",
+    "created_at",
+    "-created_at",
+    "updated_at",
+    "-updated_at",
+    "commissioning_date",
+    "-commissioning_date",
+]
 
 
 class VehicleAssignedDriverSerializer(serializers.Serializer):
@@ -21,7 +48,7 @@ class VehicleResponseSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     vehicle_number = serializers.CharField()
     license_plate = serializers.CharField()
-    status = serializers.ChoiceField(choices=[item.value for item in VehicleStatus])
+    status = serializers.ChoiceField(choices=VEHICLE_STATUS_CHOICES)
     status_label = serializers.CharField()
     created_at = serializers.DateTimeField()
     updated_at = serializers.DateTimeField()
@@ -46,8 +73,24 @@ class VehicleOdometerRecordSerializer(serializers.Serializer):
     """Validate a daily odometer reading."""
 
     reading_date = serializers.DateField()
-    odometer_km = serializers.IntegerField(min_value=0, max_value=2_147_483_647)
-    source = serializers.CharField(max_length=30, required=False, default="DRIVER")
+    odometer_km = serializers.IntegerField(min_value=0, max_value=_MAX_ODOMETER_KM)
+    source = serializers.ChoiceField(
+        choices=[item.value for item in VehicleOdometerSource],
+        required=False,
+        default=VehicleOdometerSource.DRIVER.value,
+    )
+
+
+class VehicleListQuerySerializer(serializers.Serializer):
+    """Validate vehicle list query parameters."""
+
+    status = serializers.ChoiceField(choices=VEHICLE_STATUS_CHOICES, required=False)
+    ordering = serializers.ChoiceField(
+        choices=VEHICLE_ORDERING_CHOICES,
+        required=False,
+        allow_blank=True,
+    )
+    search = serializers.CharField(required=False, allow_blank=True, max_length=100)
 
 
 class DateRangeFilterSerializer(serializers.Serializer):
@@ -71,11 +114,7 @@ class VehicleStatusChangeSerializer(serializers.Serializer):
     """Validate a vehicle status change requested from FMMS."""
 
     status = serializers.ChoiceField(
-        choices=[
-            status.value
-            for status in VehicleStatus
-            if status != VehicleStatus.DECOMMISSIONED
-        ]
+        choices=MANUAL_VEHICLE_STATUS_CHOICES
     )
 
 

@@ -24,6 +24,7 @@ from interfaces.api.v1.vehicle import schema as vehicle_schema
 from interfaces.api.v1.vehicle.serializers import (
     DateRangeFilterSerializer,
     VehicleDriverAssignmentSnapshotResponseSerializer,
+    VehicleListQuerySerializer,
     VehicleOdometerRecordSerializer,
     VehicleOdometerResponseSerializer,
     VehicleResponseSerializer,
@@ -61,9 +62,11 @@ class VehicleViewSet(GenericViewSet):
     @vehicle_schema.list
     def list(self, request: Request) -> Response:
         """List non-deleted vehicles, optionally filtered by status."""
-        raw_status = request.query_params.get("status")
-        ordering = request.query_params.get("ordering", "")
-        search = request.query_params.get("search", "").strip()
+        query_serializer = VehicleListQuerySerializer(data=request.query_params)
+        query_serializer.is_valid(raise_exception=True)
+        raw_status = query_serializer.validated_data.get("status")
+        ordering = query_serializer.validated_data.get("ordering", "")
+        search = query_serializer.validated_data.get("search", "").strip()
         vehicle_status = VehicleStatus(raw_status) if raw_status else None
         items = deps.get_list_vehicles_service().execute(
             vehicle_status,
