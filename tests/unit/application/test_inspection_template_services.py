@@ -71,11 +71,11 @@ class FakeObjectPartCatalogPort(ISAPObjectPartCatalogPort):
         )
 
 
-def _entry(code: str, group: str, text: str) -> SAPObjectPartDTO:
+def _entry(code: str, group: str, group_text: str, text: str) -> SAPObjectPartDTO:
     return SAPObjectPartDTO(
         code_group=group,
         code=code,
-        group_text=group,
+        group_text=group_text,
         code_text=text,
     )
 
@@ -85,10 +85,10 @@ class TestSyncInspectionTemplatesFromSAPService:
         repo = FakeTemplateRepository()
         sap = FakeObjectPartCatalogPort(
             [
-                _entry("SEAT", "SAFETY", "Seat belt"),
-                _entry("FLIGHT", "LIGHTS", "Front light"),
-                _entry("FRIDGE", "CARGO", "Refrigerator"),
-                _entry("SAFE", "SAFETY", "Safety equipment"),
+                _entry("SEAT", "SAFETY", "Safety checks", "Seat belt"),
+                _entry("FLIGHT", "LIGHTS", "Lighting", "Front light"),
+                _entry("FRIDGE", "CARGO", "Cargo body", "Refrigerator"),
+                _entry("SAFE", "SAFETY", "Safety checks", "Safety equipment"),
             ]
         )
 
@@ -113,17 +113,22 @@ class TestSyncInspectionTemplatesFromSAPService:
             updated_at=now,
         )
         repo = FakeTemplateRepository(initial=[existing])
-        sap = FakeObjectPartCatalogPort([_entry("SEAT", "SAFETY", "Seat belt")])
+        sap = FakeObjectPartCatalogPort(
+            [_entry("SEAT", "SAFETY", "Safety checks", "Seat belt")]
+        )
 
         result = SyncInspectionTemplatesFromSAPService(repo, sap).execute()
 
         assert result.created == 0
         assert result.updated == 1
+        assert repo.get_by_id(existing.id).group_text == "Safety checks"
         assert repo.get_by_id(existing.id).code_text == "Seat belt"
 
     def test_sync_is_idempotent(self) -> None:
         repo = FakeTemplateRepository()
-        sap = FakeObjectPartCatalogPort([_entry("SEAT", "SAFETY", "Seat belt")])
+        sap = FakeObjectPartCatalogPort(
+            [_entry("SEAT", "SAFETY", "Safety checks", "Seat belt")]
+        )
         service = SyncInspectionTemplatesFromSAPService(repo, sap)
 
         first = service.execute()

@@ -55,6 +55,13 @@ class TestInspectionTemplateSAPSyncAPI:
         assert "چراغ جلو" in descriptions
         assert "موتور اصلی" in descriptions
         assert "باتری/دینام" in descriptions
+        brake_item = next(
+            item
+            for item in results
+            if item["code_group"] == "FL-BRK" and item["code"] == "B002"
+        )
+        assert brake_item["group_text"] == "سیستم ترمز"
+        assert brake_item["code_text"] == "ترمز عقب"
         for group_text in {item["group_text"] for item in results}:
             group_codes = [
                 item["code"] for item in results if item["group_text"] == group_text
