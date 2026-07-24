@@ -93,6 +93,7 @@ export interface InspectionTemplate {
   code_group: string;
   code: string;
   group_text: string;
+  GroupText?: string;
   code_text: string;
   is_active: boolean;
   created_at: string;
