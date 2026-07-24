@@ -15,6 +15,7 @@ from apps.fault.application.dto.fault_dto import (
     CloseFaultDTO,
     FaultResponseDTO,
     ReportFaultDTO,
+    ReportFaultItemDTO,
 )
 from apps.fault.application.services.assign_fault_service import AssignFaultService
 from apps.fault.application.services.close_fault_service import CloseFaultService
@@ -191,6 +192,9 @@ class FakeVehicleRepository(IVehicleRepository):
                 count += 1
         return count
 
+    def record_driver_assignment_snapshot(self, **kwargs: object) -> None:
+        return None
+
     def delete(self, vehicle_id: uuid.UUID) -> None:
         self._store.pop(vehicle_id, None)
 
@@ -344,6 +348,38 @@ class TestReportFaultService:
         result = self._service(vehicle, faults=[closed]).execute(self._dto(vehicle.id))
 
         assert result.status == FaultStatus.OPEN
+
+    def test_reports_multiple_items_as_one_fault(self) -> None:
+        vehicle = _make_vehicle()
+        dto = ReportFaultDTO(
+            vehicle_id=vehicle.id,
+            code="MULTI",
+            description="دو خرابی همزمان",
+            severity=FaultSeverity.MEDIUM,
+            request_id="req-multi",
+            reported_by=uuid.uuid4(),
+            items=[
+                ReportFaultItemDTO(
+                    code="BRK-01",
+                    description="لنت ترمز",
+                    severity=FaultSeverity.MEDIUM,
+                    component="ترمز",
+                ),
+                ReportFaultItemDTO(
+                    code="ENG-01",
+                    description="نشتی روغن",
+                    severity=FaultSeverity.HIGH,
+                    component="موتور",
+                ),
+            ],
+        )
+
+        result = self._service(vehicle).execute(dto)
+
+        assert result.status == FaultStatus.OPEN
+        assert result.severity == FaultSeverity.HIGH
+        assert len(result.items) == 2
+        assert {item.component for item in result.items} == {"ترمز", "موتور"}
 
 
 # ---------------------------------------------------------------------------

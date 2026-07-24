@@ -8,6 +8,17 @@ from apps.fault.domain.entities import FaultStatus
 from apps.fault.domain.value_objects import FaultSeverity
 
 
+class FaultItemCreateSerializer(serializers.Serializer):
+    """Validate one child item inside a multi-defect fault report."""
+
+    code = serializers.CharField(max_length=40)
+    description = serializers.CharField(max_length=500)
+    severity = serializers.ChoiceField(choices=[item.value for item in FaultSeverity])
+    component = serializers.CharField(
+        max_length=100, required=False, allow_blank=True, default=""
+    )
+
+
 class FaultCreateSerializer(serializers.Serializer):
     """Validate fault report input."""
 
@@ -16,6 +27,7 @@ class FaultCreateSerializer(serializers.Serializer):
     description = serializers.CharField(max_length=500)
     severity = serializers.ChoiceField(choices=[item.value for item in FaultSeverity])
     inspection_id = serializers.UUIDField(required=False, allow_null=True)
+    items = FaultItemCreateSerializer(many=True, required=False)
 
 
 class FaultAssignSerializer(serializers.Serializer):

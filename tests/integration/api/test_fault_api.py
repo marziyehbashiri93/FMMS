@@ -50,6 +50,41 @@ class TestFaultAPI:
         assert closed.status_code == 200, closed.data
         assert closed.data["status"] == "CLOSED"
 
+    def test_report_multiple_items_as_one_fault(
+        self, authenticated_client: APIClient
+    ) -> None:
+        """Several catalog defects can be reported as one open fault."""
+        vehicle = create_vehicle(
+            authenticated_client, plate="12FLT003", vin="1HGCM82633A004357"
+        )
+        created = authenticated_client.post(
+            "/api/v1/faults/",
+            {
+                "vehicle_id": vehicle["id"],
+                "code": "MULTI",
+                "description": "ثبت همزمان چند خرابی",
+                "severity": "MEDIUM",
+                "items": [
+                    {
+                        "code": "BRK-01",
+                        "description": "لنت ترمز",
+                        "severity": "MEDIUM",
+                        "component": "ترمز",
+                    },
+                    {
+                        "code": "LGT-01",
+                        "description": "چراغ جلو",
+                        "severity": "HIGH",
+                        "component": "چراغ",
+                    },
+                ],
+            },
+            format="json",
+        )
+        assert created.status_code == 201, created.data
+        assert created.data["severity"] == "HIGH"
+        assert len(created.data["items"]) == 2
+
     def test_report_fault_marks_active_vehicle_under_repair(
         self, authenticated_client: APIClient
     ) -> None:

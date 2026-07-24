@@ -15,6 +15,7 @@ from apps.fault.application.dto.fault_dto import (
     AssignFaultDTO,
     CloseFaultDTO,
     ReportFaultDTO,
+    ReportFaultItemDTO,
 )
 from apps.fault.domain.value_objects import FaultSeverity
 from core.permissions import IsReadOnlyOrTechnicianOrAbove
@@ -73,10 +74,21 @@ class FaultViewSet(GenericViewSet):
         serializer.is_valid(raise_exception=True)
         data = dict(serializer.validated_data)
         severity = FaultSeverity(data.pop("severity"))
+        raw_items = data.pop("items", None) or []
+        items = [
+            ReportFaultItemDTO(
+                code=item["code"],
+                description=item["description"],
+                severity=FaultSeverity(item["severity"]),
+                component=item.get("component") or "",
+            )
+            for item in raw_items
+        ]
         result = deps.get_report_fault_service().execute(
             ReportFaultDTO(
                 **data,
                 severity=severity,
+                items=items,
                 request_id=request_id_from(request),
                 reported_by=user_id_from(request),
             )

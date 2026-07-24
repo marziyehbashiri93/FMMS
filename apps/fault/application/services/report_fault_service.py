@@ -17,10 +17,11 @@ from apps.fault.application.dto.fault_dto import (
     FaultItemResponseDTO,
     FaultResponseDTO,
     ReportFaultDTO,
+    ReportFaultItemDTO,
 )
-from apps.fault.domain.entities import Fault, FaultStatus
+from apps.fault.domain.entities import Fault, FaultItem, FaultStatus
 from apps.fault.domain.interfaces.fault_repository import IFaultRepository
-from apps.fault.domain.value_objects import FaultCode, FaultDescription
+from apps.fault.domain.value_objects import FaultCode, FaultDescription, FaultSeverity
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
 from apps.vehicle.domain.entities import VehicleStatus
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
@@ -29,6 +30,15 @@ from core.logging.structured_logger import get_structured_logger
 from core.workflow import assert_vehicle_has_no_open_flow
 
 logger = get_structured_logger("fault", __name__)
+
+_MULTI_FAULT_CODE = "MULTI"
+_MULTI_FAULT_DESCRIPTION = "Multiple reported faults"
+_SEVERITY_RANK: dict[FaultSeverity, int] = {
+    FaultSeverity.LOW: 0,
+    FaultSeverity.MEDIUM: 1,
+    FaultSeverity.HIGH: 2,
+    FaultSeverity.CRITICAL: 3,
+}
 
 
 def _to_response_dto(
@@ -114,6 +124,7 @@ class ReportFaultService:
                 "request_id": dto.request_id,
                 "vehicle_id": str(dto.vehicle_id),
                 "severity": dto.severity,
+                "item_count": len(dto.items),
             },
         )
 
@@ -130,18 +141,25 @@ class ReportFaultService:
         )
 
         now = datetime.now(tz=UTC)
+        fault_id = uuid.uuid4()
+        code, description, severity, items = _resolve_fault_payload(
+            dto=dto,
+            fault_id=fault_id,
+            now=now,
+        )
         fault = Fault(
-            id=uuid.uuid4(),
+            id=fault_id,
             vehicle_id=dto.vehicle_id,
-            code=FaultCode(dto.code),
-            description=FaultDescription(dto.description),
-            severity=dto.severity,
+            code=FaultCode(code),
+            description=FaultDescription(description),
+            severity=severity,
             status=FaultStatus.OPEN,
             reported_by_id=dto.reported_by,
             reported_at=now,
             inspection_id=dto.inspection_id,
             created_at=now,
             updated_at=now,
+            items=items,
         )
 
         saved = self._fault_repo.save(fault)
@@ -164,3 +182,57 @@ class ReportFaultService:
         )
 
         return _to_response_dto(saved, self._profile_reader)
+
+
+def _safe_parent_code(raw: str, fallback: str = _MULTI_FAULT_CODE) -> str:
+    """Normalise a catalog code into a valid parent ``FaultCode`` value."""
+    cleaned = "".join(ch for ch in raw.strip().upper() if ch.isalnum() or ch == "-")[:20]
+    if len(cleaned) >= 3:
+        return cleaned
+    return fallback
+
+
+def _resolve_fault_payload(
+    dto: ReportFaultDTO,
+    fault_id: uuid.UUID,
+    now: datetime,
+) -> tuple[str, str, FaultSeverity, list[FaultItem]]:
+    """Derive aggregate fields and child items from the report DTO."""
+    if not dto.items:
+        return dto.code, dto.description, dto.severity, []
+
+    items = [_build_fault_item(fault_id=fault_id, item=item, now=now) for item in dto.items]
+    severities = [item.severity for item in dto.items]
+    overall_severity = max(severities, key=lambda level: _SEVERITY_RANK[level])
+
+    if len(dto.items) == 1:
+        only = dto.items[0]
+        code = _safe_parent_code(dto.code.strip() or only.code, fallback="MANUAL")
+        description = dto.description.strip() or only.description
+        return code, description, overall_severity, items
+
+    code = _safe_parent_code(dto.code.strip() or _MULTI_FAULT_CODE)
+    description = dto.description.strip() or _MULTI_FAULT_DESCRIPTION
+    return code, description, overall_severity, items
+
+
+def _build_fault_item(
+    fault_id: uuid.UUID,
+    item: ReportFaultItemDTO,
+    now: datetime,
+) -> FaultItem:
+    """Construct a ``FaultItem`` from a manual report item DTO."""
+    label = (item.component or item.description or item.code).strip()
+    component = label[:100] or item.code[:100]
+    detail = item.description.strip() or item.code
+    if item.code and item.code not in detail:
+        detail = f"[{item.code}] {detail}"
+    return FaultItem(
+        id=uuid.uuid4(),
+        fault_id=fault_id,
+        component=component,
+        description=detail[:500],
+        severity=item.severity,
+        created_at=now,
+        updated_at=now,
+    )

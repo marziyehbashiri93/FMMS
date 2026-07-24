@@ -9,10 +9,12 @@ from apps.fault.application.dto.fault_dto import (
     CloseFaultDTO,
     FaultResponseDTO,
     ReportFaultDTO,
+    ReportFaultItemDTO,
 )
 
 __all__ = [
     "ReportFaultDTO",
+    "ReportFaultItemDTO",
     "AssignFaultDTO",
     "CloseFaultDTO",
     "FaultResponseDTO",
