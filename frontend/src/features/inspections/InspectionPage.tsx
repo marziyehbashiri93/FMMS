@@ -1102,11 +1102,37 @@ export function InspectionPage() {
                           bgcolor: 'background.paper',
                         }}
                         >
-                        <Stack direction="row" spacing={1} justifyContent="center" mb={1.25}>
-                          <Typography variant="caption" color="text.secondary" fontWeight={800}>
+                        <Stack
+                          direction="row"
+                          spacing={1}
+                          justifyContent="space-between"
+                          alignItems="center"
+                          mb={1.25}
+                          sx={{
+                            px: 1.25,
+                            py: 0.75,
+                            borderRadius: (t) => t.radius('sm'),
+                            bgcolor: 'rgba(0, 167, 111, 0.06)',
+                            border: '1px solid rgba(0, 167, 111, 0.16)',
+                          }}
+                        >
+                          <Typography variant="body2" color="primary.main" fontWeight={900}>
                             {currentItem.category}
                           </Typography>
-                          <Typography variant="caption" color="text.secondary" fontWeight={800}>
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            fontWeight={900}
+                            sx={{
+                              direction: 'ltr',
+                              px: 0.75,
+                              py: 0.25,
+                              borderRadius: 1,
+                              bgcolor: 'background.paper',
+                              border: '1px solid',
+                              borderColor: 'divider',
+                            }}
+                          >
                             {currentItem.code}
                           </Typography>
                         </Stack>
