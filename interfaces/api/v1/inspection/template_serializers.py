@@ -14,6 +14,7 @@ class InspectionTemplateResponseSerializer(serializers.Serializer):
     group_text = serializers.CharField()
     GroupText = serializers.CharField(source="group_text")
     code_text = serializers.CharField()
+    CodeText = serializers.CharField(source="code_text")
     is_active = serializers.BooleanField()
     created_at = serializers.DateTimeField()
     updated_at = serializers.DateTimeField()

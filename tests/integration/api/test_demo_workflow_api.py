@@ -48,6 +48,7 @@ class TestInspectionTemplateSAPSyncAPI:
         results = listed.data["results"] if "results" in listed.data else listed.data
         descriptions = {item["code_text"] for item in results}
         assert all(item["GroupText"] == item["group_text"] for item in results)
+        assert all(item["CodeText"] == item["code_text"] for item in results)
         assert "ترمز جلو" in descriptions
         assert "چراغ جلو" in descriptions
         assert "موتور اصلی" in descriptions
