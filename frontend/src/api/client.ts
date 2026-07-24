@@ -4,6 +4,8 @@ import type {
   DriverSummary,
   DriverVehicleAssignmentHistoryItem,
   Fault,
+  FaultCatalog,
+  FailureSeverity,
   Inspection,
   InspectionItemInput,
   InspectionTemplate,
@@ -281,6 +283,36 @@ export const api = {
 
   listFaults(vehicleId: string) {
     return request<Paginated<Fault>>(`/faults/?vehicle_id=${vehicleId}`);
+  },
+
+  listFaultCatalogs(options?: {
+    codeGroup?: string;
+    defectClass?: string;
+    search?: string;
+    page?: number;
+    pageSize?: number;
+  }) {
+    const params = new URLSearchParams();
+    if (options?.codeGroup) params.set('code_group', options.codeGroup);
+    if (options?.defectClass) params.set('defect_class', options.defectClass);
+    if (options?.search?.trim()) params.set('search', options.search.trim());
+    if (options?.page) params.set('page', String(options.page));
+    if (options?.pageSize) params.set('page_size', String(options.pageSize));
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return request<Paginated<FaultCatalog>>(`/fault-catalogs/${query}`);
+  },
+
+  reportFault(payload: {
+    vehicle_id: string;
+    code: string;
+    description: string;
+    severity: FailureSeverity;
+    inspection_id?: string | null;
+  }) {
+    return request<Fault>('/faults/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
   },
 
   listRepairOrders(vehicleId: string) {

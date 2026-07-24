@@ -7,6 +7,10 @@ from apps.fault.application.services.get_fault_service import (
     ListFaultsService,
 )
 from apps.fault.application.services.report_fault_service import ReportFaultService
+from apps.fault.application.services.sync_fault_catalog_from_sap_service import (
+    ListFaultCatalogService,
+    SyncFaultCatalogFromSAPService,
+)
 
 __all__ = [
     "ReportFaultService",
@@ -14,4 +18,6 @@ __all__ = [
     "CloseFaultService",
     "GetFaultService",
     "ListFaultsService",
+    "ListFaultCatalogService",
+    "SyncFaultCatalogFromSAPService",
 ]

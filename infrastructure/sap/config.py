@@ -24,6 +24,9 @@ Optional environment variables:
         (default: ZI_FLEET_CAT_B_CDS)
     SAP_OBJECT_PART_CATALOG_ENTITY_SET — Object-part catalog entity set
         (default: empty)
+    SAP_FAULT_CATALOG_SERVICE    — Fault catalog OData service
+        (default: ZI_B_DEFECTCATALOG9_CDS)
+    SAP_FAULT_CATALOG_ENTITY_SET — Fault catalog entity set (default: empty)
 """
 
 from __future__ import annotations
@@ -67,6 +70,8 @@ class SAPConfig:
     vehicle_driver_entity_set: str
     object_part_catalog_service: str
     object_part_catalog_entity_set: str
+    fault_catalog_service: str
+    fault_catalog_entity_set: str
 
     @classmethod
     def from_env(cls) -> SAPConfig:
@@ -103,6 +108,14 @@ class SAPConfig:
         )
         object_part_catalog_entity_set = os.environ.get(
             "SAP_OBJECT_PART_CATALOG_ENTITY_SET",
+            "",
+        )
+        fault_catalog_service = os.environ.get(
+            "SAP_FAULT_CATALOG_SERVICE",
+            "ZI_B_DEFECTCATALOG9_CDS",
+        )
+        fault_catalog_entity_set = os.environ.get(
+            "SAP_FAULT_CATALOG_ENTITY_SET",
             "",
         )
 
@@ -146,6 +159,8 @@ class SAPConfig:
             vehicle_driver_entity_set=vehicle_driver_entity_set,
             object_part_catalog_service=object_part_catalog_service,
             object_part_catalog_entity_set=object_part_catalog_entity_set,
+            fault_catalog_service=fault_catalog_service,
+            fault_catalog_entity_set=fault_catalog_entity_set,
         )
 
 

@@ -29,7 +29,7 @@ class FakeTemplateRepository(IInspectionTemplateRepository):
         return self._store.get(template_id)
 
     def get_by_sap_key(
-        self, code: str, code_group: str, catalog_type: str
+        self, code: str, code_group: str
     ) -> InspectionTemplate | None:
         return next(
             (
@@ -37,7 +37,6 @@ class FakeTemplateRepository(IInspectionTemplateRepository):
                 for t in self._store.values()
                 if t.code == code
                 and t.code_group == code_group
-                and t.catalog_type == catalog_type
             ),
             None,
         )
@@ -57,17 +56,18 @@ class FakeObjectPartCatalogPort(ISAPObjectPartCatalogPort):
         self._entries = entries or []
 
     def get_catalog(self, catalog_type: str) -> list[SAPObjectPartDTO]:
-        return [e for e in self._entries if e.catalog_type == catalog_type]
+        del catalog_type
+        return self._entries
 
     def get_part_by_code(
         self, code: str, code_group: str, catalog_type: str
     ) -> SAPObjectPartDTO:
+        del catalog_type
         return next(
             e
             for e in self._entries
             if e.code == code
             and e.code_group == code_group
-            and e.catalog_type == catalog_type
         )
 
 
@@ -77,9 +77,6 @@ def _entry(code: str, group: str, text: str) -> SAPObjectPartDTO:
         code=code,
         group_text=group,
         code_text=text,
-        defect_class="S2",
-        defect_class_text="Major / جدی",
-        catalog_type="B",
     )
 
 
@@ -111,9 +108,6 @@ class TestSyncInspectionTemplatesFromSAPService:
             code="SEAT",
             group_text="SAFETY",
             code_text="Old seat belt text",
-            defect_class="S3",
-            defect_class_text="Minor / جزئی",
-            catalog_type="B",
             is_active=True,
             created_at=now,
             updated_at=now,
@@ -126,7 +120,6 @@ class TestSyncInspectionTemplatesFromSAPService:
         assert result.created == 0
         assert result.updated == 1
         assert repo.get_by_id(existing.id).code_text == "Seat belt"
-        assert repo.get_by_id(existing.id).defect_class == "S2"
 
     def test_sync_is_idempotent(self) -> None:
         repo = FakeTemplateRepository()
@@ -151,9 +144,6 @@ class TestListInspectionTemplatesService:
             code="SEAT",
             group_text="SAFETY",
             code_text="Seat belt",
-            defect_class="S2",
-            defect_class_text="Major / جدی",
-            catalog_type="B",
             is_active=True,
             created_at=now,
             updated_at=now,
@@ -164,9 +154,6 @@ class TestListInspectionTemplatesService:
             code="OLD",
             group_text="SAFETY",
             code_text="Retired item",
-            defect_class="S3",
-            defect_class_text="Minor / جزئی",
-            catalog_type="B",
             is_active=False,
             created_at=now,
             updated_at=now,

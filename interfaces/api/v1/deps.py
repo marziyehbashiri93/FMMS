@@ -25,6 +25,13 @@ from apps.fault.application.services.get_fault_service import (
     ListFaultsService,
 )
 from apps.fault.application.services.report_fault_service import ReportFaultService
+from apps.fault.application.services.sync_fault_catalog_from_sap_service import (
+    ListFaultCatalogService,
+    SyncFaultCatalogFromSAPService,
+)
+from apps.fault.infrastructure.catalog_repositories import (
+    DjangoFaultCatalogRepository,
+)
 from apps.fault.infrastructure.repositories import DjangoFaultRepository
 from apps.handover.application.services.handover_service import (
     ConfirmVehicleHandoverService,
@@ -197,6 +204,9 @@ from infrastructure.sap.adapters.bapi.pm_order_bapi_adapter import PMOrderBAPIAd
 from infrastructure.sap.adapters.bapi.purchase_requisition_bapi_adapter import (
     PurchaseRequisitionBAPIAdapter,
 )
+from infrastructure.sap.adapters.odata.fault_catalog_odata_adapter import (
+    FaultCatalogODataAdapter,
+)
 from infrastructure.sap.adapters.odata.object_part_catalog_odata_adapter import (
     ObjectPartCatalogODataAdapter,
 )
@@ -274,6 +284,11 @@ def get_inspection_template_repository() -> DjangoInspectionTemplateRepository:
 def get_fault_repository() -> DjangoFaultRepository:
     """Return the fault repository."""
     return DjangoFaultRepository()
+
+
+def get_fault_catalog_repository() -> DjangoFaultCatalogRepository:
+    """Return the fault catalog repository."""
+    return DjangoFaultCatalogRepository()
 
 
 def get_material_request_repository() -> DjangoMaterialRequestRepository:
@@ -494,11 +509,30 @@ def get_sync_inspection_templates_from_sap_service() -> (
     )
 
 
+def get_list_fault_catalog_service() -> ListFaultCatalogService:
+    """Return ListFaultCatalogService."""
+    return ListFaultCatalogService(get_fault_catalog_repository())
+
+
+def get_sync_fault_catalog_from_sap_service() -> SyncFaultCatalogFromSAPService:
+    """Return SyncFaultCatalogFromSAPService."""
+    config = SAPConfig.from_env()
+    return SyncFaultCatalogFromSAPService(
+        get_fault_catalog_repository(),
+        FaultCatalogODataAdapter(
+            _sap_odata_client(),
+            service=config.fault_catalog_service,
+            entity_set=config.fault_catalog_entity_set,
+        ),
+    )
+
+
 def get_run_sap_sync_service() -> RunSAPSyncService:
     """Return the global SAP read-sync orchestration service."""
     return RunSAPSyncService(
         get_sync_vehicles_from_sap_service(),
         get_sync_inspection_templates_from_sap_service(),
+        get_sync_fault_catalog_from_sap_service(),
     )
 
 

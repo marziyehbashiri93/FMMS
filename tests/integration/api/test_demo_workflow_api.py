@@ -30,36 +30,61 @@ class TestVehicleSAPBulkSyncAPI:
 
 
 class TestInspectionTemplateSAPSyncAPI:
-    """Cover inspection-template sync and list APIs."""
+    """Cover inspection-template list API after global SAP sync."""
 
     def test_sync_and_list_templates(
         self, authenticated_client: APIClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("SAP_USE_MOCK", "True")
 
-        synced = authenticated_client.post(
-            "/api/v1/inspection-templates/sync-sap/", {}, format="json"
-        )
+        synced = authenticated_client.post("/api/v1/sap-sync/", {}, format="json")
         assert synced.status_code == 200, synced.data
-        assert synced.data["total_received"] >= 4
-        assert synced.data["created"] >= 4
-        assert synced.data["failed"] == 0
+        items = {item["name"]: item for item in synced.data["items"]}
+        assert items["inspection_templates"]["summary"]["total_received"] >= 4
+        assert items["inspection_templates"]["summary"]["failed"] == 0
 
         listed = authenticated_client.get("/api/v1/inspection-templates/")
         assert listed.status_code == 200
         results = listed.data["results"] if "results" in listed.data else listed.data
-        descriptions = {item["description"] for item in results}
+        descriptions = {item["code_text"] for item in results}
         assert "ترمز جلو" in descriptions
         assert "چراغ جلو" in descriptions
         assert "موتور اصلی" in descriptions
         assert "باتری/دینام" in descriptions
+        for group_text in {item["group_text"] for item in results}:
+            group_codes = [
+                item["code"] for item in results if item["group_text"] == group_text
+            ]
+            assert group_codes == sorted(group_codes)
 
-        again = authenticated_client.post(
+    def test_manual_template_sync_api_is_not_available(
+        self, authenticated_client: APIClient
+    ) -> None:
+        response = authenticated_client.post(
             "/api/v1/inspection-templates/sync-sap/", {}, format="json"
         )
-        assert again.status_code == 200
-        assert again.data["created"] == 0
-        assert again.data["updated"] >= 4
+
+        assert response.status_code == 404
+
+
+class TestFaultCatalogAPI:
+    """Cover fault catalog list API after global SAP sync."""
+
+    def test_sync_and_list_fault_catalog(
+        self, authenticated_client: APIClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("SAP_USE_MOCK", "True")
+        synced = authenticated_client.post("/api/v1/sap-sync/", {}, format="json")
+        assert synced.status_code == 200, synced.data
+
+        listed = authenticated_client.get("/api/v1/fault-catalogs/?search=ترمز")
+
+        assert listed.status_code == 200, listed.data
+        results = listed.data["results"] if "results" in listed.data else listed.data
+        assert {item["code_text"] for item in results}
+        assert all("defect_class" in item for item in results)
+        ordered = [(item["group_text"], item["code"]) for item in results]
+        assert ordered == sorted(ordered)
 
 
 class TestDriverInspectionWorkflowAPI:
@@ -103,7 +128,7 @@ class TestDriverInspectionWorkflowAPI:
         assert FaultModel.objects.filter(vehicle_id=vehicle["id"]).count() == 0
         assert RepairOrderModel.objects.filter(vehicle_id=vehicle["id"]).count() == 0
 
-    def test_submit_fail_creates_fault_repair_and_out_of_service(
+    def test_failed_inspection_requires_explicit_fault_report(
         self, authenticated_client: APIClient
     ) -> None:
         vehicle = create_vehicle(
@@ -137,6 +162,18 @@ class TestDriverInspectionWorkflowAPI:
         assert submitted.status_code == 200, submitted.data
         assert submitted.data["has_failures"] is True
 
+        assert (
+            FaultModel.objects.filter(
+                vehicle_id=vehicle["id"], inspection_id=created.data["id"]
+            ).count()
+            == 0
+        )
+        reported = authenticated_client.post(
+            f"/api/v1/inspections/{created.data['id']}/report-fault/",
+            {},
+            format="json",
+        )
+        assert reported.status_code == 201, reported.data
         assert (
             FaultModel.objects.filter(
                 vehicle_id=vehicle["id"], inspection_id=created.data["id"]
@@ -192,7 +229,7 @@ class TestDriverInspectionWorkflowAPI:
         assert deactivated.status_code == 200, deactivated.data
         assert deactivated.data["status"] == VehicleStatus.INACTIVE.value
 
-    def test_submit_multiple_failures_create_one_fault_with_items(
+    def test_report_failed_inspection_creates_one_fault_with_items(
         self, authenticated_client: APIClient
     ) -> None:
         vehicle = create_vehicle(
@@ -233,6 +270,12 @@ class TestDriverInspectionWorkflowAPI:
         assert submitted.status_code == 200, submitted.data
         assert submitted.data["has_failures"] is True
 
+        reported = authenticated_client.post(
+            f"/api/v1/inspections/{created.data['id']}/report-fault/",
+            {},
+            format="json",
+        )
+        assert reported.status_code == 201, reported.data
         faults = FaultModel.objects.filter(
             vehicle_id=vehicle["id"], inspection_id=created.data["id"]
         )
@@ -287,6 +330,12 @@ class TestDistributionUsableWorkflowAPI:
         assert submitted.status_code == 200, submitted.data
         assert submitted.data["has_failures"] is True
 
+        reported = authenticated_client.post(
+            f"/api/v1/inspections/{created.data['id']}/report-fault/",
+            {},
+            format="json",
+        )
+        assert reported.status_code == 201, reported.data
         faults = authenticated_client.get(f"/api/v1/faults/?vehicle_id={vehicle['id']}")
         assert faults.status_code == 200
         assert faults.data["count"] == 1

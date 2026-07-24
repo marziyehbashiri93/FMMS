@@ -87,9 +87,6 @@ class InspectionTemplateModel(BaseModel):
     code = models.CharField(max_length=40, db_index=True)
     group_text = models.CharField(max_length=100)
     code_text = models.CharField(max_length=500)
-    defect_class = models.CharField(max_length=20, blank=True, default="")
-    defect_class_text = models.CharField(max_length=100, blank=True, default="")
-    catalog_type = models.CharField(max_length=10, default="B")
     is_active = models.BooleanField(default=True, db_index=True)
 
     class Meta:
@@ -99,7 +96,7 @@ class InspectionTemplateModel(BaseModel):
         verbose_name_plural = "Inspection Templates"
         constraints = [
             models.UniqueConstraint(
-                fields=["code", "code_group", "catalog_type"],
+                fields=["code", "code_group"],
                 condition=models.Q(is_deleted=False),
                 name="unique_active_inspection_template_sap_key",
             ),

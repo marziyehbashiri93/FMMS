@@ -94,9 +94,6 @@ export interface InspectionTemplate {
   code: string;
   group_text: string;
   code_text: string;
-  defect_class: string;
-  defect_class_text: string;
-  catalog_type: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -190,6 +187,19 @@ export interface Fault {
   inspection_id?: string | null;
   reported_at?: string;
   created_at?: string;
+}
+
+export interface FaultCatalog {
+  id: string;
+  code_group: string;
+  code: string;
+  group_text: string;
+  code_text: string;
+  defect_class: string;
+  defect_class_text: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface RepairOrder {

@@ -1,70 +1,121 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
-  Box,
   Card,
   CardContent,
+  Chip,
   MenuItem,
   Stack,
-  Typography,
 } from '@mui/material';
-import { CloudUpload } from '@mui/icons-material';
+import { ReportProblem } from '@mui/icons-material';
+import { api } from '../../api/client';
 import { Button } from '../../components/Button';
 import { PageHeader } from '../../components/PageHeader';
+import { EmptyState, ErrorState, LoadingState } from '../../components/States';
 import { RtlSelectField } from '../../components/RtlSelectField';
 import { RtlTextField } from '../../components/RtlTextField';
-import type { FailureSeverity } from '../../types/fmms';
+import type { FailureSeverity, FaultCatalog, Vehicle } from '../../types/fmms';
 
-const SEVERITY_OPTIONS: Array<{ value: FailureSeverity; label: string }> = [
-  { value: 'LOW', label: 'کم' },
-  { value: 'MEDIUM', label: 'متوسط' },
-  { value: 'HIGH', label: 'زیاد' },
-  { value: 'CRITICAL', label: 'بحرانی' },
-];
+const VEHICLE_PAGE_SIZE = 100;
+const CATALOG_PAGE_SIZE = 500;
 
-const CATEGORY_OPTIONS = [
-  'موتور',
-  'ترمز',
-  'چرخ و لاستیک',
-  'برق و باتری',
-  'بدنه',
-  'سایر',
-];
+const SEVERITY_LABELS: Record<FailureSeverity, string> = {
+  LOW: 'کم',
+  MEDIUM: 'متوسط',
+  HIGH: 'زیاد',
+  CRITICAL: 'بحرانی',
+};
 
-/**
- * Manual fault registration UI (no API yet).
- */
+function normalizePaginated<T>(payload: { results?: T[] } | T[]): T[] {
+  if (Array.isArray(payload)) return payload;
+  return payload.results ?? [];
+}
+
+function severityFromDefectClass(defectClass: string): FailureSeverity {
+  const value = defectClass.trim().toUpperCase();
+  if (value === 'S1') return 'CRITICAL';
+  if (value === 'S2') return 'HIGH';
+  if (value === 'S3') return 'MEDIUM';
+  return 'LOW';
+}
+
 export function ManualFaultPage() {
-  const [vehicle, setVehicle] = useState('');
-  const [category, setCategory] = useState('');
-  const [severity, setSeverity] = useState<FailureSeverity | ''>('');
-  const [title, setTitle] = useState('');
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [catalogs, setCatalogs] = useState<FaultCatalog[]>([]);
+  const [vehicleId, setVehicleId] = useState('');
+  const [catalogId, setCatalogId] = useState('');
   const [description, setDescription] = useState('');
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [success, setSuccess] = useState(false);
+  const [bootLoading, setBootLoading] = useState(true);
+  const [bootError, setBootError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const [success, setSuccess] = useState('');
 
-  const validate = () => {
-    const next: Record<string, string> = {};
-    if (!vehicle.trim()) next.vehicle = 'انتخاب خودرو الزامی است';
-    if (!category) next.category = 'دسته‌بندی الزامی است';
-    if (!severity) next.severity = 'شدت خرابی الزامی است';
-    if (!title.trim()) next.title = 'عنوان خرابی الزامی است';
-    if (!description.trim()) next.description = 'شرح خرابی الزامی است';
-    setErrors(next);
-    return Object.keys(next).length === 0;
+  useEffect(() => {
+    let cancelled = false;
+    const boot = async () => {
+      setBootLoading(true);
+      setBootError('');
+      try {
+        const [vehiclePage, catalogPage] = await Promise.all([
+          api.listVehicles('', 'license_plate', { page: 1, pageSize: VEHICLE_PAGE_SIZE }),
+          api.listFaultCatalogs({ page: 1, pageSize: CATALOG_PAGE_SIZE }),
+        ]);
+        if (cancelled) return;
+        setVehicles(vehiclePage.results);
+        setCatalogs(normalizePaginated(catalogPage).filter((item) => item.is_active));
+      } catch (err) {
+        if (!cancelled) {
+          setBootError(err instanceof Error ? err.message : 'آماده‌سازی فرم ثبت خرابی انجام نشد');
+        }
+      } finally {
+        if (!cancelled) setBootLoading(false);
+      }
+    };
+    void boot();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const selectedCatalog = useMemo(
+    () => catalogs.find((item) => item.id === catalogId) ?? null,
+    [catalogId, catalogs],
+  );
+  const severity = selectedCatalog ? severityFromDefectClass(selectedCatalog.defect_class) : null;
+
+  const submit = async () => {
+    if (!vehicleId || !selectedCatalog || !severity) {
+      setSubmitError('انتخاب خودرو و خرابی الزامی است.');
+      return;
+    }
+    setSubmitting(true);
+    setSubmitError('');
+    setSuccess('');
+    try {
+      await api.reportFault({
+        vehicle_id: vehicleId,
+        code: selectedCatalog.code,
+        description: description.trim() || selectedCatalog.code_text,
+        severity,
+      });
+      setSuccess('خرابی ثبت شد.');
+      setCatalogId('');
+      setDescription('');
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'ثبت خرابی انجام نشد');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const submit = () => {
-    setSuccess(false);
-    if (!validate()) return;
-    setSuccess(true);
-  };
+  if (bootLoading) return <LoadingState label="در حال آماده‌سازی فرم ثبت خرابی" />;
+  if (bootError) return <ErrorState message={bootError} onRetry={() => window.location.reload()} />;
 
   return (
-    <Stack spacing={{ xs: 1.5, md: 2.25 }} style={{ direction: 'rtl', textAlign: 'right' }} maxWidth={720}>
+    <Stack spacing={{ xs: 1.5, md: 2.25 }} style={{ direction: 'rtl', textAlign: 'right' }}>
       <PageHeader
         title="ثبت خرابی موردی"
-        description="ثبت خرابی مستقل از بازرسی روزانه (فعلاً فقط رابط کاربری)"
         breadcrumbs={[
           { label: 'مدیریت ناوگان', to: '/vehicles' },
           { label: 'ثبت خرابی' },
@@ -73,104 +124,73 @@ export function ManualFaultPage() {
 
       <Card>
         <CardContent sx={{ p: { xs: 1.75, md: 2.25 }, display: 'grid', gap: 1.75 }}>
-          <RtlTextField
+          {!catalogs.length && (
+            <EmptyState
+              title="کاتالوگ خرابی یافت نشد"
+              subtitle="ابتدا همگام‌سازی SAP را اجرا کنید."
+            />
+          )}
+
+          <RtlSelectField
             label="خودرو"
-            value={vehicle}
-            onChange={(event) => setVehicle(event.target.value)}
-            placeholder="پلاک یا شناسه خودرو"
-            error={Boolean(errors.vehicle)}
-            helperText={errors.vehicle}
-          />
-
-          <RtlSelectField
-            label="دسته‌بندی خرابی"
-            value={category}
+            value={vehicleId}
             displayEmpty
-            onChange={(event) => setCategory(String(event.target.value))}
-            error={Boolean(errors.category)}
+            onChange={(event) => setVehicleId(String(event.target.value))}
           >
             <MenuItem value="">
-              <em>انتخاب دسته‌بندی</em>
+              <em>انتخاب خودرو</em>
             </MenuItem>
-            {CATEGORY_OPTIONS.map((item) => (
-              <MenuItem key={item} value={item}>
-                {item}
+            {vehicles.map((item) => (
+              <MenuItem key={item.id} value={item.id}>
+                {item.vehicle_number} - {item.license_plate}
               </MenuItem>
             ))}
           </RtlSelectField>
-          {errors.category && (
-            <Typography variant="caption" color="error.main">
-              {errors.category}
-            </Typography>
-          )}
 
           <RtlSelectField
-            label="شدت خرابی"
-            value={severity}
+            label="خرابی"
+            value={catalogId}
             displayEmpty
-            onChange={(event) => setSeverity(event.target.value as FailureSeverity)}
-            error={Boolean(errors.severity)}
+            onChange={(event) => setCatalogId(String(event.target.value))}
           >
             <MenuItem value="">
-              <em>انتخاب شدت</em>
+              <em>انتخاب خرابی</em>
             </MenuItem>
-            {SEVERITY_OPTIONS.map((item) => (
-              <MenuItem key={item.value} value={item.value}>
-                {item.label}
+            {catalogs.map((item) => (
+              <MenuItem key={item.id} value={item.id}>
+                {item.group_text} - {item.code} - {item.code_text}
               </MenuItem>
             ))}
           </RtlSelectField>
-          {errors.severity && (
-            <Typography variant="caption" color="error.main">
-              {errors.severity}
-            </Typography>
+
+          {selectedCatalog && severity && (
+            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+              <Chip label={selectedCatalog.group_text} size="small" />
+              <Chip label={selectedCatalog.defect_class_text} size="small" color="warning" />
+              <Chip label={`شدت: ${SEVERITY_LABELS[severity]}`} size="small" color="error" />
+            </Stack>
           )}
 
           <RtlTextField
-            label="عنوان خرابی"
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            error={Boolean(errors.title)}
-            helperText={errors.title}
-          />
-
-          <RtlTextField
-            label="شرح خرابی"
+            label="شرح تکمیلی"
             value={description}
             onChange={(event) => setDescription(event.target.value)}
             multiline
             minRows={4}
-            error={Boolean(errors.description)}
-            helperText={errors.description}
+            placeholder={selectedCatalog?.code_text || ''}
           />
 
-          <Box
-            sx={{
-              border: '1px dashed',
-              borderColor: 'divider',
-              borderRadius: (t) => t.radius('md'),
-              bgcolor: 'rgba(244, 246, 248, 0.9)',
-              p: 3,
-              textAlign: 'center',
-            }}
-          >
-            <CloudUpload color="disabled" sx={{ fontSize: 36, mb: 1 }} />
-            <Typography fontWeight={700} mb={0.5}>
-              آپلود تصاویر
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              این بخش به‌زودی فعال می‌شود (Placeholder)
-            </Typography>
-          </Box>
-
-          {success && (
-            <Alert severity="success">
-              فرم معتبر است. اتصال API ثبت خرابی هنوز پیاده‌سازی نشده است.
-            </Alert>
-          )}
+          {submitError && <Alert severity="error">{submitError}</Alert>}
+          {success && <Alert severity="success">{success}</Alert>}
 
           <Stack direction="row" justifyContent="flex-start">
-            <Button variant="contained" onClick={submit}>
+            <Button
+              variant="contained"
+              startIcon={<ReportProblem />}
+              loading={submitting}
+              disabled={!catalogs.length}
+              onClick={submit}
+            >
               ثبت خرابی
             </Button>
           </Stack>

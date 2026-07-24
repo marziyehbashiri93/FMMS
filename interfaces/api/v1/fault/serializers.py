@@ -60,3 +60,18 @@ class FaultResponseSerializer(serializers.Serializer):
     sap_notification_number = serializers.CharField(allow_null=True)
     items = FaultItemResponseSerializer(many=True)
     created_by = UserProfileSummarySerializer(allow_null=True, required=False)
+
+
+class FaultCatalogResponseSerializer(serializers.Serializer):
+    """Serialize SAP-synced fault catalog rows."""
+
+    id = serializers.UUIDField()
+    code_group = serializers.CharField()
+    code = serializers.CharField()
+    group_text = serializers.CharField()
+    code_text = serializers.CharField()
+    defect_class = serializers.CharField()
+    defect_class_text = serializers.CharField()
+    is_active = serializers.BooleanField()
+    created_at = serializers.DateTimeField()
+    updated_at = serializers.DateTimeField()

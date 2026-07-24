@@ -20,15 +20,8 @@ class ISAPFaultCatalogPort(ABC):
     """
 
     @abstractmethod
-    def list_defect_codes(
-        self,
-        catalog_profile: str | None = None,
-    ) -> list[SAPDefectCodeDTO]:
-        """Retrieve defect codes, optionally filtered by catalog profile.
-
-        Args:
-            catalog_profile: Optional SAP catalog profile identifier.
-                When ``None``, all accessible defect codes are returned.
+    def list_defect_codes(self) -> list[SAPDefectCodeDTO]:
+        """Retrieve defect codes.
 
         Returns:
             A list of ``SAPDefectCodeDTO`` objects. May be empty.
@@ -41,13 +34,13 @@ class ISAPFaultCatalogPort(ABC):
     def get_defect_code(
         self,
         code: str,
-        catalog_profile: str,
+        code_group: str,
     ) -> SAPDefectCodeDTO:
         """Retrieve a single defect code from the SAP catalog.
 
         Args:
             code: The defect code identifier.
-            catalog_profile: The SAP catalog profile the code belongs to.
+            code_group: SAP code group the code belongs to.
 
         Returns:
             A populated ``SAPDefectCodeDTO``.

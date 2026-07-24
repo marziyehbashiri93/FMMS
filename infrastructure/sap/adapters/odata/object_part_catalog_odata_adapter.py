@@ -136,22 +136,17 @@ class ObjectPartCatalogODataAdapter(ISAPObjectPartCatalogPort):
             code=data.get("Code", ""),
             group_text=data.get("GroupText", ""),
             code_text=data.get("CodeText", ""),
-            defect_class=data.get("DefectClass", ""),
-            defect_class_text=data.get("DefectClassText", ""),
-            catalog_type=data.get("CatalogType", ""),
         )
 
     @staticmethod
     def _map_xml_row(data: dict[str, str], catalog_type: str) -> SAPObjectPartDTO:
         """Map one simple-table XML row to ``SAPObjectPartDTO``."""
+        del catalog_type
         return SAPObjectPartDTO(
             code_group=str(data.get("CodeGroup", "")).strip(),
             code=str(data.get("Code", "")).strip(),
             group_text=str(data.get("GroupText", "")).strip(),
             code_text=str(data.get("CodeText", "")).strip(),
-            defect_class=str(data.get("DefectClass", "")).strip(),
-            defect_class_text=str(data.get("DefectClassText", "")).strip(),
-            catalog_type=catalog_type,
         )
 
 

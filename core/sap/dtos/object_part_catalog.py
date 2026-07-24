@@ -18,15 +18,9 @@ class SAPObjectPartDTO:
         code: SAP ``Code``.
         group_text: SAP ``GroupText``.
         code_text: SAP ``CodeText``.
-        defect_class: SAP ``DefectClass``.
-        defect_class_text: SAP ``DefectClassText``.
-        catalog_type: The SAP catalog type (e.g. "B").
     """
 
     code_group: str
     code: str
     group_text: str
     code_text: str
-    defect_class: str
-    defect_class_text: str
-    catalog_type: str

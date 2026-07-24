@@ -17,9 +17,6 @@ class InspectionTemplateResponseDTO:
         code: SAP ``Code``.
         group_text: SAP ``GroupText``.
         code_text: SAP ``CodeText``.
-        defect_class: SAP ``DefectClass``.
-        defect_class_text: SAP ``DefectClassText``.
-        catalog_type: SAP catalog type.
         is_active: Whether the template is offered to drivers.
         created_at: Local creation timestamp.
         updated_at: Last sync/update timestamp.
@@ -30,9 +27,6 @@ class InspectionTemplateResponseDTO:
     code: str
     group_text: str
     code_text: str
-    defect_class: str
-    defect_class_text: str
-    catalog_type: str
     is_active: bool
     created_at: datetime
     updated_at: datetime

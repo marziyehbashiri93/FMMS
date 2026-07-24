@@ -70,7 +70,7 @@ _ODATA_XML_ROUTES: dict[str, Path] = {
     / "docs"
     / "odata"
     / "جدول اطلاعات خودرو و راننده.xml",
-    "ZI_FLEET_CAT_B_CDS": _BASE_DIR / "docs" / "odata" / "ایرادات.xml",
+    "ZI_FLEET_CAT_B_CDS": _BASE_DIR / "docs" / "odata" / "چک لیست روزانه.xml",
     "ZI_B_DEFECTCATALOG9_CDS": _BASE_DIR / "docs" / "odata" / "ایرادات.xml",
 }
 

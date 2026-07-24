@@ -1,0 +1,155 @@
+"""Services for listing and syncing fault catalog rows from SAP."""
+
+from __future__ import annotations
+
+import uuid
+from datetime import UTC, datetime
+
+from apps.fault.application.dto.catalog_dto import (
+    FaultCatalogResponseDTO,
+    FaultCatalogSyncResultDTO,
+)
+from apps.fault.domain.catalog_entities import FaultCatalog
+from apps.fault.domain.interfaces.fault_catalog_repository import (
+    IFaultCatalogRepository,
+)
+from core.logging.structured_logger import get_structured_logger
+from core.sap.dtos.fault_catalog import SAPDefectCodeDTO
+from core.sap.ports.fault_catalog_port import ISAPFaultCatalogPort
+
+logger = get_structured_logger("fault", __name__)
+
+
+def _to_response_dto(catalog: FaultCatalog) -> FaultCatalogResponseDTO:
+    """Map domain catalog row to response DTO."""
+    return FaultCatalogResponseDTO(
+        id=catalog.id,
+        code_group=catalog.code_group,
+        code=catalog.code,
+        group_text=catalog.group_text,
+        code_text=catalog.code_text,
+        defect_class=catalog.defect_class,
+        defect_class_text=catalog.defect_class_text,
+        is_active=catalog.is_active,
+        created_at=catalog.created_at,
+        updated_at=catalog.updated_at,
+    )
+
+
+class ListFaultCatalogService:
+    """Return active fault catalog rows for manual fault reporting."""
+
+    def __init__(self, catalog_repository: IFaultCatalogRepository) -> None:
+        self._repo = catalog_repository
+
+    def execute(
+        self,
+        *,
+        code_group: str = "",
+        defect_class: str = "",
+        search: str = "",
+        request_id: str = "",
+    ) -> list[FaultCatalogResponseDTO]:
+        """List active catalog rows with optional filters."""
+        logger.info(
+            "Listing fault catalog",
+            extra={
+                "domain": "fault",
+                "service": "ListFaultCatalogService",
+                "operation": "execute",
+                "request_id": request_id,
+                "code_group": code_group,
+                "defect_class": defect_class,
+                "search": search,
+            },
+        )
+        rows = self._repo.list_active(
+            code_group=code_group,
+            defect_class=defect_class,
+            search=search,
+        )
+        return [_to_response_dto(row) for row in rows]
+
+
+class SyncFaultCatalogFromSAPService:
+    """Import SAP defect catalog rows into FMMS."""
+
+    def __init__(
+        self,
+        catalog_repository: IFaultCatalogRepository,
+        fault_catalog_port: ISAPFaultCatalogPort,
+    ) -> None:
+        self._repo = catalog_repository
+        self._sap = fault_catalog_port
+
+    def execute(self, request_id: str = "") -> FaultCatalogSyncResultDTO:
+        """Synchronise SAP defect catalog rows into FMMS."""
+        logger.info(
+            "Syncing fault catalog from SAP",
+            extra={
+                "domain": "fault",
+                "service": "SyncFaultCatalogFromSAPService",
+                "operation": "execute",
+                "request_id": request_id,
+            },
+        )
+        rows = self._sap.list_defect_codes()
+        created = 0
+        updated = 0
+        failed = 0
+        for sap_dto in rows:
+            try:
+                if self._sync_one(sap_dto):
+                    created += 1
+                else:
+                    updated += 1
+            except Exception as exc:  # noqa: BLE001 - per-row isolation
+                failed += 1
+                logger.error(
+                    "Failed to sync fault catalog row from SAP",
+                    extra={
+                        "domain": "fault",
+                        "service": "SyncFaultCatalogFromSAPService",
+                        "operation": "execute",
+                        "request_id": request_id,
+                        "code": sap_dto.code,
+                        "code_group": sap_dto.code_group,
+                        "exception": str(exc),
+                    },
+                    exc_info=True,
+                )
+        return FaultCatalogSyncResultDTO(
+            total_received=len(rows),
+            created=created,
+            updated=updated,
+            failed=failed,
+        )
+
+    def _sync_one(self, sap_dto: SAPDefectCodeDTO) -> bool:
+        """Create or update one catalog row from SAP data."""
+        existing = self._repo.get_by_sap_key(sap_dto.code, sap_dto.code_group)
+        now = datetime.now(tz=UTC)
+        if existing is not None:
+            existing.group_text = sap_dto.group_text
+            existing.code_text = sap_dto.code_text
+            existing.defect_class = sap_dto.defect_class
+            existing.defect_class_text = sap_dto.defect_class_text
+            existing.is_active = True
+            existing.updated_at = now
+            self._repo.save(existing)
+            return False
+
+        catalog = FaultCatalog(
+            id=uuid.uuid4(),
+            code_group=sap_dto.code_group,
+            code=sap_dto.code,
+            group_text=sap_dto.group_text,
+            code_text=sap_dto.code_text,
+            defect_class=sap_dto.defect_class,
+            defect_class_text=sap_dto.defect_class_text,
+            is_active=True,
+            created_at=now,
+            updated_at=now,
+        )
+        self._repo.save(catalog)
+        return True

@@ -24,9 +24,6 @@ def _to_domain(orm: InspectionTemplateModel) -> InspectionTemplate:
         code=orm.code,
         group_text=orm.group_text,
         code_text=orm.code_text,
-        defect_class=orm.defect_class,
-        defect_class_text=orm.defect_class_text,
-        catalog_type=orm.catalog_type,
         is_active=orm.is_active,
         created_at=orm.created_at,
         updated_at=orm.updated_at,
@@ -47,13 +44,12 @@ class DjangoInspectionTemplateRepository(IInspectionTemplateRepository):
         return _to_domain(orm)
 
     def get_by_sap_key(
-        self, code: str, code_group: str, catalog_type: str
+        self, code: str, code_group: str
     ) -> InspectionTemplate | None:
         """Retrieve a template by SAP natural key."""
         orm = InspectionTemplateModel.objects.filter(
             code=code,
             code_group=code_group,
-            catalog_type=catalog_type,
             is_deleted=False,
         ).first()
         return _to_domain(orm) if orm else None
@@ -72,9 +68,6 @@ class DjangoInspectionTemplateRepository(IInspectionTemplateRepository):
             "code": template.code,
             "group_text": template.group_text,
             "code_text": template.code_text,
-            "defect_class": template.defect_class,
-            "defect_class_text": template.defect_class_text,
-            "catalog_type": template.catalog_type,
             "is_active": template.is_active,
             "updated_at": datetime.now(tz=UTC),
         }

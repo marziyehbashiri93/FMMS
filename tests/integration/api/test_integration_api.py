@@ -68,6 +68,8 @@ class TestIntegrationAPI:
         assert items["vehicles"]["summary"]["failed"] == 0
         assert items["inspection_templates"]["summary"]["total_received"] >= 4
         assert items["inspection_templates"]["summary"]["failed"] == 0
+        assert items["fault_catalog"]["summary"]["total_received"] >= 4
+        assert items["fault_catalog"]["summary"]["failed"] == 0
         assert VehicleModel.objects.exists()
         assert SAPSyncRunModel.objects.filter(
             id=response.data["id"],
@@ -94,4 +96,5 @@ class TestIntegrationAPI:
         assert {item["name"] for item in first["items"]} == {
             "vehicles",
             "inspection_templates",
+            "fault_catalog",
         }

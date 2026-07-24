@@ -30,9 +30,6 @@ def _to_response_dto(template: InspectionTemplate) -> InspectionTemplateResponse
         code=template.code,
         group_text=template.group_text,
         code_text=template.code_text,
-        defect_class=template.defect_class,
-        defect_class_text=template.defect_class_text,
-        catalog_type=template.catalog_type,
         is_active=template.is_active,
         created_at=template.created_at,
         updated_at=template.updated_at,
@@ -101,16 +98,14 @@ class SyncInspectionTemplatesFromSAPService:
     def execute(
         self,
         request_id: str = "",
-        catalog_type: str = _DEFAULT_CATALOG_TYPE,
     ) -> InspectionTemplateSyncResultDTO:
         """Synchronise SAP catalog entries into FMMS inspection templates.
 
-        Matching key is ``(code, code_group, catalog_type)``. Existing
+        Matching key is ``(code, code_group)``. Existing
         templates are updated; missing ones are created.
 
         Args:
             request_id: Optional correlation ID for structured logging.
-            catalog_type: SAP catalog type to import (default ``B``).
 
         Returns:
             ``InspectionTemplateSyncResultDTO`` with create/update/fail counts.
@@ -122,11 +117,10 @@ class SyncInspectionTemplatesFromSAPService:
                 "service": "SyncInspectionTemplatesFromSAPService",
                 "operation": "execute",
                 "request_id": request_id,
-                "catalog_type": catalog_type,
             },
         )
 
-        catalog = self._sap.get_catalog(catalog_type)
+        catalog = self._sap.get_catalog(_DEFAULT_CATALOG_TYPE)
         created = 0
         updated = 0
         failed = 0
@@ -184,16 +178,11 @@ class SyncInspectionTemplatesFromSAPService:
         Returns:
             ``True`` when created, ``False`` when updated.
         """
-        existing = self._repo.get_by_sap_key(
-            sap_dto.code, sap_dto.code_group, sap_dto.catalog_type
-        )
+        existing = self._repo.get_by_sap_key(sap_dto.code, sap_dto.code_group)
         now = datetime.now(tz=UTC)
         if existing is not None:
             existing.group_text = sap_dto.group_text
             existing.code_text = sap_dto.code_text
-            existing.defect_class = sap_dto.defect_class
-            existing.defect_class_text = sap_dto.defect_class_text
-            existing.catalog_type = sap_dto.catalog_type
             existing.is_active = True
             existing.updated_at = now
             self._repo.save(existing)
@@ -205,9 +194,6 @@ class SyncInspectionTemplatesFromSAPService:
             code=sap_dto.code,
             group_text=sap_dto.group_text,
             code_text=sap_dto.code_text,
-            defect_class=sap_dto.defect_class,
-            defect_class_text=sap_dto.defect_class_text,
-            catalog_type=sap_dto.catalog_type or _DEFAULT_CATALOG_TYPE,
             is_active=True,
             created_at=now,
             updated_at=now,

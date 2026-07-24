@@ -1,10 +1,10 @@
-"""Thin fault REST API view set."""
+"""Thin fault REST API view sets."""
 
 from __future__ import annotations
 
 import uuid
 
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.request import Request
@@ -21,6 +21,7 @@ from core.permissions import IsReadOnlyOrTechnicianOrAbove
 from interfaces.api.v1 import deps
 from interfaces.api.v1.fault.serializers import (
     FaultAssignSerializer,
+    FaultCatalogResponseSerializer,
     FaultCreateSerializer,
     FaultResponseSerializer,
 )
@@ -106,7 +107,9 @@ class FaultViewSet(GenericViewSet):
         return Response(FaultResponseSerializer(result).data)
 
     @extend_schema(
-        tags=[API_TAGS.fault], request=None, responses=FaultResponseSerializer
+        tags=[API_TAGS.fault],
+        request=None,
+        responses=FaultResponseSerializer,
     )
     @action(detail=True, methods=["post"])
     def close(self, request: Request, pk: str | None = None) -> Response:
@@ -119,3 +122,35 @@ class FaultViewSet(GenericViewSet):
             )
         )
         return Response(FaultResponseSerializer(result).data)
+
+
+class FaultCatalogViewSet(GenericViewSet):
+    """Expose SAP-synced fault catalog rows through read-only REST endpoints."""
+
+    permission_classes = [IsReadOnlyOrTechnicianOrAbove]
+
+    @extend_schema(
+        tags=[API_TAGS.fault],
+        parameters=[
+            OpenApiParameter(name="code_group", required=False, type=str),
+            OpenApiParameter(name="defect_class", required=False, type=str),
+            OpenApiParameter(name="search", required=False, type=str),
+        ],
+        responses=FaultCatalogResponseSerializer(many=True),
+    )
+    def list(self, request: Request) -> Response:
+        """List active fault catalog rows."""
+        items = deps.get_list_fault_catalog_service().execute(
+            code_group=request.query_params.get("code_group", "").strip(),
+            defect_class=request.query_params.get("defect_class", "").strip(),
+            search=request.query_params.get("search", "").strip(),
+            request_id=request_id_from(request),
+        )
+        page = paginate_dto_list(self, items)
+        serializer = FaultCatalogResponseSerializer(
+            page if page is not None else items,
+            many=True,
+        )
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response(serializer.data)

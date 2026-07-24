@@ -6,15 +6,15 @@ from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from apps.vehicle.domain.entities import VehicleStatus
-from interfaces.api.v1.schema_tags import API_TAGS
 from interfaces.api.v1.inspection.serializers import InspectionResponseSerializer
+from interfaces.api.v1.schema_tags import API_TAGS
 from interfaces.api.v1.vehicle.serializers import (
     VehicleDriverAssignmentSnapshotResponseSerializer,
     VehicleOdometerRecordSerializer,
     VehicleOdometerResponseSerializer,
     VehicleResponseSerializer,
-    VehicleSummarySerializer,
     VehicleStatusChangeSerializer,
+    VehicleSummarySerializer,
 )
 
 _VEHICLE_ORDERING_FIELDS = [

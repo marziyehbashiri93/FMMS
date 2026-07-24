@@ -14,13 +14,17 @@ class SAPDefectCodeDTO:
     """A single defect code entry from the SAP fault catalog.
 
     Attributes:
-        code: The defect code identifier (unique within a catalog profile).
-        text: Human-readable description of the defect.
-        catalog_profile: The SAP catalog profile this code belongs to.
-        code_group: Optional grouping code within the catalog.
+        code_group: SAP ``CodeGroup``.
+        code: SAP ``Code``.
+        group_text: SAP ``GroupText``.
+        code_text: SAP ``CodeText``.
+        defect_class: SAP ``DefectClass``.
+        defect_class_text: SAP ``DefectClassText``.
     """
 
+    code_group: str
     code: str
-    text: str
-    catalog_profile: str
-    code_group: str | None = None
+    group_text: str
+    code_text: str
+    defect_class: str
+    defect_class_text: str

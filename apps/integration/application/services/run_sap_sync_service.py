@@ -10,6 +10,9 @@ from typing import Any
 
 from django.db import transaction
 
+from apps.fault.application.services.sync_fault_catalog_from_sap_service import (
+    SyncFaultCatalogFromSAPService,
+)
 from apps.inspection.application.services.sync_inspection_templates_from_sap_service import (
     SyncInspectionTemplatesFromSAPService,
 )
@@ -63,15 +66,18 @@ class RunSAPSyncService:
     Args:
         vehicle_sync_service: Imports vehicle and driver master data from SAP.
         inspection_template_sync_service: Imports inspection templates from SAP.
+        fault_catalog_sync_service: Imports fault catalog rows from SAP.
     """
 
     def __init__(
         self,
         vehicle_sync_service: SyncVehiclesFromSAPService,
         inspection_template_sync_service: SyncInspectionTemplatesFromSAPService,
+        fault_catalog_sync_service: SyncFaultCatalogFromSAPService,
     ) -> None:
         self._vehicle_sync_service = vehicle_sync_service
         self._inspection_template_sync_service = inspection_template_sync_service
+        self._fault_catalog_sync_service = fault_catalog_sync_service
 
     def execute(
         self,
@@ -120,6 +126,13 @@ class RunSAPSyncService:
                 sync_run=sync_run,
                 name="inspection_templates",
                 sync=lambda: self._inspection_template_sync_service.execute(
+                    request_id=request_id
+                ),
+            ),
+            self._run_item(
+                sync_run=sync_run,
+                name="fault_catalog",
+                sync=lambda: self._fault_catalog_sync_service.execute(
                     request_id=request_id
                 ),
             ),

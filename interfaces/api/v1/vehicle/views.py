@@ -27,8 +27,8 @@ from interfaces.api.v1.vehicle.serializers import (
     VehicleOdometerRecordSerializer,
     VehicleOdometerResponseSerializer,
     VehicleResponseSerializer,
-    VehicleSummarySerializer,
     VehicleStatusChangeSerializer,
+    VehicleSummarySerializer,
 )
 
 

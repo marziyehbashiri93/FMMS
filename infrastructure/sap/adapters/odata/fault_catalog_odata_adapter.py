@@ -1,11 +1,9 @@
-"""Fault Catalog OData Adapter — implements ISAPFaultCatalogPort.
-
-Reads defect codes from SAP using the API_DEFECTCODE_SRV OData service.
-"""
+"""Fault catalog OData adapter — implements ISAPFaultCatalogPort."""
 
 from __future__ import annotations
 
 import logging
+import xml.etree.ElementTree as ET
 from typing import Any
 
 from apps.integration.domain.exceptions import SAPIntegrationError
@@ -15,27 +13,29 @@ from infrastructure.sap.client.base import ISAPClient, SAPClientError
 
 logger = logging.getLogger(__name__)
 
-_SERVICE = "API_DEFECTCODE_SRV"
+_SERVICE = "ZI_B_DEFECTCATALOG9_CDS"
+_DEFAULT_ENTITY_SET = ""
 
 
 class FaultCatalogODataAdapter(ISAPFaultCatalogPort):
-    """Reads SAP defect codes via the API_DEFECTCODE_SRV OData service.
+    """Reads SAP defect catalog rows via OData XML.
 
     Args:
         client: An ``ISAPClient`` instance.
     """
 
-    def __init__(self, client: ISAPClient) -> None:
-        self._client = client
-
-    def list_defect_codes(
+    def __init__(
         self,
-        catalog_profile: str | None = None,
-    ) -> list[SAPDefectCodeDTO]:
-        """Retrieve defect codes, optionally filtered by catalog profile.
+        client: ISAPClient,
+        service: str = _SERVICE,
+        entity_set: str = _DEFAULT_ENTITY_SET,
+    ) -> None:
+        self._client = client
+        self._service = service
+        self._entity_set = entity_set
 
-        Args:
-            catalog_profile: Optional SAP catalog profile identifier.
+    def list_defect_codes(self) -> list[SAPDefectCodeDTO]:
+        """Retrieve defect codes.
 
         Returns:
             A list of ``SAPDefectCodeDTO`` objects.
@@ -43,38 +43,30 @@ class FaultCatalogODataAdapter(ISAPFaultCatalogPort):
         Raises:
             SAPIntegrationError: On SAP error or transport failure.
         """
-        params: dict[str, Any] = {}
-        if catalog_profile:
-            params["$filter"] = f"CatalogProfile eq '{catalog_profile}'"
-
         logger.info(
             "Listing SAP defect codes",
-            extra={"catalog_profile": catalog_profile, "domain": "integration"},
+            extra={"service": self._service, "domain": "integration"},
         )
         try:
-            response = self._client.odata_get(
-                service=_SERVICE,
-                entity="DefectCodeSet",
-                params=params,
+            xml_text = self._client.odata_get_xml(
+                service=self._service,
+                entity=self._entity_set,
             )
         except SAPClientError as exc:
-            raise SAPIntegrationError(
-                f"Failed to list defect codes (profile={catalog_profile!r}): {exc}"
-            ) from exc
+            raise SAPIntegrationError(f"Failed to list defect codes: {exc}") from exc
 
-        results: list[dict[str, Any]] = response.get("d", {}).get("results", [])
-        return [self._map_single(item) for item in results]
+        return [self._map_single(item) for item in _parse_simple_table_xml(xml_text)]
 
     def get_defect_code(
         self,
         code: str,
-        catalog_profile: str,
+        code_group: str,
     ) -> SAPDefectCodeDTO:
         """Retrieve a single defect code from the SAP catalog.
 
         Args:
             code: The defect code identifier.
-            catalog_profile: The SAP catalog profile.
+            code_group: SAP code group.
 
         Returns:
             A populated ``SAPDefectCodeDTO``.
@@ -86,28 +78,45 @@ class FaultCatalogODataAdapter(ISAPFaultCatalogPort):
             "Fetching SAP defect code",
             extra={
                 "code": code,
-                "catalog_profile": catalog_profile,
+                "code_group": code_group,
                 "domain": "integration",
             },
         )
-        try:
-            response = self._client.odata_get(
-                service=_SERVICE,
-                entity=f"DefectCode('{code}')",
-            )
-        except SAPClientError as exc:
-            raise SAPIntegrationError(
-                f"Failed to fetch defect code {code!r}: {exc}"
-            ) from exc
-
-        return self._map_single(response.get("d", response))
+        for item in self.list_defect_codes():
+            if item.code == code and item.code_group == code_group:
+                return item
+        raise SAPIntegrationError(
+            f"Defect code {code!r}/{code_group!r} was not found in SAP."
+        )
 
     @staticmethod
     def _map_single(data: dict[str, Any]) -> SAPDefectCodeDTO:
         """Map a raw SAP defect code record to ``SAPDefectCodeDTO``."""
         return SAPDefectCodeDTO(
-            code=data.get("DefectCode", ""),
-            text=data.get("DefectCodeText", ""),
-            catalog_profile=data.get("CatalogProfile", ""),
-            code_group=data.get("CodeGroup") or None,
+            code_group=str(data.get("CodeGroup", "")).strip(),
+            code=str(data.get("Code", "")).strip(),
+            group_text=str(data.get("GroupText", "")).strip(),
+            code_text=str(data.get("CodeText", "")).strip(),
+            defect_class=str(data.get("DefectClass", "")).strip(),
+            defect_class_text=str(data.get("DefectClassText", "")).strip(),
         )
+
+
+def _parse_simple_table_xml(xml_text: str) -> list[dict[str, str]]:
+    """Parse SAP XML shaped as ``Root/Columns/Rows`` into dictionaries."""
+    root = ET.fromstring(xml_text)  # noqa: S314
+    columns = [
+        str(column.attrib.get("Name", "")).strip()
+        for column in root.findall("./Columns/Column")
+    ]
+    rows: list[dict[str, str]] = []
+    for row in root.findall("./Rows/Row"):
+        values = [value.text or "" for value in row.findall("./Value")]
+        rows.append(
+            {
+                column: values[index].strip() if index < len(values) else ""
+                for index, column in enumerate(columns)
+                if column
+            }
+        )
+    return rows
