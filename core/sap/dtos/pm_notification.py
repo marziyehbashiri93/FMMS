@@ -21,6 +21,7 @@ class CreatePMNotificationRequest:
         priority: SAP priority code ("1"=Very High, "2"=High, "3"=Medium, "4"=Low).
         reported_by: Identifier of the person reporting the fault (SAP user or name).
         reported_at: UTC datetime when the fault was reported.
+        notification_type: SAP notification type. Fault reports use ``EM``.
         functional_location: Optional SAP functional location for the equipment.
         code_group: Optional defect code group within the catalog.
     """
@@ -31,6 +32,7 @@ class CreatePMNotificationRequest:
     priority: str
     reported_by: str
     reported_at: datetime
+    notification_type: str = "EM"
     functional_location: str | None = None
     code_group: str | None = None
 

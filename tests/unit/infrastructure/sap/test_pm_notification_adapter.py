@@ -43,6 +43,15 @@ class TestPMNotificationBAPIAdapterSuccess:
         assert dto.created_at is not None
         assert dto.created_at.tzinfo is not None
 
+    def test_create_notification_builds_fault_report_payload(self) -> None:
+        params = PMNotificationBAPIAdapter._build_create_params(_make_request())
+
+        assert params["NOTIF_TYPE"] == "EM"
+        assert params["EQUIPMENT"] == "10000001"
+        assert params["DESCRIPT"] == "Engine oil leak detected during inspecti"
+        assert params["NOTIFHEADER"]["STRMLFNDATE"] == "20260709"
+        assert params["NOTIFHEADER"]["DESSTDATE"] == "20260709"
+
     def test_close_notification_returns_closed_status(self) -> None:
         adapter = PMNotificationBAPIAdapter(MockSAPClient(SAPMockScenario.SUCCESS))
         dto = adapter.close_notification("10000099")

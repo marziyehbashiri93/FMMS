@@ -234,6 +234,26 @@ BAPI_PM_NOTIFICATION_DUPLICATE: dict = {
     "RETURN": _SAP_DUPLICATE_RETURN,
 }
 
+BAPI_VEHICLE_MEASUREMENT_UPDATE_SUCCESS: dict = {
+    "MEASUREMENT_DOCUMENT": "490000001",
+    "RETURN": _SAP_SUCCESS_RETURN,
+}
+
+BAPI_VEHICLE_MEASUREMENT_UPDATE_ERROR: dict = {
+    "MEASUREMENT_DOCUMENT": "",
+    "RETURN": _SAP_ERROR_RETURN,
+}
+
+BAPI_REPLACEMENT_ASSIGNMENT_SUCCESS: dict = {
+    "ASSIGNMENT_REQUEST_NO": "VA-REQ-0001",
+    "RETURN": _SAP_SUCCESS_RETURN,
+}
+
+BAPI_REPLACEMENT_ASSIGNMENT_ERROR: dict = {
+    "ASSIGNMENT_REQUEST_NO": "",
+    "RETURN": _SAP_ERROR_RETURN,
+}
+
 # ---------------------------------------------------------------------------
 # BAPI — PM Order
 # ---------------------------------------------------------------------------

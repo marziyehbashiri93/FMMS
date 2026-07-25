@@ -43,6 +43,8 @@ class SAPObjectType(StrEnum):
         FAULT: SAP PM Notification.
         REPAIR_ORDER: SAP PM Work Order.
         PM_WORK_ORDER: SAP PM Planned Maintenance Order.
+        MEASUREMENT_DOCUMENT: SAP PM measurement document for odometer updates.
+        VEHICLE_ASSIGNMENT: SAP driver replacement vehicle assignment request.
         PURCHASE_REQUISITION: SAP MM Purchase Requisition.
         PURCHASE_ORDER: SAP MM Purchase Order.
         GOODS_RECEIPT: SAP MM Goods Receipt posting.
@@ -53,6 +55,8 @@ class SAPObjectType(StrEnum):
     FAULT = "FAULT"
     REPAIR_ORDER = "REPAIR_ORDER"
     PM_WORK_ORDER = "PM_WORK_ORDER"
+    MEASUREMENT_DOCUMENT = "MEASUREMENT_DOCUMENT"
+    VEHICLE_ASSIGNMENT = "VEHICLE_ASSIGNMENT"
     PURCHASE_REQUISITION = "PURCHASE_REQUISITION"
     PURCHASE_ORDER = "PURCHASE_ORDER"
     GOODS_RECEIPT = "GOODS_RECEIPT"

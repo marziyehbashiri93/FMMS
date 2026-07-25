@@ -19,13 +19,23 @@ def test_retry_service_delegates_to_manager_with_adapter_map() -> None:
     pr_port = MagicMock()
     order_port = MagicMock()
     notif_port = MagicMock()
+    measurement_port = MagicMock()
+    vehicle_assignment_port = MagicMock()
 
-    RetryFailedSAPTransactionsService(manager, pr_port, order_port, notif_port).execute(
-        request_id="corr-1"
-    )
+    RetryFailedSAPTransactionsService(
+        manager,
+        pr_port,
+        order_port,
+        notif_port,
+        measurement_port,
+        vehicle_assignment_port,
+    ).execute(request_id="corr-1")
 
     manager.retry_all_pending.assert_called_once()
     adapter_map = manager.retry_all_pending.call_args.args[0]
     assert SAPObjectType.PURCHASE_REQUISITION in adapter_map
     assert SAPObjectType.REPAIR_ORDER in adapter_map
     assert SAPObjectType.PM_WORK_ORDER in adapter_map
+    assert SAPObjectType.FAULT in adapter_map
+    assert SAPObjectType.MEASUREMENT_DOCUMENT in adapter_map
+    assert SAPObjectType.VEHICLE_ASSIGNMENT in adapter_map
