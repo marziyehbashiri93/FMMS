@@ -201,19 +201,19 @@ function ResultToggle({
         value="PASS"
         sx={{
           color: 'text.secondary',
-          borderColor: 'rgba(15, 23, 42, 0.16) !important',
-          bgcolor: '#fff',
+          borderColor: 'divider !important',
+          bgcolor: 'background.paper',
           boxShadow: 'none',
           '&:hover': {
-            bgcolor: 'rgba(0, 120, 103, 0.06)',
-            borderColor: 'rgba(0, 120, 103, 0.35) !important',
-            color: '#007867',
+            bgcolor: 'primary.light',
+            borderColor: 'primary.main !important',
+            color: 'primary.dark',
           },
           '&.Mui-selected, &.Mui-selected:hover': {
-            bgcolor: '#007867',
-            borderColor: '#007867 !important',
-            color: '#fff',
-            boxShadow: '0 2px 8px rgba(0, 120, 103, 0.35)',
+            bgcolor: 'primary.main',
+            borderColor: 'primary.main !important',
+            color: 'primary.contrastText',
+            boxShadow: '0 2px 10px rgba(15, 107, 76, 0.28)',
           },
         }}
       >
@@ -224,19 +224,19 @@ function ResultToggle({
         value="FAIL"
         sx={{
           color: 'text.secondary',
-          borderColor: 'rgba(15, 23, 42, 0.16) !important',
-          bgcolor: '#fff',
+          borderColor: 'divider !important',
+          bgcolor: 'background.paper',
           boxShadow: 'none',
           '&:hover': {
-            bgcolor: 'rgba(201, 65, 50, 0.06)',
-            borderColor: 'rgba(201, 65, 50, 0.4) !important',
-            color: '#c94132',
+            bgcolor: 'secondary.light',
+            borderColor: 'secondary.main !important',
+            color: 'secondary.dark',
           },
           '&.Mui-selected, &.Mui-selected:hover': {
-            bgcolor: '#c94132',
-            borderColor: '#c94132 !important',
-            color: '#fff',
-            boxShadow: '0 2px 8px rgba(201, 65, 50, 0.35)',
+            bgcolor: 'secondary.main',
+            borderColor: 'secondary.main !important',
+            color: 'secondary.contrastText',
+            boxShadow: '0 2px 10px rgba(196, 92, 74, 0.32)',
           },
         }}
       >
@@ -345,10 +345,13 @@ export function InspectionPage() {
   } | null>(null);
   const [actionLoading, setActionLoading] = useState<'exit' | 'fault' | 'disposition' | ''>('');
   const [actionError, setActionError] = useState('');
+  const [actionInfo, setActionInfo] = useState('');
   const [actionSuccess, setActionSuccess] = useState('');
   const [faultReported, setFaultReported] = useState(false);
   /** True after distribution marks usable (no open fault/repair). */
   const [exitUnlocked, setExitUnlocked] = useState(false);
+  /** True after a successful exit, or when vehicle is already EXITED_CENTER. */
+  const [exitedCenter, setExitedCenter] = useState(false);
 
   const admin = isAdminUser(user);
   const driverMode = isDriverUser(user);
@@ -727,9 +730,11 @@ export function InspectionPage() {
           '',
       });
       setActionError('');
+      setActionInfo('');
       setActionSuccess('');
       setFaultReported(false);
       setExitUnlocked(false);
+      setExitedCenter(selectedVehicle?.status === 'EXITED_CENTER');
       setCompleted(true);
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'ثبت بازرسی انجام نشد');
@@ -762,9 +767,10 @@ export function InspectionPage() {
   };
 
   const handleExitCenter = async () => {
-    if (!completedInspection) return;
+    if (!completedInspection || exitedCenter) return;
     setActionLoading('exit');
     setActionError('');
+    setActionInfo('');
     setActionSuccess('');
     try {
       const driverId = await resolveDriverIdForExit();
@@ -779,9 +785,20 @@ export function InspectionPage() {
       setCompletedInspection((current) =>
         current ? { ...current, driver_id: driverId } : current,
       );
+      setExitedCenter(true);
       setActionSuccess('خروج خودرو از مرکز ثبت شد.');
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'ثبت خروج از مرکز انجام نشد');
+      const message = err instanceof Error ? err.message : 'ثبت خروج از مرکز انجام نشد';
+      const alreadyExited =
+        /only active vehicles can exit/i.test(message) ||
+        /VEHICLE_NOT_ACTIVE/i.test(message) ||
+        /خارج شده از مرکز/i.test(message);
+      if (alreadyExited) {
+        setExitedCenter(true);
+        setActionInfo('این خودرو قبلاً از مرکز خارج شده است.');
+        return;
+      }
+      setActionError(message);
     } finally {
       setActionLoading('');
     }
@@ -791,6 +808,7 @@ export function InspectionPage() {
     if (!completedInspection) return;
     setActionLoading('fault');
     setActionError('');
+    setActionInfo('');
     setActionSuccess('');
     try {
       await api.reportInspectionFault(completedInspection.id);
@@ -810,6 +828,7 @@ export function InspectionPage() {
     if (!completedInspection) return;
     setActionLoading('disposition');
     setActionError('');
+    setActionInfo('');
     setActionSuccess('');
     try {
       const [faultsPage, repairsPage] = await Promise.all([
@@ -989,8 +1008,9 @@ export function InspectionPage() {
         px: 1.5,
         py: 1.35,
         borderRadius: (t) => t.radius('md'),
-        bgcolor: 'rgba(0, 167, 111, 0.04)',
-        border: '1px solid rgba(0, 167, 111, 0.14)',
+        bgcolor: 'secondary.light',
+        border: '1px solid',
+        borderColor: 'rgba(196, 92, 74, 0.18)',
       }}
     >
       <Box>
@@ -1003,6 +1023,7 @@ export function InspectionPage() {
           underline="hover"
           fontWeight={800}
           display="block"
+          color="secondary.dark"
         >
           {selectedVehicle.license_plate}
         </Link>
@@ -1037,7 +1058,7 @@ export function InspectionPage() {
         <PageHeader
           title="بازرسی روزانه خودرو"
           breadcrumbs={[
-            { label: 'مدیریت ناوگان', to: '/vehicles' },
+            { label: 'راننده' },
             { label: 'بازرسی روزانه' },
           ]}
         />
@@ -1055,7 +1076,7 @@ export function InspectionPage() {
         <PageHeader
           title="بازرسی روزانه خودرو"
           breadcrumbs={[
-            { label: 'مدیریت ناوگان', to: '/vehicles' },
+            { label: 'راننده' },
             { label: 'بازرسی روزانه' },
           ]}
         />
@@ -1064,11 +1085,21 @@ export function InspectionPage() {
           variant="outlined"
           sx={{
             width: '100%',
-            borderColor: 'rgba(184, 197, 188, 0.9)',
+            borderColor: 'divider',
             borderRadius: (t) => t.radius('md'),
-            boxShadow: '0 8px 24px rgba(31, 79, 57, 0.05)',
+            boxShadow: '0 8px 22px rgba(15, 107, 76, 0.07)',
             bgcolor: 'background.paper',
             overflow: 'hidden',
+            position: 'relative',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              insetInlineStart: 0,
+              top: 0,
+              bottom: 0,
+              width: 4,
+              bgcolor: 'primary.main',
+            },
           }}
         >
           <CardContent
@@ -1086,9 +1117,9 @@ export function InspectionPage() {
                   fontSize: '0.8rem',
                   fontWeight: 800,
                   color: 'primary.dark',
-                  bgcolor: 'rgba(0, 167, 111, 0.12)',
+                  bgcolor: 'primary.light',
                   border: '1px solid',
-                  borderColor: 'rgba(0, 167, 111, 0.35)',
+                  borderColor: 'rgba(15, 107, 76, 0.28)',
                 }}
               >
                 تکمیل بازرسی
@@ -1107,18 +1138,20 @@ export function InspectionPage() {
                   textAlign: 'center',
                 }}
               >
-                <CheckCircleOutline color="success" sx={{ fontSize: 64, mb: 1.5 }} />
+                <CheckCircleOutline sx={{ fontSize: 64, mb: 1.5, color: 'success.main' }} />
                 <Typography variant="h2" mb={1}>
                   بازرسی با موفقیت ثبت شد
                 </Typography>
                 <Typography color="text.secondary" mb={2.5}>
-                  {hadFailures
-                    ? faultReported
-                      ? exitUnlocked
-                        ? 'واحد توزیع خودرو را قابل‌استفاده اعلام کرد. می‌توانید اقدام به خروج کنید.'
-                        : 'خرابی اعلام شد. تصمیم خروج با راننده است؛ در صورت باز بودن جریان خرابی/تعمیر، سیستم خروج را رد می‌کند.'
-                      : 'موارد خراب در چک‌لیست ثبت شد. اعلام خرابی اختیاری است و تصمیم خروج با راننده است.'
-                    : 'تمام موارد چک‌لیست بدون خرابی ثبت شد.'}
+                  {exitedCenter
+                    ? 'خروج خودرو از مرکز ثبت شده است.'
+                    : hadFailures
+                      ? faultReported
+                        ? exitUnlocked
+                          ? 'واحد توزیع خودرو را قابل‌استفاده اعلام کرد. می‌توانید اقدام به خروج کنید.'
+                          : 'خرابی اعلام شد. تصمیم خروج با راننده است؛ در صورت باز بودن جریان خرابی/تعمیر، سیستم خروج را رد می‌کند.'
+                        : 'موارد خراب در چک‌لیست ثبت شد. اعلام خرابی اختیاری است و تصمیم خروج با راننده است.'
+                      : 'تمام موارد چک‌لیست بدون خرابی ثبت شد.'}
                 </Typography>
                 <Stack
                   direction={{ xs: 'column', sm: 'row' }}
@@ -1152,17 +1185,24 @@ export function InspectionPage() {
                       بررسی تصمیم توزیع
                     </Button>
                   )}
-                  <Button
-                    variant="contained"
-                    size="large"
-                    startIcon={<Logout />}
-                    onClick={() => void handleExitCenter()}
-                    loading={actionLoading === 'exit'}
-                    disabled={actionLoading !== ''}
-                  >
-                    اقدام به خروج
-                  </Button>
+                  {!exitedCenter && (
+                    <Button
+                      variant="contained"
+                      size="large"
+                      startIcon={<Logout />}
+                      onClick={() => void handleExitCenter()}
+                      loading={actionLoading === 'exit'}
+                      disabled={actionLoading !== ''}
+                    >
+                      اقدام به خروج
+                    </Button>
+                  )}
                 </Stack>
+                {actionInfo && (
+                  <Alert severity="info" sx={{ mt: 2, textAlign: 'right' }}>
+                    {actionInfo}
+                  </Alert>
+                )}
                 {actionError && (
                   <Alert severity="error" sx={{ mt: 2, textAlign: 'right' }}>
                     {actionError}
@@ -1173,13 +1213,12 @@ export function InspectionPage() {
                     {actionSuccess}
                   </Alert>
                 )}
-                {hadFailures && !faultReported ? (
+                {hadFailures && !faultReported && !exitedCenter ? (
                   <Typography variant="caption" color="text.secondary" display="block" mt={1.25}>
-                    اعلام خرابی اختیاری است. دکمه «اقدام به خروج» همیشه در دسترس راننده
-                    است.
+                    اعلام خرابی اختیاری است. در صورت نیاز می‌توانید اقدام به خروج کنید.
                   </Typography>
                 ) : null}
-                {hadFailures && faultReported && !exitUnlocked ? (
+                {hadFailures && faultReported && !exitUnlocked && !exitedCenter ? (
                   <Typography variant="caption" color="text.secondary" display="block" mt={1.25}>
                     در صورت نیاز می‌توانید وضعیت تصمیم توزیع را بررسی کنید.
                   </Typography>
@@ -1197,7 +1236,7 @@ export function InspectionPage() {
       <PageHeader
         title="بازرسی روزانه خودرو"
         breadcrumbs={[
-          { label: 'مدیریت ناوگان', to: '/vehicles' },
+          { label: 'راننده' },
           { label: 'بازرسی روزانه' },
         ]}
       />
@@ -1206,11 +1245,21 @@ export function InspectionPage() {
         variant="outlined"
         sx={{
           width: '100%',
-          borderColor: 'rgba(184, 197, 188, 0.9)',
+          borderColor: 'divider',
           borderRadius: (t) => t.radius('md'),
-          boxShadow: '0 8px 24px rgba(31, 79, 57, 0.05)',
+          boxShadow: '0 8px 22px rgba(15, 107, 76, 0.07)',
           bgcolor: 'background.paper',
           overflow: 'hidden',
+          position: 'relative',
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            insetInlineStart: 0,
+            top: 0,
+            bottom: 0,
+            width: 4,
+            bgcolor: 'primary.main',
+          },
         }}
       >
         <CardContent
@@ -1233,9 +1282,9 @@ export function InspectionPage() {
                       fontSize: '0.8rem',
                       fontWeight: active ? 800 : 650,
                       color: active ? 'primary.dark' : 'text.secondary',
-                      bgcolor: active ? 'rgba(0, 167, 111, 0.12)' : 'rgba(145, 158, 171, 0.1)',
+                      bgcolor: active ? 'primary.light' : 'action.hover',
                       border: '1px solid',
-                      borderColor: active ? 'rgba(0, 167, 111, 0.35)' : 'transparent',
+                      borderColor: active ? 'rgba(15, 107, 76, 0.28)' : 'transparent',
                     }}
                   >
                     {step.label}
@@ -1465,11 +1514,15 @@ export function InspectionPage() {
                     <LinearProgress
                       variant="determinate"
                       value={progress}
+                      color="primary"
                       sx={{
-                        height: 6,
-                        borderRadius: 1,
-                        bgcolor: 'rgba(145, 158, 171, 0.16)',
-                        '& .MuiLinearProgress-bar': { borderRadius: 1 },
+                        height: 7,
+                        borderRadius: (t) => t.radius('sm'),
+                        bgcolor: 'primary.light',
+                        '& .MuiLinearProgress-bar': {
+                          borderRadius: (t) => t.radius('sm'),
+                          bgcolor: 'primary.main',
+                        },
                       }}
                     />
 
@@ -1489,10 +1542,11 @@ export function InspectionPage() {
                             currentItem.errors.result ||
                             currentItem.errors.notes ||
                             currentItem.errors.severity
-                              ? 'error.light'
+                              ? 'error.main'
                               : 'divider',
                           borderRadius: (t) => t.radius('md'),
                           bgcolor: 'background.paper',
+                          boxShadow: '0 4px 14px rgba(15, 107, 76, 0.05)',
                         }}
                         >
                         <Stack
@@ -1505,25 +1559,26 @@ export function InspectionPage() {
                             px: 1.25,
                             py: 0.75,
                             borderRadius: (t) => t.radius('sm'),
-                            bgcolor: 'rgba(0, 167, 111, 0.06)',
-                            border: '1px solid rgba(0, 167, 111, 0.16)',
+                            bgcolor: 'secondary.light',
+                            border: '1px solid',
+                            borderColor: 'rgba(196, 92, 74, 0.18)',
                           }}
                         >
-                          <Typography variant="body2" color="primary.main" fontWeight={900}>
+                          <Typography variant="body2" color="secondary.dark" fontWeight={900}>
                             {currentItem.category}
                           </Typography>
                           <Typography
                             variant="caption"
-                            color="text.secondary"
+                            color="secondary.dark"
                             fontWeight={900}
                             sx={{
                               direction: 'ltr',
                               px: 0.75,
                               py: 0.25,
-                              borderRadius: 1,
+                              borderRadius: (t) => t.radius('sm'),
                               bgcolor: 'background.paper',
                               border: '1px solid',
-                              borderColor: 'divider',
+                              borderColor: 'rgba(196, 92, 74, 0.18)',
                             }}
                           >
                             {currentItem.code}

@@ -320,7 +320,7 @@ export function ChecklistsPage() {
       <PageHeader
         title="لیست بازرسی روزانه"
         breadcrumbs={[
-          { label: 'مدیریت ناوگان', to: '/vehicles' },
+          { label: 'خودرو' },
           { label: 'لیست بازرسی روزانه' },
         ]}
       />
@@ -460,11 +460,16 @@ export function ChecklistsPage() {
         PaperProps={{
           sx: {
             borderRadius: (t) => t.radius('md'),
+            height: { sm: 640, md: 680 },
+            maxHeight: { sm: 640, md: 680 },
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
             boxShadow: '0 24px 64px rgba(23, 35, 29, 0.18)',
           },
         }}
       >
-        <DialogTitle sx={{ pr: 6, position: 'relative' }}>
+        <DialogTitle sx={{ pr: 6, position: 'relative', flexShrink: 0 }}>
           <Stack direction="row" alignItems="center" gap={1}>
             <FactCheck fontSize="small" color="primary" />
             جزئیات چک‌لیست
@@ -478,7 +483,7 @@ export function ChecklistsPage() {
             <Close fontSize="small" />
           </IconButton>
         </DialogTitle>
-        <DialogContent dividers>
+        <DialogContent dividers sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
           {detailLoading ? (
             <LoadingState label="در حال دریافت جزئیات چک‌لیست" />
           ) : detailError ? (
@@ -550,6 +555,7 @@ export function ChecklistsPage() {
                 rows={sortChecklistItems(selected.items)}
                 getRowKey={(row) => row.id}
                 emptyMessage="آیتمی برای این چک‌لیست ثبت نشده است"
+                standaloneEmpty
                 minWidth={640}
               />
             </Stack>

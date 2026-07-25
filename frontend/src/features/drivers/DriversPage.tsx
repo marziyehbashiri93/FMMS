@@ -253,8 +253,8 @@ export function DriversPage() {
       <PageHeader
         title="راننده‌ها"
         breadcrumbs={[
-          { label: 'مدیریت ناوگان', to: '/vehicles' },
-          { label: 'راننده‌ها' },
+          { label: 'راننده' },
+          { label: 'لیست راننده‌ها' },
         ]}
       />
 

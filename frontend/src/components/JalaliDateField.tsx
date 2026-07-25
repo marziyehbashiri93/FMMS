@@ -97,9 +97,9 @@ function JalaliCalendarHeader(props: PickersCalendarHeaderProps) {
         px: 0.75,
         py: 1.25,
         minHeight: 44,
-        bgcolor: 'rgba(0, 167, 111, 0.1)',
+        bgcolor: 'rgba(15, 107, 76, 0.1)',
         borderBottom: '1px solid',
-        borderColor: 'rgba(0, 167, 111, 0.16)',
+        borderColor: 'rgba(15, 107, 76, 0.16)',
       }}
     >
       <Fade in={showArrows} appear={!reduceAnimations}>
@@ -111,7 +111,7 @@ function JalaliCalendarHeader(props: PickersCalendarHeaderProps) {
           sx={{
             color: 'primary.main',
             visibility: showArrows ? 'visible' : 'hidden',
-            '&:hover': { bgcolor: 'rgba(0, 167, 111, 0.14)' },
+            '&:hover': { bgcolor: 'rgba(15, 107, 76, 0.14)' },
           }}
         >
           <ChevronRight />
@@ -158,7 +158,7 @@ function JalaliCalendarHeader(props: PickersCalendarHeaderProps) {
           sx={{
             color: 'primary.main',
             visibility: showArrows ? 'visible' : 'hidden',
-            '&:hover': { bgcolor: 'rgba(0, 167, 111, 0.14)' },
+            '&:hover': { bgcolor: 'rgba(15, 107, 76, 0.14)' },
           }}
         >
           <ChevronLeft />
@@ -233,7 +233,7 @@ export function JalaliDateField({
                 cursor: disabled ? 'default' : 'pointer',
                 '& .MuiPickersInputBase-root, & .MuiPickersOutlinedInput-root': {
                   cursor: disabled ? 'default' : 'pointer',
-                  bgcolor: open ? 'rgba(0, 167, 111, 0.04)' : 'background.paper',
+                  bgcolor: open ? 'rgba(15, 107, 76, 0.04)' : 'background.paper',
                   transition: 'background-color 0.15s ease, border-color 0.15s ease',
                   paddingRight: '16px',
                   paddingLeft: '4px',
@@ -284,13 +284,13 @@ export function JalaliDateField({
                 borderRadius: (t) => t.radius('md'),
                 overflow: 'hidden',
                 border: '1px solid',
-                borderColor: 'rgba(0, 167, 111, 0.22)',
-                boxShadow: '0 16px 40px rgba(31, 79, 57, 0.16)',
+                borderColor: 'rgba(15, 107, 76, 0.22)',
+                boxShadow: '0 16px 40px rgba(15, 107, 76, 0.16)',
                 direction: 'rtl',
                 backgroundImage:
-                  'linear-gradient(180deg, rgba(0, 167, 111, 0.06) 0%, rgba(255,255,255,0) 48px)',
+                  'linear-gradient(180deg, rgba(15, 107, 76, 0.06) 0%, rgba(255,255,255,0) 48px)',
                 '& .MuiDayCalendar-header': {
-                  bgcolor: 'rgba(0, 167, 111, 0.04)',
+                  bgcolor: 'rgba(15, 107, 76, 0.04)',
                 },
                 '& .MuiDayCalendar-weekDayLabel': {
                   color: 'primary.dark',
@@ -301,7 +301,7 @@ export function JalaliDateField({
                   fontWeight: 700,
                   fontFamily: 'Vazirmatn, system-ui, sans-serif',
                   '&:hover': {
-                    bgcolor: 'rgba(0, 167, 111, 0.14)',
+                    bgcolor: 'rgba(15, 107, 76, 0.14)',
                   },
                   '&.MuiPickersDay-today': {
                     border: '1.5px solid',
@@ -313,7 +313,7 @@ export function JalaliDateField({
                     bgcolor: 'primary.main',
                     color: '#ffffff',
                     fontWeight: 800,
-                    boxShadow: '0 4px 12px rgba(0, 167, 111, 0.35)',
+                    boxShadow: '0 4px 12px rgba(15, 107, 76, 0.35)',
                     '&:hover': {
                       bgcolor: 'primary.dark',
                     },

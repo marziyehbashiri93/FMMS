@@ -44,11 +44,11 @@ import type { AuthUser } from '../types/fmms';
 const drawerWidth = 244;
 const collapsedDrawerWidth = 88;
 const sidebarBg = '#141A21';
-const sidebarText = '#919EAB';
-const sidebarMuted = '#637381';
-const sidebarActive = '#95C6C2';
-const sidebarActiveBg = 'rgba(110, 158, 162, 0.14)';
-const sidebarAccent = '#E7A699';
+const sidebarText = '#9AABA3';
+const sidebarMuted = '#5A6B63';
+const sidebarActive = '#8FD4B0';
+const sidebarActiveBg = 'rgba(15, 107, 76, 0.18)';
+const sidebarAccent = '#C45C4A';
 const SIDEBAR_COLLAPSED_STORAGE_KEY = 'fmms.sidebarCollapsed';
 
 function readSidebarCollapsed(): boolean {
@@ -128,15 +128,15 @@ function HeaderProfileMenu({
           px: 0.75,
           py: 0.5,
           gap: 1,
-          '&:hover': { bgcolor: 'rgba(231, 166, 153, 0.10)' },
+          '&:hover': { bgcolor: 'rgba(15, 107, 76, 0.06)' },
         }}
       >
         <Avatar
           sx={{
             width: 40,
             height: 40,
-            bgcolor: 'secondary.main',
-            color: 'secondary.contrastText',
+            bgcolor: 'primary.main',
+            color: 'primary.contrastText',
             fontWeight: 800,
             fontSize: '0.85rem',
           }}
@@ -264,8 +264,8 @@ const navItemSx = (selected: boolean, collapsed: boolean) =>
       bgcolor: sidebarActiveBg,
       color: sidebarActive,
     },
-    '&.Mui-selected:hover': { bgcolor: 'rgba(110, 158, 162, 0.22)' },
-    '&:hover': { bgcolor: 'rgba(145, 158, 171, 0.08)' },
+    '&.Mui-selected:hover': { bgcolor: 'rgba(15, 107, 76, 0.28)' },
+    '&:hover': { bgcolor: 'rgba(154, 171, 163, 0.08)' },
     '&.Mui-disabled': {
       opacity: 1,
       color: sidebarMuted,
@@ -565,7 +565,7 @@ export function AppLayout() {
           sx={{
             width: activeDrawerWidth,
             borderLeft: '1px solid',
-            borderColor: 'rgba(145, 158, 171, 0.16)',
+            borderColor: 'rgba(154, 171, 163, 0.16)',
             bgcolor: sidebarBg,
             overflowY: 'visible',
             boxShadow: '8px 0 24px rgba(20, 26, 33, 0.06)',
@@ -585,7 +585,7 @@ export function AppLayout() {
               height: 28,
               bgcolor: sidebarBg,
               border: '1px solid',
-              borderColor: 'rgba(145, 158, 171, 0.24)',
+              borderColor: 'rgba(154, 171, 163, 0.24)',
               color: sidebarText,
               boxShadow: '0 8px 18px rgba(0, 0, 0, 0.16)',
               zIndex: 2,
@@ -597,7 +597,7 @@ export function AppLayout() {
           <Box px={sidebarCollapsed ? 1 : 2} py={2.25}>
             <BrandBlock compact={sidebarCollapsed} onDark />
           </Box>
-          <Divider sx={{ borderColor: 'rgba(145, 158, 171, 0.12)' }} />
+          <Divider sx={{ borderColor: 'rgba(154, 171, 163, 0.12)' }} />
           <Box sx={{ height: 'calc(100vh - 81px)', overflowY: 'auto', overflowX: 'hidden' }}>
             <NavigationList user={user} collapsed={sidebarCollapsed} />
           </Box>
@@ -665,7 +665,7 @@ export function AppLayout() {
               <Box p={2}>
                 <BrandBlock onDark />
               </Box>
-              <Divider sx={{ borderColor: 'rgba(145, 158, 171, 0.12)' }} />
+              <Divider sx={{ borderColor: 'rgba(154, 171, 163, 0.12)' }} />
               <NavigationList user={user} onNavigate={() => setDrawerOpen(false)} />
             </Box>
           </Drawer>

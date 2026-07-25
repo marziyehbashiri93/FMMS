@@ -32,6 +32,11 @@ type Props<T, K extends string = string> = {
   emptyMessage?: string;
   emptySubtitle?: string;
   emptyIcon?: SvgIconComponent;
+  /**
+   * When true, hide the table chrome on empty data and show only EmptyState.
+   * Use in detail modals; keep false on list pages so headers remain visible.
+   */
+  standaloneEmpty?: boolean;
 };
 
 export type Column<T, K extends string = string> = RtlDataTableColumn<T, K>;
@@ -109,6 +114,7 @@ export function RtlDataTable<T, K extends string = string>({
   emptyMessage = 'داده‌ای یافت نشد',
   emptySubtitle,
   emptyIcon = Inbox,
+  standaloneEmpty = false,
 }: Props<T, K>) {
   const [internalOrderBy, setInternalOrderBy] = useState<K | ''>('');
   const [internalOrder, setInternalOrder] = useState<'asc' | 'desc'>('asc');
@@ -130,41 +136,58 @@ export function RtlDataTable<T, K extends string = string>({
     return candidate === undefined ? String(index) : String(candidate);
   };
 
+  if (standaloneEmpty && !loading && rows.length === 0) {
+    return (
+      <EmptyState
+        title={emptyMessage}
+        subtitle={emptySubtitle}
+        icon={emptyIcon}
+      />
+    );
+  }
+
+  // Keep existing rows while refetching (e.g. sort) so column widths / header stay stable.
+  const showSkeleton = loading && rows.length === 0;
+
   return (
     <Paper
       elevation={0}
       sx={{
-        border: '1px solid #b8c5bc',
+        border: '1px solid',
+        borderColor: 'divider',
         borderRadius: (t) => t.radius('md'),
         overflow: 'hidden',
       }}
     >
       <TableContainer sx={{ overflowX: 'auto' }}>
-        <Table dir="rtl" sx={{ minWidth }}>
+        <Table dir="rtl" sx={{ minWidth, opacity: loading && !showSkeleton ? 0.72 : 1 }}>
           <TableHead>
             <TableRow>
               {columns.map((col) => (
                 <TableCell
                   key={col.key}
                   align={col.align ?? 'right'}
-                  sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}
+                  sx={{ fontWeight: 700, whiteSpace: 'nowrap', minWidth: col.minWidth }}
                 >
-                  {col.sortable && !loading ? (
+                  {col.sortable ? (
                     <TableSortLabel
                       active={activeOrderBy === col.key}
                       direction={activeOrderBy === col.key ? activeOrder : 'asc'}
+                      disabled={loading}
                       onClick={() => handleSort(col.key)}
                       sx={{ flexDirection: 'row-reverse', gap: 0.5 }}
                     >
                       {col.label}
                     </TableSortLabel>
-                  ) : col.label}
+                  ) : (
+                    col.label
+                  )}
                 </TableCell>
               ))}
             </TableRow>
           </TableHead>
           <TableBody>
-            {loading ? (
+            {showSkeleton ? (
               Array.from({ length: skeletonRows }).map((_, rowIndex) => (
                 <TableRow key={`skeleton-${rowIndex}`}>
                   {columns.map((col, columnIndex) => (
@@ -195,6 +218,7 @@ export function RtlDataTable<T, K extends string = string>({
                     title={emptyMessage}
                     subtitle={emptySubtitle}
                     icon={emptyIcon}
+                    boxed={false}
                   />
                 </TableCell>
               </TableRow>

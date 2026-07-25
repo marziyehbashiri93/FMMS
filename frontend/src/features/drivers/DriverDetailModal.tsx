@@ -13,7 +13,7 @@ import { ClearFiltersButton } from '../../components/ClearFiltersButton';
 import { DetailLine } from '../../components/DetailLine';
 import { DriverStatusBadge } from '../../components/DriverStatusBadge';
 import { JalaliDateField } from '../../components/JalaliDateField';
-import { ErrorState, LoadingState } from '../../components/States';
+import { EmptyState, ErrorState, LoadingState } from '../../components/States';
 import { RtlDataTable, type RtlDataTableColumn } from '../../components/RtlDataTable';
 import { TabbedDetailModal } from '../../components/TabbedDetailModal';
 import type {
@@ -155,9 +155,9 @@ export function DriverDetailModal({
             <Card
               variant="outlined"
               sx={{
-                borderColor: 'rgba(184, 197, 188, 0.9)',
+                borderColor: 'divider',
                 borderRadius: (t) => t.radius('md'),
-                boxShadow: '0 8px 24px rgba(31, 79, 57, 0.05)',
+                boxShadow: '0 8px 22px rgba(15, 107, 76, 0.07)',
               }}
             >
               <CardContent sx={{ p: { xs: 1.75, sm: 2.25 }, '&:last-child': { pb: { xs: 1.75, sm: 2.25 } } }}>
@@ -221,7 +221,16 @@ export function DriverDetailModal({
         },
         {
           label: 'تاریخچه تخصیص',
-          content: (
+          content: historyLoading ? (
+            <LoadingState label="در حال دریافت تاریخچه" />
+          ) : historyError ? (
+            <ErrorState
+              message={historyError}
+              onRetry={() => driverId && void loadHistory(driverId)}
+            />
+          ) : sortedHistory.length === 0 && !historyDate ? (
+            <EmptyState title="تاریخچه‌ای یافت نشد" />
+          ) : (
             <Stack spacing={1.5}>
               <Stack
                 direction={{ xs: 'column', sm: 'row' }}
@@ -246,32 +255,27 @@ export function DriverDetailModal({
                   }}
                 />
               </Stack>
-              {historyLoading && <LoadingState label="در حال دریافت تاریخچه" />}
-              {historyError && (
-                <ErrorState
-                  message={historyError}
-                  onRetry={() => driverId && void loadHistory(driverId)}
-                />
-              )}
-              {!historyLoading && !historyError && (
-                <RtlDataTable
-                  columns={historyColumns}
-                  rows={sortedHistory}
-                  getRowKey={(row) => row.id}
-                  orderBy={orderBy}
-                  order={order}
-                  onSort={(key) => {
-                    if (orderBy === key) {
-                      setOrder((current) => (current === 'asc' ? 'desc' : 'asc'));
-                      return;
-                    }
-                    setOrderBy(key);
-                    setOrder('asc');
-                  }}
-                  emptyMessage="تاریخچه‌ای یافت نشد"
-                  minWidth={560}
-                />
-              )}
+              <RtlDataTable
+                columns={historyColumns}
+                rows={sortedHistory}
+                getRowKey={(row) => row.id}
+                orderBy={orderBy}
+                order={order}
+                onSort={(key) => {
+                  if (orderBy === key) {
+                    setOrder((current) => (current === 'asc' ? 'desc' : 'asc'));
+                    return;
+                  }
+                  setOrderBy(key);
+                  setOrder('asc');
+                }}
+                emptyMessage="تاریخچه‌ای یافت نشد"
+                emptySubtitle={
+                  historyDate ? 'با تغییر تاریخ فیلتر دوباره تلاش کنید' : undefined
+                }
+                standaloneEmpty
+                minWidth={560}
+              />
             </Stack>
           ),
         },

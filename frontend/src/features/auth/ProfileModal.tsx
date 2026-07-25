@@ -47,9 +47,9 @@ function ProfileRow({
         px: 1.5,
         py: 1.35,
         borderRadius: (t) => t.radius('md'),
-        bgcolor: 'rgba(244, 246, 248, 0.9)',
+        bgcolor: 'rgba(243, 246, 244, 0.9)',
         border: '1px solid',
-        borderColor: 'rgba(184, 197, 188, 0.55)',
+        borderColor: 'rgba(213, 224, 218, 0.55)',
       }}
     >
       <Box
@@ -57,7 +57,7 @@ function ProfileRow({
           width: 36,
           height: 36,
           borderRadius: (t) => t.radius('md'),
-          bgcolor: 'rgba(0, 167, 111, 0.1)',
+          bgcolor: 'rgba(15, 107, 76, 0.1)',
           color: 'primary.dark',
           display: 'grid',
           placeItems: 'center',
@@ -154,7 +154,7 @@ export function ProfileModal({ open, onClose, initialUser = null }: ProfileModal
             pt: 3.5,
             pb: 2.5,
             px: 2.5,
-            background: 'linear-gradient(165deg, rgba(0, 167, 111, 0.16) 0%, rgba(0, 167, 111, 0.04) 55%, #fff 100%)',
+            background: 'linear-gradient(165deg, rgba(15, 107, 76, 0.16) 0%, rgba(15, 107, 76, 0.04) 55%, #fff 100%)',
             borderBottom: '1px solid',
             borderColor: 'divider',
             textAlign: 'center',
@@ -172,7 +172,7 @@ export function ProfileModal({ open, onClose, initialUser = null }: ProfileModal
                   color: 'primary.contrastText',
                   fontWeight: 800,
                   fontSize: '1.35rem',
-                  boxShadow: '0 10px 24px rgba(0, 167, 111, 0.28)',
+                  boxShadow: '0 10px 24px rgba(15, 107, 76, 0.28)',
                   border: '3px solid #fff',
                 }}
               >
@@ -192,7 +192,7 @@ export function ProfileModal({ open, onClose, initialUser = null }: ProfileModal
                 sx={{
                   mt: 1.25,
                   fontWeight: 800,
-                  bgcolor: 'rgba(0, 167, 111, 0.12)',
+                  bgcolor: 'rgba(15, 107, 76, 0.12)',
                   color: 'primary.dark',
                   borderRadius: (t) => t.radius('sm'),
                 }}

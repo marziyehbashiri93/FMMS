@@ -254,8 +254,8 @@ export function ManualFaultPage() {
         <PageHeader
           title="ثبت خرابی موردی"
           breadcrumbs={[
-            { label: 'مدیریت ناوگان', to: '/vehicles' },
-            { label: 'ثبت خرابی' },
+            { label: 'راننده' },
+            { label: 'ثبت خرابی موردی' },
           ]}
         />
 
@@ -263,11 +263,21 @@ export function ManualFaultPage() {
           variant="outlined"
           sx={{
             width: '100%',
-            borderColor: 'rgba(184, 197, 188, 0.9)',
+            borderColor: 'divider',
             borderRadius: (t) => t.radius('md'),
-            boxShadow: '0 8px 24px rgba(31, 79, 57, 0.05)',
+            boxShadow: '0 8px 22px rgba(15, 107, 76, 0.07)',
             bgcolor: 'background.paper',
             overflow: 'hidden',
+            position: 'relative',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              insetInlineStart: 0,
+              top: 0,
+              bottom: 0,
+              width: 4,
+              bgcolor: 'secondary.main',
+            },
           }}
         >
           <CardContent
@@ -284,10 +294,10 @@ export function ManualFaultPage() {
                   borderRadius: (t) => t.radius('sm'),
                   fontSize: '0.8rem',
                   fontWeight: 800,
-                  color: 'primary.dark',
-                  bgcolor: 'rgba(0, 167, 111, 0.12)',
+                  color: 'secondary.dark',
+                  bgcolor: 'secondary.light',
                   border: '1px solid',
-                  borderColor: 'rgba(0, 167, 111, 0.35)',
+                  borderColor: 'rgba(196, 92, 74, 0.4)',
                 }}
               >
                 تکمیل ثبت
@@ -328,8 +338,8 @@ export function ManualFaultPage() {
                     mb: 2.5,
                     borderRadius: (t) => t.radius('sm'),
                     bgcolor: completedFault?.sap_notification_number
-                      ? 'rgba(0, 167, 111, 0.10)'
-                      : 'rgba(255, 171, 0, 0.12)',
+                      ? 'success.light'
+                      : 'warning.light',
                     color: completedFault?.sap_notification_number
                       ? 'success.dark'
                       : 'warning.dark',
@@ -365,8 +375,8 @@ export function ManualFaultPage() {
       <PageHeader
         title="ثبت خرابی موردی"
         breadcrumbs={[
-          { label: 'مدیریت ناوگان', to: '/vehicles' },
-          { label: 'ثبت خرابی' },
+          { label: 'راننده' },
+          { label: 'ثبت خرابی موردی' },
         ]}
       />
 
@@ -374,11 +384,21 @@ export function ManualFaultPage() {
         variant="outlined"
         sx={{
           width: '100%',
-          borderColor: 'rgba(184, 197, 188, 0.9)',
+          borderColor: 'divider',
           borderRadius: (t) => t.radius('md'),
-          boxShadow: '0 8px 24px rgba(31, 79, 57, 0.05)',
+          boxShadow: '0 8px 22px rgba(15, 107, 76, 0.07)',
           bgcolor: 'background.paper',
           overflow: 'hidden',
+          position: 'relative',
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            insetInlineStart: 0,
+            top: 0,
+            bottom: 0,
+            width: 4,
+            bgcolor: 'secondary.main',
+          },
         }}
       >
         <CardContent
@@ -404,11 +424,10 @@ export function ManualFaultPage() {
                       borderRadius: (t) => t.radius('sm'),
                       fontSize: '0.8rem',
                       fontWeight: active ? 800 : 650,
-                      color: active || done ? 'primary.dark' : 'text.secondary',
-                      bgcolor:
-                        active || done ? 'rgba(0, 167, 111, 0.12)' : 'rgba(145, 158, 171, 0.1)',
+                      color: active || done ? 'secondary.dark' : 'text.secondary',
+                      bgcolor: active || done ? 'secondary.light' : 'action.hover',
                       border: '1px solid',
-                      borderColor: active || done ? 'rgba(0, 167, 111, 0.35)' : 'transparent',
+                      borderColor: active || done ? 'rgba(196, 92, 74, 0.4)' : 'transparent',
                     }}
                   >
                     {step.label}
@@ -563,7 +582,7 @@ export function ManualFaultPage() {
                                   <Chip
                                     size="small"
                                     label={toFaNumber(group.items.length)}
-                                    sx={{ bgcolor: 'rgba(0, 167, 111, 0.1)', color: 'primary.dark' }}
+                                    sx={{ bgcolor: 'primary.light', color: 'primary.dark' }}
                                   />
                                 </AccordionSummary>
                                 <AccordionDetails sx={{ px: 1, pt: 0, pb: 1 }}>
@@ -580,18 +599,12 @@ export function ManualFaultPage() {
                                             py: 1,
                                             borderRadius: (t) => t.radius('sm'),
                                             border: '1px solid',
-                                            borderColor: selected
-                                              ? 'rgba(201, 65, 50, 0.45)'
-                                              : 'rgba(184, 197, 188, 0.75)',
-                                            bgcolor: selected
-                                              ? 'rgba(201, 65, 50, 0.08)'
-                                              : 'background.paper',
+                                            borderColor: selected ? 'secondary.main' : 'divider',
+                                            bgcolor: selected ? 'secondary.light' : 'background.paper',
                                             transition:
                                               'border-color 0.15s ease, background-color 0.15s ease',
                                             '&:hover': {
-                                              borderColor: selected
-                                                ? 'rgba(201, 65, 50, 0.55)'
-                                                : 'rgba(0, 167, 111, 0.45)',
+                                              borderColor: selected ? 'secondary.dark' : 'primary.main',
                                             },
                                           }}
                                         >

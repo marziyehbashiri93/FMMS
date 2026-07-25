@@ -184,7 +184,7 @@ export function DashboardPage() {
               label="خارج از سرویس"
               value={toFaNumber(vehicleSummary?.unusable_fleet_count)}
               icon={ErrorOutline}
-              tone="secondary"
+              tone="error"
             />
           </Box>
 
@@ -208,7 +208,7 @@ export function DashboardPage() {
               label="راننده با خودرو"
               value={toFaNumber(driverSummary?.with_vehicle_count)}
               icon={DirectionsCar}
-              tone="secondary"
+              tone="info"
             />
             <KpiCard
               label="میانگین کیلومتر"

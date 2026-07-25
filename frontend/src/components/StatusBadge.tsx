@@ -8,7 +8,7 @@ const statusStyles: Record<VehicleStatus, { bg: string; softBg: string; border: 
   INACTIVE: { bg: '#647067', softBg: 'rgba(100, 112, 103, 0.12)', border: 'rgba(100, 112, 103, 0.35)', label: 'غیرفعال' },
   UNDER_REPAIR: { bg: '#d28a20', softBg: 'rgba(210, 138, 32, 0.14)', border: 'rgba(210, 138, 32, 0.42)', label: 'در تعمیر' },
   WAITING_DRIVER_CONFIRMATION: { bg: '#2d6f95', softBg: 'rgba(45, 111, 149, 0.12)', border: 'rgba(45, 111, 149, 0.36)', label: 'منتظر تایید راننده' },
-  EXITED_CENTER: { bg: '#007867', softBg: 'rgba(0, 120, 103, 0.12)', border: 'rgba(0, 120, 103, 0.36)', label: 'خارج شده از مرکز' },
+  EXITED_CENTER: { bg: '#0F6B4C', softBg: 'rgba(15, 107, 76, 0.12)', border: 'rgba(15, 107, 76, 0.36)', label: 'خارج شده از مرکز' },
   SUSPENDED: { bg: '#647067', softBg: 'rgba(100, 112, 103, 0.12)', border: 'rgba(100, 112, 103, 0.35)', label: 'تعلیق‌شده' },
   OUT_OF_SERVICE: { bg: '#c94132', softBg: 'rgba(201, 65, 50, 0.12)', border: 'rgba(201, 65, 50, 0.36)', label: 'خارج از سرویس' },
   DECOMMISSIONED: { bg: '#9f2f27', softBg: 'rgba(159, 47, 39, 0.12)', border: 'rgba(159, 47, 39, 0.36)', label: 'از رده خارج' },

@@ -1,11 +1,39 @@
-import { Breadcrumbs, Card, CardContent, Link, Stack, Typography } from '@mui/material';
-import { ArrowLeft } from '@mui/icons-material';
+import { Box, Breadcrumbs, Card, CardContent, Link, Stack, Typography } from '@mui/material';
 import type { ReactNode } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
+import { brandAccentBarGradient } from '../theme/gradients';
 
 export interface Crumb {
   label: string;
   to?: string;
+}
+
+/** Soft rounded triangle pointing left (RTL breadcrumb separator). */
+function BreadcrumbSeparator() {
+  return (
+    <Box
+      component="svg"
+      viewBox="0 0 14 16"
+      aria-hidden
+      sx={{
+        width: 9,
+        height: 10,
+        color: 'text.secondary',
+        mx: 0.35,
+        flexShrink: 0,
+        display: 'block',
+      }}
+    >
+      <path
+        fill="currentColor"
+        stroke="currentColor"
+        strokeWidth={2.4}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        d="M10.5 3.2 3.6 8l6.9 4.8z"
+      />
+    </Box>
+  );
 }
 
 export function PageHeader({
@@ -25,7 +53,7 @@ export function PageHeader({
         bgcolor: 'background.paper',
         border: '1px solid',
         borderColor: 'divider',
-        boxShadow: '0 8px 22px rgba(51, 69, 71, 0.06)',
+        boxShadow: '0 8px 22px rgba(15, 107, 76, 0.07)',
         position: 'relative',
         overflow: 'hidden',
         '&::before': {
@@ -36,15 +64,18 @@ export function PageHeader({
           bottom: 0,
           width: 4,
           background: (theme) =>
-            `linear-gradient(180deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+            brandAccentBarGradient(theme.palette.primary, theme.palette.secondary),
         },
       }}
     >
       <CardContent sx={{ p: { xs: 1.75, md: 2.25 }, '&:last-child': { pb: { xs: 1.75, md: 2.25 } } }}>
         <Stack spacing={1.25}>
           <Breadcrumbs
-            separator={<ArrowLeft sx={{ fontSize: 18, color: 'text.secondary' }} />}
-            sx={{ '& .MuiBreadcrumbs-ol': { justifyContent: 'flex-start' } }}
+            separator={<BreadcrumbSeparator />}
+            sx={{
+              '& .MuiBreadcrumbs-ol': { justifyContent: 'flex-start', alignItems: 'center' },
+              '& .MuiBreadcrumbs-separator': { mx: 0.75 },
+            }}
           >
             {breadcrumbs.map((crumb, index) => {
               const isLast = index === breadcrumbs.length - 1;

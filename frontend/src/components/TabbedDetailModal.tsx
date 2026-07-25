@@ -14,6 +14,7 @@ import {
 import { useTheme } from '@mui/material/styles';
 import { Close } from '@mui/icons-material';
 import type { SvgIconComponent } from '@mui/icons-material';
+import { brandIconGradient } from '../theme/gradients';
 import { EmptyState, ErrorState, LoadingState } from './States';
 
 export type TabbedDetailModalTab = {
@@ -37,6 +38,8 @@ export type TabbedDetailModalProps = {
   onTabChange?: (index: number) => void;
 };
 
+const MODAL_HEIGHT = { xs: '100%', sm: 640, md: 680 };
+
 function TabPanel({
   value,
   index,
@@ -47,11 +50,22 @@ function TabPanel({
   children: ReactNode;
 }) {
   if (value !== index) return null;
-  return <Box sx={{ pt: 2.25 }}>{children}</Box>;
+  return (
+    <Box
+      sx={{
+        height: '100%',
+        minHeight: 0,
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      {children}
+    </Box>
+  );
 }
 
 /**
- * Shared detail modal with RTL header and scrollable tabs.
+ * Shared detail modal with RTL header, fixed height, and scrollable body.
  * Use across feature pages to keep modal design consistent.
  */
 export function TabbedDetailModal({
@@ -96,10 +110,22 @@ export function TabbedDetailModal({
       scroll="paper"
       disableScrollLock
       dir="rtl"
+      slotProps={{
+        backdrop: {
+          sx: {
+            backgroundColor: 'rgba(23, 35, 29, 0.42)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+          },
+        },
+      }}
       PaperProps={{
         sx: {
           borderRadius: fullScreen ? 0 : theme.radius('md'),
-          minHeight: { sm: 560 },
+          height: fullScreen ? '100%' : MODAL_HEIGHT,
+          maxHeight: fullScreen ? '100%' : MODAL_HEIGHT,
+          display: 'flex',
+          flexDirection: 'column',
           overflow: 'hidden',
           boxShadow: '0 24px 64px rgba(23, 35, 29, 0.18)',
         },
@@ -107,9 +133,11 @@ export function TabbedDetailModal({
     >
       <DialogTitle
         sx={{
-          py: 2,
+          flexShrink: 0,
+          pt: 2,
+          pb: 2.25,
           px: { xs: 2, sm: 2.5 },
-          bgcolor: 'rgba(0, 167, 111, 0.04)',
+          bgcolor: 'rgba(15, 107, 76, 0.04)',
           borderBottom: '1px solid',
           borderColor: 'divider',
         }}
@@ -124,9 +152,10 @@ export function TabbedDetailModal({
                   borderRadius: (t) => t.radius('xl'),
                   display: 'grid',
                   placeItems: 'center',
-                  background: (theme) =>
-                    `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
-                  color: 'common.white',
+                  background: (t) => brandIconGradient(t.palette.primary, t.palette.secondary),
+                  color: 'secondary.dark',
+                  border: '1px solid',
+                  borderColor: 'secondary.light',
                   flexShrink: 0,
                 }}
               >
@@ -156,10 +185,34 @@ export function TabbedDetailModal({
         </Stack>
       </DialogTitle>
 
-      <DialogContent sx={{ px: { xs: 1.5, sm: 2.5 }, pt: { xs: 2.5, sm: 3 }, pb: 2 }}>
-        {loading && <LoadingState label={loadingLabel} />}
-        {!loading && error && onRetry && <ErrorState message={error} onRetry={onRetry} />}
-        {!loading && !error && tabs.length === 0 && <EmptyState title={emptyTitle} />}
+      <DialogContent
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          px: { xs: 1.5, sm: 2.5 },
+          pb: 2,
+          overflow: 'hidden',
+          // MUI sets padding-top: 0 when content follows DialogTitle — force gap under title.
+          pt: { xs: '28px !important', sm: '15px !important' },
+        }}
+      >
+        {loading && (
+          <Box flex={1} display="flex" alignItems="center" justifyContent="center" minHeight={0}>
+            <LoadingState label={loadingLabel} />
+          </Box>
+        )}
+        {!loading && error && onRetry && (
+          <Box flex={1} display="flex" alignItems="center" justifyContent="center" minHeight={0}>
+            <ErrorState message={error} onRetry={onRetry} />
+          </Box>
+        )}
+        {!loading && !error && tabs.length === 0 && (
+          <Box flex={1} display="flex" alignItems="center" justifyContent="center" minHeight={0}>
+            <EmptyState title={emptyTitle} boxed />
+          </Box>
+        )}
         {!loading && !error && tabs.length > 0 && (
           <>
             <Tabs
@@ -169,9 +222,11 @@ export function TabbedDetailModal({
               scrollButtons="auto"
               allowScrollButtonsMobile
               sx={{
-                mt: 0.5,
+                flexShrink: 0,
+                mt: 0,
+                mb: 0.5,
                 minHeight: 44,
-                bgcolor: 'rgba(244, 246, 248, 0.9)',
+                bgcolor: 'rgba(243, 246, 244, 0.9)',
                 borderRadius: (t) => t.radius('md'),
                 px: 0.5,
                 '& .MuiTabs-indicator': {
@@ -193,11 +248,20 @@ export function TabbedDetailModal({
               ))}
             </Tabs>
 
-            {tabs.map((item, index) => (
-              <TabPanel key={item.label} value={Math.min(tab, tabs.length - 1)} index={index}>
-                {item.content}
-              </TabPanel>
-            ))}
+            <Box
+              sx={{
+                flex: 1,
+                minHeight: 0,
+                mt: 2.5,
+                overflow: 'auto',
+              }}
+            >
+              {tabs.map((item, index) => (
+                <TabPanel key={item.label} value={Math.min(tab, tabs.length - 1)} index={index}>
+                  {item.content}
+                </TabPanel>
+              ))}
+            </Box>
           </>
         )}
       </DialogContent>

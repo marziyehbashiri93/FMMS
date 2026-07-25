@@ -317,8 +317,8 @@ function HistoryCard({
         bgcolor: 'background.paper',
         transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
         '&:hover': {
-          borderColor: 'rgba(0, 167, 111, 0.35)',
-          boxShadow: '0 6px 18px rgba(31, 79, 57, 0.06)',
+          borderColor: 'rgba(15, 107, 76, 0.35)',
+          boxShadow: '0 6px 18px rgba(15, 107, 76, 0.06)',
         },
       }}
     >
@@ -699,9 +699,9 @@ function VehicleDetailModal({
             <Card
               variant="outlined"
               sx={{
-                borderColor: 'rgba(184, 197, 188, 0.9)',
+                borderColor: 'divider',
                 borderRadius: (t) => t.radius('md'),
-                boxShadow: '0 8px 24px rgba(31, 79, 57, 0.05)',
+                boxShadow: '0 8px 22px rgba(15, 107, 76, 0.07)',
               }}
             >
               <CardContent sx={{ p: { xs: 1.75, sm: 2.25 }, '&:last-child': { pb: { xs: 1.75, sm: 2.25 } } }}>
@@ -737,13 +737,18 @@ function VehicleDetailModal({
                 setOdometerOrder('asc');
               }}
               emptyMessage="رکورد کیلومتری ثبت نشده است"
+              standaloneEmpty
               minWidth={480}
             />
           ),
         },
         {
           label: 'تاریخچه راننده',
-          content: (
+          content: driverHistoryLoading ? (
+            <LoadingState label="در حال دریافت تاریخچه راننده" />
+          ) : sortedDriverHistory.length === 0 && !driverHistoryFromDate ? (
+            <EmptyState title="تاریخچه راننده ثبت نشده است" />
+          ) : (
             <Stack spacing={1.5}>
               <Stack
                 direction={{ xs: 'column', sm: 'row' }}
@@ -768,36 +773,37 @@ function VehicleDetailModal({
                   }}
                 />
               </Stack>
-              {driverHistoryLoading ? (
-                <LoadingState label="در حال دریافت تاریخچه راننده" />
-              ) : (
-                <RtlDataTable
-                  columns={driverHistoryColumns}
-                  rows={sortedDriverHistory}
-                  getRowKey={(row) => row.id}
-                  orderBy={driverHistoryOrderBy}
-                  order={driverHistoryOrder}
-                  onSort={(key) => {
-                    if (driverHistoryOrderBy === key) {
-                      setDriverHistoryOrder((current) => (current === 'asc' ? 'desc' : 'asc'));
-                      return;
-                    }
-                    setDriverHistoryOrderBy(key);
-                    setDriverHistoryOrder('asc');
-                  }}
-                  emptyMessage="تاریخچه راننده ثبت نشده است"
-                  emptySubtitle={
-                    driverHistoryFromDate ? 'با تغییر تاریخ فیلتر دوباره تلاش کنید' : undefined
+              <RtlDataTable
+                columns={driverHistoryColumns}
+                rows={sortedDriverHistory}
+                getRowKey={(row) => row.id}
+                orderBy={driverHistoryOrderBy}
+                order={driverHistoryOrder}
+                onSort={(key) => {
+                  if (driverHistoryOrderBy === key) {
+                    setDriverHistoryOrder((current) => (current === 'asc' ? 'desc' : 'asc'));
+                    return;
                   }
-                  minWidth={480}
-                />
-              )}
+                  setDriverHistoryOrderBy(key);
+                  setDriverHistoryOrder('asc');
+                }}
+                emptyMessage="تاریخچه راننده ثبت نشده است"
+                emptySubtitle={
+                  driverHistoryFromDate ? 'با تغییر تاریخ فیلتر دوباره تلاش کنید' : undefined
+                }
+                standaloneEmpty
+                minWidth={480}
+              />
             </Stack>
           ),
         },
         {
           label: 'تاریخچه چک‌لیست',
-          content: (
+          content: checklistLoading ? (
+            <LoadingState label="در حال دریافت تاریخچه چک‌لیست" />
+          ) : sortedChecklists.length === 0 && !checklistFromDate ? (
+            <EmptyState title="چک‌لیستی ثبت نشده است" />
+          ) : (
             <Stack spacing={1.5}>
               <Stack
                 direction={{ xs: 'column', sm: 'row' }}
@@ -822,31 +828,28 @@ function VehicleDetailModal({
                   }}
                 />
               </Stack>
-              {checklistLoading ? (
-                <LoadingState label="در حال دریافت تاریخچه چک‌لیست" />
-              ) : (
-                <RtlDataTable
-                  columns={checklistColumns}
-                  rows={sortedChecklists}
-                  getRowKey={(row) => row.id}
-                  orderBy={checklistOrderBy}
-                  order={checklistOrder}
-                  onSort={(key) => {
-                    if (key === 'actions') return;
-                    if (checklistOrderBy === key) {
-                      setChecklistOrder((current) => (current === 'asc' ? 'desc' : 'asc'));
-                      return;
-                    }
-                    setChecklistOrderBy(key);
-                    setChecklistOrder('asc');
-                  }}
-                  emptyMessage="چک‌لیستی ثبت نشده است"
-                  emptySubtitle={
-                    checklistFromDate ? 'با تغییر تاریخ فیلتر دوباره تلاش کنید' : undefined
+              <RtlDataTable
+                columns={checklistColumns}
+                rows={sortedChecklists}
+                getRowKey={(row) => row.id}
+                orderBy={checklistOrderBy}
+                order={checklistOrder}
+                onSort={(key) => {
+                  if (key === 'actions') return;
+                  if (checklistOrderBy === key) {
+                    setChecklistOrder((current) => (current === 'asc' ? 'desc' : 'asc'));
+                    return;
                   }
-                  minWidth={720}
-                />
-              )}
+                  setChecklistOrderBy(key);
+                  setChecklistOrder('asc');
+                }}
+                emptyMessage="چک‌لیستی ثبت نشده است"
+                emptySubtitle={
+                  checklistFromDate ? 'با تغییر تاریخ فیلتر دوباره تلاش کنید' : undefined
+                }
+                standaloneEmpty
+                minWidth={720}
+              />
             </Stack>
           ),
         },
@@ -885,8 +888,8 @@ function VehicleDetailModal({
                   px: 1.5,
                   py: 1.25,
                   borderRadius: (t) => t.radius('md'),
-                  bgcolor: 'rgba(0, 167, 111, 0.06)',
-                  border: '1px solid rgba(0, 167, 111, 0.16)',
+                  bgcolor: 'rgba(15, 107, 76, 0.06)',
+                  border: '1px solid rgba(15, 107, 76, 0.16)',
                 }}
               >
                 <Typography variant="body2" color="text.secondary">
@@ -929,11 +932,16 @@ function VehicleDetailModal({
         PaperProps={{
           sx: {
             borderRadius: (t) => t.radius('md'),
+            height: { sm: 640, md: 680 },
+            maxHeight: { sm: 640, md: 680 },
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
             boxShadow: '0 24px 64px rgba(23, 35, 29, 0.18)',
           },
         }}
       >
-        <DialogTitle sx={{ pr: 6, position: 'relative' }}>
+        <DialogTitle sx={{ pr: 6, position: 'relative', flexShrink: 0 }}>
           جزئیات چک‌لیست
           <IconButton
             size="small"
@@ -944,7 +952,7 @@ function VehicleDetailModal({
             <Close fontSize="small" />
           </IconButton>
         </DialogTitle>
-        <DialogContent dividers>
+        <DialogContent dividers sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
           {checklistDetailLoading ? (
             <LoadingState label="در حال دریافت جزئیات چک‌لیست" />
           ) : checklistDetailError ? (
@@ -1011,6 +1019,7 @@ function VehicleDetailModal({
                 rows={sortChecklistItems(selectedChecklist.items)}
                 getRowKey={(row) => row.id}
                 emptyMessage="آیتمی برای این چک‌لیست ثبت نشده است"
+                standaloneEmpty
                 minWidth={640}
               />
             </Stack>
@@ -1118,8 +1127,8 @@ export function VehiclePage() {
       <PageHeader
         title="خودروها"
         breadcrumbs={[
-          { label: 'مدیریت ناوگان', to: '/vehicles' },
-          { label: 'خودروها' },
+          { label: 'خودرو' },
+          { label: 'لیست خودروها' },
         ]}
       />
 
@@ -1136,9 +1145,9 @@ export function VehiclePage() {
       >
         <KpiCard label="کل ناوگان فعال" value={summaryLoading ? '...' : toFaNumber(summary?.active_fleet_count)} icon={DirectionsCar} tone="primary" />
         <KpiCard label="عملیاتی" value={summaryLoading ? '...' : toFaNumber(summary?.operational_fleet_count)} icon={TaskAlt} tone="success" />
-        <KpiCard label="در تعمیر" value={summaryLoading ? '...' : toFaNumber(summary?.under_repair_fleet_count)} icon={CarRepair} tone="secondary" />
+        <KpiCard label="در تعمیر" value={summaryLoading ? '...' : toFaNumber(summary?.under_repair_fleet_count)} icon={CarRepair} tone="warning" />
         <KpiCard label="میانگین کیلومتر" value={summaryLoading ? '...' : toFaNumber(summary?.average_odometer_km)} icon={Speed} tone="info" />
-        <KpiCard label="میانگین خرابی ماه" value={summaryLoading ? '...' : toFaNumber(summary?.average_faults_last_30_days)} icon={ErrorIcon} tone="warning" />
+        <KpiCard label="میانگین خرابی ماه" value={summaryLoading ? '...' : toFaNumber(summary?.average_faults_last_30_days)} icon={ErrorIcon} tone="error" />
         <KpiCard
           label="آخرین همگام‌سازی SAP"
           value={summaryLoading ? '...' : formatDateTime(summary?.last_sap_sync_at)}

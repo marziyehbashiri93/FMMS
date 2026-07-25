@@ -13,6 +13,7 @@ import {
 import {Analytics, DirectionsCar, Lock, Person, PrecisionManufacturing, Sync} from '@mui/icons-material';
 import {api, ApiError} from '../../api/client';
 import { RtlTextField } from '../../components/RtlTextField';
+import { brandHeroGradient } from '../../theme/gradients';
 
 const featureItems = [
     {label: 'کنترل وضعیت ناوگان و خودروهای عملیاتی', icon: DirectionsCar},
@@ -54,7 +55,7 @@ export function LoginPage() {
             sx={{
                 minHeight: '100vh',
                 display: 'flex',
-                bgcolor: '#f4f6f8',
+                bgcolor: '#F3F6F4',
                 overflow: 'hidden',
             }}
         >
@@ -65,8 +66,8 @@ export function LoginPage() {
                     minHeight: '100vh',
                     position: 'relative',
                     background: (theme) =>
-                        `linear-gradient(155deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 55%, ${theme.palette.secondary.dark} 100%)`,
-                    color: '#ffffff',
+                        brandHeroGradient(theme.palette.primary, theme.palette.secondary),
+                    color: 'secondary.dark',
                     alignItems: 'center',
                     justifyContent: 'center',
                     px: {md: 5, lg: 8},
@@ -77,23 +78,10 @@ export function LoginPage() {
                 <Box
                     sx={{
                         position: 'absolute',
-                        width: 260,
-                        height: 260,
-                        borderRadius: '50%',
-                        bgcolor: 'rgba(231,166,153,0.18)',
-                        right: -96,
-                        bottom: -72,
-                    }}
-                />
-                <Box
-                    sx={{
-                        position: 'absolute',
-                        width: 112,
-                        height: 112,
-                        borderRadius: '50%',
-                        bgcolor: 'rgba(149,198,194,0.22)',
-                        left: 64,
-                        top: 72,
+                        inset: 0,
+                        background:
+                            'radial-gradient(ellipse 65% 55% at 20% 15%, rgba(255,255,255,0.7) 0%, transparent 60%)',
+                        pointerEvents: 'none',
                     }}
                 />
                 <Stack
@@ -108,12 +96,13 @@ export function LoginPage() {
                             fontSize: {md: '2rem', lg: '2.35rem'},
                             fontWeight: 900,
                             lineHeight: 1.45,
-                            textAlign: 'right'
+                            textAlign: 'right',
+                            color: 'secondary.dark',
                         }}>
                             پلتفرم مدیریت هوشمند نگهداری ناوگان
                         </Typography>
                         <Typography sx={{
-                            color: 'rgba(255,255,255,0.78)',
+                            color: 'rgba(158,63,49,0.82)',
                             fontSize: '1rem',
                             lineHeight: 1.9,
                             textAlign: 'right',
@@ -133,7 +122,10 @@ export function LoginPage() {
                                             width: 36,
                                             height: 36,
                                             borderRadius: (t) => t.radius('xl'),
-                                            bgcolor: index % 2 === 0 ? 'primary.main' : 'secondary.main',
+                                            bgcolor: index % 2 === 0 ? 'secondary.main' : 'common.white',
+                                            color: index % 2 === 0 ? 'common.white' : 'secondary.dark',
+                                            border: '1px solid',
+                                            borderColor: 'secondary.main',
                                             display: 'grid',
                                             placeItems: 'center',
                                             flexShrink: 0,
@@ -141,7 +133,7 @@ export function LoginPage() {
                                     >
                                         <Icon fontSize="small"/>
                                     </Box>
-                                    <Typography sx={{color: 'rgba(255,255,255,0.9)', fontWeight: 700}}>
+                                    <Typography sx={{color: 'secondary.dark', fontWeight: 700}}>
                                         {item.label}
                                     </Typography>
                                 </Stack>
