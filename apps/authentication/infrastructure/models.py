@@ -28,6 +28,7 @@ class FMMSUserRole(models.TextChoices):
     DISTRIBUTION = "DISTRIBUTION", "Distribution Supervisor"
     TRANSPORT = "TRANSPORT", "Transport Supervisor"
     WAREHOUSE = "WAREHOUSE", "Warehouse Supervisor"
+    WORKSHOP_SUPERVISOR = "WORKSHOP_SUPERVISOR", "Central Workshop Supervisor"
     TECHNICIAN = "TECHNICIAN", "Technician"
     DRIVER = "DRIVER", "Driver"
     VIEWER = "VIEWER", "Viewer (read-only)"

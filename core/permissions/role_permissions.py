@@ -48,12 +48,19 @@ class IsSupervisorOrAbove(BasePermission):
             user
             and user.is_authenticated
             and _normalized_role(user)
-            in {"ADMIN", "SUPERVISOR", "DISTRIBUTION", "TRANSPORT", "WAREHOUSE"}
+            in {
+                "ADMIN",
+                "SUPERVISOR",
+                "DISTRIBUTION",
+                "TRANSPORT",
+                "WAREHOUSE",
+                "WORKSHOP_SUPERVISOR",
+            }
         )
 
 
 class IsTechnicianOrAbove(BasePermission):
-    """Allow ADMIN, SUPERVISOR, or TECHNICIAN roles."""
+    """Allow ADMIN, SUPERVISOR, workshop supervisor, or TECHNICIAN roles."""
 
     def has_permission(self, request: Request, view: APIView) -> bool:
         """Return True for operational roles including technicians."""
@@ -61,7 +68,22 @@ class IsTechnicianOrAbove(BasePermission):
         return bool(
             user
             and user.is_authenticated
-            and _normalized_role(user) in {"ADMIN", "SUPERVISOR", "TECHNICIAN"}
+            and _normalized_role(user)
+            in {"ADMIN", "SUPERVISOR", "WORKSHOP_SUPERVISOR", "TECHNICIAN"}
+        )
+
+
+class IsWorkshopSupervisorOrAbove(BasePermission):
+    """Allow central workshop supervisors, generic supervisors, or admins."""
+
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        """Return True for users allowed to make workshop technical decisions."""
+        user: Any = request.user
+        return bool(
+            user
+            and user.is_authenticated
+            and _normalized_role(user)
+            in {"ADMIN", "SUPERVISOR", "WORKSHOP_SUPERVISOR"}
         )
 
 
@@ -78,7 +100,12 @@ class IsReadOnlyOrTechnicianOrAbove(BasePermission):
             return False
         if request.method in SAFE_METHODS:
             return True
-        return _normalized_role(user) in {"ADMIN", "SUPERVISOR", "TECHNICIAN"}
+        return _normalized_role(user) in {
+            "ADMIN",
+            "SUPERVISOR",
+            "WORKSHOP_SUPERVISOR",
+            "TECHNICIAN",
+        }
 
 
 class IsDriverOrTechnicianOrAbove(BasePermission):
@@ -91,7 +118,13 @@ class IsDriverOrTechnicianOrAbove(BasePermission):
             user
             and user.is_authenticated
             and _normalized_role(user)
-            in {"ADMIN", "SUPERVISOR", "TECHNICIAN", "DRIVER"}
+            in {
+                "ADMIN",
+                "SUPERVISOR",
+                "WORKSHOP_SUPERVISOR",
+                "TECHNICIAN",
+                "DRIVER",
+            }
         )
 
 

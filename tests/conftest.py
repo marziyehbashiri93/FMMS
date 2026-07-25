@@ -66,6 +66,14 @@ def technician_user(db: None) -> "FMMSUser":  # type: ignore[name-defined]  # no
 
 
 @pytest.fixture
+def workshop_supervisor_user(db: None) -> "FMMSUser":  # type: ignore[name-defined]  # noqa: F821
+    """Return a persisted FMMSUser with WORKSHOP_SUPERVISOR role."""
+    from tests.factories.user_factory import FMMSUserFactory
+
+    return FMMSUserFactory(role="WORKSHOP_SUPERVISOR")
+
+
+@pytest.fixture
 def viewer_user(db: None) -> "FMMSUser":  # type: ignore[name-defined]  # noqa: F821
     """Return a persisted FMMSUser with VIEWER role (read-only)."""
     from tests.factories.user_factory import FMMSUserFactory
@@ -116,6 +124,16 @@ def technician_client(technician_user: "FMMSUser") -> APIClient:  # type: ignore
     """Return an API client authenticated as a technician."""
     client = APIClient()
     client.force_authenticate(user=technician_user)
+    return client
+
+
+@pytest.fixture
+def workshop_supervisor_client(
+    workshop_supervisor_user: "FMMSUser",
+) -> APIClient:  # type: ignore[name-defined]  # noqa: F821
+    """Return an API client authenticated as a central workshop supervisor."""
+    client = APIClient()
+    client.force_authenticate(user=workshop_supervisor_user)
     return client
 
 
