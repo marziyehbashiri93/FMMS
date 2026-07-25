@@ -51,6 +51,14 @@ const SEVERITY_OPTIONS: Array<{ value: FailureSeverity; label: string }> = [
 
 const VEHICLE_PAGE_SIZE = 20;
 
+const OPEN_REPAIR_TERMINAL = new Set([
+  'COMPLETED',
+  'ACCEPTED_BY_DRIVER',
+  'REJECTED_BY_DRIVER',
+  'REJECTED_BY_TRANSPORT',
+  'CANCELLED',
+]);
+
 function mergeVehicles(current: Vehicle[], incoming: Vehicle[]): Vehicle[] {
   const seen = new Set(current.map((item) => item.id));
   return [...current, ...incoming.filter((item) => !seen.has(item.id))];
@@ -270,9 +278,12 @@ export function InspectionPage() {
   const [completed, setCompleted] = useState(false);
   const [hadFailures, setHadFailures] = useState(false);
   const [completedInspection, setCompletedInspection] = useState<{ id: string; vehicle_id: string } | null>(null);
-  const [actionLoading, setActionLoading] = useState<'exit' | 'fault' | ''>('');
+  const [actionLoading, setActionLoading] = useState<'exit' | 'fault' | 'disposition' | ''>('');
   const [actionError, setActionError] = useState('');
   const [actionSuccess, setActionSuccess] = useState('');
+  const [faultReported, setFaultReported] = useState(false);
+  /** True after distribution marks usable (no open fault/repair). */
+  const [exitUnlocked, setExitUnlocked] = useState(false);
 
   const admin = isAdminUser(user);
   const selectableVehicles = useMemo(
@@ -285,7 +296,9 @@ export function InspectionPage() {
     null;
 
   const completedCount = items.filter((item) => isItemComplete(item)).length;
-  const progress = items.length ? Math.round((completedCount / items.length) * 100) : 0;
+  const progress = items.length
+    ? Math.round(((wizardIndex + 1) / items.length) * 100)
+    : 0;
   const currentItem = items[wizardIndex] ?? null;
   const isLastItem = items.length > 0 && wizardIndex >= items.length - 1;
   const currentComplete = currentItem ? isItemComplete(currentItem) : false;
@@ -572,6 +585,8 @@ export function InspectionPage() {
       setCompletedInspection({ id: submitted.id, vehicle_id: submitted.vehicle_id });
       setActionError('');
       setActionSuccess('');
+      setFaultReported(false);
+      setExitUnlocked(false);
       setCompleted(true);
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'ثبت بازرسی انجام نشد');
@@ -607,13 +622,59 @@ export function InspectionPage() {
     setActionSuccess('');
     try {
       await api.reportInspectionFault(completedInspection.id);
-      setActionSuccess('خرابی چک‌لیست ثبت شد و دستور تعمیر ایجاد شد.');
+      setFaultReported(true);
+      setExitUnlocked(false);
+      setActionSuccess(
+        'خرابی ثبت شد و به واحد توزیع ارسال شد. تا تعیین تکلیف، خروج مجاز نیست.',
+      );
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'اعلام خرابی انجام نشد');
     } finally {
       setActionLoading('');
     }
   };
+
+  const handleCheckDisposition = async () => {
+    if (!completedInspection) return;
+    setActionLoading('disposition');
+    setActionError('');
+    setActionSuccess('');
+    try {
+      const [faultsPage, repairsPage] = await Promise.all([
+        api.listFaults(completedInspection.vehicle_id, { page: 1, pageSize: 50 }),
+        api.listRepairOrders({
+          vehicleId: completedInspection.vehicle_id,
+          page: 1,
+          pageSize: 50,
+        }),
+      ]);
+      const openFault = (faultsPage.results ?? []).some((fault) => fault.status !== 'CLOSED');
+      const openRepair = (repairsPage.results ?? []).some(
+        (order) => !OPEN_REPAIR_TERMINAL.has(order.status),
+      );
+      if (openFault || openRepair) {
+        setExitUnlocked(false);
+        setActionError(
+          openRepair
+            ? 'خودرو برای تعمیر ارجاع شده و هنوز خروج مجاز نیست.'
+            : 'هنوز تصمیم واحد توزیع ثبت نشده است.',
+        );
+        return;
+      }
+      setExitUnlocked(true);
+      setActionSuccess(
+        'واحد توزیع خودرو را قابل‌استفاده اعلام کرد. می‌توانید گرفتن خودرو و خروج از مرکز را تایید کنید.',
+      );
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : 'بررسی تصمیم توزیع انجام نشد',
+      );
+    } finally {
+      setActionLoading('');
+    }
+  };
+
+  const exitBlocked = hadFailures && !exitUnlocked;
 
   const validateOdometerStep = (): boolean => {
     if (!odometer.trim() || Number.isNaN(Number(odometer)) || Number(odometer) < 0) {
@@ -811,7 +872,11 @@ export function InspectionPage() {
                 </Typography>
                 <Typography color="text.secondary" mb={2.5}>
                   {hadFailures
-                    ? 'در صورت نیاز اعلام خرابی کنید.'
+                    ? exitUnlocked
+                      ? 'واحد توزیع خودرو را قابل‌استفاده اعلام کرد. گرفتن خودرو را تایید کنید.'
+                      : faultReported
+                        ? 'خرابی اعلام شد. تا تصمیم واحد توزیع، خروج از مرکز مجاز نیست.'
+                        : 'موارد خراب در چک‌لیست ثبت شد. ابتدا اعلام خرابی کنید.'
                     : 'تمام موارد چک‌لیست بدون خرابی ثبت شد.'}
                 </Typography>
                 <Stack
@@ -821,7 +886,7 @@ export function InspectionPage() {
                   alignItems="center"
                   sx={{ gap: 2, '& > *': { margin: 0 } }}
                 >
-                  {hadFailures && (
+                  {hadFailures && !faultReported && (
                     <Button
                       variant="contained"
                       color="error"
@@ -834,13 +899,29 @@ export function InspectionPage() {
                       اعلام خرابی
                     </Button>
                   )}
+                  {hadFailures && faultReported && !exitUnlocked && (
+                    <Button
+                      variant="contained"
+                      size="large"
+                      startIcon={<CheckCircle />}
+                      onClick={() => void handleCheckDisposition()}
+                      loading={actionLoading === 'disposition'}
+                      disabled={actionLoading !== ''}
+                    >
+                      بررسی تصمیم توزیع
+                    </Button>
+                  )}
                   <Button
-                    variant={hadFailures ? 'outlined' : 'contained'}
+                    variant={exitBlocked ? 'outlined' : 'contained'}
                     size="large"
                     startIcon={<Logout />}
                     onClick={handleExitCenter}
                     loading={actionLoading === 'exit'}
-                    disabled={actionLoading !== '' || !selectedDriverIdForExit}
+                    disabled={
+                      actionLoading !== '' ||
+                      !selectedDriverIdForExit ||
+                      exitBlocked
+                    }
                   >
                     اقدام به خروج
                   </Button>
@@ -855,12 +936,21 @@ export function InspectionPage() {
                     {actionSuccess}
                   </Alert>
                 )}
-                {hadFailures && (
+                {hadFailures && !faultReported && (
                   <Typography variant="caption" color="text.secondary" display="block" mt={1.25}>
-                    اگر خرابی جزئی است و نیازی به خروج از سرویس نیست، می‌توانید مستقیم اقدام به خروج کنید.
+                    تا اعلام خرابی و تعیین تکلیف توسط واحد توزیع، خروج از مرکز ممکن نیست.
                   </Typography>
                 )}
-              </Box>
+                {hadFailures && faultReported && !exitUnlocked && (
+                  <Typography variant="caption" color="text.secondary" display="block" mt={1.25}>
+                    پس از تصمیم واحد توزیع، با «بررسی تصمیم توزیع» وضعیت را چک کنید.
+                  </Typography>
+                )}
+                {hadFailures && exitUnlocked && (
+                  <Typography variant="caption" color="text.secondary" display="block" mt={1.25}>
+                    چک‌لیست جدید لازم نیست؛ با «اقدام به خروج» گرفتن خودرو را تایید کنید.
+                  </Typography>
+                )}              </Box>
             </Stack>
           </CardContent>
         </Card>

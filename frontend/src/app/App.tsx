@@ -7,7 +7,12 @@ import { VehiclePage } from '../features/vehicles/VehiclePage';
 import { DriversPage } from '../features/drivers/DriversPage';
 import { ChecklistsPage } from '../features/inspections/ChecklistsPage';
 import { InspectionPage } from '../features/inspections/InspectionPage';
+import { DistributionFaultsPage } from '../features/faults/DistributionFaultsPage';
 import { ManualFaultPage } from '../features/faults/ManualFaultPage';
+import { TransportRepairsPage } from '../features/repairs/TransportRepairsPage';
+import { HandoverPage } from '../features/handover/HandoverPage';
+import { DashboardPage } from '../features/dashboard/DashboardPage';
+import { SapTransactionsPage } from '../features/sap/SapTransactionsPage';
 import { ComponentShowcasePage } from '../features/showcase/ComponentShowcasePage';
 import { modules } from './modules';
 
@@ -34,11 +39,16 @@ function RequireAuth() {
 }
 
 const dedicatedPaths = new Set([
+  '/dashboard',
   '/vehicles',
   '/checklists',
   '/drivers',
   '/inspections',
   '/faults',
+  '/faults/new',
+  '/repairs',
+  '/handover',
+  '/sap',
   '/components',
 ]);
 
@@ -47,13 +57,18 @@ export function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route element={<RequireAuth />}>
-        <Route index element={<Navigate to="/vehicles" replace />} />
+        <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/vehicles" element={<VehiclePage />} />
         <Route path="/checklists" element={<ChecklistsPage />} />
         <Route path="/drivers" element={<DriversPage />} />
         <Route path="/drivers/:driverId" element={<DriversPage />} />
         <Route path="/inspections" element={<InspectionPage />} />
-        <Route path="/faults" element={<ManualFaultPage />} />
+        <Route path="/faults" element={<DistributionFaultsPage />} />
+        <Route path="/faults/new" element={<ManualFaultPage />} />
+        <Route path="/repairs" element={<TransportRepairsPage />} />
+        <Route path="/handover" element={<HandoverPage />} />
+        <Route path="/sap" element={<SapTransactionsPage />} />
         <Route path="/components" element={<ComponentShowcasePage />} />
         {modules
           .filter((item) => !item.enabled && !dedicatedPaths.has(item.path))
@@ -61,7 +76,7 @@ export function App() {
             <Route key={item.key} path={item.path} element={<PlaceholderPage label={item.label} />} />
           ))}
       </Route>
-      <Route path="*" element={<Navigate to="/vehicles" replace />} />
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
 }

@@ -27,7 +27,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { EmptyState, ErrorState, LoadingState } from '../../components/States';
 import { RtlSelectField } from '../../components/RtlSelectField';
 import { RtlTextField } from '../../components/RtlTextField';
-import type { FailureSeverity, FaultCatalog, Vehicle } from '../../types/fmms';
+import type { FailureSeverity, Fault, FaultCatalog, Vehicle } from '../../types/fmms';
 import { toFaNumber } from '../../utils/format';
 
 const VEHICLE_PAGE_SIZE = 100;
@@ -102,6 +102,7 @@ export function ManualFaultPage() {
   const [submitError, setSubmitError] = useState('');
   const [completed, setCompleted] = useState(false);
   const [completedCount, setCompletedCount] = useState(0);
+  const [completedFault, setCompletedFault] = useState<Fault | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -227,13 +228,14 @@ export function ManualFaultPage() {
           ? items[0].description
           : `${toFaNumber(items.length)} خرابی ثبت‌شده`);
 
-      await api.reportFault({
+      const created = await api.reportFault({
         vehicle_id: vehicleId,
         code: parentFaultCode(selectedCatalogs),
         description: summary,
         severity,
         items,
       });
+      setCompletedFault(created);
       setCompletedCount(selectedCatalogs.length);
       setCompleted(true);
     } catch (err) {
@@ -316,6 +318,27 @@ export function ManualFaultPage() {
                 <Typography variant="body2" color="text.secondary" mb={2.5}>
                   تا زمان بستن این پرونده، ثبت خرابی جدید برای همین خودرو ممکن نیست.
                 </Typography>
+                <Box
+                  sx={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    px: 1.5,
+                    py: 0.75,
+                    mb: 2.5,
+                    borderRadius: (t) => t.radius('sm'),
+                    bgcolor: completedFault?.sap_notification_number
+                      ? 'rgba(0, 167, 111, 0.10)'
+                      : 'rgba(255, 171, 0, 0.12)',
+                    color: completedFault?.sap_notification_number
+                      ? 'success.dark'
+                      : 'warning.dark',
+                    fontWeight: 800,
+                  }}
+                >
+                  <span>PM Notification SAP:</span>
+                  <span>{completedFault?.sap_notification_number || 'در صف ارسال'}</span>
+                </Box>
                 {selectedVehicle && (
                   <Typography fontWeight={700} mb={2.5}>
                     {selectedVehicle.license_plate} — {selectedVehicle.vehicle_number}

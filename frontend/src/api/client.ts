@@ -15,8 +15,12 @@ import type {
   Paginated,
   RefreshTokenResponse,
   RepairOrder,
+  SAPSyncRun,
+  SAPTransaction,
+  SAPTransactionSummary,
   Vehicle,
   VehicleDriverAssignmentHistory,
+  VehicleHandover,
   VehicleSummary,
   VehicleStatus,
 } from '../types/fmms';
@@ -281,8 +285,35 @@ export const api = {
     });
   },
 
-  listFaults(vehicleId: string) {
-    return request<Paginated<Fault>>(`/faults/?vehicle_id=${vehicleId}`);
+  listFaults(
+    vehicleId?: string,
+    options?: { status?: string; page?: number; pageSize?: number },
+  ) {
+    const params = new URLSearchParams();
+    if (vehicleId) params.set('vehicle_id', vehicleId);
+    if (options?.status) params.set('status', options.status);
+    if (options?.page) params.set('page', String(options.page));
+    if (options?.pageSize) params.set('page_size', String(options.pageSize));
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return request<Paginated<Fault>>(`/faults/${query}`);
+  },
+
+  getFault(id: string) {
+    return request<Fault>(`/faults/${id}/`);
+  },
+
+  markFaultVehicleUsable(id: string, note = '') {
+    return request<Fault>(`/faults/${id}/distribution-usable/`, {
+      method: 'POST',
+      body: JSON.stringify({ note }),
+    });
+  },
+
+  markFaultVehicleUnusable(id: string, note = '') {
+    return request<Fault>(`/faults/${id}/distribution-unusable/`, {
+      method: 'POST',
+      body: JSON.stringify({ note }),
+    });
   },
 
   listFaultCatalogs(options?: {
@@ -321,8 +352,66 @@ export const api = {
     });
   },
 
-  listRepairOrders(vehicleId: string) {
-    return request<Paginated<RepairOrder>>(`/repair-orders/?vehicle_id=${vehicleId}`);
+  listRepairOrders(options?: {
+    vehicleId?: string;
+    status?: string;
+    page?: number;
+    pageSize?: number;
+  }) {
+    const params = new URLSearchParams();
+    if (options?.vehicleId) params.set('vehicle_id', options.vehicleId);
+    if (options?.status) params.set('status', options.status);
+    if (options?.page) params.set('page', String(options.page));
+    if (options?.pageSize) params.set('page_size', String(options.pageSize));
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return request<Paginated<RepairOrder>>(`/repair-orders/${query}`);
+  },
+
+  getRepairOrder(id: string) {
+    return request<RepairOrder>(`/repair-orders/${id}/`);
+  },
+
+  approveRepairOrder(id: string) {
+    return request<{ id: string; status: string; message: string }>(
+      `/repair-orders/${id}/approve/`,
+      { method: 'POST', body: JSON.stringify({}) },
+    );
+  },
+
+  rejectRepairOrderByTransport(id: string, reason: string) {
+    return request<{ id: string; status: string; message: string }>(
+      `/repair-orders/${id}/transport-reject/`,
+      { method: 'POST', body: JSON.stringify({ reason }) },
+    );
+  },
+
+  assignRepairWorkshop(
+    id: string,
+    payload: { workshop_type: 'INTERNAL' | 'EXTERNAL'; workshop_id?: string; reason?: string },
+  ) {
+    return request<{
+      id: string;
+      status: string;
+      message: string;
+      workshop_type?: string | null;
+    }>(`/repair-orders/${id}/assign-workshop/`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  listVehicleHandovers() {
+    return request<VehicleHandover[] | Paginated<VehicleHandover>>('/vehicle-handovers/');
+  },
+
+  confirmVehicleHandover(
+    id: string,
+    payload: { accepted: boolean; comment?: string },
+  ) {
+    return request<VehicleHandover>(`/vehicle-handovers/${id}/confirm/`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
   },
 
   listDrivers(options?: {
@@ -445,6 +534,37 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({}),
     });
+  },
+
+  listSapTransactions(options?: {
+    status?: string;
+    objectType?: string;
+    page?: number;
+    pageSize?: number;
+  }) {
+    const params = new URLSearchParams();
+    if (options?.status) params.set('status', options.status);
+    if (options?.objectType) params.set('object_type', options.objectType);
+    if (options?.page) params.set('page', String(options.page));
+    if (options?.pageSize) params.set('page_size', String(options.pageSize));
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return request<Paginated<SAPTransaction>>(`/sap-transactions/${query}`);
+  },
+
+  getSapTransaction(id: string) {
+    return request<SAPTransaction>(`/sap-transactions/${id}/`);
+  },
+
+  getSapTransactionSummary() {
+    return request<SAPTransactionSummary>('/sap-transactions/summary/');
+  },
+
+  listSapSyncHistory(options?: { page?: number; pageSize?: number }) {
+    const params = new URLSearchParams();
+    if (options?.page) params.set('page', String(options.page));
+    if (options?.pageSize) params.set('page_size', String(options.pageSize));
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return request<Paginated<SAPSyncRun>>(`/sap-sync/history/${query}`);
   },
 
   setAccessToken,

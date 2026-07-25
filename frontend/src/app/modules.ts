@@ -1,7 +1,5 @@
 import {
-  Assessment,
   Build,
-  CalendarMonth,
   CarRepair,
   Dashboard,
   DirectionsCar,
@@ -39,20 +37,18 @@ export function isNavGroup(entry: NavEntry): entry is NavGroup {
 }
 
 export const modules: AppModule[] = [
-  { key: 'dashboard', label: 'داشبورد', path: '/dashboard', icon: Dashboard, enabled: false },
+  { key: 'dashboard', label: 'داشبورد', path: '/dashboard', icon: Dashboard, enabled: true },
   { key: 'vehicles', label: 'لیست خودروها', path: '/vehicles', icon: DirectionsCar, enabled: true },
   { key: 'checklists', label: 'لیست بازرسی روزانه', path: '/checklists', icon: FactCheck, enabled: true },
   { key: 'components', label: 'کامپوننت‌ها', path: '/components', icon: Widgets, enabled: true },
   { key: 'drivers', label: 'لیست راننده‌ها', path: '/drivers', icon: PeopleAlt, enabled: true },
   { key: 'inspections', label: 'بازرسی روزانه', path: '/inspections', icon: ReportProblem, enabled: true },
-  { key: 'faults', label: 'ثبت خرابی', path: '/faults', icon: CarRepair, enabled: true },
-  { key: 'repairs', label: 'تعمیرات', path: '/repairs', icon: Build, enabled: false },
+  { key: 'manualFault', label: 'ثبت خرابی موردی', path: '/faults/new', icon: ReportProblem, enabled: true },
+  { key: 'faults', label: 'لیست خرابی‌ها', path: '/faults', icon: CarRepair, enabled: true },
+  { key: 'handover', label: 'تحویل و تایید', path: '/handover', icon: Handshake, enabled: true },
+  { key: 'repairs', label: 'کارتابل ترابری', path: '/repairs', icon: Build, enabled: true },
   { key: 'materials', label: 'قطعات و انبار', path: '/materials', icon: Inventory2, enabled: false },
-  { key: 'procurement', label: 'تدارکات', path: '/procurement', icon: LocalShipping, enabled: false },
-  { key: 'pm', label: 'نگهداری پیشگیرانه', path: '/pm', icon: CalendarMonth, enabled: false },
-  { key: 'handover', label: 'تحویل و تایید', path: '/handover', icon: Handshake, enabled: false },
-  { key: 'sap', label: 'یکپارچه‌سازی SAP', path: '/sap', icon: Sync, enabled: false },
-  { key: 'reports', label: 'گزارش‌ها', path: '/reports', icon: Assessment, enabled: false },
+  { key: 'sap', label: 'یکپارچه‌سازی SAP', path: '/sap', icon: Sync, enabled: true },
   { key: 'settings', label: 'تنظیمات', path: '/settings', icon: Settings, enabled: false },
 ];
 
@@ -74,28 +70,28 @@ export const navSections: Array<{ label: string; entries: NavEntry[] }> = [
         icon: DirectionsCar,
         children: [byKey('vehicles'), byKey('checklists')],
       },
-      byKey('components'),
+      {
+        key: 'distribution',
+        label: 'توزیع خودرو',
+        icon: LocalShipping,
+        children: [byKey('faults')],
+      },
+      {
+        key: 'transport',
+        label: 'ترابری',
+        icon: Build,
+        children: [byKey('repairs')],
+      },
       {
         key: 'driver',
         label: 'راننده',
         icon: PeopleAlt,
-        children: [byKey('drivers'), byKey('inspections'), byKey('faults')],
+        children: [byKey('drivers'), byKey('inspections'), byKey('manualFault'), byKey('handover')],
       },
     ],
   },
   {
     label: 'مدیریت',
-    entries: modules.filter(
-      (item) =>
-        ![
-          'dashboard',
-          'vehicles',
-          'checklists',
-          'components',
-          'drivers',
-          'inspections',
-          'faults',
-        ].includes(item.key),
-    ),
+    entries: [byKey('components'), byKey('materials'), byKey('sap'), byKey('settings')],
   },
 ];

@@ -440,7 +440,7 @@ function VehicleDetailModal({
           fromDate: fromDate || undefined,
         }),
         api.listFaults(vehicle.id),
-        api.listRepairOrders(vehicle.id),
+        api.listRepairOrders({ vehicleId: vehicle.id }),
       ]);
 
       if (vehicleResult.status === 'rejected') {
@@ -857,7 +857,7 @@ function VehicleDetailModal({
                 <HistoryCard
                   key={fault.id}
                   title={fault.description}
-                  meta={`${fault.code} · ${formatDateTime(fault.reported_at || fault.created_at)}`}
+                  meta={`${fault.code} · SAP: ${fault.sap_notification_number || 'در صف ارسال'} · ${formatDateTime(fault.reported_at || fault.created_at)}`}
                   badge={<PlainStatusBadge label={fault.status} />}
                 />
               ))}

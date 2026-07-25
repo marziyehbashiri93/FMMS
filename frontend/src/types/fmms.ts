@@ -185,6 +185,14 @@ export interface Fault {
   severity: string;
   status: string;
   inspection_id?: string | null;
+  sap_notification_number?: string | null;
+  items?: Array<{
+    id: string;
+    component: string;
+    description: string;
+    severity: string;
+    inspection_item_id?: string | null;
+  }>;
   reported_at?: string;
   created_at?: string;
 }
@@ -216,6 +224,18 @@ export interface RepairOrder {
   activities?: RepairActivity[];
 }
 
+export interface VehicleHandover {
+  id: string;
+  repair_order_id: string;
+  vehicle_id: string;
+  status: 'WAITING_DRIVER_CONFIRMATION' | 'ACCEPTED' | 'REJECTED' | string;
+  created_at: string;
+  updated_at: string;
+  comment?: string | null;
+  driver_id?: string | null;
+  confirmed_at?: string | null;
+}
+
 export interface RepairPart {
   part_id: string;
   material_number: string;
@@ -228,4 +248,76 @@ export interface RepairActivity {
   description: string;
   labor_hours: string | number;
   performed_at: string;
+}
+
+export type SAPTransactionStatus =
+  | 'PENDING'
+  | 'IN_PROGRESS'
+  | 'SUCCESS'
+  | 'FAILED'
+  | 'RETRYING'
+  | 'EXHAUSTED';
+
+export type SAPObjectType =
+  | 'VEHICLE'
+  | 'FAULT'
+  | 'REPAIR_ORDER'
+  | 'PM_WORK_ORDER'
+  | 'MEASUREMENT_DOCUMENT'
+  | 'VEHICLE_ASSIGNMENT'
+  | 'PURCHASE_REQUISITION'
+  | 'PURCHASE_ORDER'
+  | 'GOODS_RECEIPT'
+  | 'GOODS_ISSUE';
+
+/** One SAP write call (BAPI) with request/response payloads. */
+export interface SAPTransaction {
+  id: string;
+  object_type: SAPObjectType | string;
+  section: string;
+  protocol: string;
+  object_id: string;
+  idempotency_key: string;
+  status: SAPTransactionStatus | string;
+  retry_count: number;
+  max_retries: number;
+  request_payload: Record<string, unknown>;
+  response_payload: Record<string, unknown> | null;
+  sap_document_number: string | null;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+}
+
+export interface SAPTransactionSummary {
+  total: number;
+  success: number;
+  failed: number;
+  pending: number;
+  exhausted: number;
+  last_created_at: string | null;
+}
+
+export interface SAPSyncItemResult {
+  name: string;
+  status: 'SUCCESS' | 'FAILED' | 'PARTIAL_SUCCESS' | string;
+  started_at: string;
+  finished_at: string;
+  summary: Record<string, unknown>;
+  error: string | null;
+}
+
+/** OData read-sync run history entry. */
+export interface SAPSyncRun {
+  id: string;
+  trigger_source: 'API' | 'CELERY' | 'JOB' | string;
+  status: 'IN_PROGRESS' | 'SUCCESS' | 'FAILED' | 'PARTIAL_SUCCESS' | string;
+  request_id: string;
+  triggered_by: string | null;
+  started_at: string;
+  finished_at: string | null;
+  summary: Record<string, unknown>;
+  error: string | null;
+  items: SAPSyncItemResult[];
 }

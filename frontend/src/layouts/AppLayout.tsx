@@ -496,7 +496,7 @@ export function AppLayout() {
   const navigate = useNavigate();
   const mobileValue = useMemo(() => {
     const current = modules.find((item) => location.pathname.startsWith(item.path));
-    return current?.path ?? '/vehicles';
+    return current?.path ?? '/dashboard';
   }, [location.pathname]);
   const activeDrawerWidth = sidebarCollapsed ? collapsedDrawerWidth : drawerWidth;
 
