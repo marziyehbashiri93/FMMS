@@ -72,6 +72,16 @@ class FMMSUser(AbstractBaseUser, PermissionsMixin):
         db_index=True,
         help_text="FMMS role — controls API permissions.",
     )
+    personnel_number = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text=(
+            "SAP personnel number (کد پرسنلی). Links this login user to SAP "
+            "driver/employee master data for role-scoped access."
+        ),
+    )
     is_active = models.BooleanField(
         default=True,
         help_text="Inactive users cannot log in.",

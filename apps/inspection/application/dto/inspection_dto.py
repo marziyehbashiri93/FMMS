@@ -64,6 +64,8 @@ class CreateInspectionDTO:
     created_by: uuid.UUID
     driver_id: uuid.UUID | None = field(default=None)
     items: list[CreateInspectionItemInputDTO] = field(default_factory=list)
+    actor_role: str = ""
+    actor_personnel_number: str = ""
 
 
 @dataclass(frozen=True)

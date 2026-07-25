@@ -14,7 +14,10 @@ from apps.driver.application.dto.driver_dto import (
 )
 from apps.driver.application.services.get_driver_service import DriverAssignmentRole
 from apps.driver.domain.entities import DriverStatus
-from core.permissions import IsReadOnlyOrTechnicianOrAbove
+from core.permissions import (
+    IsReadOnlyOrDriverOrTechnicianOrAbove,
+    IsReadOnlyOrTechnicianOrAbove,
+)
 from interfaces.api.v1 import deps
 from interfaces.api.v1.driver import schema as driver_schema
 from interfaces.api.v1.driver.serializers import (
@@ -76,14 +79,29 @@ class DriverViewSet(GenericViewSet):
         return Response(DriverSummarySerializer(result).data)
 
     @driver_schema.exit_center
-    @action(detail=True, methods=["post"], url_path="exit-center")
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="exit-center",
+        permission_classes=[IsReadOnlyOrDriverOrTechnicianOrAbove],
+    )
     def exit_center(self, request: Request, pk: str | None = None) -> Response:
         """Mark the assigned vehicle as exited from the fleet center."""
         serializer = DriverExitCenterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        driver_id = uuid.UUID(str(pk))
+        if getattr(request.user, "role", None) == "DRIVER":
+            personnel = str(getattr(request.user, "personnel_number", "") or "").strip()
+            linked = deps.get_driver_repository().find_by_personnel_number(personnel)
+            if linked is None or linked.id != driver_id:
+                from rest_framework.exceptions import PermissionDenied  # noqa: PLC0415
+
+                raise PermissionDenied(
+                    detail="Drivers may only exit for their own linked SAP identity."
+                )
         result = deps.get_driver_exit_center_service().execute(
             DriverExitCenterDTO(
-                driver_id=uuid.UUID(str(pk)),
+                driver_id=driver_id,
                 vehicle_id=serializer.validated_data["vehicle_id"],
                 inspection_id=serializer.validated_data["inspection_id"],
                 request_id=request_id_from(request),

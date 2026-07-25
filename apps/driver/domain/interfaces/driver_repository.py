@@ -41,6 +41,17 @@ class IDriverRepository(ABC):
         """
 
     @abstractmethod
+    def find_by_personnel_number(self, personnel_number: str) -> Driver | None:
+        """Find an ACTIVE driver by SAP personnel number (کد پرسنلی).
+
+        Args:
+            personnel_number: Non-empty personnel number string.
+
+        Returns:
+            Matching driver, or ``None`` when not found / blank input.
+        """
+
+    @abstractmethod
     def list_by_status(self, status: DriverStatus) -> list[Driver]:
         """Return all drivers matching a given status.
 

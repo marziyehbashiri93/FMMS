@@ -7,7 +7,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
-from core.permissions import IsReadOnlyOrTechnicianOrAbove
+from core.permissions import IsReadOnlyOrDriverOrTechnicianOrAbove
 from interfaces.api.v1 import deps
 from interfaces.api.v1.inspection.template_serializers import (
     InspectionTemplateResponseSerializer,
@@ -19,7 +19,7 @@ from interfaces.api.v1.utils import paginate_dto_list, request_id_from
 class InspectionTemplateViewSet(GenericViewSet):
     """Expose inspection checklist templates synced from SAP."""
 
-    permission_classes = [IsReadOnlyOrTechnicianOrAbove]
+    permission_classes = [IsReadOnlyOrDriverOrTechnicianOrAbove]
 
     @extend_schema(
         tags=[API_TAGS.inspection],

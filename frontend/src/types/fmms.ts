@@ -5,12 +5,21 @@ export interface Paginated<T> {
   results: T[];
 }
 
+export interface LinkedDriver {
+  id: string;
+  customer_number: string;
+  name: string;
+  personnel_number: string;
+}
+
 export interface AuthUser {
   id: string;
   username: string;
   email: string;
   full_name: string;
   role: string;
+  personnel_number?: string;
+  linked_driver?: LinkedDriver | null;
   is_staff: boolean;
   is_superuser: boolean;
 }
@@ -244,7 +253,6 @@ export interface RepairPart {
   part_id: string;
   material_number: string;
   quantity: number;
-  unit_of_measure: string;
 }
 
 export interface RepairActivity {
@@ -310,6 +318,25 @@ export interface SAPSyncItemResult {
   finished_at: string;
   summary: Record<string, unknown>;
   error: string | null;
+}
+
+/** Central warehouse stock row synced from ZI_STOCK_KH08_CDS. */
+export interface CentralStockItem {
+  id: string;
+  material: string;
+  plant: string;
+  storage_location: string;
+  inventory_stock_type: string;
+  material_code: string;
+  material_name: string;
+  inventory_stock_type_text: string;
+  quantity: string | number;
+  base_unit: string;
+  stock_value: string | number;
+  display_currency: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 /** OData read-sync run history entry. */

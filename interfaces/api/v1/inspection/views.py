@@ -24,7 +24,7 @@ from apps.inspection.domain.value_objects import (
     FailureSeverity,
     OdometerUnit,
 )
-from core.permissions import IsReadOnlyOrTechnicianOrAbove
+from core.permissions import IsReadOnlyOrDriverOrTechnicianOrAbove
 from interfaces.api.v1 import deps
 from interfaces.api.v1.fault.serializers import FaultResponseSerializer
 from interfaces.api.v1.inspection import schema as inspection_schema
@@ -53,7 +53,7 @@ def _date_range_to_datetimes(
 class InspectionViewSet(GenericViewSet):
     """Expose inspection application services through REST endpoints."""
 
-    permission_classes = [IsReadOnlyOrTechnicianOrAbove]
+    permission_classes = [IsReadOnlyOrDriverOrTechnicianOrAbove]
 
     @inspection_schema.retrieve
     def retrieve(self, request: Request, pk: str | None = None) -> Response:
@@ -114,6 +114,10 @@ class InspectionViewSet(GenericViewSet):
                 items=items,
                 request_id=request_id_from(request),
                 created_by=user_id_from(request),
+                actor_role=str(getattr(request.user, "role", "") or ""),
+                actor_personnel_number=str(
+                    getattr(request.user, "personnel_number", "") or ""
+                ),
             )
         )
         return Response(

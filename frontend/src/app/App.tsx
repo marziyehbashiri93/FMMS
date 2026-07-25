@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { Box, Card, CardContent, Typography } from '@mui/material';
 import { AppLayout } from '../layouts/AppLayout';
@@ -11,11 +12,13 @@ import { DistributionFaultsPage } from '../features/faults/DistributionFaultsPag
 import { ManualFaultPage } from '../features/faults/ManualFaultPage';
 import { TransportRepairsPage } from '../features/repairs/TransportRepairsPage';
 import { CentralWorkshopPage } from '../features/workshop/CentralWorkshopPage';
+import { TransportPartsPage } from '../features/transport/TransportPartsPage';
 import { HandoverPage } from '../features/handover/HandoverPage';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { SapTransactionsPage } from '../features/sap/SapTransactionsPage';
 import { ComponentShowcasePage } from '../features/showcase/ComponentShowcasePage';
 import { modules } from './modules';
+import { RequireModule } from './RequireModule';
 
 function PlaceholderPage({ label }: { label: string }) {
   return (
@@ -39,6 +42,10 @@ function RequireAuth() {
   return <AppLayout />;
 }
 
+function guarded(moduleKey: string, element: ReactNode) {
+  return <RequireModule moduleKey={moduleKey}>{element}</RequireModule>;
+}
+
 const dedicatedPaths = new Set([
   '/dashboard',
   '/vehicles',
@@ -48,6 +55,7 @@ const dedicatedPaths = new Set([
   '/faults',
   '/faults/new',
   '/repairs',
+  '/transport/parts',
   '/workshop',
   '/handover',
   '/sap',
@@ -60,23 +68,31 @@ export function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route element={<RequireAuth />}>
         <Route index element={<Navigate to="/dashboard" replace />} />
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/vehicles" element={<VehiclePage />} />
-        <Route path="/checklists" element={<ChecklistsPage />} />
-        <Route path="/drivers" element={<DriversPage />} />
-        <Route path="/drivers/:driverId" element={<DriversPage />} />
-        <Route path="/inspections" element={<InspectionPage />} />
-        <Route path="/faults" element={<DistributionFaultsPage />} />
-        <Route path="/faults/new" element={<ManualFaultPage />} />
-        <Route path="/repairs" element={<TransportRepairsPage />} />
-        <Route path="/workshop" element={<CentralWorkshopPage />} />
-        <Route path="/handover" element={<HandoverPage />} />
-        <Route path="/sap" element={<SapTransactionsPage />} />
-        <Route path="/components" element={<ComponentShowcasePage />} />
+        <Route path="/dashboard" element={guarded('dashboard', <DashboardPage />)} />
+        <Route path="/vehicles" element={guarded('vehicles', <VehiclePage />)} />
+        <Route path="/checklists" element={guarded('checklists', <ChecklistsPage />)} />
+        <Route path="/drivers" element={guarded('drivers', <DriversPage />)} />
+        <Route path="/drivers/:driverId" element={guarded('drivers', <DriversPage />)} />
+        <Route path="/inspections" element={guarded('inspections', <InspectionPage />)} />
+        <Route path="/faults" element={guarded('faults', <DistributionFaultsPage />)} />
+        <Route path="/faults/new" element={guarded('manualFault', <ManualFaultPage />)} />
+        <Route path="/repairs" element={guarded('repairs', <TransportRepairsPage />)} />
+        <Route
+          path="/transport/parts"
+          element={guarded('transportParts', <TransportPartsPage />)}
+        />
+        <Route path="/workshop" element={guarded('workshop', <CentralWorkshopPage />)} />
+        <Route path="/handover" element={guarded('handover', <HandoverPage />)} />
+        <Route path="/sap" element={guarded('sap', <SapTransactionsPage />)} />
+        <Route path="/components" element={guarded('components', <ComponentShowcasePage />)} />
         {modules
           .filter((item) => !item.enabled && !dedicatedPaths.has(item.path))
           .map((item) => (
-            <Route key={item.key} path={item.path} element={<PlaceholderPage label={item.label} />} />
+            <Route
+              key={item.key}
+              path={item.path}
+              element={guarded(item.key, <PlaceholderPage label={item.label} />)}
+            />
           ))}
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

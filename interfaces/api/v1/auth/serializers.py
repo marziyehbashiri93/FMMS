@@ -46,6 +46,15 @@ class FMMSJWTTokenRefreshSerializer(TokenRefreshSerializer):
         return data
 
 
+class LinkedDriverSerializer(serializers.Serializer):
+    """SAP driver linked to the login user via personnel number."""
+
+    id = serializers.UUIDField()
+    customer_number = serializers.CharField()
+    name = serializers.CharField()
+    personnel_number = serializers.CharField(allow_blank=True)
+
+
 class UserProfileSerializer(serializers.Serializer):
     """Serialize the authenticated FMMS user for frontend session state."""
 
@@ -54,8 +63,34 @@ class UserProfileSerializer(serializers.Serializer):
     email = serializers.EmailField(read_only=True)
     full_name = serializers.CharField(read_only=True)
     role = serializers.CharField(read_only=True)
+    personnel_number = serializers.CharField(read_only=True, allow_blank=True)
     is_staff = serializers.BooleanField(read_only=True)
     is_superuser = serializers.BooleanField(read_only=True)
+    linked_driver = LinkedDriverSerializer(read_only=True, allow_null=True, required=False)
+
+    def to_representation(self, instance: Any) -> dict[str, Any]:
+        """Include SAP driver link resolved by personnel_number when present."""
+        data = super().to_representation(instance)
+        personnel = str(getattr(instance, "personnel_number", "") or "").strip()
+        data["personnel_number"] = personnel
+        data["linked_driver"] = None
+        if not personnel:
+            return data
+        try:
+            from interfaces.api.v1 import deps  # noqa: PLC0415
+
+            driver = deps.get_driver_repository().find_by_personnel_number(personnel)
+        except Exception:  # noqa: BLE001 — profile must not fail if driver sync is down
+            return data
+        if driver is None:
+            return data
+        data["linked_driver"] = {
+            "id": driver.id,
+            "customer_number": driver.customer_number.value,
+            "name": driver.name,
+            "personnel_number": driver.personnel_number or "",
+        }
+        return data
 
 
 class TokenObtainPairResponseSerializer(serializers.Serializer):

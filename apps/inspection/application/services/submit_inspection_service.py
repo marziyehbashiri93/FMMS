@@ -15,11 +15,13 @@ from apps.inspection.application.dto.inspection_dto import (
 )
 from apps.inspection.application.services.create_inspection_service import (
     _to_response_dto,
+    assert_vehicle_is_operational_for_checklist,
 )
 from apps.inspection.domain.interfaces.inspection_repository import (
     IInspectionRepository,
 )
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
+from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
 from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
 
@@ -33,6 +35,7 @@ class SubmitInspectionService:
         inspection_repository: Concrete ``IInspectionRepository``.
         fault_repository: Kept for constructor compatibility; unused by submit.
         repair_order_repository: Kept for constructor compatibility; unused by submit.
+        vehicle_repository: Used to ensure the vehicle is still operational.
     """
 
     def __init__(
@@ -40,10 +43,12 @@ class SubmitInspectionService:
         inspection_repository: IInspectionRepository,
         fault_repository: IFaultRepository,
         repair_order_repository: IRepairOrderRepository,
+        vehicle_repository: IVehicleRepository,
     ) -> None:
         self._inspection_repo = inspection_repository
         self._fault_repo = fault_repository
         self._repair_repo = repair_order_repository
+        self._vehicle_repo = vehicle_repository
 
     def execute(self, dto: SubmitInspectionDTO) -> InspectionResponseDTO:
         """Submit a DRAFT inspection without creating faults.
@@ -56,6 +61,7 @@ class SubmitInspectionService:
 
         Raises:
             FMMSNotFoundError: If inspection does not exist.
+            FMMSConflictError: If the vehicle is not operational (ACTIVE).
             InspectionItemRequiredError: If the inspection has no items.
             InspectionInvalidStateTransitionError: If not in DRAFT status.
         """
@@ -74,6 +80,10 @@ class SubmitInspectionService:
             lambda: self._inspection_repo.get_by_id(dto.inspection_id),
             message=f"Inspection '{dto.inspection_id}' not found.",
             details={"inspection_id": str(dto.inspection_id)},
+        )
+        assert_vehicle_is_operational_for_checklist(
+            vehicle_id=inspection.vehicle_id,
+            vehicle_repository=self._vehicle_repo,
         )
 
         inspection.submit()

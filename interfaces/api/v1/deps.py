@@ -81,7 +81,10 @@ from apps.material.application.services.material_request_service import (
     CreateMaterialRequestService,
     ListMaterialRequestsService,
     ReceiveMaterialRequestService,
-    RejectMaterialRequestService,
+)
+from apps.material.application.services.parts_availability_decision_service import (
+    DecidePartsAvailabilityService,
+    IssuePurchasedPartsService,
 )
 from apps.material.application.services.sync_central_stock_from_sap_service import (
     ListCentralStockService,
@@ -164,6 +167,9 @@ from apps.repair.application.services.get_repair_order_service import (
     GetRepairOrderService,
     ListRepairOrdersService,
 )
+from apps.repair.application.services.register_internal_repair_cost_service import (
+    RegisterInternalRepairCostService,
+)
 from apps.repair.application.services.repair_order_timeline_service import (
     GetRepairOrderTimelineService,
     RecordRepairOrderEventService,
@@ -186,6 +192,9 @@ from apps.repair.application.services.workshop_technical_decision_service import
 from apps.repair.infrastructure.event_repositories import (
     DjangoRepairOrderEventRepository,
 )
+from apps.repair.infrastructure.internal_cost_repositories import (
+    DjangoInternalRepairCostRepository,
+)
 from apps.repair.infrastructure.invoice_repositories import (
     DjangoExternalRepairInvoiceRepository,
 )
@@ -207,6 +216,10 @@ from apps.vehicle.application.services.list_driver_assignment_history_service im
     ListDriverVehicleAssignmentHistoryService,
     ListVehicleDriverAssignmentHistoryService,
 )
+from apps.vehicle.application.services.record_component_history_service import (
+    ListVehicleComponentHistoryService,
+    RecordComponentHistoryFromRepairService,
+)
 from apps.vehicle.application.services.record_odometer_service import (
     GetVehicleCurrentOdometerService,
     ListVehicleOdometerHistoryService,
@@ -214,6 +227,9 @@ from apps.vehicle.application.services.record_odometer_service import (
 )
 from apps.vehicle.application.services.sync_vehicles_from_sap_service import (
     SyncVehiclesFromSAPService,
+)
+from apps.vehicle.infrastructure.component_history_repositories import (
+    DjangoVehicleComponentHistoryRepository,
 )
 from apps.vehicle.infrastructure.odometer_readers import (
     DjangoFaultVehicleOdometerReader,
@@ -496,6 +512,7 @@ def get_create_inspection_service() -> CreateInspectionService:
     return CreateInspectionService(
         get_inspection_repository(),
         get_vehicle_repository(),
+        get_driver_repository(),
     )
 
 
@@ -528,6 +545,7 @@ def get_submit_inspection_service() -> SubmitInspectionService:
         get_inspection_repository(),
         get_fault_repository(),
         get_repair_order_repository(),
+        get_vehicle_repository(),
     )
 
 
@@ -774,12 +792,50 @@ def get_reject_repair_order_service() -> RejectRepairOrderService:
     return RejectRepairOrderService(get_workshop_technical_decision_service())
 
 
+def get_vehicle_component_history_repository() -> (
+    DjangoVehicleComponentHistoryRepository
+):
+    """Return vehicle component history repository."""
+    return DjangoVehicleComponentHistoryRepository()
+
+
+def get_internal_repair_cost_repository() -> DjangoInternalRepairCostRepository:
+    """Return internal repair cost repository."""
+    return DjangoInternalRepairCostRepository()
+
+
+def get_record_component_history_from_repair_service() -> (
+    RecordComponentHistoryFromRepairService
+):
+    """Return RecordComponentHistoryFromRepairService."""
+    return RecordComponentHistoryFromRepairService(
+        get_vehicle_component_history_repository()
+    )
+
+
+def get_list_vehicle_component_history_service() -> ListVehicleComponentHistoryService:
+    """Return ListVehicleComponentHistoryService."""
+    return ListVehicleComponentHistoryService(
+        get_vehicle_component_history_repository()
+    )
+
+
+def get_register_internal_repair_cost_service() -> RegisterInternalRepairCostService:
+    """Return RegisterInternalRepairCostService."""
+    return RegisterInternalRepairCostService(
+        get_internal_repair_cost_repository(),
+        get_repair_order_repository(),
+    )
+
+
 def get_approve_transport_handover_service() -> ApproveTransportHandoverService:
     """Return ApproveTransportHandoverService."""
     return ApproveTransportHandoverService(
         get_repair_order_repository(),
         get_vehicle_repository(),
         get_fault_repository(),
+        get_record_component_history_from_repair_service(),
+        get_internal_repair_cost_repository(),
         get_record_repair_order_event_service(),
     )
 
@@ -798,20 +854,24 @@ def get_create_material_request_service() -> CreateMaterialRequestService:
     return CreateMaterialRequestService(
         get_material_request_repository(),
         get_repair_order_repository(),
+        get_central_stock_repository(),
         get_record_repair_order_event_service(),
     )
 
 
 def get_list_material_requests_service() -> ListMaterialRequestsService:
     """Return ListMaterialRequestsService."""
-    return ListMaterialRequestsService(get_material_request_repository())
-
-
-def get_approve_material_request_service() -> ApproveMaterialRequestService:
-    """Return ApproveMaterialRequestService."""
-    return ApproveMaterialRequestService(
+    return ListMaterialRequestsService(
         get_material_request_repository(),
-        StubInventoryAvailabilityAdapter(),
+        get_central_stock_repository(),
+    )
+
+
+def get_decide_parts_availability_service() -> DecidePartsAvailabilityService:
+    """Return DecidePartsAvailabilityService (explicit transport decision)."""
+    return DecidePartsAvailabilityService(
+        get_material_request_repository(),
+        get_central_stock_repository(),
         get_inventory_transaction_repository(),
         get_create_purchase_requisition_service(),
         get_add_pr_line_item_service(),
@@ -819,10 +879,22 @@ def get_approve_material_request_service() -> ApproveMaterialRequestService:
     )
 
 
-def get_reject_material_request_service() -> RejectMaterialRequestService:
-    """Return RejectMaterialRequestService."""
-    return RejectMaterialRequestService(
+def get_issue_purchased_parts_service() -> IssuePurchasedPartsService:
+    """Return IssuePurchasedPartsService."""
+    return IssuePurchasedPartsService(
         get_material_request_repository(),
+        get_inventory_transaction_repository(),
+        get_central_stock_repository(),
+        get_record_repair_order_event_service(),
+    )
+
+
+def get_approve_material_request_service() -> ApproveMaterialRequestService:
+    """Return ApproveMaterialRequestService (compat auto-availability wrapper)."""
+    return ApproveMaterialRequestService(
+        get_material_request_repository(),
+        StubInventoryAvailabilityAdapter(),
+        get_decide_parts_availability_service(),
         get_record_repair_order_event_service(),
     )
 
@@ -832,6 +904,7 @@ def get_receive_material_request_service() -> ReceiveMaterialRequestService:
     return ReceiveMaterialRequestService(
         get_material_request_repository(),
         get_repair_order_repository(),
+        get_central_stock_repository(),
         get_record_repair_order_event_service(),
     )
 

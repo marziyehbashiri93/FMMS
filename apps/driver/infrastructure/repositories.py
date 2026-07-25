@@ -66,6 +66,21 @@ class DjangoDriverRepository(IDriverRepository):
             raise DriverNotFoundError(customer_number.value) from None
         return _to_domain(orm)
 
+    def find_by_personnel_number(self, personnel_number: str) -> Driver | None:
+        """Find an ACTIVE driver by SAP personnel number."""
+        needle = personnel_number.strip()
+        if not needle:
+            return None
+        orm = (
+            DriverModel.objects.filter(
+                personnel_number=needle,
+                status=DriverStatus.ACTIVE.value,
+            )
+            .order_by("created_at")
+            .first()
+        )
+        return _to_domain(orm) if orm is not None else None
+
     def list_by_status(self, status: DriverStatus) -> list[Driver]:
         """Return all drivers matching a given status."""
         qs = DriverModel.objects.filter(status=status.value)

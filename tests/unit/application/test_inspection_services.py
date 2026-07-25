@@ -57,10 +57,18 @@ from apps.inspection.domain.value_objects import (
 from apps.integration.domain.entities import SAPObjectType
 from apps.repair.domain.entities import RepairOrder, RepairOrderStatus
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
+from apps.driver.domain.entities import Driver, DriverStatus
+from apps.driver.domain.interfaces.driver_repository import IDriverRepository
+from apps.driver.domain.value_objects import CustomerNumber
 from apps.vehicle.domain.entities import Vehicle, VehicleStatus
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
 from apps.vehicle.domain.value_objects import PlateNumber, SAPVehicleNumber
-from core.exceptions.base_exception import FMMSNotFoundError, FMMSStateError
+from core.exceptions.base_exception import (
+    FMMSConflictError,
+    FMMSNotFoundError,
+    FMMSStateError,
+    FMMSValidationError,
+)
 from core.sap.dtos.pm_notification import (
     CreatePMNotificationRequest,
     SAPNotificationDTO,
@@ -73,7 +81,7 @@ from core.workflow import VEHICLE_OPEN_FLOW_ERROR_CODE, VEHICLE_OPEN_FLOW_MESSAG
 # ---------------------------------------------------------------------------
 
 
-def _make_vehicle() -> Vehicle:
+def _make_vehicle(*, driver1_customer_number: str | None = None) -> Vehicle:
     return Vehicle(
         id=uuid.uuid4(),
         vehicle_number=SAPVehicleNumber("300001"),
@@ -81,6 +89,19 @@ def _make_vehicle() -> Vehicle:
         status=VehicleStatus.ACTIVE,
         created_at=datetime.now(tz=UTC),
         updated_at=datetime.now(tz=UTC),
+        driver1_customer_number=driver1_customer_number,
+    )
+
+
+def _make_driver(*, personnel_number: str = "P-100", customer_number: str = "C-100") -> Driver:
+    return Driver(
+        id=uuid.uuid4(),
+        customer_number=CustomerNumber(customer_number),
+        name="Driver Test",
+        status=DriverStatus.ACTIVE,
+        created_at=datetime.now(tz=UTC),
+        updated_at=datetime.now(tz=UTC),
+        personnel_number=personnel_number,
     )
 
 
@@ -210,6 +231,57 @@ class FakeVehicleRepository(IVehicleRepository):
         self._store.pop(vehicle_id, None)
 
 
+class FakeDriverRepository(IDriverRepository):
+    """In-memory driver repository for inspection actor scoping tests."""
+
+    def __init__(self, initial: list[Driver] | None = None) -> None:
+        self._store: dict[uuid.UUID, Driver] = {d.id: d for d in (initial or [])}
+
+    def get_by_id(self, driver_id: uuid.UUID) -> Driver:
+        driver = self._store.get(driver_id)
+        if driver is None:
+            raise KeyError(driver_id)
+        return driver
+
+    def get_by_customer_number(self, customer_number: CustomerNumber) -> Driver:
+        for driver in self._store.values():
+            if driver.customer_number == customer_number:
+                return driver
+        raise KeyError(customer_number.value)
+
+    def find_by_personnel_number(self, personnel_number: str) -> Driver | None:
+        needle = personnel_number.strip()
+        if not needle:
+            return None
+        for driver in self._store.values():
+            if (
+                (driver.personnel_number or "") == needle
+                and driver.status == DriverStatus.ACTIVE
+            ):
+                return driver
+        return None
+
+    def list_by_status(self, status: DriverStatus) -> list[Driver]:
+        return [d for d in self._store.values() if d.status == status]
+
+    def list_all(self) -> list[Driver]:
+        return list(self._store.values())
+
+    def list_by_customer_numbers(self, customer_numbers: set[str]) -> list[Driver]:
+        return [
+            d
+            for d in self._store.values()
+            if d.customer_number.value in customer_numbers
+        ]
+
+    def decommission_missing_from_sap(self, seen_customer_numbers: set[str]) -> int:
+        return 0
+
+    def save(self, driver: Driver) -> Driver:
+        self._store[driver.id] = driver
+        return driver
+
+
 class FakeFaultRepository(IFaultRepository):
     def __init__(self) -> None:
         self.saved: list[Fault] = []
@@ -333,10 +405,16 @@ class FakeSAPPMNotificationPort:
 
 
 class TestCreateInspectionService:
-    def _service(self, vehicle: Vehicle) -> CreateInspectionService:
+    def _service(
+        self,
+        vehicle: Vehicle,
+        *,
+        drivers: list[Driver] | None = None,
+    ) -> CreateInspectionService:
         return CreateInspectionService(
             inspection_repository=FakeInspectionRepository(),
             vehicle_repository=FakeVehicleRepository(initial=[vehicle]),
+            driver_repository=FakeDriverRepository(initial=drivers or []),
         )
 
     def test_creates_draft_inspection(self) -> None:
@@ -361,6 +439,7 @@ class TestCreateInspectionService:
         service = CreateInspectionService(
             inspection_repository=FakeInspectionRepository(),
             vehicle_repository=FakeVehicleRepository(),
+            driver_repository=FakeDriverRepository(),
         )
 
         with pytest.raises(FMMSNotFoundError):
@@ -375,6 +454,86 @@ class TestCreateInspectionService:
                     created_by=uuid.uuid4(),
                 )
             )
+
+    def test_rejects_non_operational_vehicle(self) -> None:
+        vehicle = _make_vehicle()
+        vehicle.status = VehicleStatus.OUT_OF_SERVICE
+        service = self._service(vehicle)
+
+        with pytest.raises(FMMSConflictError) as exc:
+            service.execute(
+                CreateInspectionDTO(
+                    vehicle_id=vehicle.id,
+                    inspection_type=InspectionType.PRE_TRIP,
+                    odometer_value=50000,
+                    odometer_unit=OdometerUnit.KM,
+                    inspected_at=datetime.now(tz=UTC),
+                    request_id="req-oos",
+                    created_by=uuid.uuid4(),
+                )
+            )
+        assert exc.value.error_code == "VEHICLE_NOT_OPERATIONAL"
+
+    def test_driver_may_only_inspect_assigned_vehicle(self) -> None:
+        driver = _make_driver(personnel_number="PN-9", customer_number="6000000249")
+        vehicle = _make_vehicle(driver1_customer_number="6000000249")
+        service = self._service(vehicle, drivers=[driver])
+
+        result = service.execute(
+            CreateInspectionDTO(
+                vehicle_id=vehicle.id,
+                inspection_type=InspectionType.PRE_TRIP,
+                odometer_value=50000,
+                odometer_unit=OdometerUnit.KM,
+                inspected_at=datetime.now(tz=UTC),
+                request_id="req-driver-ok",
+                created_by=uuid.uuid4(),
+                actor_role="DRIVER",
+                actor_personnel_number="PN-9",
+            )
+        )
+        assert result.driver_id == driver.id
+
+    def test_driver_rejected_for_unassigned_vehicle(self) -> None:
+        driver = _make_driver(personnel_number="PN-9", customer_number="6000000249")
+        vehicle = _make_vehicle(driver1_customer_number="OTHER")
+        service = self._service(vehicle, drivers=[driver])
+
+        with pytest.raises(FMMSConflictError) as exc:
+            service.execute(
+                CreateInspectionDTO(
+                    vehicle_id=vehicle.id,
+                    inspection_type=InspectionType.PRE_TRIP,
+                    odometer_value=50000,
+                    odometer_unit=OdometerUnit.KM,
+                    inspected_at=datetime.now(tz=UTC),
+                    request_id="req-driver-deny",
+                    created_by=uuid.uuid4(),
+                    actor_role="DRIVER",
+                    actor_personnel_number="PN-9",
+                )
+            )
+        assert exc.value.error_code == "VEHICLE_NOT_ASSIGNED_TO_DRIVER"
+
+    def test_driver_requires_personnel_number(self) -> None:
+        vehicle = _make_vehicle()
+        service = self._service(vehicle)
+
+        with pytest.raises(FMMSValidationError) as exc:
+            service.execute(
+                CreateInspectionDTO(
+                    vehicle_id=vehicle.id,
+                    inspection_type=InspectionType.PRE_TRIP,
+                    odometer_value=50000,
+                    odometer_unit=OdometerUnit.KM,
+                    inspected_at=datetime.now(tz=UTC),
+                    request_id="req-no-pn",
+                    created_by=uuid.uuid4(),
+                    actor_role="DRIVER",
+                    actor_personnel_number="",
+                )
+            )
+        assert exc.value.error_code == "PERSONNEL_NUMBER_REQUIRED"
 
 
 # ---------------------------------------------------------------------------
@@ -459,6 +618,7 @@ class TestSubmitInspectionService:
             inspection_repository=FakeInspectionRepository(initial=inspections or []),
             fault_repository=fault_repo,
             repair_order_repository=repair_repo,
+            vehicle_repository=vehicle_repo,
         )
         return service, fault_repo, repair_repo, vehicle_repo
 
@@ -534,6 +694,19 @@ class TestSubmitInspectionService:
         assert len(fault_repo.saved) == 0
         assert len(repair_repo.saved) == 0
         assert vehicle_repo.get_by_id(vehicle.id).status == VehicleStatus.ACTIVE
+
+    def test_submit_rejects_non_operational_vehicle(self) -> None:
+        vehicle = _make_vehicle()
+        vehicle.status = VehicleStatus.UNDER_REPAIR
+        inspection = _make_inspection(vehicle_id=vehicle.id)
+        inspection.items.append(_make_pass_item())
+        service, _, _, _ = self._service(
+            inspections=[inspection], vehicles=[vehicle]
+        )
+
+        with pytest.raises(FMMSConflictError) as exc:
+            service.execute(self._dto(inspection.id))
+        assert exc.value.error_code == "VEHICLE_NOT_OPERATIONAL"
 
     def test_submit_allows_failed_items_without_open_flow_check(self) -> None:
         vehicle = _make_vehicle()

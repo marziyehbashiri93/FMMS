@@ -70,6 +70,18 @@ class FakeDriverRepository(IDriverRepository):
                 return driver
         raise DriverNotFoundError(customer_number.value)
 
+    def find_by_personnel_number(self, personnel_number: str) -> Driver | None:
+        needle = personnel_number.strip()
+        if not needle:
+            return None
+        for driver in self._store.values():
+            if (
+                (driver.personnel_number or "") == needle
+                and driver.status == DriverStatus.ACTIVE
+            ):
+                return driver
+        return None
+
     def list_by_status(self, status: DriverStatus) -> list[Driver]:
         return [d for d in self._store.values() if d.status == status]
 

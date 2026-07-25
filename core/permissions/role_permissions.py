@@ -108,6 +108,28 @@ class IsReadOnlyOrTechnicianOrAbove(BasePermission):
         }
 
 
+class IsReadOnlyOrDriverOrTechnicianOrAbove(BasePermission):
+    """SAFE methods for any auth user; writes for DRIVER or TECHNICIAN+.
+
+    Used for driver daily checklist / odometer / exit-center workflows.
+    """
+
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        """Gate write access including DRIVER while allowing authenticated reads."""
+        user: Any = request.user
+        if not (user and user.is_authenticated):
+            return False
+        if request.method in SAFE_METHODS:
+            return True
+        return _normalized_role(user) in {
+            "ADMIN",
+            "SUPERVISOR",
+            "WORKSHOP_SUPERVISOR",
+            "TECHNICIAN",
+            "DRIVER",
+        }
+
+
 class IsDriverOrTechnicianOrAbove(BasePermission):
     """Allow drivers and operational roles to confirm vehicle handovers."""
 

@@ -35,7 +35,8 @@ import {
 } from '@mui/icons-material';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '@mui/material/styles';
-import { isNavGroup, modules, navSections, type AppModule, type NavGroup } from '../app/modules';
+import { canAccessModule, navSectionsForUser } from '../app/access';
+import { isNavGroup, modules, type AppModule, type NavGroup } from '../app/modules';
 import { api } from '../api/client';
 import { ProfileModal } from '../features/auth/ProfileModal';
 import type { AuthUser } from '../types/fmms';
@@ -456,10 +457,19 @@ function NavGroupItem({
   );
 }
 
-function NavigationList({ collapsed = false, onNavigate }: { collapsed?: boolean; onNavigate?: () => void }) {
+function NavigationList({
+  user,
+  collapsed = false,
+  onNavigate,
+}: {
+  user: AuthUser | null;
+  collapsed?: boolean;
+  onNavigate?: () => void;
+}) {
+  const sections = useMemo(() => navSectionsForUser(user), [user]);
   return (
     <List disablePadding sx={{ px: collapsed ? 1 : 1.5, py: 1.5 }}>
-      {navSections.map((section) => (
+      {sections.map((section) => (
         <Box key={section.label} sx={{ mb: 1.25 }}>
           {!collapsed && (
             <Typography
@@ -574,7 +584,7 @@ export function AppLayout() {
           </Box>
           <Divider sx={{ borderColor: 'rgba(145, 158, 171, 0.12)' }} />
           <Box sx={{ height: 'calc(100vh - 81px)', overflowY: 'auto', overflowX: 'hidden' }}>
-            <NavigationList collapsed={sidebarCollapsed} />
+            <NavigationList user={user} collapsed={sidebarCollapsed} />
           </Box>
         </Box>
       )}
@@ -641,7 +651,7 @@ export function AppLayout() {
                 <BrandBlock onDark />
               </Box>
               <Divider sx={{ borderColor: 'rgba(145, 158, 171, 0.12)' }} />
-              <NavigationList onNavigate={() => setDrawerOpen(false)} />
+              <NavigationList user={user} onNavigate={() => setDrawerOpen(false)} />
             </Box>
           </Drawer>
           <BottomNavigation
@@ -657,7 +667,9 @@ export function AppLayout() {
               borderColor: 'divider',
             }}
           >
-            {modules.filter((item) => item.enabled).map((item) => {
+            {modules
+              .filter((item) => item.enabled && canAccessModule(user, item.key))
+              .map((item) => {
               const Icon = item.icon;
               return <BottomNavigationAction key={item.key} label={item.label} value={item.path} icon={<Icon />} />;
             })}

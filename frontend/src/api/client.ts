@@ -1,5 +1,6 @@
 import type {
   AuthUser,
+  CentralStockItem,
   Driver,
   DriverSummary,
   DriverVehicleAssignmentHistoryItem,
@@ -414,7 +415,11 @@ export const api = {
 
   createRepairMaterialRequest(
     id: string,
-    items: Array<{ material_number: string; quantity: number; unit_of_measure: string }>,
+    items: Array<{
+      material_number: string;
+      quantity: number;
+      from_catalog?: boolean;
+    }>,
   ) {
     return request(`/repair-orders/${id}/material-requests/`, {
       method: 'POST',
@@ -429,11 +434,105 @@ export const api = {
     });
   },
 
+  decideMaterialAvailability(
+    id: string,
+    payload: {
+      note?: string;
+      items: Array<{ item_id: string; decision: 'FROM_STOCK' | 'PURCHASE' }>;
+    },
+  ) {
+    return request(`/material-requests/${id}/availability-decision/`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  issuePurchasedMaterialRequest(id: string) {
+    return request(`/material-requests/${id}/issue-purchased/`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  },
+
   listMaterialRequests(options?: { status?: string }) {
     const params = new URLSearchParams();
     if (options?.status) params.set('status', options.status);
     const query = params.toString() ? `?${params.toString()}` : '';
     return request<Array<Record<string, unknown>>>(`/material-requests/${query}`);
+  },
+
+  listCentralStock(options?: {
+    plant?: string;
+    storageLocation?: string;
+    search?: string;
+    page?: number;
+    pageSize?: number;
+  }) {
+    const params = new URLSearchParams();
+    if (options?.plant) params.set('plant', options.plant);
+    if (options?.storageLocation) params.set('storage_location', options.storageLocation);
+    if (options?.search) params.set('search', options.search);
+    if (options?.page) params.set('page', String(options.page));
+    if (options?.pageSize) params.set('page_size', String(options.pageSize));
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return request<CentralStockItem[] | Paginated<CentralStockItem>>(`/central-stock/${query}`);
+  },
+
+  addRepairPart(
+    id: string,
+    payload: { material_number: string; quantity: number },
+  ) {
+    return request(`/repair-orders/${id}/parts/`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  completeRepairOrder(
+    id: string,
+    payload: { completed_at: string; no_parts_consumed?: boolean },
+  ) {
+    return request(`/repair-orders/${id}/complete/`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  registerInternalRepairCost(
+    id: string,
+    payload: {
+      invoice_number?: string;
+      labor_cost?: number;
+      parts_cost?: number;
+      service_cost?: number;
+      currency?: string;
+      notes?: string;
+    },
+  ) {
+    return request(`/repair-orders/${id}/internal-cost/`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  transportHandoverApprove(id: string) {
+    return request(`/repair-orders/${id}/transport-handover-approve/`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  },
+
+  transportHandoverReject(id: string, comment?: string) {
+    return request(`/repair-orders/${id}/transport-handover-reject/`, {
+      method: 'POST',
+      body: JSON.stringify({ comment: comment ?? '' }),
+    });
+  },
+
+  listVehicleComponentHistory(vehicleId: string) {
+    return request<Array<Record<string, unknown>> | Paginated<Record<string, unknown>>>(
+      `/vehicles/${vehicleId}/component-history/`,
+    );
   },
 
   getRepairOrderTimeline(id: string) {
