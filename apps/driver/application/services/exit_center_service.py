@@ -6,10 +6,13 @@ from datetime import UTC, datetime
 
 from apps.driver.application.dto.driver_dto import DriverExitCenterDTO
 from apps.driver.domain.interfaces.driver_repository import IDriverRepository
+from apps.fault.domain.entities import FaultStatus
+from apps.fault.domain.interfaces.fault_repository import IFaultRepository
 from apps.inspection.domain.entities import InspectionStatus
 from apps.inspection.domain.interfaces.inspection_repository import (
     IInspectionRepository,
 )
+from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
 from apps.vehicle.application.dto.vehicle_dto import VehicleResponseDTO
 from apps.vehicle.application.mappers import vehicle_to_response_dto
 from apps.vehicle.domain.entities import VehicleStatus
@@ -17,6 +20,7 @@ from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
 from core.exceptions.base_exception import FMMSConflictError, FMMSValidationError
 from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
+from core.workflow import assert_vehicle_has_no_open_flow
 
 logger = get_structured_logger("driver", __name__)
 
@@ -36,10 +40,14 @@ class DriverExitCenterService:
         driver_repository: IDriverRepository,
         vehicle_repository: IVehicleRepository,
         inspection_repository: IInspectionRepository,
+        fault_repository: IFaultRepository,
+        repair_order_repository: IRepairOrderRepository,
     ) -> None:
         self._driver_repo = driver_repository
         self._vehicle_repo = vehicle_repository
         self._inspection_repo = inspection_repository
+        self._fault_repo = fault_repository
+        self._repair_repo = repair_order_repository
 
     def execute(self, dto: DriverExitCenterDTO) -> VehicleResponseDTO:
         """Set a driver's assigned vehicle to ``EXITED_CENTER``.
@@ -53,7 +61,8 @@ class DriverExitCenterService:
         Raises:
             FMMSNotFoundError: If driver, vehicle, or inspection does not exist.
             FMMSValidationError: If checklist or assignment data does not match.
-            FMMSConflictError: If checklist failed or vehicle is not ACTIVE.
+            FMMSConflictError: If checklist failures are undisposed or vehicle is not ACTIVE.
+            FMMSStateError: If the vehicle still has an open fault/repair flow.
             VehicleInvalidStateTransitionError: If the transition is not allowed.
         """
         logger.info(
@@ -117,12 +126,25 @@ class DriverExitCenterService:
                     "status": inspection.status.value,
                 },
             )
+        assert_vehicle_has_no_open_flow(
+            vehicle.id,
+            fault_repository=self._fault_repo,
+            repair_order_repository=self._repair_repo,
+        )
         if inspection.failed_items():
-            raise FMMSConflictError(
-                message="Vehicle cannot exit center with failed checklist items.",
-                error_code="CHECKLIST_HAS_FAILURES",
-                details={"inspection_id": str(dto.inspection_id)},
+            # Failures block exit until distribution disposes the reported fault.
+            # After distribution-usable (fault CLOSED for this checklist), exit is
+            # allowed on the same inspection — no new checklist is required.
+            inspection_faults = self._fault_repo.list_by_inspection(inspection.id)
+            disposition_cleared = bool(inspection_faults) and all(
+                fault.status == FaultStatus.CLOSED for fault in inspection_faults
             )
+            if not disposition_cleared:
+                raise FMMSConflictError(
+                    message="Vehicle cannot exit center with failed checklist items.",
+                    error_code="CHECKLIST_HAS_FAILURES",
+                    details={"inspection_id": str(dto.inspection_id)},
+                )
         if vehicle.status != VehicleStatus.ACTIVE:
             raise FMMSConflictError(
                 message="Only active vehicles can exit the fleet center.",

@@ -11,7 +11,10 @@ from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
 from apps.handover.application.dto.handover_dto import ConfirmVehicleHandoverDTO
-from core.permissions import IsReadOnlyOrTechnicianOrAbove
+from core.permissions import (
+    IsDriverOrTechnicianOrAbove,
+    IsReadOnlyOrTechnicianOrAbove,
+)
 from interfaces.api.v1 import deps
 from interfaces.api.v1.handover.serializers import (
     VehicleHandoverConfirmSerializer,
@@ -40,7 +43,11 @@ class VehicleHandoverViewSet(GenericViewSet):
         request=VehicleHandoverConfirmSerializer,
         responses=VehicleHandoverResponseSerializer,
     )
-    @action(detail=True, methods=["post"])
+    @action(
+        detail=True,
+        methods=["post"],
+        permission_classes=[IsDriverOrTechnicianOrAbove],
+    )
     def confirm(self, request: Request, pk: str | None = None) -> Response:
         """Confirm driver handover result."""
         serializer = VehicleHandoverConfirmSerializer(data=request.data)

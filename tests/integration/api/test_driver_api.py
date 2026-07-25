@@ -392,6 +392,152 @@ class TestDriverAPI:
         assert response.status_code == 409
         assert response.data["error_code"] == "CHECKLIST_HAS_FAILURES"
 
+    def test_driver_exit_center_rejects_when_open_fault_exists(
+        self,
+        authenticated_client: APIClient,
+    ) -> None:
+        """Vehicles with an open fault cannot exit until distribution decides."""
+        driver = DriverModel.objects.create(
+            customer_number="6000002299",
+            name="Exit Blocked Driver",
+            status=DriverStatus.ACTIVE.value,
+        )
+        vehicle = VehicleModel.objects.create(
+            vehicle_number="203200499",
+            license_plate="99و499",
+            status=VehicleStatus.ACTIVE.value,
+            driver1_customer_number=driver.customer_number,
+        )
+        fault = authenticated_client.post(
+            "/api/v1/faults/",
+            {
+                "vehicle_id": str(vehicle.id),
+                "code": "EXT-01",
+                "description": "Open fault blocks exit",
+                "severity": "MEDIUM",
+            },
+            format="json",
+        )
+        assert fault.status_code == 201, fault.data
+
+        created = authenticated_client.post(
+            "/api/v1/inspections/",
+            {
+                "vehicle_id": str(vehicle.id),
+                "driver_id": str(driver.id),
+                "inspection_type": "PRE_TRIP",
+                "odometer_value": 12000,
+                "odometer_unit": "KM",
+                "inspected_at": datetime(2026, 7, 22, 8, 0, tzinfo=UTC).isoformat(),
+                "items": [
+                    {
+                        "category": "ایمنی",
+                        "description": "کمربند ایمنی",
+                        "result": "PASS",
+                    }
+                ],
+            },
+            format="json",
+        )
+        assert created.status_code == 201, created.data
+        submitted = authenticated_client.post(
+            f"/api/v1/inspections/{created.data['id']}/submit/",
+            {},
+            format="json",
+        )
+        assert submitted.status_code == 200, submitted.data
+
+        response = authenticated_client.post(
+            f"/api/v1/drivers/{driver.id}/exit-center/",
+            {
+                "vehicle_id": str(vehicle.id),
+                "inspection_id": created.data["id"],
+            },
+            format="json",
+        )
+
+        assert response.status_code == 422, response.data
+        assert response.data["error_code"] == "VEHICLE_HAS_OPEN_FAULT_OR_REPAIR"
+
+    def test_driver_exit_center_allowed_after_distribution_usable_on_failed_checklist(
+        self,
+        authenticated_client: APIClient,
+    ) -> None:
+        """After usable, exit is allowed on the same failed checklist."""
+        driver = DriverModel.objects.create(
+            customer_number="6000002300",
+            name="Usable Exit Driver",
+            status=DriverStatus.ACTIVE.value,
+        )
+        vehicle = VehicleModel.objects.create(
+            vehicle_number="203200500",
+            license_plate="88و500",
+            status=VehicleStatus.ACTIVE.value,
+            driver1_customer_number=driver.customer_number,
+        )
+        created = authenticated_client.post(
+            "/api/v1/inspections/",
+            {
+                "vehicle_id": str(vehicle.id),
+                "driver_id": str(driver.id),
+                "inspection_type": "PRE_TRIP",
+                "odometer_value": 12000,
+                "odometer_unit": "KM",
+                "inspected_at": datetime(2026, 7, 22, 8, 0, tzinfo=UTC).isoformat(),
+                "items": [
+                    {
+                        "category": "ترمز",
+                        "description": "لنت ترمز",
+                        "result": "FAIL",
+                        "notes": "نیازمند بررسی",
+                        "severity": "HIGH",
+                    }
+                ],
+            },
+            format="json",
+        )
+        assert created.status_code == 201, created.data
+        submitted = authenticated_client.post(
+            f"/api/v1/inspections/{created.data['id']}/submit/",
+            {},
+            format="json",
+        )
+        assert submitted.status_code == 200, submitted.data
+        reported = authenticated_client.post(
+            f"/api/v1/inspections/{created.data['id']}/report-fault/",
+            {},
+            format="json",
+        )
+        assert reported.status_code == 201, reported.data
+
+        blocked = authenticated_client.post(
+            f"/api/v1/drivers/{driver.id}/exit-center/",
+            {
+                "vehicle_id": str(vehicle.id),
+                "inspection_id": created.data["id"],
+            },
+            format="json",
+        )
+        assert blocked.status_code == 422, blocked.data
+
+        usable = authenticated_client.post(
+            f"/api/v1/faults/{reported.data['id']}/distribution-usable/",
+            {"note": "minor issue"},
+            format="json",
+        )
+        assert usable.status_code == 200, usable.data
+
+        response = authenticated_client.post(
+            f"/api/v1/drivers/{driver.id}/exit-center/",
+            {
+                "vehicle_id": str(vehicle.id),
+                "inspection_id": created.data["id"],
+            },
+            format="json",
+        )
+        assert response.status_code == 200, response.data
+        assert response.data["status"] == "EXITED_CENTER"
+
     def test_list_without_status_filter_returns_all_statuses(
         self,
         authenticated_client: APIClient,

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from decimal import Decimal
 
 from apps.handover.application.dto.handover_dto import (
     ConfirmVehicleHandoverDTO,
@@ -30,12 +29,7 @@ from apps.repair.domain.interfaces.external_invoice_repository import (
     IExternalRepairInvoiceRepository,
 )
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
-from apps.repair.domain.invoice_entities import (
-    ExternalRepairInvoice,
-    ExternalRepairInvoiceStatus,
-)
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
-from core.exceptions.base_exception import FMMSValidationError
 from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
 
@@ -107,13 +101,14 @@ class ConfirmVehicleHandoverService:
         self._repair_repo = repair_order_repository
         self._vehicle_repo = vehicle_repository
         self._event_recorder = event_recorder
+        # Kept for DI compatibility; invoices are uploaded by transport later.
         self._invoice_repo = invoice_repository
 
     def execute(self, dto: ConfirmVehicleHandoverDTO) -> VehicleHandoverResponseDTO:
         """Confirm handover and apply driver decision.
 
-        On accept for EXTERNAL repairs, the driver must upload the workshop
-        invoice in the same confirmation request.
+        On accept, the repair moves to transport final approval. External
+        workshop invoices are uploaded later by transport (not by the driver).
 
         On reject, opens a new RepairOrder for the same vehicle/fault without
         creating a duplicate Fault. The vehicle remains unavailable.
@@ -128,9 +123,6 @@ class ConfirmVehicleHandoverService:
             message=f"Repair order '{handover.repair_order_id}' not found.",
             details={"repair_order_id": str(handover.repair_order_id)},
         )
-
-        if dto.accepted and repair_order.workshop_type == WorkshopType.EXTERNAL:
-            _require_external_invoice_payload(dto, repair_order)
 
         handover.confirm(
             dto.accepted,
@@ -154,13 +146,16 @@ class ConfirmVehicleHandoverService:
                 created_by_id=dto.confirmed_by,
                 request_id=dto.request_id,
             )
+            waiting_message = "در انتظار تایید نهایی واحد ترابری."
             if repair_order.workshop_type == WorkshopType.EXTERNAL:
-                self._upload_external_invoice(dto, repair_order)
+                waiting_message = (
+                    "در انتظار تایید نهایی واحد ترابری و آپلود فاکتور تعمیرگاه بیرونی."
+                )
             record_repair_timeline_event(
                 self._event_recorder,
                 repair_order.id,
                 RepairOrderEventType.WAITING_TRANSPORT_FINAL_APPROVAL,
-                "در انتظار تایید نهایی واحد ترابری.",
+                waiting_message,
                 created_by_id=dto.confirmed_by,
                 request_id=dto.request_id,
             )
@@ -197,63 +192,3 @@ class ConfirmVehicleHandoverService:
                 },
             )
         return _to_dto(saved_handover)
-
-    def _upload_external_invoice(
-        self,
-        dto: ConfirmVehicleHandoverDTO,
-        repair_order: RepairOrder,
-    ) -> None:
-        """Persist the invoice provided by the driver at handover accept."""
-        if self._invoice_repo is None:
-            raise RuntimeError(
-                "ConfirmVehicleHandoverService requires invoice repository for EXTERNAL."
-            )
-        if dto.invoice_amount is None or not dto.invoice_currency:
-            raise FMMSValidationError(
-                message="Invoice amount and currency are required for external repair handover.",
-                error_code="EXTERNAL_HANDOVER_INVOICE_REQUIRED",
-                details={"repair_order_id": str(repair_order.id)},
-            )
-
-        now = datetime.now(tz=UTC)
-        self._invoice_repo.save(
-            ExternalRepairInvoice(
-                id=uuid.uuid4(),
-                repair_order_id=repair_order.id,
-                amount=float(dto.invoice_amount),
-                currency=dto.invoice_currency,
-                status=ExternalRepairInvoiceStatus.UPLOADED,
-                created_by_id=dto.confirmed_by,
-                created_at=now,
-                updated_at=now,
-                vendor_id=dto.invoice_vendor_id,
-                document=dto.invoice_document,
-            )
-        )
-        record_repair_timeline_event(
-            self._event_recorder,
-            repair_order.id,
-            RepairOrderEventType.INVOICE_UPLOADED,
-            "فاکتور تعمیرگاه خارجی هنگام تایید تحویل راننده بارگذاری شد.",
-            created_by_id=dto.confirmed_by,
-            request_id=dto.request_id,
-        )
-
-
-def _require_external_invoice_payload(
-    dto: ConfirmVehicleHandoverDTO,
-    repair_order: RepairOrder,
-) -> None:
-    """Validate that EXTERNAL accept includes invoice amount and currency."""
-    if dto.invoice_amount is None or dto.invoice_amount <= Decimal("0"):
-        raise FMMSValidationError(
-            message="Driver must upload invoice amount when accepting external repair handover.",
-            error_code="EXTERNAL_HANDOVER_INVOICE_REQUIRED",
-            details={"repair_order_id": str(repair_order.id)},
-        )
-    if not dto.invoice_currency:
-        raise FMMSValidationError(
-            message="Driver must provide invoice currency when accepting external repair handover.",
-            error_code="EXTERNAL_HANDOVER_INVOICE_REQUIRED",
-            details={"repair_order_id": str(repair_order.id)},
-        )
