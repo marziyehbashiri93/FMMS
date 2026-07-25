@@ -271,7 +271,7 @@ BAPI_PM_ORDER_COMPLETE_SUCCESS: dict = {
 BAPI_PM_ORDER_GET_SUCCESS: dict = {
     "ORDER_HEADER_DATA": {
         "ORDERID": "20000001",
-        "EQUNR": "10000001",
+        "EQUNR": "20320",
         "AUART": "PM01",
         "SYSST": "REL",
         "GSTRP": _TODAY,

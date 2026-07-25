@@ -506,12 +506,12 @@ class TestSyncVehiclesFromSAPService:
         sap_port = FakeSAPVehicleDriverPort(
             vehicle_drivers=[
                 SAPVehicleDriverDTO(
-                    vehicle_number="10000001",
-                    license_plate="10000001",
+                    vehicle_number="20320",
+                    license_plate="237ع51-11",
                 ),
                 SAPVehicleDriverDTO(
-                    vehicle_number="10000002",
-                    license_plate="10000002",
+                    vehicle_number="20322",
+                    license_plate="394ع22-11",
                 ),
             ]
         )
@@ -528,13 +528,13 @@ class TestSyncVehiclesFromSAPService:
         assert len(repo.driver_assignment_snapshots) == 4
 
     def test_updates_existing_vehicle_by_vehicle_number(self) -> None:
-        vehicle = _make_vehicle(plate="EQ10000001", sap_eq="10000001")
+        vehicle = _make_vehicle(plate="237ع51-11", sap_eq="20320")
         repo = FakeVehicleRepository(initial=[vehicle])
         sap_port = FakeSAPVehicleDriverPort(
             vehicle_drivers=[
                 SAPVehicleDriverDTO(
-                    vehicle_number="10000001",
-                    license_plate="10000001",
+                    vehicle_number="20320",
+                    license_plate="237ع51-11",
                 )
             ]
         )
@@ -544,7 +544,7 @@ class TestSyncVehiclesFromSAPService:
         assert result.created == 0
         assert result.updated == 1
         assert result.failed == 0
-        assert repo.get_by_id(vehicle.id).vehicle_number.value == "10000001"
+        assert repo.get_by_id(vehicle.id).vehicle_number.value == "20320"
         assert len(repo.driver_assignment_snapshots) == 2
 
     def test_sync_is_idempotent(self) -> None:
@@ -552,8 +552,8 @@ class TestSyncVehiclesFromSAPService:
         sap_port = FakeSAPVehicleDriverPort(
             vehicle_drivers=[
                 SAPVehicleDriverDTO(
-                    vehicle_number="10000001",
-                    license_plate="10000001",
+                    vehicle_number="20320",
+                    license_plate="237ع51-11",
                 )
             ]
         )

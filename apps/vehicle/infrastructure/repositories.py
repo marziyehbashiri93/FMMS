@@ -24,6 +24,11 @@ from core.logging.structured_logger import get_structured_logger
 
 logger = get_structured_logger(domain="vehicle", module=__name__)
 
+# Retired API_EQUIPMENT mock vehicles (plates EQ10000001 / EQ10000002).
+_OBSOLETE_LEGACY_MOCK_VEHICLE_NUMBERS: frozenset[str] = frozenset(
+    {"10000001", "10000002"}
+)
+
 
 def _to_domain(orm: VehicleModel) -> Vehicle:
     """Map a VehicleModel ORM instance to a Vehicle domain entity.
@@ -187,17 +192,26 @@ class DjangoVehicleRepository(IVehicleRepository):
         return vehicle
 
     def decommission_missing_from_sap(self, seen_vehicle_numbers: set[str]) -> int:
-        """Mark vehicles absent from SAP as DECOMMISSIONED without soft-delete."""
+        """Mark vehicles absent from SAP as DECOMMISSIONED without soft-delete.
+
+        Also hard-deletes retired demo equipment rows (``10000001`` /
+        ``10000002`` / ``EQ…`` plates) left over from the old
+        ``API_EQUIPMENT`` mock so they never reappear in the vehicle list.
+        """
         now = datetime.now(tz=UTC)
         qs = VehicleModel.objects.exclude(
             status=VehicleStatus.DECOMMISSIONED.value
         ).exclude(vehicle_number="")
         if seen_vehicle_numbers:
             qs = qs.exclude(vehicle_number__in=seen_vehicle_numbers)
-        return qs.update(
+        updated = qs.update(
             status=VehicleStatus.DECOMMISSIONED.value,
             updated_at=now,
         )
+        VehicleModel.objects.filter(
+            vehicle_number__in=_OBSOLETE_LEGACY_MOCK_VEHICLE_NUMBERS
+        ).delete()
+        return updated
 
     def record_driver_assignment_snapshot(
         self,

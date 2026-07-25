@@ -68,6 +68,11 @@ _WORKFLOW_VEHICLE_STATUSES: frozenset[str] = frozenset(
     }
 )
 
+# Retired API_EQUIPMENT mock vehicles (EQ10000001 / EQ10000002).
+_OBSOLETE_LEGACY_MOCK_VEHICLE_NUMBERS: frozenset[str] = frozenset(
+    {"10000001", "10000002"}
+)
+
 
 class Command(BaseCommand):
     """Wipe operational workflow data; keep vehicles, templates, and users."""
@@ -113,6 +118,9 @@ class Command(BaseCommand):
             status__in=_WORKFLOW_VEHICLE_STATUSES,
             is_deleted=False,
         ).count()
+        obsolete_vehicles = VehicleModel.objects.filter(
+            vehicle_number__in=_OBSOLETE_LEGACY_MOCK_VEHICLE_NUMBERS,
+        ).count()
 
         self.stdout.write(self.style.WARNING("Tables that will be cleared:"))
         for label, count in counts:
@@ -120,8 +128,11 @@ class Command(BaseCommand):
         self.stdout.write(
             f"  - vehicles status reset → ACTIVE: {vehicles_to_reset} row(s)"
         )
+        self.stdout.write(
+            f"  - obsolete mock vehicles removed: {obsolete_vehicles} row(s)"
+        )
         self.stdout.write(self.style.SUCCESS("Preserved:"))
-        self.stdout.write("  - vehicle")
+        self.stdout.write("  - vehicle (except retired mock equipment 10000001/02)")
         self.stdout.write("  - inspection_template")
         self.stdout.write("  - users (AUTH_USER_MODEL)")
 
@@ -136,14 +147,19 @@ class Command(BaseCommand):
 
         with transaction.atomic():
             deleted_summary = self._delete_all()
+            obsolete_deleted, _ = VehicleModel.objects.filter(
+                vehicle_number__in=_OBSOLETE_LEGACY_MOCK_VEHICLE_NUMBERS,
+            ).delete()
             reset_n = VehicleModel.objects.filter(
                 is_deleted=False,
+                status__in=_WORKFLOW_VEHICLE_STATUSES,
             ).update(status=VehicleStatus.ACTIVE.value)
 
         for label, deleted in deleted_summary:
             self.stdout.write(f"Deleted {label}: {deleted}")
         self.stdout.write(
             self.style.SUCCESS(
+                f"Removed {obsolete_deleted} obsolete mock vehicle(s). "
                 f"Reset {reset_n} vehicle(s) to ACTIVE. Workflow data cleared."
             )
         )
