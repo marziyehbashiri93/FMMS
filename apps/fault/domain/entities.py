@@ -123,6 +123,7 @@ class Fault:
     sap_defect_code: SAPDefectCode | None = field(default=None)
     sap_notification_number: str | None = field(default=None)
     assigned_to_id: uuid.UUID | None = field(default=None)
+    distribution_decision_note: str | None = field(default=None)
     items: list[FaultItem] = field(default_factory=list)
 
     def transition_to(self, target: FaultStatus) -> None:

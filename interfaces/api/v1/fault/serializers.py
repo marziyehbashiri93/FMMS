@@ -95,6 +95,9 @@ class FaultResponseSerializer(serializers.Serializer):
     inspection_id = serializers.UUIDField(allow_null=True)
     assigned_to_id = serializers.UUIDField(allow_null=True)
     sap_notification_number = serializers.CharField(allow_null=True)
+    distribution_decision_note = serializers.CharField(
+        allow_null=True, required=False, allow_blank=True
+    )
     items = FaultItemResponseSerializer(many=True)
     created_by = UserProfileSummarySerializer(allow_null=True, required=False)
 

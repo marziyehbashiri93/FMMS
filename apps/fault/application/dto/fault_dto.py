@@ -149,5 +149,6 @@ class FaultResponseDTO:
     inspection_id: uuid.UUID | None = field(default=None)
     assigned_to_id: uuid.UUID | None = field(default=None)
     sap_notification_number: str | None = field(default=None)
+    distribution_decision_note: str | None = field(default=None)
     items: list[FaultItemResponseDTO] = field(default_factory=list)
     created_by: UserProfileSummaryDTO | None = field(default=None)

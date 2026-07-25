@@ -25,6 +25,9 @@ class FaultModel(BaseModel):
     sap_defect_code = models.CharField(max_length=30, blank=True, default="")
     sap_notification_number = models.CharField(max_length=30, blank=True, default="")
     assigned_to_id = models.UUIDField(null=True, blank=True, default=None)
+    distribution_decision_note = models.CharField(
+        max_length=500, blank=True, default=""
+    )
 
     class Meta:
         app_label = "fault"

@@ -79,6 +79,10 @@ class DistributionFaultDecisionService:
             message=f"Fault '{dto.fault_id}' not found.",
             details={"fault_id": str(dto.fault_id)},
         )
+        if dto.note:
+            fault.distribution_decision_note = dto.note
+            fault.updated_at = datetime.now(tz=UTC)
+            fault = self._fault_repo.save(fault)
         vehicle = load_or_not_found(
             lambda: self._vehicle_repo.get_by_id(fault.vehicle_id),
             message=f"Vehicle '{fault.vehicle_id}' not found.",
@@ -132,6 +136,8 @@ class DistributionFaultDecisionService:
             self._vehicle_repo.save(vehicle)
 
         fault.mark_awaiting_transport()
+        if dto.note:
+            fault.distribution_decision_note = dto.note
         fault.updated_at = now
         fault = self._fault_repo.save(fault)
         repair = self._ensure_repair_order_for_transport_queue(

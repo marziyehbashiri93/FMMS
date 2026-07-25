@@ -73,6 +73,7 @@ def _to_response_dto(
         inspection_id=fault.inspection_id,
         assigned_to_id=fault.assigned_to_id,
         sap_notification_number=fault.sap_notification_number,
+        distribution_decision_note=fault.distribution_decision_note,
         items=[
             FaultItemResponseDTO(
                 id=item.id,
