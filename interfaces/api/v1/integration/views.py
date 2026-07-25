@@ -10,13 +10,14 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
-from apps.integration.domain.entities import SAPTransactionStatus
+from apps.integration.domain.entities import SAPObjectType, SAPTransactionStatus
 from core.permissions import IsFMMSAuthenticated, IsSupervisorOrAbove
 from interfaces.api.v1 import deps
 from interfaces.api.v1.integration.serializers import (
     SAPSyncRunHistorySerializer,
     SAPSyncRunResponseSerializer,
     SAPTransactionResponseSerializer,
+    SAPTransactionSummarySerializer,
 )
 from interfaces.api.v1.schema_tags import API_TAGS
 from interfaces.api.v1.utils import paginate_dto_list, request_id_from, user_id_from
@@ -41,15 +42,20 @@ class SAPTransactionViewSet(GenericViewSet):
         responses=SAPTransactionResponseSerializer(many=True),
     )
     def list(self, request: Request) -> Response:
-        """List SAP transactions, optionally filtered by status."""
+        """List SAP transactions, optionally filtered by status/object_type."""
         repo = deps.get_sap_transaction_repository()
         status_raw = request.query_params.get("status")
+        object_type_raw = request.query_params.get("object_type")
         if status_raw:
             items = repo.list_by_status(SAPTransactionStatus(status_raw))
         else:
             items = []
             for txn_status in SAPTransactionStatus:
                 items.extend(repo.list_by_status(txn_status))
+        if object_type_raw:
+            object_type = SAPObjectType(object_type_raw)
+            items = [item for item in items if item.object_type == object_type]
+        items.sort(key=lambda item: item.created_at, reverse=True)
         page = paginate_dto_list(self, items)
         serializer = SAPTransactionResponseSerializer(
             page if page is not None else items, many=True
@@ -57,6 +63,37 @@ class SAPTransactionViewSet(GenericViewSet):
         if page is not None:
             return self.get_paginated_response(serializer.data)
         return Response(serializer.data)
+
+    @extend_schema(
+        tags=[API_TAGS.integration],
+        responses=SAPTransactionSummarySerializer,
+    )
+    @action(detail=False, methods=["get"], url_path="summary")
+    def summary(self, request: Request) -> Response:
+        """Return aggregate SAP transaction counts for dashboard cards."""
+        del request
+        repo = deps.get_sap_transaction_repository()
+        by_status: dict[SAPTransactionStatus, int] = {}
+        last_created_at = None
+        total = 0
+        for txn_status in SAPTransactionStatus:
+            items = repo.list_by_status(txn_status)
+            by_status[txn_status] = len(items)
+            total += len(items)
+            for item in items:
+                if last_created_at is None or item.created_at > last_created_at:
+                    last_created_at = item.created_at
+        payload = {
+            "total": total,
+            "success": by_status.get(SAPTransactionStatus.SUCCESS, 0),
+            "failed": by_status.get(SAPTransactionStatus.FAILED, 0)
+            + by_status.get(SAPTransactionStatus.RETRYING, 0),
+            "pending": by_status.get(SAPTransactionStatus.PENDING, 0)
+            + by_status.get(SAPTransactionStatus.IN_PROGRESS, 0),
+            "exhausted": by_status.get(SAPTransactionStatus.EXHAUSTED, 0),
+            "last_created_at": last_created_at,
+        }
+        return Response(SAPTransactionSummarySerializer(payload).data)
 
 
 class SAPSyncViewSet(GenericViewSet):

@@ -52,6 +52,20 @@ class TestIntegrationAPI:
         assert retrieved.status_code == 200
         assert retrieved.data["id"] == str(saved.id)
         assert retrieved.data["status"] == "PENDING"
+        assert retrieved.data["section"] == "خرابی / اعلان PM"
+        assert retrieved.data["protocol"] == "BAPI"
+        assert retrieved.data["request_payload"] == {"action": "CREATE_NOTIFICATION"}
+
+        by_type = authenticated_client.get(
+            "/api/v1/sap-transactions/?object_type=FAULT"
+        )
+        assert by_type.status_code == 200
+        assert by_type.data["count"] >= 1
+
+        summary = authenticated_client.get("/api/v1/sap-transactions/summary/")
+        assert summary.status_code == 200
+        assert summary.data["total"] >= 1
+        assert summary.data["pending"] >= 1
 
     def test_global_sap_sync_uses_mock_odata_fixtures(
         self, authenticated_client: APIClient, monkeypatch: pytest.MonkeyPatch
