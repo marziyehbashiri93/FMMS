@@ -80,7 +80,12 @@ from apps.material.application.services.material_request_service import (
     ApproveMaterialRequestService,
     CreateMaterialRequestService,
     ListMaterialRequestsService,
+    ReceiveMaterialRequestService,
     RejectMaterialRequestService,
+)
+from apps.material.application.services.sync_central_stock_from_sap_service import (
+    ListCentralStockService,
+    SyncCentralStockFromSAPService,
 )
 from apps.material.infrastructure.inventory_adapter import (
     StubInventoryAvailabilityAdapter,
@@ -89,6 +94,7 @@ from apps.material.infrastructure.repositories import (
     DjangoInventoryTransactionRepository,
     DjangoMaterialRequestRepository,
 )
+from apps.material.infrastructure.stock_repositories import DjangoCentralStockRepository
 from apps.preventive_maintenance.application.services.complete_pm_work_order_service import (
     CompletePMWorkOrderService,
 )
@@ -174,6 +180,9 @@ from apps.repair.application.services.update_repair_status_service import (
     CompleteRepairOrderService,
     StartRepairService,
 )
+from apps.repair.application.services.workshop_technical_decision_service import (
+    WorkshopTechnicalDecisionService,
+)
 from apps.repair.infrastructure.event_repositories import (
     DjangoRepairOrderEventRepository,
 )
@@ -222,6 +231,9 @@ from infrastructure.sap.adapters.bapi.vehicle_assignment_bapi_adapter import (
 )
 from infrastructure.sap.adapters.bapi.vehicle_measurement_bapi_adapter import (
     VehicleMeasurementBAPIAdapter,
+)
+from infrastructure.sap.adapters.odata.central_stock_odata_adapter import (
+    CentralStockODataAdapter,
 )
 from infrastructure.sap.adapters.odata.fault_catalog_odata_adapter import (
     FaultCatalogODataAdapter,
@@ -313,6 +325,11 @@ def get_fault_catalog_repository() -> DjangoFaultCatalogRepository:
 def get_material_request_repository() -> DjangoMaterialRequestRepository:
     """Return the material request repository."""
     return DjangoMaterialRequestRepository()
+
+
+def get_central_stock_repository() -> DjangoCentralStockRepository:
+    """Return the central warehouse stock repository."""
+    return DjangoCentralStockRepository()
 
 
 def get_inventory_transaction_repository() -> DjangoInventoryTransactionRepository:
@@ -567,12 +584,31 @@ def get_sync_fault_catalog_from_sap_service() -> SyncFaultCatalogFromSAPService:
     )
 
 
+def get_list_central_stock_service() -> ListCentralStockService:
+    """Return ListCentralStockService."""
+    return ListCentralStockService(get_central_stock_repository())
+
+
+def get_sync_central_stock_from_sap_service() -> SyncCentralStockFromSAPService:
+    """Return SyncCentralStockFromSAPService."""
+    config = SAPConfig.from_env()
+    return SyncCentralStockFromSAPService(
+        get_central_stock_repository(),
+        CentralStockODataAdapter(
+            _sap_odata_client(),
+            service=config.central_stock_service,
+            entity_set=config.central_stock_entity_set,
+        ),
+    )
+
+
 def get_run_sap_sync_service() -> RunSAPSyncService:
     """Return the global SAP read-sync orchestration service."""
     return RunSAPSyncService(
         get_sync_vehicles_from_sap_service(),
         get_sync_inspection_templates_from_sap_service(),
         get_sync_fault_catalog_from_sap_service(),
+        get_sync_central_stock_from_sap_service(),
     )
 
 
@@ -716,21 +752,26 @@ def get_list_external_workshop_referral_requests_service() -> (
     )
 
 
-def get_accept_repair_order_service() -> AcceptRepairOrderService:
-    """Return AcceptRepairOrderService."""
-    return AcceptRepairOrderService(
+def get_workshop_technical_decision_service() -> WorkshopTechnicalDecisionService:
+    """Return WorkshopTechnicalDecisionService."""
+    return WorkshopTechnicalDecisionService(
         get_repair_order_repository(),
+        get_vehicle_repository(),
+        get_fault_repository(),
+        get_sync_repair_to_sap_service(),
+        get_vehicle_handover_repository(),
         get_record_repair_order_event_service(),
     )
+
+
+def get_accept_repair_order_service() -> AcceptRepairOrderService:
+    """Return AcceptRepairOrderService (maps to repairable decision)."""
+    return AcceptRepairOrderService(get_workshop_technical_decision_service())
 
 
 def get_reject_repair_order_service() -> RejectRepairOrderService:
-    """Return RejectRepairOrderService."""
-    return RejectRepairOrderService(
-        get_repair_order_repository(),
-        get_vehicle_repository(),
-        get_record_repair_order_event_service(),
-    )
+    """Return RejectRepairOrderService (maps to عدم نیاز به تعمیر)."""
+    return RejectRepairOrderService(get_workshop_technical_decision_service())
 
 
 def get_approve_transport_handover_service() -> ApproveTransportHandoverService:
@@ -782,6 +823,15 @@ def get_reject_material_request_service() -> RejectMaterialRequestService:
     """Return RejectMaterialRequestService."""
     return RejectMaterialRequestService(
         get_material_request_repository(),
+        get_record_repair_order_event_service(),
+    )
+
+
+def get_receive_material_request_service() -> ReceiveMaterialRequestService:
+    """Return ReceiveMaterialRequestService."""
+    return ReceiveMaterialRequestService(
+        get_material_request_repository(),
+        get_repair_order_repository(),
         get_record_repair_order_event_service(),
     )
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from abc import ABC, abstractmethod
 
-from apps.repair.domain.entities import RepairOrder, RepairOrderStatus
+from apps.repair.domain.entities import RepairOrder, RepairOrderStatus, WorkshopType
 
 
 class IRepairOrderRepository(ABC):
@@ -56,8 +56,9 @@ class IRepairOrderRepository(ABC):
     def list_all(
         self,
         status: RepairOrderStatus | None = None,
+        workshop_type: WorkshopType | None = None,
     ) -> list[RepairOrder]:
-        """Return all repair orders, optionally filtered by status."""
+        """Return all repair orders, optionally filtered by status/workshop."""
 
     @abstractmethod
     def list_active_by_vehicle(self, vehicle_id: uuid.UUID) -> list[RepairOrder]:

@@ -25,6 +25,23 @@ class RepairAssignSerializer(serializers.Serializer):
     technician_id = serializers.UUIDField()
 
 
+class RepairApproveSerializer(serializers.Serializer):
+    """Optional note for transport approval."""
+
+    note = serializers.CharField(
+        max_length=500, required=False, allow_blank=True, trim_whitespace=True
+    )
+
+
+class WorkshopTechnicalDecisionSerializer(serializers.Serializer):
+    """Validate central-workshop technical inspection decision."""
+
+    repairable = serializers.BooleanField()
+    note = serializers.CharField(
+        max_length=500, required=False, allow_blank=True, trim_whitespace=True
+    )
+
+
 class RepairAssignWorkshopSerializer(serializers.Serializer):
     """Validate workshop type selection after transport approval."""
 
@@ -150,6 +167,8 @@ class RepairOrderResponseSerializer(serializers.Serializer):
     )
     workshop_id = serializers.CharField(allow_null=True)
     transport_rejection_reason = serializers.CharField(allow_null=True, required=False)
+    transport_approval_note = serializers.CharField(allow_null=True, required=False)
+    workshop_decision_note = serializers.CharField(allow_null=True, required=False)
     completed_at = serializers.DateTimeField(allow_null=True)
 
 

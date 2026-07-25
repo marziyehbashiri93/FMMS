@@ -219,7 +219,7 @@ class FakeRepairRepository(IRepairOrderRepository):
     def list_by_fault(self, fault_id: uuid.UUID) -> list[RepairOrder]:
         return [o for o in self._store.values() if o.fault_id == fault_id]
 
-    def list_all(self, status: RepairOrderStatus | None = None) -> list[RepairOrder]:
+    def list_all(self, status: RepairOrderStatus | None = None, workshop_type=None) -> list[RepairOrder]:
         if status is None:
             return list(self._store.values())
         return [o for o in self._store.values() if o.status == status]

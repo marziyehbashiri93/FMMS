@@ -98,6 +98,28 @@ class TestFaultCatalogAPI:
         assert ordered == sorted(ordered)
 
 
+class TestCentralStockAPI:
+    """Cover central warehouse stock list API after global SAP sync."""
+
+    def test_sync_and_list_central_stock(
+        self, authenticated_client: APIClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("SAP_USE_MOCK", "True")
+        synced = authenticated_client.post("/api/v1/sap-sync/", {}, format="json")
+        assert synced.status_code == 200, synced.data
+
+        listed = authenticated_client.get(
+            "/api/v1/central-stock/?storage_location=KH08&search=60001764"
+        )
+
+        assert listed.status_code == 200, listed.data
+        results = listed.data["results"] if "results" in listed.data else listed.data
+        assert len(results) >= 1
+        assert all(item["storage_location"] == "KH08" for item in results)
+        assert all("quantity" in item for item in results)
+        assert any(item["material_code"] == "60001764" for item in results)
+
+
 class TestDriverInspectionWorkflowAPI:
     """Cover PASS vs FAIL inspection submit side-effects."""
 

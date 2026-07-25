@@ -43,6 +43,8 @@ def _to_response_dto(order: RepairOrder) -> RepairOrderResponseDTO:
         workshop_type=order.workshop_type,
         workshop_id=order.workshop_id,
         transport_rejection_reason=order.transport_rejection_reason,
+        transport_approval_note=order.transport_approval_note,
+        workshop_decision_note=order.workshop_decision_note,
         technician_id=order.assignment.technician_id if order.assignment else None,
         assigned_at=order.assignment.assigned_at if order.assignment else None,
         activities=[

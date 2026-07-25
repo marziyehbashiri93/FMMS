@@ -81,3 +81,7 @@ class MaterialRequest:
     def reject(self) -> None:
         """Reject request."""
         self.transition_to(MaterialRequestStatus.REJECTED)
+
+    def receive(self) -> None:
+        """Confirm physical receipt of parts at the workshop."""
+        self.transition_to(MaterialRequestStatus.RECEIVED)

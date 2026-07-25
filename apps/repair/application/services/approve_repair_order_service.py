@@ -100,14 +100,17 @@ class ApproveRepairOrderService:
             message=f"Repair order '{dto.repair_order_id}' not found.",
             details={"repair_order_id": str(dto.repair_order_id)},
         )
-        order.approve()
+        order.approve(dto.note or None)
         order.updated_at = datetime.now(tz=UTC)
         saved = self._repo.save(order)
+        approve_message = _APPROVE_MESSAGE
+        if dto.note:
+            approve_message = f"{_APPROVE_MESSAGE} یادداشت: {dto.note}"
         record_repair_timeline_event(
             self._event_recorder,
             saved.id,
             RepairOrderEventType.TRANSPORT_APPROVED,
-            _APPROVE_MESSAGE,
+            approve_message,
             created_by_id=dto.approved_by,
             request_id=dto.request_id,
         )
@@ -435,15 +438,10 @@ class ListExternalWorkshopReferralRequestsService:
 
 
 class AcceptRepairOrderService:
-    """Accept an internally assigned workshop before technical start."""
+    """Compatibility wrapper: maps accept → repairable technical decision."""
 
-    def __init__(
-        self,
-        repair_order_repository: IRepairOrderRepository,
-        event_recorder: RecordRepairOrderEventService | None = None,
-    ) -> None:
-        self._repo = repair_order_repository
-        self._event_recorder = event_recorder
+    def __init__(self, technical_decision_service: object) -> None:
+        self._technical = technical_decision_service
 
     def execute(
         self,
@@ -451,44 +449,30 @@ class AcceptRepairOrderService:
         request_id: str,
         accepted_by: uuid.UUID,
     ) -> RepairDecisionResponseDTO:
-        """Transition WORKSHOP_ASSIGNED(INTERNAL) to WAITING_WORKSHOP_CONFIRMATION."""
-        order = load_or_not_found(
-            lambda: self._repo.get_by_id(repair_order_id),
-            message=f"Repair order '{repair_order_id}' not found.",
-            details={"repair_order_id": str(repair_order_id)},
+        """Delegate to WorkshopTechnicalDecisionService(repairable=True)."""
+        from apps.repair.application.dto.repair_dto import (  # noqa: PLC0415
+            WorkshopTechnicalDecisionDTO,
         )
-        order.accept_internal_workshop()
-        order.updated_at = datetime.now(tz=UTC)
-        saved = self._repo.save(order)
-        record_repair_timeline_event(
-            self._event_recorder,
-            saved.id,
-            RepairOrderEventType.TECHNICIAN_ACCEPTED,
-            _WORKSHOP_ACCEPTED_MESSAGE,
-            created_by_id=accepted_by,
-            request_id=request_id,
+        from apps.repair.application.services.workshop_technical_decision_service import (  # noqa: PLC0415
+            WorkshopTechnicalDecisionService,
         )
-        return RepairDecisionResponseDTO(
-            id=saved.id,
-            status=saved.status,
-            message=_WORKSHOP_ACCEPTED_MESSAGE,
-            workshop_type=saved.workshop_type,
-            workshop_id=saved.workshop_id,
+
+        assert isinstance(self._technical, WorkshopTechnicalDecisionService)
+        return self._technical.execute(
+            WorkshopTechnicalDecisionDTO(
+                repair_order_id=repair_order_id,
+                repairable=True,
+                request_id=request_id,
+                decided_by=accepted_by,
+            )
         )
 
 
 class RejectRepairOrderService:
-    """Reject repair order at workshop step and cancel workflow."""
+    """Compatibility wrapper: maps reject → عدم نیاز به تعمیر."""
 
-    def __init__(
-        self,
-        repair_order_repository: IRepairOrderRepository,
-        vehicle_repository: IVehicleRepository,
-        event_recorder: RecordRepairOrderEventService | None = None,
-    ) -> None:
-        self._repo = repair_order_repository
-        self._vehicle_repo = vehicle_repository
-        self._event_recorder = event_recorder
+    def __init__(self, technical_decision_service: object) -> None:
+        self._technical = technical_decision_service
 
     def execute(
         self,
@@ -496,36 +480,20 @@ class RejectRepairOrderService:
         request_id: str,
         rejected_by: uuid.UUID,
     ) -> RepairDecisionResponseDTO:
-        """Transition WORKSHOP_ASSIGNED to CANCELLED."""
-        order = load_or_not_found(
-            lambda: self._repo.get_by_id(repair_order_id),
-            message=f"Repair order '{repair_order_id}' not found.",
-            details={"repair_order_id": str(repair_order_id)},
+        """Delegate to WorkshopTechnicalDecisionService(repairable=False)."""
+        from apps.repair.application.dto.repair_dto import (  # noqa: PLC0415
+            WorkshopTechnicalDecisionDTO,
         )
-        order.cancel()
-        order.updated_at = datetime.now(tz=UTC)
-        saved = self._repo.save(order)
-        vehicle = load_or_not_found(
-            lambda: self._vehicle_repo.get_by_id(order.vehicle_id),
-            message=f"Vehicle '{order.vehicle_id}' not found.",
-            details={"vehicle_id": str(order.vehicle_id)},
+        from apps.repair.application.services.workshop_technical_decision_service import (  # noqa: PLC0415
+            WorkshopTechnicalDecisionService,
         )
-        if vehicle.status != VehicleStatus.ACTIVE:
-            vehicle.activate()
-            vehicle.updated_at = datetime.now(tz=UTC)
-            self._vehicle_repo.save(vehicle)
-        record_repair_timeline_event(
-            self._event_recorder,
-            saved.id,
-            RepairOrderEventType.REPAIR_REJECTED,
-            _WORKSHOP_REJECTED_MESSAGE,
-            created_by_id=rejected_by,
-            request_id=request_id,
-        )
-        return RepairDecisionResponseDTO(
-            id=saved.id,
-            status=saved.status,
-            message=_WORKSHOP_REJECTED_MESSAGE,
-            workshop_type=saved.workshop_type,
-            workshop_id=saved.workshop_id,
+
+        assert isinstance(self._technical, WorkshopTechnicalDecisionService)
+        return self._technical.execute(
+            WorkshopTechnicalDecisionDTO(
+                repair_order_id=repair_order_id,
+                repairable=False,
+                request_id=request_id,
+                decided_by=rejected_by,
+            )
         )

@@ -46,6 +46,7 @@ _TERMINAL_STATUSES = {
     RepairOrderStatus.ACCEPTED_BY_DRIVER,
     RepairOrderStatus.REJECTED_BY_DRIVER,
     RepairOrderStatus.REJECTED_BY_TRANSPORT,
+    RepairOrderStatus.NO_REPAIR_NEEDED,
 }
 
 
@@ -103,6 +104,8 @@ def _to_domain(
         workshop_type=WorkshopType(orm.workshop_type) if orm.workshop_type else None,
         workshop_id=orm.workshop_id or None,
         transport_rejection_reason=orm.transport_rejection_reason or None,
+        transport_approval_note=orm.transport_approval_note or None,
+        workshop_decision_note=orm.workshop_decision_note or None,
         completed_at=orm.completed_at,
     )
 
@@ -176,11 +179,14 @@ class DjangoRepairOrderRepository(IRepairOrderRepository):
     def list_all(
         self,
         status: RepairOrderStatus | None = None,
+        workshop_type: WorkshopType | None = None,
     ) -> list[RepairOrder]:
-        """Return all non-deleted repair orders, optionally filtered by status."""
+        """Return all non-deleted repair orders, optionally filtered."""
         qs = RepairOrderModel.objects.filter(is_deleted=False).order_by("-created_at")
         if status is not None:
             qs = qs.filter(status=status.value)
+        if workshop_type is not None:
+            qs = qs.filter(workshop_type=workshop_type.value)
         return [
             _to_domain(orm, list(orm.activities.all()), list(orm.parts.all()))
             for orm in qs
@@ -228,6 +234,8 @@ class DjangoRepairOrderRepository(IRepairOrderRepository):
                     "transport_rejection_reason": (
                         order.transport_rejection_reason or ""
                     ),
+                    "transport_approval_note": order.transport_approval_note or "",
+                    "workshop_decision_note": order.workshop_decision_note or "",
                     "completed_at": order.completed_at,
                     "assigned_technician_id": (
                         order.assignment.technician_id if order.assignment else None

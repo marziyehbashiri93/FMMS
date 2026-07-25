@@ -42,3 +42,22 @@ class MaterialRequestResponseSerializer(serializers.Serializer):
     created_at = serializers.DateTimeField()
     updated_at = serializers.DateTimeField()
     items = MaterialRequestItemResponseSerializer(many=True)
+
+
+class CentralStockResponseSerializer(serializers.Serializer):
+    """Serialize SAP-synced central warehouse stock rows."""
+
+    id = serializers.UUIDField()
+    material = serializers.CharField()
+    plant = serializers.CharField()
+    storage_location = serializers.CharField()
+    inventory_stock_type = serializers.CharField()
+    material_code = serializers.CharField()
+    inventory_stock_type_text = serializers.CharField()
+    quantity = serializers.DecimalField(max_digits=18, decimal_places=3)
+    base_unit = serializers.CharField()
+    stock_value = serializers.DecimalField(max_digits=18, decimal_places=2)
+    display_currency = serializers.CharField()
+    is_active = serializers.BooleanField()
+    created_at = serializers.DateTimeField()
+    updated_at = serializers.DateTimeField()

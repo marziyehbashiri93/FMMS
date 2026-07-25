@@ -190,11 +190,24 @@ class ApproveRepairOrderDTO:
         repair_order_id: UUID of the repair order to approve.
         request_id: Correlation ID for tracing.
         approved_by: UUID of the supervisor/admin approving the order.
+        note: Optional transport approval note.
     """
 
     repair_order_id: uuid.UUID
     request_id: str
     approved_by: uuid.UUID
+    note: str = ""
+
+
+@dataclass(frozen=True)
+class WorkshopTechnicalDecisionDTO:
+    """Input DTO for central-workshop repairable / no-repair-needed decision."""
+
+    repair_order_id: uuid.UUID
+    repairable: bool
+    request_id: str
+    decided_by: uuid.UUID
+    note: str = ""
 
 
 @dataclass(frozen=True)
@@ -268,6 +281,8 @@ class RepairOrderResponseDTO:
     workshop_type: WorkshopType | None = field(default=None)
     workshop_id: str | None = field(default=None)
     transport_rejection_reason: str | None = field(default=None)
+    transport_approval_note: str | None = field(default=None)
+    workshop_decision_note: str | None = field(default=None)
     completed_at: datetime | None = field(default=None)
 
 

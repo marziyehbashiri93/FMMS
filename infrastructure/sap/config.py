@@ -27,6 +27,9 @@ Optional environment variables:
     SAP_FAULT_CATALOG_SERVICE    — Fault catalog OData service
         (default: ZI_B_DEFECTCATALOG9_CDS)
     SAP_FAULT_CATALOG_ENTITY_SET — Fault catalog entity set (default: empty)
+    SAP_CENTRAL_STOCK_SERVICE    — Central warehouse stock OData service
+        (default: ZI_STOCK_KH08_CDS)
+    SAP_CENTRAL_STOCK_ENTITY_SET — Central stock entity set (default: empty)
 """
 
 from __future__ import annotations
@@ -72,6 +75,8 @@ class SAPConfig:
     object_part_catalog_entity_set: str
     fault_catalog_service: str
     fault_catalog_entity_set: str
+    central_stock_service: str
+    central_stock_entity_set: str
 
     @classmethod
     def from_env(cls) -> SAPConfig:
@@ -118,6 +123,14 @@ class SAPConfig:
             "SAP_FAULT_CATALOG_ENTITY_SET",
             "",
         )
+        central_stock_service = os.environ.get(
+            "SAP_CENTRAL_STOCK_SERVICE",
+            "ZI_STOCK_KH08_CDS",
+        )
+        central_stock_entity_set = os.environ.get(
+            "SAP_CENTRAL_STOCK_ENTITY_SET",
+            "",
+        )
 
         try:
             timeout_seconds = int(os.environ.get("SAP_TIMEOUT_SECONDS", "30"))
@@ -161,6 +174,8 @@ class SAPConfig:
             object_part_catalog_entity_set=object_part_catalog_entity_set,
             fault_catalog_service=fault_catalog_service,
             fault_catalog_entity_set=fault_catalog_entity_set,
+            central_stock_service=central_stock_service,
+            central_stock_entity_set=central_stock_entity_set,
         )
 
 

@@ -9,6 +9,7 @@ Application services import from this package only.
 Infrastructure adapters implement these ABCs.
 """
 
+from core.sap.ports.central_stock_port import ISAPCentralStockPort
 from core.sap.ports.fault_catalog_port import ISAPFaultCatalogPort
 from core.sap.ports.goods_issue_port import ISAPGoodsIssuePort
 from core.sap.ports.goods_receipt_port import ISAPGoodsReceiptPort
@@ -24,6 +25,7 @@ from core.sap.ports.service_po_port import ISAPServicePOPort
 from core.sap.ports.vehicle_driver_port import ISAPVehicleDriverPort
 
 __all__ = [
+    "ISAPCentralStockPort",
     "ISAPFaultCatalogPort",
     "ISAPObjectPartCatalogPort",
     "ISAPMaterialPort",

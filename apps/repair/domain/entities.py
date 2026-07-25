@@ -48,6 +48,7 @@ class RepairOrderStatus(StrEnum):
     ACCEPTED_BY_DRIVER = "ACCEPTED_BY_DRIVER"
     REJECTED_BY_DRIVER = "REJECTED_BY_DRIVER"
     REJECTED_BY_TRANSPORT = "REJECTED_BY_TRANSPORT"
+    NO_REPAIR_NEEDED = "NO_REPAIR_NEEDED"
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"
 
@@ -86,7 +87,8 @@ _ALLOWED_TRANSITIONS: dict[RepairOrderStatus, frozenset[RepairOrderStatus]] = {
         {
             RepairOrderStatus.ASSIGNED,
             RepairOrderStatus.WAITING_WORKSHOP_CONFIRMATION,
-            RepairOrderStatus.IN_PROGRESS,  # backward-compat / EXTERNAL shortcut
+            RepairOrderStatus.IN_PROGRESS,
+            RepairOrderStatus.NO_REPAIR_NEEDED,
             RepairOrderStatus.WAITING_DRIVER_CONFIRMATION,
             RepairOrderStatus.CANCELLED,
         }
@@ -94,6 +96,7 @@ _ALLOWED_TRANSITIONS: dict[RepairOrderStatus, frozenset[RepairOrderStatus]] = {
     RepairOrderStatus.WAITING_WORKSHOP_CONFIRMATION: frozenset(
         {
             RepairOrderStatus.IN_PROGRESS,
+            RepairOrderStatus.NO_REPAIR_NEEDED,
             RepairOrderStatus.CANCELLED,
         }
     ),
@@ -128,6 +131,7 @@ _ALLOWED_TRANSITIONS: dict[RepairOrderStatus, frozenset[RepairOrderStatus]] = {
     RepairOrderStatus.ACCEPTED_BY_DRIVER: frozenset({RepairOrderStatus.COMPLETED}),
     RepairOrderStatus.REJECTED_BY_DRIVER: frozenset(),
     RepairOrderStatus.REJECTED_BY_TRANSPORT: frozenset(),
+    RepairOrderStatus.NO_REPAIR_NEEDED: frozenset(),
     RepairOrderStatus.COMPLETED: frozenset(),
     RepairOrderStatus.CANCELLED: frozenset(),
 }
@@ -151,6 +155,7 @@ _TERMINAL_STATUSES: frozenset[RepairOrderStatus] = frozenset(
         RepairOrderStatus.CANCELLED,
         RepairOrderStatus.REJECTED_BY_DRIVER,
         RepairOrderStatus.REJECTED_BY_TRANSPORT,
+        RepairOrderStatus.NO_REPAIR_NEEDED,
     }
 )
 
@@ -230,6 +235,8 @@ class RepairOrder:
     workshop_type: WorkshopType | None = field(default=None)
     workshop_id: str | None = field(default=None)
     transport_rejection_reason: str | None = field(default=None)
+    transport_approval_note: str | None = field(default=None)
+    workshop_decision_note: str | None = field(default=None)
     completed_at: datetime | None = field(default=None)
 
     def _assert_mutable(self, operation: str) -> None:
@@ -282,12 +289,14 @@ class RepairOrder:
         self.transition_to(RepairOrderStatus.ASSIGNED)
         self.assignment = assignment
 
-    def approve(self) -> None:
+    def approve(self, note: str | None = None) -> None:
         """Approve the repair order for continuation (transport supervisor).
 
         Raises:
             RepairOrderInvalidStateTransitionError: If not in CREATED status.
         """
+        if note:
+            self.transport_approval_note = note
         self.transition_to(RepairOrderStatus.APPROVED)
 
     def reject_by_transport(self, reason: str) -> None:
@@ -326,6 +335,44 @@ class RepairOrder:
                 target_status=RepairOrderStatus.WAITING_WORKSHOP_CONFIRMATION.value,
             )
         self.transition_to(RepairOrderStatus.WAITING_WORKSHOP_CONFIRMATION)
+
+    def mark_repairable(self, note: str | None = None) -> None:
+        """Workshop confirms the vehicle needs repair (before PM Order / start)."""
+        if self.workshop_type != WorkshopType.INTERNAL:
+            raise RepairOrderInvalidStateTransitionError(
+                current_status=self.status.value,
+                target_status=RepairOrderStatus.IN_PROGRESS.value,
+            )
+        if self.status not in (
+            RepairOrderStatus.WORKSHOP_ASSIGNED,
+            RepairOrderStatus.WAITING_WORKSHOP_CONFIRMATION,
+        ):
+            raise RepairOrderInvalidStateTransitionError(
+                current_status=self.status.value,
+                target_status=RepairOrderStatus.IN_PROGRESS.value,
+            )
+        if note:
+            self.workshop_decision_note = note
+        self.transition_to(RepairOrderStatus.IN_PROGRESS)
+
+    def mark_no_repair_needed(self, note: str | None = None) -> None:
+        """Workshop decides the vehicle does not need repair (عدم نیاز به تعمیر)."""
+        if self.workshop_type != WorkshopType.INTERNAL:
+            raise RepairOrderInvalidStateTransitionError(
+                current_status=self.status.value,
+                target_status=RepairOrderStatus.NO_REPAIR_NEEDED.value,
+            )
+        if self.status not in (
+            RepairOrderStatus.WORKSHOP_ASSIGNED,
+            RepairOrderStatus.WAITING_WORKSHOP_CONFIRMATION,
+        ):
+            raise RepairOrderInvalidStateTransitionError(
+                current_status=self.status.value,
+                target_status=RepairOrderStatus.NO_REPAIR_NEEDED.value,
+            )
+        if note:
+            self.workshop_decision_note = note
+        self.transition_to(RepairOrderStatus.NO_REPAIR_NEEDED)
 
     def start_work(self) -> None:
         """Mark the repair order as actively in progress.
@@ -470,6 +517,8 @@ class RepairOrderEventType(StrEnum):
     TECHNICIAN_ACCEPTED = "TECHNICIAN_ACCEPTED"
     TECHNICIAN_REJECTED = "TECHNICIAN_REJECTED"
     REPAIR_REJECTED = "REPAIR_REJECTED"
+    REPAIRABLE_CONFIRMED = "REPAIRABLE_CONFIRMED"
+    NO_REPAIR_NEEDED = "NO_REPAIR_NEEDED"
     MATERIAL_REQUESTED = "MATERIAL_REQUESTED"
     MATERIAL_APPROVED = "MATERIAL_APPROVED"
     MATERIAL_REJECTED = "MATERIAL_REJECTED"

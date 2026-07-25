@@ -25,6 +25,7 @@ from apps.repair.application.dto.repair_dto import (
     SyncRepairToSAPDTO,
     TransportHandoverApproveDTO,
     TransportHandoverRejectDTO,
+    WorkshopTechnicalDecisionDTO,
 )
 from apps.repair.domain.entities import (
     ExternalWorkshopReferralStatus,
@@ -36,6 +37,7 @@ from core.permissions import (
     IsReadOnlyOrTechnicianOrAbove,
     IsTechnicianOrAbove,
     IsTransportSupervisorOrAbove,
+    IsWorkshopSupervisorOrAbove,
 )
 from interfaces.api.v1 import deps
 from interfaces.api.v1.material.views import RepairOrderMaterialRequestMixin
@@ -45,6 +47,7 @@ from interfaces.api.v1.repair.external_invoice_views import (
 from interfaces.api.v1.repair.serializers import (
     ExternalWorkshopReferralResponseSerializer,
     RepairActivityCreateSerializer,
+    RepairApproveSerializer,
     RepairAssignSerializer,
     RepairAssignWorkshopSerializer,
     RepairCompleteSerializer,
@@ -56,6 +59,7 @@ from interfaces.api.v1.repair.serializers import (
     RepairSyncSAPSerializer,
     RepairTransportRejectSerializer,
     TransportHandoverRejectSerializer,
+    WorkshopTechnicalDecisionSerializer,
 )
 from interfaces.api.v1.schema_tags import API_TAGS
 from interfaces.api.v1.utils import paginate_dto_list, request_id_from, user_id_from
@@ -80,13 +84,18 @@ class RepairOrderViewSet(
         tags=[API_TAGS.repair], responses=RepairOrderResponseSerializer(many=True)
     )
     def list(self, request: Request) -> Response:
-        """List repair orders, optionally filtered by vehicle/status."""
+        """List repair orders, optionally filtered by vehicle/status/workshop."""
         vehicle_id_raw = request.query_params.get("vehicle_id")
         status_raw = request.query_params.get("status")
+        workshop_type_raw = request.query_params.get("workshop_type")
         order_status = RepairOrderStatus(status_raw) if status_raw else None
+        workshop_type = (
+            WorkshopType(workshop_type_raw) if workshop_type_raw else None
+        )
         items = deps.get_list_repair_orders_service().execute(
             uuid.UUID(vehicle_id_raw) if vehicle_id_raw else None,
             status=order_status,
+            workshop_type=workshop_type,
             request_id=request_id_from(request),
         )
         page = paginate_dto_list(self, items)
@@ -121,7 +130,7 @@ class RepairOrderViewSet(
 
     @extend_schema(
         tags=[API_TAGS.repair],
-        request=None,
+        request=RepairApproveSerializer,
         responses=RepairDecisionResponseSerializer,
     )
     @action(
@@ -131,11 +140,40 @@ class RepairOrderViewSet(
     )
     def approve(self, request: Request, pk: str | None = None) -> Response:
         """Transport supervisor approves continuing the repair process."""
+        serializer = RepairApproveSerializer(data=request.data or {})
+        serializer.is_valid(raise_exception=True)
         result = deps.get_approve_repair_order_service().execute(
             ApproveRepairOrderDTO(
                 repair_order_id=uuid.UUID(str(pk)),
                 request_id=request_id_from(request),
                 approved_by=user_id_from(request),
+                note=serializer.validated_data.get("note", ""),
+            )
+        )
+        return Response(RepairDecisionResponseSerializer(result).data)
+
+    @extend_schema(
+        tags=[API_TAGS.repair],
+        request=WorkshopTechnicalDecisionSerializer,
+        responses=RepairDecisionResponseSerializer,
+    )
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="technical-decision",
+        permission_classes=[IsWorkshopSupervisorOrAbove],
+    )
+    def technical_decision(self, request: Request, pk: str | None = None) -> Response:
+        """Central workshop decides repairable vs عدم نیاز به تعمیر."""
+        serializer = WorkshopTechnicalDecisionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        result = deps.get_workshop_technical_decision_service().execute(
+            WorkshopTechnicalDecisionDTO(
+                repair_order_id=uuid.UUID(str(pk)),
+                repairable=serializer.validated_data["repairable"],
+                note=serializer.validated_data.get("note", ""),
+                request_id=request_id_from(request),
+                decided_by=user_id_from(request),
             )
         )
         return Response(RepairDecisionResponseSerializer(result).data)
@@ -197,9 +235,13 @@ class RepairOrderViewSet(
         request=None,
         responses=RepairDecisionResponseSerializer,
     )
-    @action(detail=True, methods=["post"], permission_classes=[IsTechnicianOrAbove])
+    @action(
+        detail=True,
+        methods=["post"],
+        permission_classes=[IsWorkshopSupervisorOrAbove],
+    )
     def accept(self, request: Request, pk: str | None = None) -> Response:
-        """Internal workshop accepts the repair order."""
+        """Compatibility: maps to repairable technical decision."""
         result = deps.get_accept_repair_order_service().execute(
             repair_order_id=uuid.UUID(str(pk)),
             request_id=request_id_from(request),
@@ -212,9 +254,13 @@ class RepairOrderViewSet(
         request=None,
         responses=RepairDecisionResponseSerializer,
     )
-    @action(detail=True, methods=["post"], permission_classes=[IsTechnicianOrAbove])
+    @action(
+        detail=True,
+        methods=["post"],
+        permission_classes=[IsWorkshopSupervisorOrAbove],
+    )
     def reject(self, request: Request, pk: str | None = None) -> Response:
-        """Internal workshop rejects the repair order."""
+        """Compatibility: maps to عدم نیاز به تعمیر."""
         result = deps.get_reject_repair_order_service().execute(
             repair_order_id=uuid.UUID(str(pk)),
             request_id=request_id_from(request),

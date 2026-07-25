@@ -81,12 +81,24 @@ class CreateMaterialRequestService:
         self._event_recorder = event_recorder
 
     def execute(self, dto: CreateMaterialRequestDTO) -> MaterialRequestResponseDTO:
-        """Create material request in REQUESTED status."""
-        load_or_not_found(
+        """Create material request in REQUESTED status and pause repair for parts."""
+        from apps.repair.domain.entities import RepairOrderStatus  # noqa: PLC0415
+        from core.exceptions.base_exception import FMMSConflictError  # noqa: PLC0415
+
+        order = load_or_not_found(
             lambda: self._repair_repo.get_by_id(dto.repair_order_id),
             message=f"Repair order '{dto.repair_order_id}' not found.",
             details={"repair_order_id": str(dto.repair_order_id)},
         )
+        if order.status != RepairOrderStatus.IN_PROGRESS:
+            raise FMMSConflictError(
+                message="Parts can only be requested while repair is in progress.",
+                error_code="MATERIAL_REQUEST_REQUIRES_IN_PROGRESS",
+                details={
+                    "repair_order_id": str(order.id),
+                    "status": order.status.value,
+                },
+            )
         now = datetime.now(tz=UTC)
         material_request = MaterialRequest(
             id=uuid.uuid4(),
@@ -106,11 +118,14 @@ class CreateMaterialRequestService:
             ],
         )
         saved = self._repo.save(material_request)
+        order.wait_for_parts()
+        order.updated_at = now
+        self._repair_repo.save(order)
         record_repair_timeline_event(
             self._event_recorder,
             saved.repair_order_id,
             RepairOrderEventType.MATERIAL_REQUESTED,
-            "درخواست قطعه ثبت شد.",
+            "درخواست قطعه ثبت شد؛ تعمیر در انتظار قطعات است.",
             created_by_id=dto.requested_by,
             request_id=dto.request_id,
         )
@@ -243,6 +258,53 @@ class RejectMaterialRequestService:
             saved.repair_order_id,
             RepairOrderEventType.MATERIAL_REJECTED,
             "درخواست قطعه رد شد.",
+            created_by_id=dto.decided_by,
+            request_id=dto.request_id,
+        )
+        return _to_dto(saved)
+
+
+class ReceiveMaterialRequestService:
+    """Workshop confirms physical receipt of parts and resumes repair."""
+
+    def __init__(
+        self,
+        material_request_repository: IMaterialRequestRepository,
+        repair_order_repository: IRepairOrderRepository,
+        event_recorder: RecordRepairOrderEventService | None = None,
+    ) -> None:
+        self._repo = material_request_repository
+        self._repair_repo = repair_order_repository
+        self._event_recorder = event_recorder
+
+    def execute(self, dto: MaterialRequestDecisionDTO) -> MaterialRequestResponseDTO:
+        """Mark material request received and resume WAITING_PARTS repair."""
+        from apps.repair.domain.entities import RepairOrderStatus  # noqa: PLC0415
+
+        material_request = load_or_not_found(
+            lambda: self._repo.get_by_id(dto.material_request_id),
+            message=f"Material request '{dto.material_request_id}' not found.",
+            details={"material_request_id": str(dto.material_request_id)},
+        )
+        material_request.receive()
+        material_request.updated_at = datetime.now(tz=UTC)
+        saved = self._repo.save(material_request)
+
+        order = load_or_not_found(
+            lambda: self._repair_repo.get_by_id(saved.repair_order_id),
+            message=f"Repair order '{saved.repair_order_id}' not found.",
+            details={"repair_order_id": str(saved.repair_order_id)},
+        )
+        if order.status == RepairOrderStatus.WAITING_PARTS:
+            order.resume_after_parts()
+            order.updated_at = datetime.now(tz=UTC)
+            self._repair_repo.save(order)
+
+        record_repair_timeline_event(
+            self._event_recorder,
+            saved.repair_order_id,
+            RepairOrderEventType.PARTS_RECEIVED,
+            "دریافت قطعات در تعمیرگاه ثبت شد؛ تعمیر ادامه می‌یابد.",
             created_by_id=dto.decided_by,
             request_id=dto.request_id,
         )

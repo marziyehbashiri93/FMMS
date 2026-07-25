@@ -17,6 +17,9 @@ from apps.inspection.application.services.sync_inspection_templates_from_sap_ser
     SyncInspectionTemplatesFromSAPService,
 )
 from apps.integration.infrastructure.models import SAPSyncRunItemModel, SAPSyncRunModel
+from apps.material.application.services.sync_central_stock_from_sap_service import (
+    SyncCentralStockFromSAPService,
+)
 from apps.vehicle.application.services.sync_vehicles_from_sap_service import (
     SyncVehiclesFromSAPService,
 )
@@ -67,6 +70,7 @@ class RunSAPSyncService:
         vehicle_sync_service: Imports vehicle and driver master data from SAP.
         inspection_template_sync_service: Imports inspection templates from SAP.
         fault_catalog_sync_service: Imports fault catalog rows from SAP.
+        central_stock_sync_service: Imports central warehouse stock from SAP.
     """
 
     def __init__(
@@ -74,10 +78,12 @@ class RunSAPSyncService:
         vehicle_sync_service: SyncVehiclesFromSAPService,
         inspection_template_sync_service: SyncInspectionTemplatesFromSAPService,
         fault_catalog_sync_service: SyncFaultCatalogFromSAPService,
+        central_stock_sync_service: SyncCentralStockFromSAPService,
     ) -> None:
         self._vehicle_sync_service = vehicle_sync_service
         self._inspection_template_sync_service = inspection_template_sync_service
         self._fault_catalog_sync_service = fault_catalog_sync_service
+        self._central_stock_sync_service = central_stock_sync_service
 
     def execute(
         self,
@@ -133,6 +139,13 @@ class RunSAPSyncService:
                 sync_run=sync_run,
                 name="fault_catalog",
                 sync=lambda: self._fault_catalog_sync_service.execute(
+                    request_id=request_id
+                ),
+            ),
+            self._run_item(
+                sync_run=sync_run,
+                name="central_stock",
+                sync=lambda: self._central_stock_sync_service.execute(
                     request_id=request_id
                 ),
             ),
