@@ -24,6 +24,7 @@ import { RtlTextField } from '../../components/RtlTextField';
 import type {
   AuthUser,
   ChecklistResult,
+  Driver,
   FailureSeverity,
   InspectionTemplate,
   OdometerReading,
@@ -98,6 +99,31 @@ function normalizeTemplates(
 
 function hasAssignedDriver(vehicle: Vehicle): boolean {
   return Boolean(vehicle.driver1 || vehicle.driver2);
+}
+
+function normalizePersonnelNumber(value: string): string {
+  return value.trim();
+}
+
+function findDriverByPersonnelNumber(
+  drivers: Driver[],
+  personnelNumber: string,
+): Driver | null {
+  const needle = normalizePersonnelNumber(personnelNumber);
+  if (!needle) return null;
+  return (
+    drivers.find(
+      (driver) => normalizePersonnelNumber(driver.personnel_number || '') === needle,
+    ) ?? null
+  );
+}
+
+function assignedVehicleIdForDriver(driver: Driver): string {
+  return (
+    driver.current_vehicle_as_driver?.id ||
+    driver.current_vehicle_as_assistant?.id ||
+    ''
+  );
 }
 
 function DriverNameLink({
@@ -271,7 +297,7 @@ function pickTodayOdometer(readings: OdometerReading[]): OdometerReading | null 
 
 /**
  * Daily vehicle inspection flow wizard:
- * vehicle (admin) → odometer → checklist items → submit.
+ * personnel lookup (admin) / assigned vehicle (driver) → odometer → checklist → submit.
  */
 export function InspectionPage() {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -285,6 +311,9 @@ export function InspectionPage() {
   const vehiclesLoadingRef = useRef(false);
   const vehiclePagingRef = useRef({ page: 1, total: 0, count: 0 });
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
+  const [adminPersonnelNumber, setAdminPersonnelNumber] = useState('');
+  const [personnelLookupError, setPersonnelLookupError] = useState('');
+  const [personnelLookupLoading, setPersonnelLookupLoading] = useState(false);
   const [flowStep, setFlowStep] = useState<'vehicle' | 'odometer' | 'checklist'>('vehicle');
 
   vehiclePagingRef.current = {
@@ -421,19 +450,12 @@ export function InspectionPage() {
       setBootLoading(true);
       setBootError('');
       try {
-        const [me, vehiclePageResult, templatePayload] = await Promise.all([
+        const [me, templatePayload] = await Promise.all([
           api.me(),
-          api.listVehicles('', 'license_plate', { page: 1, pageSize: VEHICLE_PAGE_SIZE }),
           api.listInspectionTemplates(),
         ]);
         if (cancelled) return;
         setUser(me);
-        let loadedVehicles = vehiclePageResult.results;
-        let loadedTotal = vehiclePageResult.count;
-        let loadedPage = 1;
-        setVehicles(loadedVehicles);
-        setVehicleTotal(loadedTotal);
-        setVehiclePage(loadedPage);
 
         const nextTemplates = normalizeTemplates(templatePayload).filter((item) => item.is_active);
         setItems(
@@ -451,8 +473,27 @@ export function InspectionPage() {
         setWizardIndex(0);
 
         if (isAdminUser(me)) {
+          // Admin resolves vehicle via driver personnel number — no vehicle list needed.
+          setVehicles([]);
+          setVehicleTotal(0);
+          setVehiclePage(1);
           setFlowStep('vehicle');
-        } else if (isDriverUser(me)) {
+          return;
+        }
+
+        const vehiclePageResult = await api.listVehicles('', 'license_plate', {
+          page: 1,
+          pageSize: VEHICLE_PAGE_SIZE,
+        });
+        if (cancelled) return;
+        let loadedVehicles = vehiclePageResult.results;
+        let loadedTotal = vehiclePageResult.count;
+        let loadedPage = 1;
+        setVehicles(loadedVehicles);
+        setVehicleTotal(loadedTotal);
+        setVehiclePage(loadedPage);
+
+        if (isDriverUser(me)) {
           const customer = me.linked_driver?.customer_number || '';
           if (!me.personnel_number?.trim() || !customer) {
             setBootError(
@@ -833,6 +874,69 @@ export function InspectionPage() {
     setFlowStep('odometer');
   };
 
+  const resolveAdminVehicleByPersonnel = async () => {
+    const personnel = normalizePersonnelNumber(adminPersonnelNumber);
+    if (!personnel) {
+      setPersonnelLookupError('کد پرسنلی راننده را وارد کنید.');
+      return;
+    }
+
+    setPersonnelLookupLoading(true);
+    setPersonnelLookupError('');
+    try {
+      const page = await api.listDrivers({
+        search: personnel,
+        status: 'ACTIVE',
+        page: 1,
+        pageSize: 20,
+      });
+      const driver = findDriverByPersonnelNumber(page.results ?? [], personnel);
+      if (!driver) {
+        setSelectedVehicleId('');
+        setPersonnelLookupError('راننده‌ای با این کد پرسنلی یافت نشد.');
+        return;
+      }
+
+      const vehicleId = assignedVehicleIdForDriver(driver);
+      if (!vehicleId) {
+        setSelectedVehicleId('');
+        setPersonnelLookupError(
+          'برای راننده با این کد پرسنلی خودرویی تخصیص داده نشده است.',
+        );
+        return;
+      }
+
+      const vehicle = await api.getVehicle(vehicleId);
+      if (vehicle.status !== 'ACTIVE') {
+        setSelectedVehicleId('');
+        setPersonnelLookupError(
+          'خودروی تخصیص‌یافته به این راننده عملیاتی نیست و ثبت چک‌لیست برای آن مجاز نیست.',
+        );
+        return;
+      }
+
+      setVehicles((prev) => {
+        if (prev.some((item) => item.id === vehicle.id)) {
+          return prev.map((item) => (item.id === vehicle.id ? vehicle : item));
+        }
+        return [vehicle, ...prev];
+      });
+      setSelectedVehicleId(vehicle.id);
+      setWizardIndex(0);
+      setOdometer('');
+      setOdometerError('');
+      setOdometerRecorded(false);
+      setFlowStep('odometer');
+    } catch (err) {
+      setSelectedVehicleId('');
+      setPersonnelLookupError(
+        err instanceof Error ? err.message : 'خطا در جستجوی راننده با کد پرسنلی',
+      );
+    } finally {
+      setPersonnelLookupLoading(false);
+    }
+  };
+
   const goToChecklist = async () => {
     if (!validateOdometerStep() || !selectedVehicleId || !selectedVehicleOperational) {
       if (selectedVehicleId && !selectedVehicleOperational) {
@@ -867,7 +971,7 @@ export function InspectionPage() {
 
   const stepLabels = admin
     ? [
-        { key: 'vehicle', label: 'انتخاب خودرو' },
+        { key: 'vehicle', label: 'کد پرسنلی راننده' },
         { key: 'odometer', label: 'کیلومتر' },
         { key: 'checklist', label: 'چک‌لیست' },
       ]
@@ -1154,69 +1258,120 @@ export function InspectionPage() {
             >
                 {flowStep === 'vehicle' && (
                   <Stack spacing={2}>
-                    <Typography fontWeight={800}>انتخاب خودرو</Typography>
-                    <RtlSelectField
-                      label="خودرو"
-                      value={selectedVehicleId}
-                      displayEmpty
-                      onChange={(event) => {
-                        setSelectedVehicleId(String(event.target.value));
-                        setWizardIndex(0);
-                        setOdometer('');
-                        setOdometerError('');
-                        setOdometerRecorded(false);
-                      }}
-                      fullWidth
-                      MenuProps={{
-                        PaperProps: {
-                          onScroll: handleVehicleMenuScroll,
-                          sx: { maxHeight: 260 },
-                        },
-                      }}
-                    >
-                      <MenuItem value="">
-                        <em>انتخاب خودرو دارای راننده</em>
-                      </MenuItem>
-                      {selectableVehicles.map((vehicle) => (
-                        <MenuItem key={vehicle.id} value={vehicle.id}>
-                          {vehicle.license_plate} — {vehicle.vehicle_number}
-                          {vehicle.status_label ? ` (${vehicle.status_label})` : ''}
-                        </MenuItem>
-                      ))}
-                      {(vehiclesLoadingMore || vehicleHasMore) && (
-                        <MenuItem disabled value="__loading__" sx={{ justifyContent: 'center', opacity: 1 }}>
-                          {vehiclesLoadingMore ? (
-                            <CircularProgress size={18} />
-                          ) : (
-                            <Typography variant="caption" color="text.secondary">
-                              برای موارد بیشتر اسکرول کنید
-                            </Typography>
+                    {admin ? (
+                      <>
+                        <Typography fontWeight={800}>کد پرسنلی راننده</Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          کد پرسنلی راننده را وارد کنید تا خودروی تخصیص‌یافته پیدا شود.
+                        </Typography>
+                        <RtlTextField
+                          label="کد پرسنلی"
+                          value={adminPersonnelNumber}
+                          onChange={(event) => {
+                            setAdminPersonnelNumber(event.target.value);
+                            setPersonnelLookupError('');
+                            setSelectedVehicleId('');
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') {
+                              event.preventDefault();
+                              void resolveAdminVehicleByPersonnel();
+                            }
+                          }}
+                          error={Boolean(personnelLookupError)}
+                          helperText={personnelLookupError || undefined}
+                          fullWidth
+                          disabled={personnelLookupLoading}
+                          inputDir="ltr"
+                          inputProps={{
+                            autoComplete: 'off',
+                            inputMode: 'text',
+                          }}
+                        />
+                        <Stack direction="row" justifyContent="flex-end">
+                          <Button
+                            variant="contained"
+                            disabled={
+                              personnelLookupLoading ||
+                              !normalizePersonnelNumber(adminPersonnelNumber)
+                            }
+                            onClick={() => void resolveAdminVehicleByPersonnel()}
+                          >
+                            {personnelLookupLoading ? 'در حال جستجو...' : 'ادامه'}
+                          </Button>
+                        </Stack>
+                      </>
+                    ) : (
+                      <>
+                        <Typography fontWeight={800}>انتخاب خودرو</Typography>
+                        <RtlSelectField
+                          label="خودرو"
+                          value={selectedVehicleId}
+                          displayEmpty
+                          onChange={(event) => {
+                            setSelectedVehicleId(String(event.target.value));
+                            setWizardIndex(0);
+                            setOdometer('');
+                            setOdometerError('');
+                            setOdometerRecorded(false);
+                          }}
+                          fullWidth
+                          MenuProps={{
+                            PaperProps: {
+                              onScroll: handleVehicleMenuScroll,
+                              sx: { maxHeight: 260 },
+                            },
+                          }}
+                        >
+                          <MenuItem value="">
+                            <em>انتخاب خودرو دارای راننده</em>
+                          </MenuItem>
+                          {selectableVehicles.map((vehicle) => (
+                            <MenuItem key={vehicle.id} value={vehicle.id}>
+                              {vehicle.license_plate} — {vehicle.vehicle_number}
+                              {vehicle.status_label ? ` (${vehicle.status_label})` : ''}
+                            </MenuItem>
+                          ))}
+                          {(vehiclesLoadingMore || vehicleHasMore) && (
+                            <MenuItem
+                              disabled
+                              value="__loading__"
+                              sx={{ justifyContent: 'center', opacity: 1 }}
+                            >
+                              {vehiclesLoadingMore ? (
+                                <CircularProgress size={18} />
+                              ) : (
+                                <Typography variant="caption" color="text.secondary">
+                                  برای موارد بیشتر اسکرول کنید
+                                </Typography>
+                              )}
+                            </MenuItem>
                           )}
-                        </MenuItem>
-                      )}
-                    </RtlSelectField>
-                    {!selectableVehicles.length && (
-                      <Typography variant="body2" color="text.secondary">
-                        {driverMode
-                          ? 'خودروی عملیاتی اساین‌شده به کد پرسنلی شما یافت نشد.'
-                          : 'خودرویی عملیاتی با راننده تخصیص‌یافته یافت نشد.'}
-                      </Typography>
+                        </RtlSelectField>
+                        {!selectableVehicles.length && (
+                          <Typography variant="body2" color="text.secondary">
+                            {driverMode
+                              ? 'خودروی عملیاتی اساین‌شده به کد پرسنلی شما یافت نشد.'
+                              : 'خودرویی عملیاتی با راننده تخصیص‌یافته یافت نشد.'}
+                          </Typography>
+                        )}
+                        {selectedVehicleId && !selectedVehicleOperational ? (
+                          <Alert severity="warning">
+                            این خودرو عملیاتی نیست و ثبت چک‌لیست برای آن مجاز نیست.
+                          </Alert>
+                        ) : null}
+                        {vehicleSummary}
+                        <Stack direction="row" justifyContent="flex-end">
+                          <Button
+                            variant="contained"
+                            disabled={!selectedVehicleId || !selectedVehicleOperational}
+                            onClick={goToOdometer}
+                          >
+                            ادامه
+                          </Button>
+                        </Stack>
+                      </>
                     )}
-                    {selectedVehicleId && !selectedVehicleOperational ? (
-                      <Alert severity="warning">
-                        این خودرو عملیاتی نیست و ثبت چک‌لیست برای آن مجاز نیست.
-                      </Alert>
-                    ) : null}
-                    {vehicleSummary}
-                    <Stack direction="row" justifyContent="flex-end">
-                      <Button
-                        variant="contained"
-                        disabled={!selectedVehicleId || !selectedVehicleOperational}
-                        onClick={goToOdometer}
-                      >
-                        ادامه
-                      </Button>
-                    </Stack>
                   </Stack>
                 )}
 
