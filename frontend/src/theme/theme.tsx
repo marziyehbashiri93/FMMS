@@ -119,7 +119,7 @@ export const theme = createTheme({
         // Golestan copper/red accent (~20% emphasis)
         secondary: {
             main: '#C45C4A',
-            light: '#F7E0DB',
+            light: '#FFF4F1FF',
             dark: '#9E3F31',
             contrastText: '#FFFFFF',
         },
