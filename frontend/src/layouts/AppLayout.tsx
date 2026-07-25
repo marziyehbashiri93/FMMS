@@ -48,6 +48,23 @@ const sidebarText = '#919EAB';
 const sidebarMuted = '#637381';
 const sidebarActive = '#5BE49B';
 const sidebarActiveBg = 'rgba(0, 167, 111, 0.08)';
+const SIDEBAR_COLLAPSED_STORAGE_KEY = 'fmms.sidebarCollapsed';
+
+function readSidebarCollapsed(): boolean {
+  try {
+    return localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function writeSidebarCollapsed(collapsed: boolean): void {
+  try {
+    localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, String(collapsed));
+  } catch {
+    // Ignore quota / private-mode failures; UI state still works in-session.
+  }
+}
 
 const ROLE_LABELS: Record<string, string> = {
   ADMIN: 'مدیر',
@@ -498,7 +515,7 @@ export function AppLayout() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsed);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
@@ -509,6 +526,10 @@ export function AppLayout() {
     return current?.path ?? '/dashboard';
   }, [location.pathname]);
   const activeDrawerWidth = sidebarCollapsed ? collapsedDrawerWidth : drawerWidth;
+
+  useEffect(() => {
+    writeSidebarCollapsed(sidebarCollapsed);
+  }, [sidebarCollapsed]);
 
   useEffect(() => {
     let cancelled = false;
