@@ -16,14 +16,6 @@ from rest_framework.views import APIView
 def _normalized_role(user: Any) -> str | None:
     """Map legacy/demo roles to canonical FMMS authorization roles."""
     role = getattr(user, "role", None)
-    role_map = {
-        "DISTRIBUTION": "SUPERVISOR",
-        "TRANSPORT": "SUPERVISOR",
-        "WAREHOUSE": "SUPERVISOR",
-        "DRIVER": "TECHNICIAN",
-    }
-    if role in role_map:
-        return role_map[role]
     return role
 
 
@@ -55,7 +47,8 @@ class IsSupervisorOrAbove(BasePermission):
         return bool(
             user
             and user.is_authenticated
-            and _normalized_role(user) in {"ADMIN", "SUPERVISOR"}
+            and _normalized_role(user)
+            in {"ADMIN", "SUPERVISOR", "DISTRIBUTION", "TRANSPORT", "WAREHOUSE"}
         )
 
 
@@ -88,6 +81,33 @@ class IsReadOnlyOrTechnicianOrAbove(BasePermission):
         return _normalized_role(user) in {"ADMIN", "SUPERVISOR", "TECHNICIAN"}
 
 
+class IsDriverOrTechnicianOrAbove(BasePermission):
+    """Allow drivers and operational roles to confirm vehicle handovers."""
+
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        """Return True for DRIVER and TECHNICIAN+ roles."""
+        user: Any = request.user
+        return bool(
+            user
+            and user.is_authenticated
+            and _normalized_role(user)
+            in {"ADMIN", "SUPERVISOR", "TECHNICIAN", "DRIVER"}
+        )
+
+
+class IsDistributionSupervisorOrAbove(BasePermission):
+    """Allow distribution supervisors, generic supervisors, or admins."""
+
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        """Return True for users allowed to make distribution decisions."""
+        user: Any = request.user
+        return bool(
+            user
+            and user.is_authenticated
+            and _normalized_role(user) in {"ADMIN", "SUPERVISOR", "DISTRIBUTION"}
+        )
+
+
 class IsTransportSupervisorOrAbove(BasePermission):
     """Allow transport/supervisor/admin roles for workflow approvals."""
 
@@ -97,5 +117,5 @@ class IsTransportSupervisorOrAbove(BasePermission):
         return bool(
             user
             and user.is_authenticated
-            and _normalized_role(user) in {"ADMIN", "SUPERVISOR"}
+            and _normalized_role(user) in {"ADMIN", "SUPERVISOR", "TRANSPORT"}
         )

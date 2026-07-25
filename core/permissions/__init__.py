@@ -2,6 +2,8 @@
 
 from core.permissions.role_permissions import (
     IsAdminRole,
+    IsDistributionSupervisorOrAbove,
+    IsDriverOrTechnicianOrAbove,
     IsFMMSAuthenticated,
     IsReadOnlyOrTechnicianOrAbove,
     IsSupervisorOrAbove,
@@ -11,6 +13,8 @@ from core.permissions.role_permissions import (
 
 __all__ = [
     "IsAdminRole",
+    "IsDistributionSupervisorOrAbove",
+    "IsDriverOrTechnicianOrAbove",
     "IsFMMSAuthenticated",
     "IsReadOnlyOrTechnicianOrAbove",
     "IsSupervisorOrAbove",
