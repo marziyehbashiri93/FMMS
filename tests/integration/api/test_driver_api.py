@@ -335,11 +335,11 @@ class TestDriverAPI:
         assert response.data["status"] == "EXITED_CENTER"
         assert response.data["status_label"] == "خروج از مرکز"
 
-    def test_driver_exit_center_rejects_failed_checklist(
+    def test_driver_exit_center_allows_failed_checklist_without_fault_report(
         self,
         authenticated_client: APIClient,
     ) -> None:
-        """Vehicles with failed checklist items cannot exit the center."""
+        """Checklist FAIL alone does not block exit when no fault was reported."""
         driver = DriverModel.objects.create(
             customer_number="6000009335",
             name="Failed Exit Driver",
@@ -365,8 +365,8 @@ class TestDriverAPI:
                         "category": "ترمز",
                         "description": "لنت ترمز",
                         "result": "FAIL",
-                        "notes": "نیازمند بررسی",
-                        "severity": "HIGH",
+                        "notes": "شدت کم — بدون اعلام",
+                        "severity": "LOW",
                     }
                 ],
             },
@@ -389,8 +389,8 @@ class TestDriverAPI:
             format="json",
         )
 
-        assert response.status_code == 409
-        assert response.data["error_code"] == "CHECKLIST_HAS_FAILURES"
+        assert response.status_code == 200, response.data
+        assert response.data["status"] == "EXITED_CENTER"
 
     def test_driver_exit_center_rejects_when_open_fault_exists(
         self,

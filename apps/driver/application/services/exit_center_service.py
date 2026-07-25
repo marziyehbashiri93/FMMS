@@ -6,7 +6,6 @@ from datetime import UTC, datetime
 
 from apps.driver.application.dto.driver_dto import DriverExitCenterDTO
 from apps.driver.domain.interfaces.driver_repository import IDriverRepository
-from apps.fault.domain.entities import FaultStatus
 from apps.fault.domain.interfaces.fault_repository import IFaultRepository
 from apps.inspection.domain.entities import InspectionStatus
 from apps.inspection.domain.interfaces.inspection_repository import (
@@ -61,9 +60,14 @@ class DriverExitCenterService:
         Raises:
             FMMSNotFoundError: If driver, vehicle, or inspection does not exist.
             FMMSValidationError: If checklist or assignment data does not match.
-            FMMSConflictError: If checklist failures are undisposed or vehicle is not ACTIVE.
+            FMMSConflictError: If the vehicle is not ACTIVE.
             FMMSStateError: If the vehicle still has an open fault/repair flow.
             VehicleInvalidStateTransitionError: If the transition is not allowed.
+
+        Notes:
+            Failed checklist items alone do not block exit. Low-severity findings
+            may stay on the checklist without reporting a fault. Exit is blocked
+            only when an open fault/repair flow exists (e.g. after اعلام خرابی).
         """
         logger.info(
             "Driver requesting vehicle center exit",
@@ -126,25 +130,13 @@ class DriverExitCenterService:
                     "status": inspection.status.value,
                 },
             )
+        # Open fault/repair (including after optional checklist fault report)
+        # blocks exit; bare checklist FAIL items do not.
         assert_vehicle_has_no_open_flow(
             vehicle.id,
             fault_repository=self._fault_repo,
             repair_order_repository=self._repair_repo,
         )
-        if inspection.failed_items():
-            # Failures block exit until distribution disposes the reported fault.
-            # After distribution-usable (fault CLOSED for this checklist), exit is
-            # allowed on the same inspection — no new checklist is required.
-            inspection_faults = self._fault_repo.list_by_inspection(inspection.id)
-            disposition_cleared = bool(inspection_faults) and all(
-                fault.status == FaultStatus.CLOSED for fault in inspection_faults
-            )
-            if not disposition_cleared:
-                raise FMMSConflictError(
-                    message="Vehicle cannot exit center with failed checklist items.",
-                    error_code="CHECKLIST_HAS_FAILURES",
-                    details={"inspection_id": str(dto.inspection_id)},
-                )
         if vehicle.status != VehicleStatus.ACTIVE:
             raise FMMSConflictError(
                 message="Only active vehicles can exit the fleet center.",
