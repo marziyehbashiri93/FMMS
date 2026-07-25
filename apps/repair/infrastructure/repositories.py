@@ -12,6 +12,8 @@ from datetime import UTC, datetime
 from django.db import transaction
 
 from apps.repair.domain.entities import (
+    ExternalWorkshopReferralRequest,
+    ExternalWorkshopReferralStatus,
     RepairActivity,
     RepairOrder,
     RepairOrderStatus,
@@ -19,6 +21,9 @@ from apps.repair.domain.entities import (
     WorkshopType,
 )
 from apps.repair.domain.exceptions import RepairOrderNotFoundError
+from apps.repair.domain.interfaces.external_referral_repository import (
+    IExternalWorkshopReferralRepository,
+)
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
 from apps.repair.domain.value_objects import (
     LaborHours,
@@ -26,6 +31,7 @@ from apps.repair.domain.value_objects import (
     TechnicianAssignment,
 )
 from apps.repair.infrastructure.models import (
+    ExternalWorkshopReferralRequestModel,
     RepairActivityModel,
     RepairOrderModel,
     RepairPartModel,
@@ -39,6 +45,7 @@ _TERMINAL_STATUSES = {
     RepairOrderStatus.CANCELLED,
     RepairOrderStatus.ACCEPTED_BY_DRIVER,
     RepairOrderStatus.REJECTED_BY_DRIVER,
+    RepairOrderStatus.REJECTED_BY_TRANSPORT,
 }
 
 
@@ -95,7 +102,32 @@ def _to_domain(
         sap_order_number=orm.sap_order_number or None,
         workshop_type=WorkshopType(orm.workshop_type) if orm.workshop_type else None,
         workshop_id=orm.workshop_id or None,
+        transport_rejection_reason=orm.transport_rejection_reason or None,
         completed_at=orm.completed_at,
+    )
+
+
+def _referral_to_domain(
+    orm: ExternalWorkshopReferralRequestModel,
+) -> ExternalWorkshopReferralRequest:
+    """Map an external referral ORM row to its domain entity."""
+    return ExternalWorkshopReferralRequest(
+        id=uuid.UUID(str(orm.id)),
+        repair_order_id=orm.repair_order_id,
+        vehicle_id=orm.vehicle_id,
+        fault_id=orm.fault_id,
+        status=ExternalWorkshopReferralStatus(orm.status),
+        workshop_id=orm.workshop_id or None,
+        reason=orm.reason,
+        requested_by_id=orm.requested_by_id,
+        requested_at=orm.requested_at,
+        approved_by_id=orm.approved_by_id,
+        approved_at=orm.approved_at,
+        rejected_by_id=orm.rejected_by_id,
+        rejected_at=orm.rejected_at,
+        rejection_reason=orm.rejection_reason or None,
+        created_at=orm.created_at,
+        updated_at=orm.updated_at,
     )
 
 
@@ -141,6 +173,19 @@ class DjangoRepairOrderRepository(IRepairOrderRepository):
             for orm in qs
         ]
 
+    def list_all(
+        self,
+        status: RepairOrderStatus | None = None,
+    ) -> list[RepairOrder]:
+        """Return all non-deleted repair orders, optionally filtered by status."""
+        qs = RepairOrderModel.objects.filter(is_deleted=False).order_by("-created_at")
+        if status is not None:
+            qs = qs.filter(status=status.value)
+        return [
+            _to_domain(orm, list(orm.activities.all()), list(orm.parts.all()))
+            for orm in qs
+        ]
+
     def list_active_by_vehicle(self, vehicle_id: uuid.UUID) -> list[RepairOrder]:
         """Return all non-terminal repair orders for a vehicle.
 
@@ -180,6 +225,9 @@ class DjangoRepairOrderRepository(IRepairOrderRepository):
                         order.workshop_type.value if order.workshop_type else ""
                     ),
                     "workshop_id": order.workshop_id or "",
+                    "transport_rejection_reason": (
+                        order.transport_rejection_reason or ""
+                    ),
                     "completed_at": order.completed_at,
                     "assigned_technician_id": (
                         order.assignment.technician_id if order.assignment else None
@@ -237,3 +285,74 @@ class DjangoRepairOrderRepository(IRepairOrderRepository):
         )
         if updated == 0:
             raise RepairOrderNotFoundError(order_id)
+
+
+class DjangoExternalWorkshopReferralRepository(IExternalWorkshopReferralRepository):
+    """Django repository for external-workshop referral requests."""
+
+    def get_by_id(self, request_id: uuid.UUID) -> ExternalWorkshopReferralRequest:
+        """Return one referral request by ID."""
+        try:
+            orm = ExternalWorkshopReferralRequestModel.objects.get(
+                id=request_id,
+                is_deleted=False,
+            )
+        except ExternalWorkshopReferralRequestModel.DoesNotExist:
+            raise RepairOrderNotFoundError(request_id) from None
+        return _referral_to_domain(orm)
+
+    def get_open_by_repair_order(
+        self, repair_order_id: uuid.UUID
+    ) -> ExternalWorkshopReferralRequest | None:
+        """Return the active referral request for a repair order, when present."""
+        orm = (
+            ExternalWorkshopReferralRequestModel.objects.filter(
+                repair_order_id=repair_order_id,
+                status=ExternalWorkshopReferralStatus.REQUESTED.value,
+                is_deleted=False,
+            )
+            .order_by("-created_at")
+            .first()
+        )
+        return _referral_to_domain(orm) if orm is not None else None
+
+    def list_all(
+        self,
+        status: ExternalWorkshopReferralStatus | None = None,
+    ) -> list[ExternalWorkshopReferralRequest]:
+        """Return referral requests, newest first."""
+        qs = ExternalWorkshopReferralRequestModel.objects.filter(
+            is_deleted=False
+        ).order_by("-requested_at")
+        if status is not None:
+            qs = qs.filter(status=status.value)
+        return [_referral_to_domain(row) for row in qs]
+
+    def save(
+        self,
+        request: ExternalWorkshopReferralRequest,
+    ) -> ExternalWorkshopReferralRequest:
+        """Persist a referral request."""
+        obj, created = ExternalWorkshopReferralRequestModel.objects.update_or_create(
+            id=request.id,
+            defaults={
+                "repair_order_id": request.repair_order_id,
+                "vehicle_id": request.vehicle_id,
+                "fault_id": request.fault_id,
+                "status": request.status.value,
+                "workshop_id": request.workshop_id or "",
+                "reason": request.reason,
+                "requested_by_id": request.requested_by_id,
+                "requested_at": request.requested_at,
+                "approved_by_id": request.approved_by_id,
+                "approved_at": request.approved_at,
+                "rejected_by_id": request.rejected_by_id,
+                "rejected_at": request.rejected_at,
+                "rejection_reason": request.rejection_reason or "",
+                "updated_at": datetime.now(tz=UTC),
+            },
+        )
+        if created:
+            obj.created_at = request.created_at
+            obj.save(update_fields=["created_at"])
+        return request

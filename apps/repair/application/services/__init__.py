@@ -7,6 +7,8 @@ from apps.repair.application.services.add_repair_activity_service import (
 from apps.repair.application.services.approve_repair_order_service import (
     ApproveRepairOrderService,
     AssignWorkshopService,
+    ListExternalWorkshopReferralRequestsService,
+    RejectRepairOrderByTransportService,
 )
 from apps.repair.application.services.assign_repair_order_service import (
     AssignRepairOrderService,
@@ -32,6 +34,8 @@ __all__ = [
     "AssignRepairOrderService",
     "ApproveRepairOrderService",
     "AssignWorkshopService",
+    "RejectRepairOrderByTransportService",
+    "ListExternalWorkshopReferralRequestsService",
     "StartRepairService",
     "CompleteRepairOrderService",
     "CancelRepairOrderService",

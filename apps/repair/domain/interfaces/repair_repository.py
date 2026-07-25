@@ -53,6 +53,13 @@ class IRepairOrderRepository(ABC):
         """
 
     @abstractmethod
+    def list_all(
+        self,
+        status: RepairOrderStatus | None = None,
+    ) -> list[RepairOrder]:
+        """Return all repair orders, optionally filtered by status."""
+
+    @abstractmethod
     def list_active_by_vehicle(self, vehicle_id: uuid.UUID) -> list[RepairOrder]:
         """Return all active (non-terminal) repair orders for a vehicle.
 

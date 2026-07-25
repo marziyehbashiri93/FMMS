@@ -38,6 +38,7 @@ class RepairOrderStatus(StrEnum):
     CREATED = "CREATED"
     APPROVED = "APPROVED"
     WORKSHOP_ASSIGNED = "WORKSHOP_ASSIGNED"
+    WAITING_EXTERNAL_REFERRAL_APPROVAL = "WAITING_EXTERNAL_REFERRAL_APPROVAL"
     WAITING_WORKSHOP_CONFIRMATION = "WAITING_WORKSHOP_CONFIRMATION"
     WAITING_PARTS = "WAITING_PARTS"
     ASSIGNED = "ASSIGNED"
@@ -46,6 +47,7 @@ class RepairOrderStatus(StrEnum):
     WAITING_TRANSPORT_FINAL_APPROVAL = "WAITING_TRANSPORT_FINAL_APPROVAL"
     ACCEPTED_BY_DRIVER = "ACCEPTED_BY_DRIVER"
     REJECTED_BY_DRIVER = "REJECTED_BY_DRIVER"
+    REJECTED_BY_TRANSPORT = "REJECTED_BY_TRANSPORT"
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"
 
@@ -71,7 +73,14 @@ _ALLOWED_TRANSITIONS: dict[RepairOrderStatus, frozenset[RepairOrderStatus]] = {
         }
     ),
     RepairOrderStatus.APPROVED: frozenset(
-        {RepairOrderStatus.WORKSHOP_ASSIGNED, RepairOrderStatus.CANCELLED}
+        {
+            RepairOrderStatus.WORKSHOP_ASSIGNED,
+            RepairOrderStatus.WAITING_EXTERNAL_REFERRAL_APPROVAL,
+            RepairOrderStatus.CANCELLED,
+        }
+    ),
+    RepairOrderStatus.WAITING_EXTERNAL_REFERRAL_APPROVAL: frozenset(
+        {RepairOrderStatus.WAITING_DRIVER_CONFIRMATION, RepairOrderStatus.CANCELLED}
     ),
     RepairOrderStatus.WORKSHOP_ASSIGNED: frozenset(
         {
@@ -118,6 +127,7 @@ _ALLOWED_TRANSITIONS: dict[RepairOrderStatus, frozenset[RepairOrderStatus]] = {
     ),
     RepairOrderStatus.ACCEPTED_BY_DRIVER: frozenset({RepairOrderStatus.COMPLETED}),
     RepairOrderStatus.REJECTED_BY_DRIVER: frozenset(),
+    RepairOrderStatus.REJECTED_BY_TRANSPORT: frozenset(),
     RepairOrderStatus.COMPLETED: frozenset(),
     RepairOrderStatus.CANCELLED: frozenset(),
 }
@@ -127,6 +137,7 @@ _MUTABLE_STATUSES: frozenset[RepairOrderStatus] = frozenset(
         RepairOrderStatus.CREATED,
         RepairOrderStatus.APPROVED,
         RepairOrderStatus.WORKSHOP_ASSIGNED,
+        RepairOrderStatus.WAITING_EXTERNAL_REFERRAL_APPROVAL,
         RepairOrderStatus.WAITING_WORKSHOP_CONFIRMATION,
         RepairOrderStatus.WAITING_PARTS,
         RepairOrderStatus.ASSIGNED,
@@ -139,6 +150,7 @@ _TERMINAL_STATUSES: frozenset[RepairOrderStatus] = frozenset(
         RepairOrderStatus.COMPLETED,
         RepairOrderStatus.CANCELLED,
         RepairOrderStatus.REJECTED_BY_DRIVER,
+        RepairOrderStatus.REJECTED_BY_TRANSPORT,
     }
 )
 
@@ -217,6 +229,7 @@ class RepairOrder:
     sap_order_number: str | None = field(default=None)
     workshop_type: WorkshopType | None = field(default=None)
     workshop_id: str | None = field(default=None)
+    transport_rejection_reason: str | None = field(default=None)
     completed_at: datetime | None = field(default=None)
 
     def _assert_mutable(self, operation: str) -> None:
@@ -277,6 +290,16 @@ class RepairOrder:
         """
         self.transition_to(RepairOrderStatus.APPROVED)
 
+    def reject_by_transport(self, reason: str) -> None:
+        """Reject the repair request during initial transport review."""
+        if self.status != RepairOrderStatus.CREATED:
+            raise RepairOrderInvalidStateTransitionError(
+                current_status=self.status.value,
+                target_status=RepairOrderStatus.REJECTED_BY_TRANSPORT.value,
+            )
+        self.status = RepairOrderStatus.REJECTED_BY_TRANSPORT
+        self.transport_rejection_reason = reason
+
     def assign_workshop(
         self, workshop_type: WorkshopType, workshop_id: str | None = None
     ) -> None:
@@ -288,9 +311,12 @@ class RepairOrder:
         Raises:
             RepairOrderInvalidStateTransitionError: If not in APPROVED status.
         """
-        self.transition_to(RepairOrderStatus.WORKSHOP_ASSIGNED)
         self.workshop_type = workshop_type
         self.workshop_id = workshop_id
+        if workshop_type == WorkshopType.EXTERNAL:
+            self.transition_to(RepairOrderStatus.WAITING_EXTERNAL_REFERRAL_APPROVAL)
+            return
+        self.transition_to(RepairOrderStatus.WORKSHOP_ASSIGNED)
 
     def accept_internal_workshop(self) -> None:
         """Accept an internally assigned workshop before work starts."""
@@ -436,7 +462,11 @@ class RepairOrderEventType(StrEnum):
     DISTRIBUTION_APPROVED = "DISTRIBUTION_APPROVED"
     DISTRIBUTION_APPROVED_USABLE = "DISTRIBUTION_APPROVED_USABLE"
     TRANSPORT_APPROVED = "TRANSPORT_APPROVED"
+    TRANSPORT_REJECTED = "TRANSPORT_REJECTED"
     WORKSHOP_ASSIGNED = "WORKSHOP_ASSIGNED"
+    EXTERNAL_REFERRAL_REQUESTED = "EXTERNAL_REFERRAL_REQUESTED"
+    EXTERNAL_REFERRAL_APPROVED = "EXTERNAL_REFERRAL_APPROVED"
+    EXTERNAL_REFERRAL_REJECTED = "EXTERNAL_REFERRAL_REJECTED"
     TECHNICIAN_ACCEPTED = "TECHNICIAN_ACCEPTED"
     TECHNICIAN_REJECTED = "TECHNICIAN_REJECTED"
     REPAIR_REJECTED = "REPAIR_REJECTED"
@@ -481,3 +511,78 @@ class RepairOrderEvent:
     description: str
     created_at: datetime
     created_by_id: uuid.UUID | None = None
+
+
+class ExternalWorkshopReferralStatus(StrEnum):
+    """Lifecycle states for external-workshop referral permission requests."""
+
+    REQUESTED = "REQUESTED"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+    CANCELLED = "CANCELLED"
+
+
+_EXTERNAL_REFERRAL_ALLOWED_TRANSITIONS: dict[
+    ExternalWorkshopReferralStatus, frozenset[ExternalWorkshopReferralStatus]
+] = {
+    ExternalWorkshopReferralStatus.REQUESTED: frozenset(
+        {
+            ExternalWorkshopReferralStatus.APPROVED,
+            ExternalWorkshopReferralStatus.REJECTED,
+            ExternalWorkshopReferralStatus.CANCELLED,
+        }
+    ),
+    ExternalWorkshopReferralStatus.APPROVED: frozenset(),
+    ExternalWorkshopReferralStatus.REJECTED: frozenset(),
+    ExternalWorkshopReferralStatus.CANCELLED: frozenset(),
+}
+
+
+@dataclass
+class ExternalWorkshopReferralRequest:
+    """Permission request for sending a repair order to an external workshop."""
+
+    id: uuid.UUID
+    repair_order_id: uuid.UUID
+    vehicle_id: uuid.UUID
+    fault_id: uuid.UUID
+    status: ExternalWorkshopReferralStatus
+    requested_by_id: uuid.UUID
+    requested_at: datetime
+    created_at: datetime
+    updated_at: datetime
+    workshop_id: str | None = field(default=None)
+    reason: str = ""
+    approved_by_id: uuid.UUID | None = field(default=None)
+    approved_at: datetime | None = field(default=None)
+    rejected_by_id: uuid.UUID | None = field(default=None)
+    rejected_at: datetime | None = field(default=None)
+    rejection_reason: str | None = field(default=None)
+
+    def transition_to(self, target: ExternalWorkshopReferralStatus) -> None:
+        """Transition the referral request to a permitted target status."""
+        allowed = _EXTERNAL_REFERRAL_ALLOWED_TRANSITIONS.get(self.status, frozenset())
+        if target not in allowed:
+            raise RepairOrderInvalidStateTransitionError(
+                current_status=self.status.value,
+                target_status=target.value,
+            )
+        self.status = target
+
+    def approve(self, approved_by_id: uuid.UUID, approved_at: datetime) -> None:
+        """Approve external workshop referral permission."""
+        self.transition_to(ExternalWorkshopReferralStatus.APPROVED)
+        self.approved_by_id = approved_by_id
+        self.approved_at = approved_at
+
+    def reject(
+        self,
+        rejected_by_id: uuid.UUID,
+        rejected_at: datetime,
+        reason: str,
+    ) -> None:
+        """Reject external workshop referral permission."""
+        self.transition_to(ExternalWorkshopReferralStatus.REJECTED)
+        self.rejected_by_id = rejected_by_id
+        self.rejected_at = rejected_at
+        self.rejection_reason = reason

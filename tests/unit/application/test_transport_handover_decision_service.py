@@ -92,6 +92,13 @@ class FakeRepairRepository(IRepairOrderRepository):
     def list_by_fault(self, fault_id: uuid.UUID) -> list[RepairOrder]:
         return [o for o in self._store.values() if o.fault_id == fault_id]
 
+    def list_all(
+        self, status: RepairOrderStatus | None = None
+    ) -> list[RepairOrder]:
+        if status is None:
+            return list(self._store.values())
+        return [o for o in self._store.values() if o.status == status]
+
     def list_active_by_vehicle(self, vehicle_id: uuid.UUID) -> list[RepairOrder]:
         terminal = {
             RepairOrderStatus.COMPLETED,
@@ -124,6 +131,11 @@ class FakeFaultRepository(IFaultRepository):
 
     def list_by_vehicle(self, vehicle_id: uuid.UUID) -> list[Fault]:
         return [f for f in self._store.values() if f.vehicle_id == vehicle_id]
+
+    def list_all(self, status: FaultStatus | None = None) -> list[Fault]:
+        if status is None:
+            return list(self._store.values())
+        return [f for f in self._store.values() if f.status == status]
 
     def list_open_by_severity(self, severity: FaultSeverity) -> list[Fault]:
         return [

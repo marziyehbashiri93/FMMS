@@ -21,14 +21,19 @@ from apps.repair.application.dto.repair_dto import (
     CloseRepairOrderDTO,
     CompleteRepairOrderDTO,
     CreateRepairOrderDTO,
+    RejectRepairOrderByTransportDTO,
     SyncRepairToSAPDTO,
     TransportHandoverApproveDTO,
     TransportHandoverRejectDTO,
 )
-from apps.repair.domain.entities import RepairOrderStatus, WorkshopType
+from apps.repair.domain.entities import (
+    ExternalWorkshopReferralStatus,
+    RepairOrderStatus,
+    WorkshopType,
+)
 from core.permissions import (
+    IsDistributionSupervisorOrAbove,
     IsReadOnlyOrTechnicianOrAbove,
-    IsSupervisorOrAbove,
     IsTechnicianOrAbove,
     IsTransportSupervisorOrAbove,
 )
@@ -38,6 +43,7 @@ from interfaces.api.v1.repair.external_invoice_views import (
     RepairOrderExternalInvoiceMixin,
 )
 from interfaces.api.v1.repair.serializers import (
+    ExternalWorkshopReferralResponseSerializer,
     RepairActivityCreateSerializer,
     RepairAssignSerializer,
     RepairAssignWorkshopSerializer,
@@ -48,6 +54,7 @@ from interfaces.api.v1.repair.serializers import (
     RepairOrderTimelineEventSerializer,
     RepairPartCreateSerializer,
     RepairSyncSAPSerializer,
+    RepairTransportRejectSerializer,
     TransportHandoverRejectSerializer,
 )
 from interfaces.api.v1.schema_tags import API_TAGS
@@ -73,17 +80,12 @@ class RepairOrderViewSet(
         tags=[API_TAGS.repair], responses=RepairOrderResponseSerializer(many=True)
     )
     def list(self, request: Request) -> Response:
-        """List repair orders for a vehicle."""
+        """List repair orders, optionally filtered by vehicle/status."""
         vehicle_id_raw = request.query_params.get("vehicle_id")
-        if not vehicle_id_raw:
-            return Response(
-                {"detail": "vehicle_id query parameter is required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
         status_raw = request.query_params.get("status")
         order_status = RepairOrderStatus(status_raw) if status_raw else None
         items = deps.get_list_repair_orders_service().execute(
-            uuid.UUID(vehicle_id_raw),
+            uuid.UUID(vehicle_id_raw) if vehicle_id_raw else None,
             status=order_status,
             request_id=request_id_from(request),
         )
@@ -122,7 +124,11 @@ class RepairOrderViewSet(
         request=None,
         responses=RepairDecisionResponseSerializer,
     )
-    @action(detail=True, methods=["post"], permission_classes=[IsSupervisorOrAbove])
+    @action(
+        detail=True,
+        methods=["post"],
+        permission_classes=[IsTransportSupervisorOrAbove],
+    )
     def approve(self, request: Request, pk: str | None = None) -> Response:
         """Transport supervisor approves continuing the repair process."""
         result = deps.get_approve_repair_order_service().execute(
@@ -143,7 +149,7 @@ class RepairOrderViewSet(
         detail=True,
         methods=["post"],
         url_path="assign-workshop",
-        permission_classes=[IsSupervisorOrAbove],
+        permission_classes=[IsTransportSupervisorOrAbove],
     )
     def assign_workshop(self, request: Request, pk: str | None = None) -> Response:
         """Transport supervisor selects INTERNAL or EXTERNAL workshop."""
@@ -154,8 +160,34 @@ class RepairOrderViewSet(
                 repair_order_id=uuid.UUID(str(pk)),
                 workshop_type=WorkshopType(serializer.validated_data["workshop_type"]),
                 workshop_id=serializer.validated_data.get("workshop_id") or None,
+                reason=serializer.validated_data.get("reason", ""),
                 request_id=request_id_from(request),
                 assigned_by=user_id_from(request),
+            )
+        )
+        return Response(RepairDecisionResponseSerializer(result).data)
+
+    @extend_schema(
+        tags=[API_TAGS.repair],
+        request=RepairTransportRejectSerializer,
+        responses=RepairDecisionResponseSerializer,
+    )
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="transport-reject",
+        permission_classes=[IsTransportSupervisorOrAbove],
+    )
+    def transport_reject(self, request: Request, pk: str | None = None) -> Response:
+        """Transport supervisor rejects the initial repair request."""
+        serializer = RepairTransportRejectSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        result = deps.get_reject_repair_order_by_transport_service().execute(
+            RejectRepairOrderByTransportDTO(
+                repair_order_id=uuid.UUID(str(pk)),
+                reason=serializer.validated_data["reason"],
+                request_id=request_id_from(request),
+                rejected_by=user_id_from(request),
             )
         )
         return Response(RepairDecisionResponseSerializer(result).data)
@@ -381,3 +413,27 @@ class RepairOrderViewSet(
             )
         )
         return Response(RepairOrderResponseSerializer(result).data)
+
+
+class ExternalWorkshopReferralViewSet(GenericViewSet):
+    """Expose external-workshop referral permission requests."""
+
+    permission_classes = [IsDistributionSupervisorOrAbove]
+
+    @extend_schema(
+        tags=[API_TAGS.repair],
+        responses=ExternalWorkshopReferralResponseSerializer(many=True),
+    )
+    def list(self, request: Request) -> Response:
+        """List external-workshop referral permission requests."""
+        status_raw = request.query_params.get("status")
+        items = deps.get_list_external_workshop_referral_requests_service().execute(
+            ExternalWorkshopReferralStatus(status_raw) if status_raw else None
+        )
+        page = paginate_dto_list(self, items)
+        serializer = ExternalWorkshopReferralResponseSerializer(
+            page if page is not None else items, many=True
+        )
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response(serializer.data)

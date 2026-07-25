@@ -13,7 +13,11 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 
-from apps.repair.domain.entities import RepairOrderStatus, WorkshopType
+from apps.repair.domain.entities import (
+    ExternalWorkshopReferralStatus,
+    RepairOrderStatus,
+    WorkshopType,
+)
 from apps.repair.domain.invoice_entities import ExternalRepairInvoiceStatus
 
 
@@ -194,6 +198,16 @@ class ApproveRepairOrderDTO:
 
 
 @dataclass(frozen=True)
+class RejectRepairOrderByTransportDTO:
+    """Input DTO for initial transport rejection of a repair request."""
+
+    repair_order_id: uuid.UUID
+    reason: str
+    request_id: str
+    rejected_by: uuid.UUID
+
+
+@dataclass(frozen=True)
 class AssignWorkshopDTO:
     """Input DTO for selecting internal/external workshop after approval.
 
@@ -209,6 +223,7 @@ class AssignWorkshopDTO:
     request_id: str
     assigned_by: uuid.UUID
     workshop_id: str | None = field(default=None)
+    reason: str = ""
 
 
 @dataclass(frozen=True)
@@ -227,6 +242,8 @@ class RepairDecisionResponseDTO:
     message: str
     workshop_type: WorkshopType | None = field(default=None)
     workshop_id: str | None = field(default=None)
+    external_referral_request_id: uuid.UUID | None = field(default=None)
+    transport_rejection_reason: str | None = field(default=None)
 
 
 @dataclass(frozen=True)
@@ -250,6 +267,7 @@ class RepairOrderResponseDTO:
     sap_order_number: str | None = field(default=None)
     workshop_type: WorkshopType | None = field(default=None)
     workshop_id: str | None = field(default=None)
+    transport_rejection_reason: str | None = field(default=None)
     completed_at: datetime | None = field(default=None)
 
 
@@ -318,3 +336,25 @@ class ExternalInvoiceResponseDTO:
     updated_at: datetime
     vendor_id: str | None = field(default=None)
     document: str | None = field(default=None)
+
+
+@dataclass(frozen=True)
+class ExternalWorkshopReferralResponseDTO:
+    """Output DTO for external-workshop referral permission requests."""
+
+    id: uuid.UUID
+    repair_order_id: uuid.UUID
+    vehicle_id: uuid.UUID
+    fault_id: uuid.UUID
+    status: ExternalWorkshopReferralStatus
+    requested_by_id: uuid.UUID
+    requested_at: datetime
+    created_at: datetime
+    updated_at: datetime
+    workshop_id: str | None = field(default=None)
+    reason: str = ""
+    approved_by_id: uuid.UUID | None = field(default=None)
+    approved_at: datetime | None = field(default=None)
+    rejected_by_id: uuid.UUID | None = field(default=None)
+    rejected_at: datetime | None = field(default=None)
+    rejection_reason: str | None = field(default=None)

@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
-from apps.repair.domain.entities import RepairOrderStatus, WorkshopType
+from apps.repair.domain.entities import (
+    ExternalWorkshopReferralStatus,
+    RepairOrderStatus,
+    WorkshopType,
+)
 from apps.repair.domain.invoice_entities import ExternalRepairInvoiceStatus
 
 
@@ -30,6 +34,25 @@ class RepairAssignWorkshopSerializer(serializers.Serializer):
     workshop_id = serializers.CharField(
         max_length=64, required=False, allow_null=True, allow_blank=True
     )
+    reason = serializers.CharField(
+        max_length=500, required=False, allow_blank=True, trim_whitespace=True
+    )
+
+    def validate(self, attrs: dict) -> dict:
+        """Require workshop ID when selecting an external workshop."""
+        if attrs.get("workshop_type") == WorkshopType.EXTERNAL.value and not attrs.get(
+            "workshop_id"
+        ):
+            raise serializers.ValidationError(
+                {"workshop_id": "workshop_id is required for external workshop."}
+            )
+        return attrs
+
+
+class RepairTransportRejectSerializer(serializers.Serializer):
+    """Validate initial transport rejection payload."""
+
+    reason = serializers.CharField(max_length=500, trim_whitespace=True)
 
 
 class RepairCompleteSerializer(serializers.Serializer):
@@ -126,6 +149,7 @@ class RepairOrderResponseSerializer(serializers.Serializer):
         choices=[item.value for item in WorkshopType], allow_null=True
     )
     workshop_id = serializers.CharField(allow_null=True)
+    transport_rejection_reason = serializers.CharField(allow_null=True, required=False)
     completed_at = serializers.DateTimeField(allow_null=True)
 
 
@@ -141,6 +165,33 @@ class RepairDecisionResponseSerializer(serializers.Serializer):
         required=False,
     )
     workshop_id = serializers.CharField(allow_null=True, required=False)
+    external_referral_request_id = serializers.UUIDField(
+        allow_null=True, required=False
+    )
+    transport_rejection_reason = serializers.CharField(allow_null=True, required=False)
+
+
+class ExternalWorkshopReferralResponseSerializer(serializers.Serializer):
+    """Serialize external-workshop referral permission requests."""
+
+    id = serializers.UUIDField()
+    repair_order_id = serializers.UUIDField()
+    vehicle_id = serializers.UUIDField()
+    fault_id = serializers.UUIDField()
+    status = serializers.ChoiceField(
+        choices=[item.value for item in ExternalWorkshopReferralStatus]
+    )
+    workshop_id = serializers.CharField(allow_null=True, required=False)
+    reason = serializers.CharField()
+    requested_by_id = serializers.UUIDField()
+    requested_at = serializers.DateTimeField()
+    approved_by_id = serializers.UUIDField(allow_null=True, required=False)
+    approved_at = serializers.DateTimeField(allow_null=True, required=False)
+    rejected_by_id = serializers.UUIDField(allow_null=True, required=False)
+    rejected_at = serializers.DateTimeField(allow_null=True, required=False)
+    rejection_reason = serializers.CharField(allow_null=True, required=False)
+    created_at = serializers.DateTimeField()
+    updated_at = serializers.DateTimeField()
 
 
 class ExternalInvoiceUploadSerializer(serializers.Serializer):

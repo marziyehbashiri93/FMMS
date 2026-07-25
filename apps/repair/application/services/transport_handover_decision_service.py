@@ -73,7 +73,7 @@ def _close_fault_for_completed_repair(
 
 def _close_open_fault(fault: Fault) -> None:
     """Transition a non-closed fault to CLOSED via the domain entity."""
-    if fault.status == FaultStatus.ASSIGNED:
+    if fault.status in {FaultStatus.ASSIGNED, FaultStatus.AWAITING_TRANSPORT}:
         fault.start_repair()
     fault.close()
 

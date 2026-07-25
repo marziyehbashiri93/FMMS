@@ -29,6 +29,9 @@ class RepairOrderModel(BaseModel):
     sap_order_number = models.CharField(max_length=30, blank=True, default="")
     workshop_type = models.CharField(max_length=20, blank=True, default="")
     workshop_id = models.CharField(max_length=64, blank=True, default="")
+    transport_rejection_reason = models.CharField(
+        max_length=500, blank=True, default=""
+    )
     completed_at = models.DateTimeField(null=True, blank=True, default=None)
     # TechnicianAssignment (value object — denormalized)
     assigned_technician_id = models.UUIDField(null=True, blank=True, default=None)
@@ -152,3 +155,37 @@ class ExternalRepairInvoiceModel(BaseModel):
     class Meta:
         app_label = "repair"
         db_table = "external_repair_invoice"
+
+
+class ExternalWorkshopReferralRequestModel(BaseModel):
+    """Permission request for referring a repair order to an external workshop."""
+
+    repair_order_id = models.UUIDField(db_index=True)
+    vehicle_id = models.UUIDField(db_index=True)
+    fault_id = models.UUIDField(db_index=True)
+    status = models.CharField(max_length=20, db_index=True)
+    workshop_id = models.CharField(max_length=64, blank=True, default="")
+    reason = models.CharField(max_length=500, blank=True, default="")
+    requested_by_id = models.UUIDField()
+    requested_at = models.DateTimeField()
+    approved_by_id = models.UUIDField(null=True, blank=True, default=None)
+    approved_at = models.DateTimeField(null=True, blank=True, default=None)
+    rejected_by_id = models.UUIDField(null=True, blank=True, default=None)
+    rejected_at = models.DateTimeField(null=True, blank=True, default=None)
+    rejection_reason = models.CharField(max_length=500, blank=True, default="")
+
+    class Meta:
+        app_label = "repair"
+        db_table = "external_workshop_referral_request"
+        verbose_name = "External Workshop Referral Request"
+        verbose_name_plural = "External Workshop Referral Requests"
+        indexes = [
+            models.Index(
+                fields=["repair_order_id", "status", "is_deleted"],
+                name="ext_ref_order_status_idx",
+            ),
+            models.Index(
+                fields=["status", "is_deleted"],
+                name="ext_ref_status_idx",
+            ),
+        ]

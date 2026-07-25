@@ -219,6 +219,11 @@ class FakeRepairRepository(IRepairOrderRepository):
     def list_by_fault(self, fault_id: uuid.UUID) -> list[RepairOrder]:
         return [o for o in self._store.values() if o.fault_id == fault_id]
 
+    def list_all(self, status: RepairOrderStatus | None = None) -> list[RepairOrder]:
+        if status is None:
+            return list(self._store.values())
+        return [o for o in self._store.values() if o.status == status]
+
     def list_active_by_vehicle(self, vehicle_id: uuid.UUID) -> list[RepairOrder]:
         return [
             o
@@ -247,15 +252,12 @@ class FakeVehicleRepository(IVehicleRepository):
     def get_by_plate(self, plate_number: PlateNumber) -> Vehicle | None:
         return None
 
-    def get_by_vehicle_number(
-        self, vehicle_number: SAPVehicleNumber
-    ) -> Vehicle | None:
+    def get_by_vehicle_number(self, vehicle_number: SAPVehicleNumber) -> Vehicle | None:
         return next(
             (
                 v
                 for v in self._store.values()
-                if v.vehicle_number is not None
-                and v.vehicle_number == vehicle_number
+                if v.vehicle_number is not None and v.vehicle_number == vehicle_number
             ),
             None,
         )
@@ -324,6 +326,11 @@ class FakeFaultRepository(IFaultRepository):
     ) -> list[Fault]:
         return [f for f in self._store.values() if f.vehicle_id == vehicle_id]
 
+    def list_all(self, status: FaultStatus | None = None) -> list[Fault]:
+        if status is None:
+            return list(self._store.values())
+        return [f for f in self._store.values() if f.status == status]
+
     def list_open_by_severity(self, severity: FaultSeverity) -> list[Fault]:
         return []
 
@@ -379,7 +386,7 @@ class FakeSAPPMOrderPort(ISAPPMOrderPort):
 
 
 class TestCreateRepairOrderService:
-    def test_creates_order_in_created_status(self) -> None:
+    def test_direct_create_is_blocked(self) -> None:
         vehicle = _make_vehicle()
         fault = _make_fault(vehicle.id)
         service = CreateRepairOrderService(
@@ -388,75 +395,18 @@ class TestCreateRepairOrderService:
             FakeFaultRepository([fault]),
         )
 
-        result = service.execute(
-            CreateRepairOrderDTO(
-                vehicle_id=vehicle.id,
-                fault_id=fault.id,
-                request_id="req-create",
-                created_by=uuid.uuid4(),
-            )
-        )
-
-        assert isinstance(result, RepairOrderResponseDTO)
-        assert result.status == RepairOrderStatus.CREATED
-        assert result.vehicle_id == vehicle.id
-        assert result.fault_id == fault.id
-
-    def test_raises_not_found_for_missing_vehicle(self) -> None:
-        fault = _make_fault(uuid.uuid4())
-        service = CreateRepairOrderService(
-            FakeRepairRepository(),
-            FakeVehicleRepository(),
-            FakeFaultRepository([fault]),
-        )
-
-        with pytest.raises(FMMSNotFoundError):
-            service.execute(
-                CreateRepairOrderDTO(
-                    vehicle_id=uuid.uuid4(),
-                    fault_id=fault.id,
-                    request_id="req-noveh",
-                    created_by=uuid.uuid4(),
-                )
-            )
-
-    def test_raises_not_found_for_missing_fault(self) -> None:
-        vehicle = _make_vehicle()
-        service = CreateRepairOrderService(
-            FakeRepairRepository(),
-            FakeVehicleRepository([vehicle]),
-            FakeFaultRepository(),
-        )
-
-        with pytest.raises(FMMSNotFoundError):
-            service.execute(
-                CreateRepairOrderDTO(
-                    vehicle_id=vehicle.id,
-                    fault_id=uuid.uuid4(),
-                    request_id="req-nofault",
-                    created_by=uuid.uuid4(),
-                )
-            )
-
-    def test_raises_conflict_when_fault_vehicle_mismatch(self) -> None:
-        vehicle = _make_vehicle()
-        other_vehicle = _make_vehicle()
-        fault = _make_fault(other_vehicle.id)
-        service = CreateRepairOrderService(
-            FakeRepairRepository(),
-            FakeVehicleRepository([vehicle, other_vehicle]),
-            FakeFaultRepository([fault]),
-        )
-
-        with pytest.raises(FMMSConflictError):
+        with pytest.raises(FMMSConflictError) as exc_info:
             service.execute(
                 CreateRepairOrderDTO(
                     vehicle_id=vehicle.id,
                     fault_id=fault.id,
-                    request_id="req-mismatch",
+                    request_id="req-create",
                     created_by=uuid.uuid4(),
                 )
             )
+        assert (
+            exc_info.value.error_code == "REPAIR_ORDER_CREATE_VIA_DISTRIBUTION_ONLY"
+        )
 
 
 # ---------------------------------------------------------------------------

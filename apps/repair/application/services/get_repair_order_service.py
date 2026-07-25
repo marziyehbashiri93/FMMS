@@ -85,7 +85,7 @@ class ListRepairOrdersService:
 
     def execute(
         self,
-        vehicle_id: uuid.UUID,
+        vehicle_id: uuid.UUID | None = None,
         status: RepairOrderStatus | None = None,
         request_id: str = "",
     ) -> list[RepairOrderResponseDTO]:
@@ -111,7 +111,10 @@ class ListRepairOrdersService:
             },
         )
 
-        orders = self._repo.list_by_vehicle(vehicle_id=vehicle_id, status=status)
+        if vehicle_id is None:
+            orders = self._repo.list_all(status=status)
+        else:
+            orders = self._repo.list_by_vehicle(vehicle_id=vehicle_id, status=status)
 
         logger.info(
             "Repair orders listed",

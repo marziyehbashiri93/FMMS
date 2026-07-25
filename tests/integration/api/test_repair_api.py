@@ -8,7 +8,7 @@ from uuid import uuid4
 import pytest
 from rest_framework.test import APIClient
 
-from tests.integration.api.conftest import create_vehicle
+from tests.integration.api.conftest import create_repair_order_via_distribution
 
 pytestmark = pytest.mark.django_db
 
@@ -16,34 +16,38 @@ pytestmark = pytest.mark.django_db
 class TestRepairAPI:
     """Cover repair order lifecycle endpoints."""
 
-    def test_repair_lifecycle(self, authenticated_client: APIClient) -> None:
-        """Create, assign, start, and complete a repair order."""
-        vehicle = create_vehicle(
+    def test_direct_create_repair_order_is_blocked(
+        self, authenticated_client: APIClient
+    ) -> None:
+        """POST /repair-orders/ is closed; RO comes from distribution-unusable."""
+        order = create_repair_order_via_distribution(
             authenticated_client,
-            plate="12REP001",
-            vin="1HGCM82633A004356",
-            vehicle_number="100001",
+            plate="12REP000",
+            vin="1HGCM82633A004355",
         )
-        fault = authenticated_client.post(
-            "/api/v1/faults/",
+        blocked = authenticated_client.post(
+            "/api/v1/repair-orders/",
             {
-                "vehicle_id": vehicle["id"],
-                "code": "ENG-01",
-                "description": "Engine noise",
-                "severity": "HIGH",
+                "vehicle_id": order["vehicle_id"],
+                "fault_id": order["fault_id"],
             },
             format="json",
         )
-        assert fault.status_code == 201, fault.data
+        assert blocked.status_code == 409
+        assert blocked.data["error_code"] == "REPAIR_ORDER_CREATE_VIA_DISTRIBUTION_ONLY"
 
-        created = authenticated_client.post(
-            "/api/v1/repair-orders/",
-            {"vehicle_id": vehicle["id"], "fault_id": fault.data["id"]},
-            format="json",
+    def test_repair_lifecycle(self, authenticated_client: APIClient) -> None:
+        """Create, assign, start, and complete a repair order."""
+        created = create_repair_order_via_distribution(
+            authenticated_client,
+            plate="12REP001",
+            vin="1HGCM82633A004356",
+            code="ENG-01",
+            description="Engine noise",
         )
-        assert created.status_code == 201, created.data
-        order_id = created.data["id"]
-        assert created.data["status"] == "CREATED"
+        vehicle = created["vehicle"]
+        order_id = created["id"]
+        assert created["status"] == "CREATED"
 
         technician_id = str(uuid4())
         assigned = authenticated_client.post(
