@@ -47,6 +47,7 @@ export const modules: AppModule[] = [
   { key: 'faults', label: 'لیست خرابی‌ها', path: '/faults', icon: CarRepair, enabled: true },
   { key: 'handover', label: 'تحویل و تایید', path: '/handover', icon: Handshake, enabled: true },
   { key: 'repairs', label: 'کارتابل ترابری', path: '/repairs', icon: Build, enabled: true },
+  { key: 'transportParts', label: 'درخواست قطعات', path: '/transport/parts', icon: Inventory2, enabled: true },
   { key: 'workshop', label: 'تعمیرگاه مرکزی', path: '/workshop', icon: Build, enabled: true },
   { key: 'materials', label: 'قطعات و انبار', path: '/materials', icon: Inventory2, enabled: false },
   { key: 'sap', label: 'یکپارچه‌سازی SAP', path: '/sap', icon: Sync, enabled: true },
@@ -81,7 +82,7 @@ export const navSections: Array<{ label: string; entries: NavEntry[] }> = [
         key: 'transport',
         label: 'ترابری',
         icon: Build,
-        children: [byKey('repairs')],
+        children: [byKey('repairs'), byKey('transportParts')],
       },
       {
         key: 'workshopGroup',

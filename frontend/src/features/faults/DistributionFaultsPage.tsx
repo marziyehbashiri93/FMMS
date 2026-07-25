@@ -102,6 +102,26 @@ function vehiclePlate(vehicle: Vehicle | undefined, vehicleId: string): string {
   return vehicle.license_plate || vehicle.vehicle_number || vehicleId.slice(0, 8);
 }
 
+function faultItemLines(fault: Fault): string[] {
+  const items = fault.items ?? [];
+  if (items.length === 0) {
+    return fault.description ? [fault.description] : [];
+  }
+  return items.map((item) => {
+    const title = item.description || item.component || 'خرابی';
+    const component =
+      item.component && item.component !== item.description ? ` (${item.component})` : '';
+    return `${title}${component}`;
+  });
+}
+
+function faultSummaryLabel(fault: Fault): string {
+  const lines = faultItemLines(fault);
+  if (lines.length === 0) return fault.description || '—';
+  if (lines.length === 1) return lines[0];
+  return `${toFaNumber(lines.length)} خرابی`;
+}
+
 /**
  * Distribution unit queue for reviewing reported vehicle faults.
  */
@@ -174,9 +194,13 @@ export function DistributionFaultsPage() {
       if (status && fault.status !== status) return false;
       if (!needle) return true;
       const vehicle = vehicleMap.get(String(fault.vehicle_id));
+      const itemText = (fault.items ?? [])
+        .map((item) => `${item.description} ${item.component}`)
+        .join(' ');
       return [
         fault.code,
         fault.description,
+        itemText,
         fault.status,
         fault.severity,
         fault.sap_notification_number ?? '',
@@ -291,10 +315,10 @@ export function DistributionFaultsPage() {
     {
       key: 'description',
       label: 'شرح خرابی',
-      minWidth: 220,
+      minWidth: 260,
       render: (fault) => (
         <Stack spacing={0.35}>
-          <Typography fontWeight={800}>{fault.description}</Typography>
+          <Typography fontWeight={800}>{faultSummaryLabel(fault)}</Typography>
           <Typography variant="caption" color="text.secondary">
             {fault.code} · {formatDateTime(fault.reported_at || fault.created_at)}
           </Typography>
@@ -359,9 +383,16 @@ export function DistributionFaultsPage() {
                     label="پلاک"
                     value={vehiclePlate(detail.vehicle ?? undefined, detail.fault.vehicle_id)}
                   />
-                  <DetailLine label="شرح" value={detail.fault.description} />
+                  <DetailLine
+                    label="خلاصه"
+                    value={
+                      (detail.fault.items?.length ?? 0) > 1
+                        ? detail.fault.description
+                        : detail.fault.description || '—'
+                    }
+                  />
                   <DetailLine label="کد خرابی" value={detail.fault.code} />
-                  <DetailLine label="شدت" value={severityLabel(detail.fault.severity)} />
+                  <DetailLine label="شدت کلی" value={severityLabel(detail.fault.severity)} />
                   <DetailLine label="وضعیت" value={faultStatusLabel(detail.fault.status)} />
                   <DetailLine
                     label="PM Notification"
@@ -373,61 +404,134 @@ export function DistributionFaultsPage() {
                   />
                 </CardContent>
               </Card>
-              {decisionDisabled && (
-                <Alert severity="info">
-                  تصمیم توزیع برای این خرابی قبلا ثبت شده است.
-                </Alert>
+
+              {(detail.fault.items?.length ?? 0) > 0 ? (
+                <Card variant="outlined">
+                  <CardContent>
+                    <Typography fontWeight={800} mb={1.25}>
+                      شرح خرابی‌ها ({toFaNumber(detail.fault.items!.length)})
+                    </Typography>
+                    <Stack spacing={1.25} divider={<Divider flexItem />}>
+                      {detail.fault.items!.map((item, index) => (
+                        <Stack key={item.id} spacing={0.5}>
+                          <Typography fontWeight={800}>
+                            {toFaNumber(index + 1)}. {item.description || item.component}
+                          </Typography>
+                          {item.component && item.component !== item.description ? (
+                            <DetailLine label="قطعه / بخش" value={item.component} />
+                          ) : null}
+                          <DetailLine label="شدت" value={severityLabel(item.severity)} />
+                        </Stack>
+                      ))}
+                    </Stack>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card variant="outlined">
+                  <CardContent>
+                    <Typography fontWeight={800} mb={1}>
+                      شرح خرابی
+                    </Typography>
+                    <Typography>{detail.fault.description || '—'}</Typography>
+                  </CardContent>
+                </Card>
               )}
               {actionError && <Alert severity="error">{actionError}</Alert>}
-              <RtlTextField
-                fullWidth
-                label="یادداشت تصمیم توزیع"
-                value={decisionNote}
-                onChange={(event) => setDecisionNote(event.target.value)}
-              />
-              <Stack
-                direction={{ xs: 'column', sm: 'row' }}
-                spacing={1}
-                justifyContent="flex-end"
-                useFlexGap
-              >
-                <Button
-                  color="success"
-                  variant="contained"
-                  size="small"
-                  startIcon={<CheckCircleOutline />}
-                  loading={decisionLoading === 'usable'}
-                  disabled={decisionDisabled}
-                  onClick={() => void decide('usable')}
+              {decisionDisabled ? (
+                <Alert
+                  severity="info"
+                  icon={false}
                   sx={{
-                    height: 40,
-                    minHeight: 40,
-                    px: 1.75,
-                    whiteSpace: 'nowrap',
-                    flexShrink: 0,
+                    py: 2,
+                    px: 2,
+                    border: '1px solid',
+                    borderColor: 'info.main',
+                    bgcolor: (theme) =>
+                      theme.palette.mode === 'dark'
+                        ? 'rgba(2, 136, 209, 0.16)'
+                        : 'rgba(2, 136, 209, 0.08)',
+                    '& .MuiAlert-message': { width: '100%' },
                   }}
                 >
-                  خودرو قابل استفاده است
-                </Button>
-                <Button
-                  color="error"
-                  variant="contained"
-                  size="small"
-                  startIcon={<DoNotDisturbAlt />}
-                  loading={decisionLoading === 'unusable'}
-                  disabled={decisionDisabled}
-                  onClick={() => void decide('unusable')}
-                  sx={{
-                    height: 40,
-                    minHeight: 40,
-                    px: 1.75,
-                    whiteSpace: 'nowrap',
-                    flexShrink: 0,
-                  }}
-                >
-                  خودرو قابل استفاده نیست
-                </Button>
-              </Stack>
+                  <Typography
+                    fontWeight={900}
+                    fontSize={{ xs: '1rem', sm: '1.1rem' }}
+                    color="info.dark"
+                    textAlign="center"
+                  >
+                    تصمیم توزیع برای این خرابی قبلاً ثبت شده است.
+                  </Typography>
+                  {detail.fault.distribution_decision_note ? (
+                    <Typography
+                      mt={1}
+                      textAlign="center"
+                      color="text.secondary"
+                      fontWeight={600}
+                    >
+                      یادداشت: {detail.fault.distribution_decision_note}
+                    </Typography>
+                  ) : null}
+                  <Typography
+                    mt={0.75}
+                    textAlign="center"
+                    variant="body2"
+                    color="text.secondary"
+                    fontWeight={700}
+                  >
+                    وضعیت فعلی: {faultStatusLabel(detail.fault.status)}
+                  </Typography>
+                </Alert>
+              ) : (
+                <>
+                  <RtlTextField
+                    fullWidth
+                    label="یادداشت تصمیم توزیع"
+                    value={decisionNote}
+                    onChange={(event) => setDecisionNote(event.target.value)}
+                  />
+                  <Stack
+                    direction={{ xs: 'column', sm: 'row' }}
+                    spacing={1}
+                    justifyContent="flex-end"
+                    useFlexGap
+                  >
+                    <Button
+                      color="success"
+                      variant="contained"
+                      size="small"
+                      startIcon={<CheckCircleOutline />}
+                      loading={decisionLoading === 'usable'}
+                      onClick={() => void decide('usable')}
+                      sx={{
+                        height: 40,
+                        minHeight: 40,
+                        px: 1.75,
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0,
+                      }}
+                    >
+                      خودرو قابل استفاده است
+                    </Button>
+                    <Button
+                      color="error"
+                      variant="contained"
+                      size="small"
+                      startIcon={<DoNotDisturbAlt />}
+                      loading={decisionLoading === 'unusable'}
+                      onClick={() => void decide('unusable')}
+                      sx={{
+                        height: 40,
+                        minHeight: 40,
+                        px: 1.75,
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0,
+                      }}
+                    >
+                      خودرو قابل استفاده نیست
+                    </Button>
+                  </Stack>
+                </>
+              )}
             </Stack>
           ),
         },

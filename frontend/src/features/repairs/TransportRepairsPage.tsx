@@ -39,8 +39,8 @@ const PAGE_SIZE = 50;
 
 const REPAIR_STATUS_LABELS: Record<string, string> = {
   CREATED: 'در انتظار تصمیم ترابری',
-  APPROVED: 'تایید شده — انتخاب تعمیرگاه',
-  WORKSHOP_ASSIGNED: 'ارجاع به تعمیرگاه مرکزی',
+  APPROVED: 'ارجاع به تعمیرگاه',
+  WORKSHOP_ASSIGNED: 'ارجاع‌شده به تعمیرگاه مرکزی',
   WAITING_EXTERNAL_REFERRAL_APPROVAL: 'منتظر مجوز تعمیرگاه بیرونی',
   REJECTED_BY_TRANSPORT: 'رد شده توسط ترابری',
   CANCELLED: 'لغو شده',
@@ -340,7 +340,9 @@ export function TransportRepairsPage() {
   const hasActiveFilters = status !== 'CREATED';
   const currentOrder = detail?.order ?? selected;
   const canDecide = currentOrder?.status === 'CREATED';
-  const canAssignWorkshop = currentOrder?.status === 'APPROVED';
+  const workshopAlreadyAssigned = Boolean(currentOrder?.workshop_type);
+  const canAssignWorkshop =
+    currentOrder?.status === 'APPROVED' && !workshopAlreadyAssigned;
 
   const columns: Array<RtlDataTableColumn<RepairOrder, string>> = [
     {
@@ -464,9 +466,45 @@ export function TransportRepairsPage() {
                 </CardContent>
               </Card>
 
-              {!canDecide && !canAssignWorkshop && (
+              {!canDecide && !canAssignWorkshop && !workshopAlreadyAssigned && (
                 <Alert severity="info">
                   این سفارش از صف تصمیم ترابری خارج شده است.
+                </Alert>
+              )}
+              {workshopAlreadyAssigned && (
+                <Alert
+                  severity="info"
+                  icon={false}
+                  sx={{
+                    py: 2,
+                    border: '1px solid',
+                    borderColor: 'info.main',
+                    bgcolor: (theme) =>
+                      theme.palette.mode === 'dark'
+                        ? 'rgba(2, 136, 209, 0.16)'
+                        : 'rgba(2, 136, 209, 0.08)',
+                    '& .MuiAlert-message': { width: '100%' },
+                  }}
+                >
+                  <Typography
+                    fontWeight={900}
+                    fontSize={{ xs: '1rem', sm: '1.1rem' }}
+                    color="info.dark"
+                    textAlign="center"
+                  >
+                    تعمیرگاه قبلاً تخصیص داده شده است.
+                  </Typography>
+                  <Typography
+                    mt={0.75}
+                    textAlign="center"
+                    variant="body2"
+                    color="text.secondary"
+                    fontWeight={700}
+                  >
+                    نوع تعمیرگاه:{' '}
+                    {WORKSHOP_LABELS[currentOrder?.workshop_type || ''] ??
+                      currentOrder?.workshop_type}
+                  </Typography>
                 </Alert>
               )}
               {actionError && <Alert severity="error">{actionError}</Alert>}
@@ -708,7 +746,7 @@ export function TransportRepairsPage() {
           tone="warning"
         />
         <KpiCard
-          label="منتظر انتخاب تعمیرگاه"
+          label="ارجاع به تعمیرگاه"
           value={loading ? '...' : toFaNumber(kpi.approved)}
           icon={CheckCircleOutline}
           tone="success"
@@ -727,7 +765,7 @@ export function TransportRepairsPage() {
         >
           <MenuItem value="">همه</MenuItem>
           <MenuItem value="CREATED">در انتظار تصمیم</MenuItem>
-          <MenuItem value="APPROVED">تایید شده</MenuItem>
+          <MenuItem value="APPROVED">ارجاع به تعمیرگاه</MenuItem>
         </RtlSelectField>
         <ClearFiltersButton onClick={resetFilters} disabled={!hasActiveFilters} />
       </FilterPanel>
@@ -804,13 +842,12 @@ export function TransportRepairsPage() {
         open={Boolean(selected)}
         onClose={closeDetail}
         title={
-          detail?.fault?.description ||
-          (selected
-            ? `سفارش تعمیر — ${vehiclePlate(
-                vehicleMap.get(String(selected.vehicle_id)),
+          selected
+            ? vehiclePlate(
+                detail?.vehicle ?? vehicleMap.get(String(selected.vehicle_id)),
                 selected.vehicle_id,
-              )}`
-            : 'جزئیات درخواست تعمیر')
+              )
+            : 'جزئیات درخواست تعمیر'
         }
         icon={DirectionsCar}
         tabs={tabs}
