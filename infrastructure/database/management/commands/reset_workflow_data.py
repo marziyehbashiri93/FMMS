@@ -35,7 +35,10 @@ from apps.repair.infrastructure.models import (
     RepairOrderModel,
 )
 from apps.vehicle.domain.entities import VehicleStatus
-from apps.vehicle.infrastructure.models import VehicleModel
+from apps.vehicle.infrastructure.models import (
+    VehicleModel,
+    VehicleOdometerReadingModel,
+)
 
 # Delete order: children / dependents first where hard FKs exist; UUID refs
 # are unordered but we still clear leaf aggregates before roots for clarity.
@@ -54,6 +57,7 @@ _DELETE_TARGETS: tuple[tuple[str, type], ...] = (
     ("pm_work_order", PMWorkOrderModel),
     ("pm_plan", PMPlanModel),
     ("sap_transaction", SAPTransactionModel),
+    ("vehicle_odometer_reading", VehicleOdometerReadingModel),
     ("driver", DriverModel),
 )
 
@@ -70,9 +74,10 @@ class Command(BaseCommand):
 
     help = (
         "DEBUG only: delete all workflow data (inspections, faults, repairs, "
-        "materials, handovers, procurement, SAP txs, drivers, PM) while "
-        "keeping vehicles, inspection checklist templates, and users. "
-        "Resets UNDER_REPAIR / WAITING_DRIVER_CONFIRMATION vehicles to ACTIVE."
+        "materials, handovers, procurement, SAP txs, odometer readings, "
+        "drivers, PM) while keeping vehicles, inspection checklist templates, "
+        "and users. Resets UNDER_REPAIR / WAITING_DRIVER_CONFIRMATION "
+        "vehicles to ACTIVE."
     )
 
     def add_arguments(self, parser: Any) -> None:

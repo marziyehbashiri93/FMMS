@@ -74,6 +74,17 @@ function isAdminUser(user: AuthUser | null): boolean {
   );
 }
 
+function isDriverUser(user: AuthUser | null): boolean {
+  return Boolean(user && user.role === 'DRIVER');
+}
+
+function vehicleAssignedToDriver(vehicle: Vehicle, customerNumber: string): boolean {
+  return (
+    vehicle.driver1?.customer_number === customerNumber ||
+    vehicle.driver2?.customer_number === customerNumber
+  );
+}
+
 function normalizeTemplates(
   payload: { results?: InspectionTemplate[] } | InspectionTemplate[],
 ): InspectionTemplate[] {
@@ -163,15 +174,20 @@ function ResultToggle({
       <ToggleButton
         value="PASS"
         sx={{
-          color: '#155f3d',
-          borderColor: 'rgba(0, 167, 111, 0.35) !important',
-          bgcolor: 'rgba(0, 167, 111, 0.06)',
-          '&:hover': { bgcolor: 'rgba(0, 167, 111, 0.12)' },
-          '&.Mui-selected': {
-            bgcolor: 'rgba(0, 167, 111, 0.18)',
-            borderColor: 'rgba(0, 167, 111, 0.55) !important',
+          color: 'text.secondary',
+          borderColor: 'rgba(15, 23, 42, 0.16) !important',
+          bgcolor: '#fff',
+          boxShadow: 'none',
+          '&:hover': {
+            bgcolor: 'rgba(0, 120, 103, 0.06)',
+            borderColor: 'rgba(0, 120, 103, 0.35) !important',
             color: '#007867',
-            '&:hover': { bgcolor: 'rgba(0, 167, 111, 0.24)' },
+          },
+          '&.Mui-selected, &.Mui-selected:hover': {
+            bgcolor: '#007867',
+            borderColor: '#007867 !important',
+            color: '#fff',
+            boxShadow: '0 2px 8px rgba(0, 120, 103, 0.35)',
           },
         }}
       >
@@ -181,15 +197,20 @@ function ResultToggle({
       <ToggleButton
         value="FAIL"
         sx={{
-          color: '#c94132',
-          borderColor: 'rgba(201, 65, 50, 0.35) !important',
-          bgcolor: 'rgba(201, 65, 50, 0.06)',
-          '&:hover': { bgcolor: 'rgba(201, 65, 50, 0.12)' },
-          '&.Mui-selected': {
-            bgcolor: 'rgba(201, 65, 50, 0.16)',
-            borderColor: 'rgba(201, 65, 50, 0.55) !important',
-            color: '#9f2f27',
-            '&:hover': { bgcolor: 'rgba(201, 65, 50, 0.22)' },
+          color: 'text.secondary',
+          borderColor: 'rgba(15, 23, 42, 0.16) !important',
+          bgcolor: '#fff',
+          boxShadow: 'none',
+          '&:hover': {
+            bgcolor: 'rgba(201, 65, 50, 0.06)',
+            borderColor: 'rgba(201, 65, 50, 0.4) !important',
+            color: '#c94132',
+          },
+          '&.Mui-selected, &.Mui-selected:hover': {
+            bgcolor: '#c94132',
+            borderColor: '#c94132 !important',
+            color: '#fff',
+            boxShadow: '0 2px 8px rgba(201, 65, 50, 0.35)',
           },
         }}
       >
@@ -218,6 +239,8 @@ function digitsOnly(value: string): string {
 
 /** Matches Django PositiveIntegerField / DB integer upper bound. */
 const MAX_ODOMETER_KM = 2_147_483_647;
+/** Must match backend ``RecordVehicleOdometerService`` minimum daily growth. */
+const MIN_DAILY_DELTA_KM = 10;
 
 function todayDateIso(): string {
   const date = new Date();
@@ -227,14 +250,23 @@ function todayDateIso(): string {
   return `${year}-${month}-${day}`;
 }
 
+function readingDateKey(reading: OdometerReading): string {
+  return reading.reading_date.slice(0, 10);
+}
+
 /** Latest odometer from a day before today (never today's reading). */
 function pickPreviousOdometer(readings: OdometerReading[]): OdometerReading | null {
   if (!readings.length) return null;
   const today = todayDateIso();
   const priorDays = readings
-    .filter((item) => item.reading_date.slice(0, 10) < today)
-    .sort((a, b) => b.reading_date.localeCompare(a.reading_date));
+    .filter((item) => readingDateKey(item) < today)
+    .sort((a, b) => readingDateKey(b).localeCompare(readingDateKey(a)));
   return priorDays[0] ?? null;
+}
+
+function pickTodayOdometer(readings: OdometerReading[]): OdometerReading | null {
+  const today = todayDateIso();
+  return readings.find((item) => readingDateKey(item) === today) ?? null;
 }
 
 /**
@@ -277,7 +309,11 @@ export function InspectionPage() {
   const [submitError, setSubmitError] = useState('');
   const [completed, setCompleted] = useState(false);
   const [hadFailures, setHadFailures] = useState(false);
-  const [completedInspection, setCompletedInspection] = useState<{ id: string; vehicle_id: string } | null>(null);
+  const [completedInspection, setCompletedInspection] = useState<{
+    id: string;
+    vehicle_id: string;
+    driver_id: string;
+  } | null>(null);
   const [actionLoading, setActionLoading] = useState<'exit' | 'fault' | 'disposition' | ''>('');
   const [actionError, setActionError] = useState('');
   const [actionSuccess, setActionSuccess] = useState('');
@@ -286,14 +322,27 @@ export function InspectionPage() {
   const [exitUnlocked, setExitUnlocked] = useState(false);
 
   const admin = isAdminUser(user);
-  const selectableVehicles = useMemo(
-    () => (admin ? vehicles.filter(hasAssignedDriver) : vehicles),
-    [admin, vehicles],
-  );
+  const driverMode = isDriverUser(user);
+  const linkedCustomerNumber = user?.linked_driver?.customer_number || '';
+  const isOperationalVehicle = (vehicle: Vehicle) => vehicle.status === 'ACTIVE';
+  const selectableVehicles = useMemo(() => {
+    return vehicles.filter((vehicle) => {
+      if (!isOperationalVehicle(vehicle)) return false;
+      if (driverMode) {
+        return Boolean(
+          linkedCustomerNumber && vehicleAssignedToDriver(vehicle, linkedCustomerNumber),
+        );
+      }
+      return admin ? hasAssignedDriver(vehicle) : hasAssignedDriver(vehicle);
+    });
+  }, [admin, driverMode, linkedCustomerNumber, vehicles]);
   const selectedVehicle =
     selectableVehicles.find((item) => item.id === selectedVehicleId) ??
     vehicles.find((item) => item.id === selectedVehicleId) ??
     null;
+  const selectedVehicleOperational = Boolean(
+    selectedVehicle && isOperationalVehicle(selectedVehicle),
+  );
 
   const completedCount = items.filter((item) => isItemComplete(item)).length;
   const progress = items.length
@@ -315,16 +364,24 @@ export function InspectionPage() {
   }, [odometer]);
 
   const canSubmit = useMemo(() => {
-    if (!selectedVehicleId || items.length === 0 || submitting) return false;
+    if (!selectedVehicleId || !selectedVehicleOperational || items.length === 0 || submitting) {
+      return false;
+    }
     return odometerValid && checklistComplete;
-  }, [checklistComplete, items.length, odometerValid, selectedVehicleId, submitting]);
+  }, [
+    checklistComplete,
+    items.length,
+    odometerValid,
+    selectedVehicleId,
+    selectedVehicleOperational,
+    submitting,
+  ]);
 
   const assignedVehicleForDriver = useMemo(() => {
-    if (admin || !user) return null;
-    // Without user↔driver link, prefer a single ACTIVE vehicle if only one exists.
-    const active = vehicles.filter((item) => item.status === 'ACTIVE' && hasAssignedDriver(item));
-    return active.length === 1 ? active[0] : null;
-  }, [admin, user, vehicles]);
+    if (!driverMode || !linkedCustomerNumber) return null;
+    const assigned = selectableVehicles;
+    return assigned.length === 1 ? assigned[0] : null;
+  }, [driverMode, linkedCustomerNumber, selectableVehicles]);
 
   const loadVehiclesPage = async (page: number, append: boolean) => {
     if (vehiclesLoadingRef.current) return null;
@@ -395,12 +452,22 @@ export function InspectionPage() {
 
         if (isAdminUser(me)) {
           setFlowStep('vehicle');
-        } else {
+        } else if (isDriverUser(me)) {
+          const customer = me.linked_driver?.customer_number || '';
+          if (!me.personnel_number?.trim() || !customer) {
+            setBootError(
+              'حساب کاربری شما به کد پرسنلی SAP یا راننده فعال متصل نیست. با مدیر سیستم هماهنگ کنید.',
+            );
+            return;
+          }
           const findAssigned = (list: Vehicle[]) =>
-            list.filter((item) => item.status === 'ACTIVE' && hasAssignedDriver(item));
+            list.filter(
+              (item) =>
+                item.status === 'ACTIVE' && vehicleAssignedToDriver(item, customer),
+            );
 
           let assigned = findAssigned(loadedVehicles);
-          while (assigned.length !== 1 && loadedVehicles.length < loadedTotal) {
+          while (assigned.length < 1 && loadedVehicles.length < loadedTotal) {
             loadedPage += 1;
             const next = await api.listVehicles('', 'license_plate', {
               page: loadedPage,
@@ -418,7 +485,13 @@ export function InspectionPage() {
           if (assigned.length === 1) {
             setSelectedVehicleId(assigned[0].id);
             setFlowStep('odometer');
+          } else if (assigned.length > 1) {
+            setFlowStep('vehicle');
+          } else {
+            setBootError('خودروی عملیاتی اساین‌شده به شما یافت نشد.');
           }
+        } else {
+          setFlowStep('vehicle');
         }
       } catch (err) {
         if (!cancelled) {
@@ -444,15 +517,29 @@ export function InspectionPage() {
   useEffect(() => {
     if (!selectedVehicleId) {
       setPreviousOdometer(null);
+      setOdometer('');
+      setOdometerRecorded(false);
+      setOdometerError('');
       return;
     }
 
     let cancelled = false;
     setPreviousOdometerLoading(true);
+    setOdometer('');
+    setOdometerRecorded(false);
+    setOdometerError('');
     void api
       .getOdometerHistory(selectedVehicleId)
       .then((readings) => {
-        if (!cancelled) setPreviousOdometer(pickPreviousOdometer(readings));
+        if (cancelled) return;
+        const list = Array.isArray(readings) ? readings : [];
+        setPreviousOdometer(pickPreviousOdometer(list));
+        const todayReading = pickTodayOdometer(list);
+        // Only hydrate today's already-saved value — never invent previous+delta.
+        if (todayReading) {
+          setOdometer(String(todayReading.odometer_km));
+          setOdometerRecorded(true);
+        }
       })
       .catch(() => {
         if (!cancelled) setPreviousOdometer(null);
@@ -527,7 +614,10 @@ export function InspectionPage() {
 
   const validate = (): boolean => {
     let ok = true;
-    if (!selectedVehicleId) ok = false;
+    if (!selectedVehicleId || !selectedVehicleOperational) {
+      setSubmitError('ثبت چک‌لیست فقط برای خودروی عملیاتی مجاز است.');
+      ok = false;
+    }
     if (!odometer.trim() || Number.isNaN(Number(odometer)) || Number(odometer) < 0) {
       setOdometerError('مقدار کیلومتر معتبر الزامی است');
       ok = false;
@@ -571,18 +661,30 @@ export function InspectionPage() {
         severity: item.result === 'FAIL' ? (item.severity as FailureSeverity) : null,
       }));
 
+      const driverId =
+        selectedVehicle?.driver1?.id ||
+        selectedVehicle?.driver2?.id ||
+        null;
       const created = await api.createInspection({
         vehicle_id: selectedVehicleId,
         inspection_type: 'PRE_TRIP',
         odometer_value: Number(odometer),
         odometer_unit: 'KM',
         inspected_at: new Date().toISOString(),
-        driver_id: selectedVehicle?.driver1?.id || selectedVehicle?.driver2?.id || null,
+        driver_id: driverId,
         items: payloadItems,
       });
       const submitted = await api.submitInspection(created.id);
       setHadFailures(Boolean(submitted.has_failures));
-      setCompletedInspection({ id: submitted.id, vehicle_id: submitted.vehicle_id });
+      setCompletedInspection({
+        id: submitted.id,
+        vehicle_id: submitted.vehicle_id,
+        driver_id:
+          submitted.driver_id ||
+          created.driver_id ||
+          driverId ||
+          '',
+      });
       setActionError('');
       setActionSuccess('');
       setFaultReported(false);
@@ -595,18 +697,47 @@ export function InspectionPage() {
     }
   };
 
-  const selectedDriverIdForExit = selectedVehicle?.driver1?.id || selectedVehicle?.driver2?.id || '';
+  const resolveDriverIdForExit = async (): Promise<string> => {
+    if (completedInspection?.driver_id) return completedInspection.driver_id;
+    const fromVehicle =
+      selectedVehicle?.driver1?.id || selectedVehicle?.driver2?.id || '';
+    if (fromVehicle) return fromVehicle;
+
+    const customerNumber =
+      selectedVehicle?.driver1?.customer_number ||
+      selectedVehicle?.driver2?.customer_number ||
+      '';
+    if (!customerNumber) return '';
+
+    const page = await api.listDrivers({
+      search: customerNumber,
+      page: 1,
+      pageSize: 20,
+    });
+    const match = (page.results ?? []).find(
+      (driver) => driver.customer_number === customerNumber,
+    );
+    return match?.id ?? '';
+  };
 
   const handleExitCenter = async () => {
-    if (!completedInspection || !selectedDriverIdForExit) return;
+    if (!completedInspection) return;
     setActionLoading('exit');
     setActionError('');
     setActionSuccess('');
     try {
-      await api.driverExitCenter(selectedDriverIdForExit, {
+      const driverId = await resolveDriverIdForExit();
+      if (!driverId) {
+        setActionError('راننده تخصیص‌یافته برای ثبت خروج یافت نشد.');
+        return;
+      }
+      await api.driverExitCenter(driverId, {
         vehicle_id: completedInspection.vehicle_id,
         inspection_id: completedInspection.id,
       });
+      setCompletedInspection((current) =>
+        current ? { ...current, driver_id: driverId } : current,
+      );
       setActionSuccess('خروج خودرو از مرکز ثبت شد.');
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'ثبت خروج از مرکز انجام نشد');
@@ -674,8 +805,6 @@ export function InspectionPage() {
     }
   };
 
-  const exitBlocked = hadFailures && !exitUnlocked;
-
   const validateOdometerStep = (): boolean => {
     if (!odometer.trim() || Number.isNaN(Number(odometer)) || Number(odometer) < 0) {
       setOdometerError('مقدار کیلومتر معتبر الزامی است');
@@ -685,24 +814,32 @@ export function InspectionPage() {
       setOdometerError(`حداکثر مقدار کیلومتر ${toFaNumber(MAX_ODOMETER_KM)} است`);
       return false;
     }
-    if (previousOdometer && Number(odometer) < previousOdometer.odometer_km) {
-      setOdometerError(
-        `مقدار کیلومتر نمی‌تواند کمتر از کیلومتر قبلی (${toFaNumber(previousOdometer.odometer_km)}) باشد`,
-      );
-      return false;
+    if (previousOdometer) {
+      const minimum = previousOdometer.odometer_km + MIN_DAILY_DELTA_KM;
+      if (Number(odometer) < minimum) {
+        setOdometerError(
+          `حداقل کیلومتر قابل ثبت ${toFaNumber(minimum)} است (آخرین ثبت‌شده: ${toFaNumber(previousOdometer.odometer_km)} + ${toFaNumber(MIN_DAILY_DELTA_KM)})`,
+        );
+        return false;
+      }
     }
     setOdometerError('');
     return true;
   };
 
   const goToOdometer = () => {
-    if (!selectedVehicleId) return;
+    if (!selectedVehicleId || !selectedVehicleOperational) return;
     setWizardIndex(0);
     setFlowStep('odometer');
   };
 
   const goToChecklist = async () => {
-    if (!validateOdometerStep() || !selectedVehicleId) return;
+    if (!validateOdometerStep() || !selectedVehicleId || !selectedVehicleOperational) {
+      if (selectedVehicleId && !selectedVehicleOperational) {
+        setOdometerError('ثبت چک‌لیست فقط برای خودروی عملیاتی مجاز است.');
+      }
+      return;
+    }
 
     if (odometerRecorded) {
       setWizardIndex(0);
@@ -872,11 +1009,11 @@ export function InspectionPage() {
                 </Typography>
                 <Typography color="text.secondary" mb={2.5}>
                   {hadFailures
-                    ? exitUnlocked
-                      ? 'واحد توزیع خودرو را قابل‌استفاده اعلام کرد. گرفتن خودرو را تایید کنید.'
-                      : faultReported
-                        ? 'خرابی اعلام شد. تا تصمیم واحد توزیع، خروج از مرکز مجاز نیست.'
-                        : 'موارد خراب در چک‌لیست ثبت شد. ابتدا اعلام خرابی کنید.'
+                    ? faultReported
+                      ? exitUnlocked
+                        ? 'واحد توزیع خودرو را قابل‌استفاده اعلام کرد. می‌توانید اقدام به خروج کنید.'
+                        : 'خرابی اعلام شد. تصمیم خروج با راننده است؛ در صورت باز بودن جریان خرابی/تعمیر، سیستم خروج را رد می‌کند.'
+                      : 'موارد خراب در چک‌لیست ثبت شد. اعلام خرابی اختیاری است و تصمیم خروج با راننده است.'
                     : 'تمام موارد چک‌لیست بدون خرابی ثبت شد.'}
                 </Typography>
                 <Stack
@@ -888,7 +1025,7 @@ export function InspectionPage() {
                 >
                   {hadFailures && !faultReported && (
                     <Button
-                      variant="contained"
+                      variant="outlined"
                       color="error"
                       size="large"
                       startIcon={<ReportProblem />}
@@ -901,7 +1038,7 @@ export function InspectionPage() {
                   )}
                   {hadFailures && faultReported && !exitUnlocked && (
                     <Button
-                      variant="contained"
+                      variant="outlined"
                       size="large"
                       startIcon={<CheckCircle />}
                       onClick={() => void handleCheckDisposition()}
@@ -912,16 +1049,12 @@ export function InspectionPage() {
                     </Button>
                   )}
                   <Button
-                    variant={exitBlocked ? 'outlined' : 'contained'}
+                    variant="contained"
                     size="large"
                     startIcon={<Logout />}
-                    onClick={handleExitCenter}
+                    onClick={() => void handleExitCenter()}
                     loading={actionLoading === 'exit'}
-                    disabled={
-                      actionLoading !== '' ||
-                      !selectedDriverIdForExit ||
-                      exitBlocked
-                    }
+                    disabled={actionLoading !== ''}
                   >
                     اقدام به خروج
                   </Button>
@@ -936,21 +1069,18 @@ export function InspectionPage() {
                     {actionSuccess}
                   </Alert>
                 )}
-                {hadFailures && !faultReported && (
+                {hadFailures && !faultReported ? (
                   <Typography variant="caption" color="text.secondary" display="block" mt={1.25}>
-                    تا اعلام خرابی و تعیین تکلیف توسط واحد توزیع، خروج از مرکز ممکن نیست.
+                    اعلام خرابی اختیاری است. دکمه «اقدام به خروج» همیشه در دسترس راننده
+                    است.
                   </Typography>
-                )}
-                {hadFailures && faultReported && !exitUnlocked && (
+                ) : null}
+                {hadFailures && faultReported && !exitUnlocked ? (
                   <Typography variant="caption" color="text.secondary" display="block" mt={1.25}>
-                    پس از تصمیم واحد توزیع، با «بررسی تصمیم توزیع» وضعیت را چک کنید.
+                    در صورت نیاز می‌توانید وضعیت تصمیم توزیع را بررسی کنید.
                   </Typography>
-                )}
-                {hadFailures && exitUnlocked && (
-                  <Typography variant="caption" color="text.secondary" display="block" mt={1.25}>
-                    چک‌لیست جدید لازم نیست؛ با «اقدام به خروج» گرفتن خودرو را تایید کنید.
-                  </Typography>
-                )}              </Box>
+                ) : null}
+              </Box>
             </Stack>
           </CardContent>
         </Card>
@@ -1050,6 +1180,7 @@ export function InspectionPage() {
                       {selectableVehicles.map((vehicle) => (
                         <MenuItem key={vehicle.id} value={vehicle.id}>
                           {vehicle.license_plate} — {vehicle.vehicle_number}
+                          {vehicle.status_label ? ` (${vehicle.status_label})` : ''}
                         </MenuItem>
                       ))}
                       {(vehiclesLoadingMore || vehicleHasMore) && (
@@ -1066,12 +1197,23 @@ export function InspectionPage() {
                     </RtlSelectField>
                     {!selectableVehicles.length && (
                       <Typography variant="body2" color="text.secondary">
-                        خودرویی با راننده تخصیص‌یافته یافت نشد.
+                        {driverMode
+                          ? 'خودروی عملیاتی اساین‌شده به کد پرسنلی شما یافت نشد.'
+                          : 'خودرویی عملیاتی با راننده تخصیص‌یافته یافت نشد.'}
                       </Typography>
                     )}
+                    {selectedVehicleId && !selectedVehicleOperational ? (
+                      <Alert severity="warning">
+                        این خودرو عملیاتی نیست و ثبت چک‌لیست برای آن مجاز نیست.
+                      </Alert>
+                    ) : null}
                     {vehicleSummary}
                     <Stack direction="row" justifyContent="flex-end">
-                      <Button variant="contained" disabled={!selectedVehicleId} onClick={goToOdometer}>
+                      <Button
+                        variant="contained"
+                        disabled={!selectedVehicleId || !selectedVehicleOperational}
+                        onClick={goToOdometer}
+                      >
                         ادامه
                       </Button>
                     </Stack>
@@ -1103,12 +1245,14 @@ export function InspectionPage() {
                       helperText={
                         odometerError ||
                         (previousOdometerLoading
-                          ? 'در حال دریافت کیلومتر قبلی...'
-                          : previousOdometer
-                            ? `آخرین کیلومتر قبل از امروز: ${toFaNumber(previousOdometer.odometer_km)} KM`
-                            : selectedVehicleId
-                              ? 'کیلومتر روزهای قبل ثبت نشده است'
-                              : 'فقط عدد وارد کنید')
+                          ? 'در حال دریافت سابقه کیلومتر...'
+                          : odometerRecorded
+                            ? 'مقدار امروز قبلاً ثبت شده؛ در صورت نیاز می‌توانید اصلاح کنید.'
+                            : previousOdometer
+                              ? `آخرین مقدار ثبت‌شده (روزهای قبل): ${toFaNumber(previousOdometer.odometer_km)} KM — حداقل امروز: ${toFaNumber(previousOdometer.odometer_km + MIN_DAILY_DELTA_KM)}`
+                              : selectedVehicleId
+                                ? 'سابقه‌ای ثبت نشده؛ مقدار امروز را وارد کنید (دیفالت ندارد).'
+                                : 'فقط عدد وارد کنید')
                       }
                       inputProps={{
                         inputMode: 'numeric',
@@ -1132,7 +1276,11 @@ export function InspectionPage() {
                       )}
                       <Button
                         variant="contained"
-                        disabled={!odometerValid || odometerSaving}
+                        disabled={
+                          !odometerValid ||
+                          odometerSaving ||
+                          !selectedVehicleOperational
+                        }
                         onClick={() => void goToChecklist()}
                       >
                         {odometerSaving ? 'در حال ثبت کیلومتر...' : 'ادامه به چک‌لیست'}
