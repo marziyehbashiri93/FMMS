@@ -6,7 +6,14 @@ import uuid
 from datetime import UTC, datetime
 
 from apps.fault.application.dto.fault_dto import FaultResponseDTO
-from apps.fault.application.services.report_fault_service import _to_response_dto
+from apps.fault.application.interfaces.vehicle_odometer_reader import (
+    IFaultVehicleOdometerReader,
+)
+from apps.fault.application.services.report_fault_service import (
+    _create_sap_pm_notification,
+    _to_response_dto,
+    _update_sap_vehicle_measurement,
+)
 from apps.fault.domain.entities import Fault, FaultItem, FaultStatus
 from apps.fault.domain.interfaces.fault_repository import IFaultRepository
 from apps.fault.domain.value_objects import FaultCode, FaultDescription, FaultSeverity
@@ -15,11 +22,14 @@ from apps.inspection.domain.entities import InspectionItem, InspectionStatus
 from apps.inspection.domain.interfaces.inspection_repository import (
     IInspectionRepository,
 )
-from apps.repair.domain.entities import RepairOrder, RepairOrderStatus
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
+from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
 from core.exceptions.base_exception import FMMSConflictError, FMMSValidationError
 from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
+from core.sap.ports.measurement_document_port import ISAPMeasurementDocumentPort
+from core.sap.ports.pm_notification_port import ISAPPMNotificationPort
+from core.sap.ports.sap_transaction_manager_port import ISAPTransactionManager
 from core.workflow import assert_vehicle_has_no_open_flow
 
 logger = get_structured_logger("inspection", __name__)
@@ -36,17 +46,31 @@ _SEVERITY_RANK: dict[FaultSeverity, int] = {
 
 
 class ReportInspectionFaultService:
-    """Create one fault and repair order from failed checklist items."""
+    """Create one open fault from failed checklist items (no repair order yet).
+
+    Repair orders are created only after distribution confirms the vehicle is
+    unusable / needs repair, so checklist and manual fault paths stay aligned.
+    """
 
     def __init__(
         self,
         inspection_repository: IInspectionRepository,
         fault_repository: IFaultRepository,
         repair_order_repository: IRepairOrderRepository,
+        vehicle_repository: IVehicleRepository | None = None,
+        sap_transaction_manager: ISAPTransactionManager | None = None,
+        sap_pm_notification_port: ISAPPMNotificationPort | None = None,
+        sap_measurement_port: ISAPMeasurementDocumentPort | None = None,
+        odometer_reader: IFaultVehicleOdometerReader | None = None,
     ) -> None:
         self._inspection_repo = inspection_repository
         self._fault_repo = fault_repository
         self._repair_repo = repair_order_repository
+        self._vehicle_repo = vehicle_repository
+        self._sap_tx = sap_transaction_manager
+        self._sap_pm_notification = sap_pm_notification_port
+        self._sap_measurement = sap_measurement_port
+        self._odometer_reader = odometer_reader
 
     def execute(self, dto: ReportInspectionFaultDTO) -> FaultResponseDTO:
         """Report failed checklist items as a single fault incident."""
@@ -110,16 +134,39 @@ class ReportInspectionFaultService:
             now=now,
         )
         saved = self._fault_repo.save(fault)
-        repair = RepairOrder(
-            id=uuid.uuid4(),
-            vehicle_id=inspection.vehicle_id,
-            fault_id=saved.id,
-            status=RepairOrderStatus.CREATED,
-            created_by_id=dto.reported_by,
-            created_at=now,
-            updated_at=now,
-        )
-        self._repair_repo.save(repair)
+        vehicle = None
+        if self._vehicle_repo is not None:
+            vehicle = load_or_not_found(
+                lambda: self._vehicle_repo.get_by_id(inspection.vehicle_id),
+                message=f"Vehicle '{inspection.vehicle_id}' not found.",
+                details={"vehicle_id": str(inspection.vehicle_id)},
+            )
+        if (
+            vehicle is not None
+            and self._sap_tx is not None
+            and self._sap_pm_notification is not None
+        ):
+            notification_number = _create_sap_pm_notification(
+                sap_tx=self._sap_tx,
+                sap_pm_notification=self._sap_pm_notification,
+                fault=saved,
+                vehicle_number=vehicle.vehicle_number.value,
+                request_id=dto.request_id,
+            )
+            if notification_number:
+                saved.link_sap_notification(notification_number)
+                saved.updated_at = datetime.now(tz=UTC)
+                saved = self._fault_repo.save(saved)
+                if self._sap_measurement is not None and self._odometer_reader is not None:
+                    _update_sap_vehicle_measurement(
+                        sap_tx=self._sap_tx,
+                        sap_measurement=self._sap_measurement,
+                        odometer_reader=self._odometer_reader,
+                        fault=saved,
+                        vehicle_number=vehicle.vehicle_number.value,
+                        notification_number=notification_number,
+                        request_id=dto.request_id,
+                    )
 
         logger.info(
             "Inspection fault reported successfully",
@@ -130,7 +177,6 @@ class ReportInspectionFaultService:
                 "request_id": dto.request_id,
                 "inspection_id": str(inspection.id),
                 "fault_id": str(saved.id),
-                "repair_order_id": str(repair.id),
                 "result": "success",
             },
         )

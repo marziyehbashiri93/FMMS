@@ -43,6 +43,10 @@ class IFaultRepository(ABC):
         """
 
     @abstractmethod
+    def list_all(self, status: FaultStatus | None = None) -> list[Fault]:
+        """Return all faults, optionally filtered by status."""
+
+    @abstractmethod
     def has_open_fault_for_vehicle(self, vehicle_id: uuid.UUID) -> bool:
         """Return True if the vehicle has any non-terminal fault.
 

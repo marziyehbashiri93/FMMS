@@ -37,7 +37,64 @@
 
 در زمان بررسی، این دو دستور پاس شدند. اجرای کامل `mypy` به خطاهای خارج از اپ fault رسید و اجرای محدود هم به internal error در `django-stubs` برخورد.
 
+آخرین اعتبارسنجی بعد از اصلاحات SAP:
+
+- `ruff check apps/fault ... core/sap infrastructure/sap interfaces/api/v1/deps.py ...`: پاس شد.
+- `pytest tests/unit/application/test_fault_services.py tests/unit/application/test_inspection_services.py tests/integration/api/test_fault_api.py tests/integration/api/test_inspection_api.py -q`: ۵۵ تست پاس شد.
+- `pytest tests/unit/infrastructure/sap/test_pm_notification_adapter.py tests/unit/infrastructure/sap/test_vehicle_measurement_adapter.py tests/unit/infrastructure/sap/test_sap_retry_lifecycle.py tests/unit/infrastructure/messaging/test_retry_failed_sap_service.py -q`: ۱۷ تست پاس شد.
+
+آخرین اعتبارسنجی بعد از اصلاحات صف خرابی واحد توزیع:
+
+- `.venv/bin/ruff check apps/fault apps/integration core/sap infrastructure/sap interfaces/api/v1 tests/integration/api/test_fault_api.py tests/unit/infrastructure tests/unit/application`: پاس شد.
+- `.venv/bin/pytest tests/integration/api/test_fault_api.py tests/unit/application/test_fault_services.py tests/unit/infrastructure/messaging/test_retry_failed_sap_service.py tests/unit/infrastructure/sap/test_sap_retry_lifecycle.py tests/unit/infrastructure/sap/test_vehicle_measurement_adapter.py tests/unit/infrastructure/sap/test_vehicle_assignment_adapter.py`: ۴۳ تست پاس شد.
+- `npm run build` در `frontend`: پاس شد. فقط warning اندازه chunk از Vite گزارش شد.
+
+## تغییرات انجام‌شده در این مرحله
+
+- بعد از ثبت خرابی موردی، SAP PM Notification با `BAPI_ALM_NOTIF_CREATE` از مسیر `SAPTransactionManager` ساخته می‌شود.
+- بعد از ثبت خرابی از checklist هم همان SAP PM Notification ساخته می‌شود.
+- payload ایجاد notification با مشخصات SAP جدید هماهنگ شد: `NOTIF_TYPE="EM"`، `EQUIPMENT=VehicleNumber`، `DESCRIPT=شرح هدر`، و تاریخ‌های `STRMLFNDATE`/`DESSTDATE`.
+- شماره `NOTIF_NO` موفق روی `fault.sap_notification_number` ذخیره می‌شود.
+- برای آپدیت کیلومتر SAP، port و adapter جدید `VehicleMeasurementBAPIAdapter` با function module `MEASUREM_DOCUM_RFC_SINGLE_001` اضافه شد.
+- آخرین odometer خودرو از read model جدا خوانده می‌شود و در صورت وجود، transaction جداگانه `MEASUREMENT_DOCUMENT` برای SAP ساخته می‌شود.
+- retry service برای object typeهای `FAULT` و `MEASUREMENT_DOCUMENT` توسعه داده شد.
+- endpoint لیست خرابی‌ها بدون filter حالا برای صف واحد توزیع، همه خرابی‌های ثبت‌شده را برمی‌گرداند.
+- query paramهای لیست خرابی با `FaultListQuerySerializer` اعتبارسنجی می‌شوند.
+- دو endpoint تصمیم واحد توزیع اضافه شد: `distribution-usable` و `distribution-unusable`.
+- در تصمیم «خودرو قابل استفاده است»، خرابی بسته می‌شود، repair orderهای اولیه لغو می‌شوند و خودرو به `ACTIVE` برمی‌گردد تا راننده بتواند خروج را ادامه دهد.
+- در تصمیم «خودرو قابل استفاده نیست»، خودرو `OUT_OF_SERVICE` می‌شود و درخواست تخصیص خودرو جایگزین از مسیر transaction قابل retry به SAP ثبت می‌شود.
+- برای درخواست خودرو جایگزین SAP، port/dto/adapter/mock/test اضافه شد. نام function module فعلا placeholder است تا SAP API نهایی اعلام شود.
+- صفحه فرانت `خرابی‌های توزیع` زیر منوی `توزیع خودرو` اضافه شد و فرم ثبت خرابی موردی به مسیر `/faults/new` منتقل شد.
+
 ## فاز ۱: یکپارچگی داده و Transaction
+
+### ۰. ارسال PM Notification به SAP بعد از اعلام خرابی
+
+- [x] انجام شد
+
+شدت: بحرانی
+
+محل:
+
+- `apps/fault/application/services/report_fault_service.py`
+- `apps/inspection/application/services/report_inspection_fault_service.py`
+- `infrastructure/sap/adapters/bapi/pm_notification_bapi_adapter.py`
+- `infrastructure/sap/adapters/bapi/vehicle_measurement_bapi_adapter.py`
+
+مشکل:
+
+اعلام خرابی، چه موردی و چه از checklist، باید در SAP به PM Notification تبدیل شود و آخرین کیلومتر خودرو هم برای SAP ارسال شود.
+
+راهکار انجام‌شده:
+
+PM Notification و measurement update از طریق SAP write gateway و transactionهای idempotent انجام می‌شوند. اگر SAP موفق باشد شماره notification روی fault ذخیره می‌شود. اگر measurement خوانده نشود، ثبت خرابی fail نمی‌شود و warning log ثبت می‌شود.
+
+معیار پذیرش:
+
+- خرابی موردی SAP PM Notification بسازد.
+- خرابی checklist SAP PM Notification بسازد.
+- payloadهای SAP با مشخصات اعلام‌شده توسط تیم SAP هماهنگ باشند.
+- retry برای transactionهای fault notification و measurement فعال باشد.
 
 ### ۱. Transaction واحد برای ثبت Fault و تغییر وضعیت Vehicle
 
@@ -265,7 +322,7 @@ def validate_code(self, value: str) -> str:
 
 ### ۹. Serializer برای Query Paramهای لیست Fault
 
-- [ ] انجام شد
+- [x] انجام شد
 
 شدت: متوسط
 
@@ -282,6 +339,10 @@ def validate_code(self, value: str) -> str:
 
 یک serializer برای query params ساخته شود.
 
+راهکار انجام‌شده:
+
+`FaultListQuerySerializer` در `interfaces/api/v1/fault/serializers.py` اضافه شد و `FaultViewSet.list` فقط از `validated_data` استفاده می‌کند. فیلترهای پشتیبانی‌شده فعلی `vehicle_id`، `status` و `open_by_severity` هستند.
+
 معیار پذیرش:
 
 - UUID نامعتبر پاسخ 400 بدهد.
@@ -289,7 +350,7 @@ def validate_code(self, value: str) -> str:
 
 ### ۱۰. تعیین رفتار صریح برای List بدون Filter یا Filter همزمان
 
-- [ ] انجام شد
+- [x] انجام شد
 
 شدت: متوسط
 
@@ -305,6 +366,10 @@ def validate_code(self, value: str) -> str:
 راهکار:
 
 یا query بدون filter را 400 کنید، یا endpoint list عمومی تعریف کنید. همچنین ارسال همزمان filterهای ناسازگار باید صریح validate شود.
+
+راهکار انجام‌شده:
+
+برای نیاز صف واحد توزیع، query بدون filter به عنوان list عمومی خرابی‌های ثبت‌شده تعریف شد. متد `IFaultRepository.list_all` و پیاده‌سازی Django آن اضافه شد و تست‌های service/API رفتار جدید را تثبیت کردند.
 
 معیار پذیرش:
 

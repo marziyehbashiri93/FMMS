@@ -1,37 +1,23 @@
-"""Service that orchestrates creation of a new repair order.
+"""Repair-order creation entrypoint (distribution-only).
 
-Cross-domain checks performed here:
-- Vehicle must exist (IVehicleRepository).
-- Fault must exist (IFaultRepository) and belong to the same vehicle.
-
-No state-machine logic lives here — all transitions delegate to the entity.
+Direct API creation is closed. Distribution creates orders via
+``DistributionFaultDecisionService.mark_unusable``.
 """
 
 from __future__ import annotations
-
-import uuid
-from datetime import UTC, datetime
 
 from apps.fault.domain.interfaces.fault_repository import IFaultRepository
 from apps.repair.application.dto.repair_dto import (
     CreateRepairOrderDTO,
     RepairOrderResponseDTO,
 )
-from apps.repair.application.services._timeline_helper import (
-    record_repair_timeline_event,
-)
 from apps.repair.application.services.repair_order_timeline_service import (
     RecordRepairOrderEventService,
 )
-from apps.repair.domain.entities import (
-    RepairOrder,
-    RepairOrderEventType,
-    RepairOrderStatus,
-)
+from apps.repair.domain.entities import RepairOrder
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
 from core.exceptions.base_exception import FMMSConflictError
-from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
 
 logger = get_structured_logger("repair", __name__)
@@ -56,6 +42,7 @@ def _to_response_dto(order: RepairOrder) -> RepairOrderResponseDTO:
         sap_order_number=order.sap_order_number,
         workshop_type=order.workshop_type,
         workshop_id=order.workshop_id,
+        transport_rejection_reason=order.transport_rejection_reason,
         technician_id=order.assignment.technician_id if order.assignment else None,
         assigned_at=order.assignment.assigned_at if order.assignment else None,
         activities=[
@@ -84,13 +71,13 @@ def _to_response_dto(order: RepairOrder) -> RepairOrderResponseDTO:
 
 
 class CreateRepairOrderService:
-    """Orchestrates creation of a new repair order.
+    """Reject direct repair-order creation; keep wiring for dependency injection.
 
     Args:
         repair_order_repository: Concrete ``IRepairOrderRepository``.
-        vehicle_repository: Concrete ``IVehicleRepository`` for existence check.
-        fault_repository: Concrete ``IFaultRepository`` for existence and
-            vehicle-match check.
+        vehicle_repository: Concrete ``IVehicleRepository``.
+        fault_repository: Concrete ``IFaultRepository``.
+        event_recorder: Optional timeline recorder (unused; kept for DI compat).
     """
 
     def __init__(
@@ -106,20 +93,19 @@ class CreateRepairOrderService:
         self._event_recorder = event_recorder
 
     def execute(self, dto: CreateRepairOrderDTO) -> RepairOrderResponseDTO:
-        """Create and persist a new repair order in CREATED status.
+        """Reject direct repair-order creation.
+
+        Repair orders are created only by distribution when a fault vehicle is
+        marked unusable. Direct ``POST /repair-orders/`` is closed.
 
         Args:
-            dto: Input data.
-
-        Returns:
-            ``RepairOrderResponseDTO`` in CREATED status.
+            dto: Input data (used only for logging/details).
 
         Raises:
-            FMMSNotFoundError: If vehicle or fault does not exist.
-            FMMSConflictError: If the fault belongs to a different vehicle.
+            FMMSConflictError: Always — creation is distribution-only.
         """
         logger.info(
-            "Creating repair order",
+            "Rejecting direct repair order creation",
             extra={
                 "domain": "repair",
                 "service": "CreateRepairOrderService",
@@ -129,63 +115,14 @@ class CreateRepairOrderService:
                 "fault_id": str(dto.fault_id),
             },
         )
-
-        load_or_not_found(
-            lambda: self._vehicle_repo.get_by_id(dto.vehicle_id),
-            message=f"Vehicle '{dto.vehicle_id}' not found.",
-            details={"vehicle_id": str(dto.vehicle_id)},
-        )
-
-        fault = load_or_not_found(
-            lambda: self._fault_repo.get_by_id(dto.fault_id),
-            message=f"Fault '{dto.fault_id}' not found.",
-            details={"fault_id": str(dto.fault_id)},
-        )
-
-        if fault.vehicle_id != dto.vehicle_id:
-            raise FMMSConflictError(
-                message=(
-                    f"Fault '{dto.fault_id}' belongs to vehicle '{fault.vehicle_id}', "
-                    f"not '{dto.vehicle_id}'."
-                ),
-                details={
-                    "fault_id": str(dto.fault_id),
-                    "fault_vehicle_id": str(fault.vehicle_id),
-                    "requested_vehicle_id": str(dto.vehicle_id),
-                },
-            )
-
-        now = datetime.now(tz=UTC)
-        order = RepairOrder(
-            id=uuid.uuid4(),
-            vehicle_id=dto.vehicle_id,
-            fault_id=dto.fault_id,
-            status=RepairOrderStatus.CREATED,
-            created_by_id=dto.created_by,
-            created_at=now,
-            updated_at=now,
-        )
-
-        saved = self._repair_repo.save(order)
-        record_repair_timeline_event(
-            self._event_recorder,
-            saved.id,
-            RepairOrderEventType.FAULT_CREATED,
-            "خرابی ثبت شد و دستور تعمیر ایجاد گردید.",
-            created_by_id=dto.created_by,
-            request_id=dto.request_id,
-        )
-
-        logger.info(
-            "Repair order created successfully",
-            extra={
-                "domain": "repair",
-                "service": "CreateRepairOrderService",
-                "operation": "execute",
-                "request_id": dto.request_id,
-                "entity_id": str(saved.id),
-                "result": "success",
+        raise FMMSConflictError(
+            message=(
+                "Repair orders are created only when distribution marks the "
+                "vehicle as unusable."
+            ),
+            error_code="REPAIR_ORDER_CREATE_VIA_DISTRIBUTION_ONLY",
+            details={
+                "vehicle_id": str(dto.vehicle_id),
+                "fault_id": str(dto.fault_id),
             },
         )
-
-        return _to_response_dto(saved)

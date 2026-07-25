@@ -86,12 +86,22 @@ class TestFaultEntityLifecycle:
         assert f.status == FaultStatus.OPEN
         assert f.is_open is True
 
-    def test_assign(self) -> None:
+    def test_mark_awaiting_transport(self) -> None:
         f = _make_fault()
+        f.mark_awaiting_transport()
+        assert f.status == FaultStatus.AWAITING_TRANSPORT
+
+    def test_assign(self) -> None:
+        f = _make_fault(status=FaultStatus.AWAITING_TRANSPORT)
         tech_id = uuid.uuid4()
         f.assign(tech_id)
         assert f.status == FaultStatus.ASSIGNED
         assert f.assigned_to_id == tech_id
+
+    def test_assign_from_open_is_invalid(self) -> None:
+        f = _make_fault(status=FaultStatus.OPEN)
+        with pytest.raises(FaultInvalidStateTransitionError):
+            f.assign(uuid.uuid4())
 
     def test_start_repair(self) -> None:
         f = _make_fault(status=FaultStatus.ASSIGNED)

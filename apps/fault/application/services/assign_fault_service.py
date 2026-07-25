@@ -1,8 +1,8 @@
 """Service that orchestrates fault assignment to a technician.
 
 The domain entity's ``assign()`` enforces the state-machine rule
-(only OPEN faults may be assigned). This service loads, delegates,
-persists, and logs.
+(only AWAITING_TRANSPORT faults may be assigned). This service loads,
+delegates, persists, and logs.
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ class AssignFaultService:
 
         Raises:
             FMMSNotFoundError: If no fault with ``dto.fault_id`` exists.
-            FaultInvalidStateTransitionError: If the fault is not in OPEN status
+            FaultInvalidStateTransitionError: If the fault is not awaiting transport
                 (raised by the domain entity).
             FaultAlreadyClosedError: If the fault is already CLOSED
                 (raised by the domain entity).

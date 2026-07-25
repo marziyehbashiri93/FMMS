@@ -54,12 +54,18 @@ from apps.inspection.domain.value_objects import (
     OdometerReading,
     OdometerUnit,
 )
+from apps.integration.domain.entities import SAPObjectType
 from apps.repair.domain.entities import RepairOrder, RepairOrderStatus
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
 from apps.vehicle.domain.entities import Vehicle, VehicleStatus
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
 from apps.vehicle.domain.value_objects import PlateNumber, SAPVehicleNumber
 from core.exceptions.base_exception import FMMSNotFoundError, FMMSStateError
+from core.sap.dtos.pm_notification import (
+    CreatePMNotificationRequest,
+    SAPNotificationDTO,
+)
+from core.sap.ports.sap_transaction_manager_port import SAPAdapterCallable
 from core.workflow import VEHICLE_OPEN_FLOW_ERROR_CODE, VEHICLE_OPEN_FLOW_MESSAGE
 
 # ---------------------------------------------------------------------------
@@ -166,15 +172,12 @@ class FakeVehicleRepository(IVehicleRepository):
     def get_by_plate(self, plate_number: PlateNumber) -> Vehicle | None:
         return None
 
-    def get_by_vehicle_number(
-        self, vehicle_number: SAPVehicleNumber
-    ) -> Vehicle | None:
+    def get_by_vehicle_number(self, vehicle_number: SAPVehicleNumber) -> Vehicle | None:
         return next(
             (
                 v
                 for v in self._store.values()
-                if v.vehicle_number is not None
-                and v.vehicle_number == vehicle_number
+                if v.vehicle_number is not None and v.vehicle_number == vehicle_number
             ),
             None,
         )
@@ -217,6 +220,11 @@ class FakeFaultRepository(IFaultRepository):
     def list_by_vehicle(self, vehicle_id: uuid.UUID) -> list[Fault]:
         return [f for f in self.saved if f.vehicle_id == vehicle_id]
 
+    def list_all(self, status: FaultStatus | None = None) -> list[Fault]:
+        if status is None:
+            return list(self.saved)
+        return [f for f in self.saved if f.status == status]
+
     def list_open_by_severity(self, severity) -> list[Fault]:
         return []
 
@@ -252,6 +260,11 @@ class FakeRepairOrderRepository(IRepairOrderRepository):
     def list_by_fault(self, fault_id: uuid.UUID) -> list[RepairOrder]:
         return [o for o in self.saved if o.fault_id == fault_id]
 
+    def list_all(self, status: RepairOrderStatus | None = None) -> list[RepairOrder]:
+        if status is None:
+            return list(self.saved)
+        return [o for o in self.saved if o.status == status]
+
     def list_active_by_vehicle(self, vehicle_id: uuid.UUID) -> list[RepairOrder]:
         return [
             o
@@ -270,6 +283,48 @@ class FakeRepairOrderRepository(IRepairOrderRepository):
 
     def delete(self, order_id: uuid.UUID) -> None:
         self.saved = [o for o in self.saved if o.id != order_id]
+
+
+class FakeSAPTransactionManager:
+    def __init__(self) -> None:
+        self.calls: list[tuple[SAPObjectType, uuid.UUID, str, dict[str, object]]] = []
+
+    def execute(
+        self,
+        object_type: SAPObjectType,
+        object_id: uuid.UUID,
+        idempotency_key: str,
+        request_payload: dict[str, object],
+        adapter_call: SAPAdapterCallable,
+    ) -> tuple[dict[str, object], str]:
+        self.calls.append((object_type, object_id, idempotency_key, request_payload))
+        return adapter_call(request_payload)
+
+
+class FakeSAPPMNotificationPort:
+    def __init__(self, notification_number: str = "10008888") -> None:
+        self.calls: list[CreatePMNotificationRequest] = []
+        self._notification_number = notification_number
+
+    def create_notification(
+        self,
+        request: CreatePMNotificationRequest,
+    ) -> SAPNotificationDTO:
+        self.calls.append(request)
+        return SAPNotificationDTO(
+            notification_number=self._notification_number,
+            equipment_number=request.equipment_number,
+            status="OPEN",
+            created_at=datetime.now(tz=UTC),
+        )
+
+    def close_notification(self, notification_number: str) -> SAPNotificationDTO:
+        return SAPNotificationDTO(
+            notification_number=notification_number,
+            equipment_number="",
+            status="CLOSED",
+            created_at=datetime.now(tz=UTC),
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -561,6 +616,35 @@ class TestReportInspectionFaultService:
         assert len(fault_repo.saved) == 1
         assert len(fault_repo.saved[0].items) == 2
 
+    def test_reports_checklist_fault_to_sap_pm_notification(self) -> None:
+        vehicle = _make_vehicle()
+        inspection = _make_inspection(
+            vehicle_id=vehicle.id,
+            status=InspectionStatus.SUBMITTED,
+        )
+        inspection.items.append(_make_fail_item("Brakes", "Brake fluid low"))
+        fault_repo = FakeFaultRepository()
+        repair_repo = FakeRepairOrderRepository()
+        sap_tx = FakeSAPTransactionManager()
+        sap_port = FakeSAPPMNotificationPort(notification_number="10007777")
+        service = ReportInspectionFaultService(
+            inspection_repository=FakeInspectionRepository(initial=[inspection]),
+            fault_repository=fault_repo,
+            repair_order_repository=repair_repo,
+            vehicle_repository=FakeVehicleRepository(initial=[vehicle]),
+            sap_transaction_manager=sap_tx,
+            sap_pm_notification_port=sap_port,
+        )
+
+        result = service.execute(self._dto(inspection.id))
+
+        assert result.sap_notification_number == "10007777"
+        assert len(sap_tx.calls) == 1
+        assert sap_tx.calls[0][0] == SAPObjectType.FAULT
+        request = sap_port.calls[0]
+        assert request.notification_type == "EM"
+        assert request.equipment_number == vehicle.vehicle_number.value
+
     def test_creates_one_repair_order_for_failed_inspection(self) -> None:
         vehicle = _make_vehicle()
         inspection = _make_inspection(
@@ -572,9 +656,8 @@ class TestReportInspectionFaultService:
 
         service.execute(self._dto(inspection.id))
 
-        assert len(repair_repo.saved) == 1
-        assert repair_repo.saved[0].status == RepairOrderStatus.CREATED
-        assert repair_repo.saved[0].fault_id == fault_repo.saved[0].id
+        assert len(fault_repo.saved) == 1
+        assert len(repair_repo.saved) == 0
 
     def test_raises_when_vehicle_has_open_fault(self) -> None:
         vehicle = _make_vehicle()

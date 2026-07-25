@@ -14,16 +14,23 @@ from rest_framework.viewsets import GenericViewSet
 from apps.fault.application.dto.fault_dto import (
     AssignFaultDTO,
     CloseFaultDTO,
+    DistributionFaultDecisionDTO,
     ReportFaultDTO,
     ReportFaultItemDTO,
 )
+from apps.fault.domain.entities import FaultStatus
 from apps.fault.domain.value_objects import FaultSeverity
-from core.permissions import IsReadOnlyOrTechnicianOrAbove
+from core.permissions import (
+    IsDistributionSupervisorOrAbove,
+    IsReadOnlyOrTechnicianOrAbove,
+)
 from interfaces.api.v1 import deps
 from interfaces.api.v1.fault.serializers import (
     FaultAssignSerializer,
     FaultCatalogResponseSerializer,
     FaultCreateSerializer,
+    FaultDistributionDecisionSerializer,
+    FaultListQuerySerializer,
     FaultResponseSerializer,
 )
 from interfaces.api.v1.schema_tags import API_TAGS
@@ -46,13 +53,15 @@ class FaultViewSet(GenericViewSet):
     @extend_schema(tags=[API_TAGS.fault], responses=FaultResponseSerializer(many=True))
     def list(self, request: Request) -> Response:
         """List faults filtered by vehicle or open severity."""
-        vehicle_id_raw = request.query_params.get("vehicle_id")
-        severity_raw = request.query_params.get("open_by_severity")
-        vehicle_id = uuid.UUID(vehicle_id_raw) if vehicle_id_raw else None
-        open_by_severity = FaultSeverity(severity_raw) if severity_raw else None
+        query = FaultListQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        filters = query.validated_data
+        raw_status = filters.get("status")
+        raw_severity = filters.get("open_by_severity")
         items = deps.get_list_faults_service().execute(
-            vehicle_id=vehicle_id,
-            open_by_severity=open_by_severity,
+            vehicle_id=filters.get("vehicle_id"),
+            status=FaultStatus(raw_status) if raw_status else None,
+            open_by_severity=FaultSeverity(raw_severity) if raw_severity else None,
             request_id=request_id_from(request),
         )
         page = paginate_dto_list(self, items)
@@ -131,6 +140,58 @@ class FaultViewSet(GenericViewSet):
                 fault_id=uuid.UUID(str(pk)),
                 request_id=request_id_from(request),
                 closed_by=user_id_from(request),
+            )
+        )
+        return Response(FaultResponseSerializer(result).data)
+
+    @extend_schema(
+        tags=[API_TAGS.fault],
+        request=FaultDistributionDecisionSerializer,
+        responses=FaultResponseSerializer,
+    )
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="distribution-usable",
+        permission_classes=[IsDistributionSupervisorOrAbove],
+    )
+    def distribution_usable(self, request: Request, pk: str | None = None) -> Response:
+        """Distribution rejected the fault: vehicle is usable."""
+        serializer = FaultDistributionDecisionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        result = deps.get_distribution_fault_decision_service().mark_usable(
+            DistributionFaultDecisionDTO(
+                fault_id=uuid.UUID(str(pk)),
+                request_id=request_id_from(request),
+                decided_by=user_id_from(request),
+                note=serializer.validated_data.get("note", ""),
+            )
+        )
+        return Response(FaultResponseSerializer(result).data)
+
+    @extend_schema(
+        tags=[API_TAGS.fault],
+        request=FaultDistributionDecisionSerializer,
+        responses=FaultResponseSerializer,
+    )
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="distribution-unusable",
+        permission_classes=[IsDistributionSupervisorOrAbove],
+    )
+    def distribution_unusable(
+        self, request: Request, pk: str | None = None
+    ) -> Response:
+        """Distribution confirmed the vehicle is unusable."""
+        serializer = FaultDistributionDecisionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        result = deps.get_distribution_fault_decision_service().mark_unusable(
+            DistributionFaultDecisionDTO(
+                fault_id=uuid.UUID(str(pk)),
+                request_id=request_id_from(request),
+                decided_by=user_id_from(request),
+                note=serializer.validated_data.get("note", ""),
             )
         )
         return Response(FaultResponseSerializer(result).data)

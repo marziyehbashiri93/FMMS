@@ -67,10 +67,10 @@ class TestSaveAndRetrieve:
     def test_update_status(self) -> None:
         repo = DjangoFaultRepository()
         fault = _make_fault()
-        fault.transition_to(FaultStatus.ASSIGNED)
+        fault.mark_awaiting_transport()
         repo.save(fault)
         fetched = repo.get_by_id(fault.id)
-        assert fetched.status == FaultStatus.ASSIGNED
+        assert fetched.status == FaultStatus.AWAITING_TRANSPORT
 
     def test_sap_fields_persisted(self) -> None:
         repo = DjangoFaultRepository()
@@ -143,7 +143,7 @@ class TestListOperations:
         vid = uuid.uuid4()
         _make_fault(vehicle_id=vid, status=FaultStatus.OPEN)
         fault_ip = _make_fault(vehicle_id=vid, status=FaultStatus.OPEN)
-        fault_ip.transition_to(FaultStatus.ASSIGNED)
+        fault_ip.mark_awaiting_transport()
         repo.save(fault_ip)
         open_faults = repo.list_by_vehicle(vid, status=FaultStatus.OPEN)
         assert all(f.status == FaultStatus.OPEN for f in open_faults)

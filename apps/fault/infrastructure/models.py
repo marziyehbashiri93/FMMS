@@ -19,7 +19,7 @@ class FaultModel(BaseModel):
     description = models.CharField(max_length=500)
     reported_at = models.DateTimeField()
     severity = models.CharField(max_length=10, db_index=True)
-    status = models.CharField(max_length=20, db_index=True)
+    status = models.CharField(max_length=32, db_index=True)
     reported_by_id = models.UUIDField()
     inspection_id = models.UUIDField(null=True, blank=True, default=None)
     sap_defect_code = models.CharField(max_length=30, blank=True, default="")

@@ -13,12 +13,16 @@ import pytest
 from apps.fault.application.dto.fault_dto import (
     AssignFaultDTO,
     CloseFaultDTO,
+    DistributionFaultDecisionDTO,
     FaultResponseDTO,
     ReportFaultDTO,
     ReportFaultItemDTO,
 )
 from apps.fault.application.services.assign_fault_service import AssignFaultService
 from apps.fault.application.services.close_fault_service import CloseFaultService
+from apps.fault.application.services.distribution_fault_decision_service import (
+    DistributionFaultDecisionService,
+)
 from apps.fault.application.services.get_fault_service import (
     GetFaultService,
     ListFaultsService,
@@ -31,15 +35,18 @@ from apps.fault.domain.exceptions import (
 )
 from apps.fault.domain.interfaces.fault_repository import IFaultRepository
 from apps.fault.domain.value_objects import FaultCode, FaultDescription, FaultSeverity
-from apps.repair.domain.entities import (
-    RepairOrder,
-    RepairOrderStatus,
-)
+from apps.integration.domain.entities import SAPObjectType
+from apps.repair.domain.entities import RepairOrder, RepairOrderStatus
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
 from apps.vehicle.domain.entities import Vehicle, VehicleStatus
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
 from apps.vehicle.domain.value_objects import PlateNumber, SAPVehicleNumber
 from core.exceptions.base_exception import FMMSNotFoundError, FMMSStateError
+from core.sap.dtos.pm_notification import (
+    CreatePMNotificationRequest,
+    SAPNotificationDTO,
+)
+from core.sap.ports.sap_transaction_manager_port import SAPAdapterCallable
 from core.workflow import VEHICLE_OPEN_FLOW_ERROR_CODE, VEHICLE_OPEN_FLOW_MESSAGE
 
 # ---------------------------------------------------------------------------
@@ -124,6 +131,11 @@ class FakeFaultRepository(IFaultRepository):
     def list_by_vehicle(self, vehicle_id: uuid.UUID) -> list[Fault]:
         return [f for f in self._store.values() if f.vehicle_id == vehicle_id]
 
+    def list_all(self, status: FaultStatus | None = None) -> list[Fault]:
+        if status is None:
+            return list(self._store.values())
+        return [f for f in self._store.values() if f.status == status]
+
     def list_open_by_severity(self, severity: FaultSeverity) -> list[Fault]:
         return [
             f
@@ -158,15 +170,12 @@ class FakeVehicleRepository(IVehicleRepository):
     def get_by_plate(self, plate_number: PlateNumber) -> Vehicle | None:
         return None
 
-    def get_by_vehicle_number(
-        self, vehicle_number: SAPVehicleNumber
-    ) -> Vehicle | None:
+    def get_by_vehicle_number(self, vehicle_number: SAPVehicleNumber) -> Vehicle | None:
         return next(
             (
                 v
                 for v in self._store.values()
-                if v.vehicle_number is not None
-                and v.vehicle_number == vehicle_number
+                if v.vehicle_number is not None and v.vehicle_number == vehicle_number
             ),
             None,
         )
@@ -216,6 +225,11 @@ class FakeRepairOrderRepository(IRepairOrderRepository):
     def list_by_fault(self, fault_id: uuid.UUID) -> list[RepairOrder]:
         return [o for o in self._store.values() if o.fault_id == fault_id]
 
+    def list_all(self, status: RepairOrderStatus | None = None) -> list[RepairOrder]:
+        if status is None:
+            return list(self._store.values())
+        return [o for o in self._store.values() if o.status == status]
+
     def list_active_by_vehicle(self, vehicle_id: uuid.UUID) -> list[RepairOrder]:
         return [
             o
@@ -234,6 +248,48 @@ class FakeRepairOrderRepository(IRepairOrderRepository):
 
     def delete(self, order_id: uuid.UUID) -> None:
         self._store.pop(order_id, None)
+
+
+class FakeSAPTransactionManager:
+    def __init__(self) -> None:
+        self.calls: list[tuple[SAPObjectType, uuid.UUID, str, dict[str, object]]] = []
+
+    def execute(
+        self,
+        object_type: SAPObjectType,
+        object_id: uuid.UUID,
+        idempotency_key: str,
+        request_payload: dict[str, object],
+        adapter_call: SAPAdapterCallable,
+    ) -> tuple[dict[str, object], str]:
+        self.calls.append((object_type, object_id, idempotency_key, request_payload))
+        return adapter_call(request_payload)
+
+
+class FakeSAPPMNotificationPort:
+    def __init__(self, notification_number: str = "10009999") -> None:
+        self.calls: list[CreatePMNotificationRequest] = []
+        self._notification_number = notification_number
+
+    def create_notification(
+        self,
+        request: CreatePMNotificationRequest,
+    ) -> SAPNotificationDTO:
+        self.calls.append(request)
+        return SAPNotificationDTO(
+            notification_number=self._notification_number,
+            equipment_number=request.equipment_number,
+            status="OPEN",
+            created_at=datetime.now(tz=UTC),
+        )
+
+    def close_notification(self, notification_number: str) -> SAPNotificationDTO:
+        return SAPNotificationDTO(
+            notification_number=notification_number,
+            equipment_number="",
+            status="CLOSED",
+            created_at=datetime.now(tz=UTC),
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -271,6 +327,43 @@ class TestReportFaultService:
         assert isinstance(result, FaultResponseDTO)
         assert result.status == FaultStatus.OPEN
         assert result.vehicle_id == vehicle.id
+
+    def test_does_not_mark_vehicle_under_repair_before_distribution(self) -> None:
+        vehicle = _make_vehicle()
+        vehicle_repo = FakeVehicleRepository(initial=[vehicle])
+        service = ReportFaultService(
+            fault_repository=FakeFaultRepository(),
+            vehicle_repository=vehicle_repo,
+            repair_order_repository=FakeRepairOrderRepository(),
+        )
+
+        service.execute(self._dto(vehicle.id))
+
+        assert vehicle_repo.get_by_id(vehicle.id).status == VehicleStatus.ACTIVE
+
+    def test_reports_fault_to_sap_pm_notification(self) -> None:
+        vehicle = _make_vehicle()
+        sap_tx = FakeSAPTransactionManager()
+        sap_port = FakeSAPPMNotificationPort(notification_number="10001234")
+        service = ReportFaultService(
+            fault_repository=FakeFaultRepository(),
+            vehicle_repository=FakeVehicleRepository(initial=[vehicle]),
+            repair_order_repository=FakeRepairOrderRepository(),
+            sap_transaction_manager=sap_tx,
+            sap_pm_notification_port=sap_port,
+        )
+
+        result = service.execute(self._dto(vehicle.id))
+
+        assert result.sap_notification_number == "10001234"
+        assert len(sap_tx.calls) == 1
+        assert sap_tx.calls[0][0] == SAPObjectType.FAULT
+        assert sap_tx.calls[0][2] == f"fault-pm-notification:{result.id}"
+        assert len(sap_port.calls) == 1
+        request = sap_port.calls[0]
+        assert request.notification_type == "EM"
+        assert request.equipment_number == vehicle.vehicle_number.value
+        assert request.fault_description == "Engine oil pressure low"
 
     def test_code_is_normalised_to_uppercase(self) -> None:
         vehicle = _make_vehicle()
@@ -388,8 +481,8 @@ class TestReportFaultService:
 
 
 class TestAssignFaultService:
-    def test_assigns_open_fault_to_technician(self) -> None:
-        fault = _make_fault()
+    def test_assigns_awaiting_transport_fault_to_technician(self) -> None:
+        fault = _make_fault(status=FaultStatus.AWAITING_TRANSPORT)
         repo = FakeFaultRepository(initial=[fault])
         technician_id = uuid.uuid4()
 
@@ -517,9 +610,7 @@ class TestCloseFaultService:
             status=RepairOrderStatus.APPROVED,
         )
         fault_repo = FakeFaultRepository(initial=[fault])
-        repair_repo = FakeRepairOrderRepository(
-            initial=[created_order, approved_order]
-        )
+        repair_repo = FakeRepairOrderRepository(initial=[created_order, approved_order])
 
         _close_service(fault_repo, repair_repo).execute(
             CloseFaultDTO(
@@ -529,8 +620,14 @@ class TestCloseFaultService:
             )
         )
 
-        assert repair_repo.get_by_id(created_order.id).status == RepairOrderStatus.CANCELLED
-        assert repair_repo.get_by_id(approved_order.id).status == RepairOrderStatus.CANCELLED
+        assert (
+            repair_repo.get_by_id(created_order.id).status
+            == RepairOrderStatus.CANCELLED
+        )
+        assert (
+            repair_repo.get_by_id(approved_order.id).status
+            == RepairOrderStatus.CANCELLED
+        )
 
     def test_does_not_cancel_in_progress_or_completed_repair_orders(self) -> None:
         fault = _make_fault()
@@ -559,9 +656,35 @@ class TestCloseFaultService:
             repair_repo.get_by_id(in_progress.id).status
             == RepairOrderStatus.IN_PROGRESS
         )
-        assert (
-            repair_repo.get_by_id(completed.id).status == RepairOrderStatus.COMPLETED
+        assert repair_repo.get_by_id(completed.id).status == RepairOrderStatus.COMPLETED
+
+
+class TestDistributionFaultDecisionService:
+    def test_unusable_creates_repair_order_for_transport_queue(self) -> None:
+        vehicle = _make_vehicle()
+        fault = _make_fault(vehicle_id=vehicle.id)
+        fault_repo = FakeFaultRepository(initial=[fault])
+        vehicle_repo = FakeVehicleRepository(initial=[vehicle])
+        repair_repo = FakeRepairOrderRepository()
+
+        result = DistributionFaultDecisionService(
+            fault_repo,
+            vehicle_repo,
+            repair_repo,
+        ).mark_unusable(
+            DistributionFaultDecisionDTO(
+                fault_id=fault.id,
+                request_id="req-distribution-unusable",
+                decided_by=uuid.uuid4(),
+                note="Vehicle unavailable",
+            )
         )
+
+        assert result.status == FaultStatus.AWAITING_TRANSPORT
+        repairs = repair_repo.list_by_fault(fault.id)
+        assert len(repairs) == 1
+        assert repairs[0].status == RepairOrderStatus.CREATED
+        assert vehicle_repo.get_by_id(vehicle.id).status == VehicleStatus.OUT_OF_SERVICE
 
 
 # ---------------------------------------------------------------------------
@@ -612,10 +735,11 @@ class TestListFaultsService:
         assert len(results) == 1
         assert results[0].severity == FaultSeverity.CRITICAL
 
-    def test_returns_empty_list_when_no_filter_provided(self) -> None:
+    def test_lists_all_faults_when_no_filter_provided(self) -> None:
         fault = _make_fault()
         repo = FakeFaultRepository(initial=[fault])
 
         results = ListFaultsService(repo).execute()
 
-        assert results == []
+        assert len(results) == 1
+        assert results[0].id == fault.id

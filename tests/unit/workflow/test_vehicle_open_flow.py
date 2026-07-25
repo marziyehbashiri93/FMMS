@@ -35,6 +35,9 @@ class FakeFaultRepository(IFaultRepository):
     ) -> list[Fault]:
         return []
 
+    def list_all(self, status: FaultStatus | None = None) -> list[Fault]:
+        return []
+
     def has_open_fault_for_vehicle(self, vehicle_id: uuid.UUID) -> bool:
         return self._open_fault
 
@@ -64,6 +67,9 @@ class FakeRepairOrderRepository(IRepairOrderRepository):
         return []
 
     def list_by_fault(self, fault_id: uuid.UUID) -> list[RepairOrder]:
+        return []
+
+    def list_all(self, status: RepairOrderStatus | None = None) -> list[RepairOrder]:
         return []
 
     def list_active_by_vehicle(self, vehicle_id: uuid.UUID) -> list[RepairOrder]:

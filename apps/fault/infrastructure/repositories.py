@@ -145,6 +145,14 @@ class DjangoFaultRepository(IFaultRepository):
         faults = [_to_domain(orm) for orm in qs]
         return self._attach_items(faults)
 
+    def list_all(self, status: FaultStatus | None = None) -> list[Fault]:
+        """Return all non-deleted faults, optionally filtered by status."""
+        qs = FaultModel.objects.filter(is_deleted=False).order_by("-reported_at")
+        if status is not None:
+            qs = qs.filter(status=status.value)
+        faults = [_to_domain(orm) for orm in qs]
+        return self._attach_items(faults)
+
     def has_open_fault_for_vehicle(self, vehicle_id: uuid.UUID) -> bool:
         """Return True when the vehicle has any fault that is not CLOSED."""
         return (

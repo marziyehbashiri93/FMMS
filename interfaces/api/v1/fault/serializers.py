@@ -30,10 +30,35 @@ class FaultCreateSerializer(serializers.Serializer):
     items = FaultItemCreateSerializer(many=True, required=False)
 
 
+class FaultListQuerySerializer(serializers.Serializer):
+    """Validate fault list filters."""
+
+    vehicle_id = serializers.UUIDField(required=False)
+    status = serializers.ChoiceField(
+        choices=[item.value for item in FaultStatus],
+        required=False,
+    )
+    open_by_severity = serializers.ChoiceField(
+        choices=[item.value for item in FaultSeverity],
+        required=False,
+    )
+
+
 class FaultAssignSerializer(serializers.Serializer):
     """Validate fault assignment input."""
 
     technician_id = serializers.UUIDField()
+
+
+class FaultDistributionDecisionSerializer(serializers.Serializer):
+    """Validate distribution unit decision note."""
+
+    note = serializers.CharField(
+        max_length=500,
+        required=False,
+        allow_blank=True,
+        trim_whitespace=True,
+    )
 
 
 class UserProfileSummarySerializer(serializers.Serializer):

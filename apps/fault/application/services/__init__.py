@@ -2,6 +2,9 @@
 
 from apps.fault.application.services.assign_fault_service import AssignFaultService
 from apps.fault.application.services.close_fault_service import CloseFaultService
+from apps.fault.application.services.distribution_fault_decision_service import (
+    DistributionFaultDecisionService,
+)
 from apps.fault.application.services.get_fault_service import (
     GetFaultService,
     ListFaultsService,
@@ -16,6 +19,7 @@ __all__ = [
     "ReportFaultService",
     "AssignFaultService",
     "CloseFaultService",
+    "DistributionFaultDecisionService",
     "GetFaultService",
     "ListFaultsService",
     "ListFaultCatalogService",

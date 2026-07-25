@@ -85,10 +85,10 @@ class TestFaultAPI:
         assert created.data["severity"] == "HIGH"
         assert len(created.data["items"]) == 2
 
-    def test_report_fault_marks_active_vehicle_under_repair(
+    def test_report_fault_keeps_active_vehicle_until_distribution_decision(
         self, authenticated_client: APIClient
     ) -> None:
-        """An open fault must be reflected in vehicle availability status."""
+        """Reporting a fault must not move the vehicle to UNDER_REPAIR yet."""
         vehicle = create_vehicle(
             authenticated_client, plate="12FLT002", vin="1HGCM82633A004356"
         )
@@ -105,4 +105,87 @@ class TestFaultAPI:
         )
 
         assert created.status_code == 201, created.data
-        assert VehicleModel.objects.get(id=vehicle["id"]).status == "UNDER_REPAIR"
+        assert VehicleModel.objects.get(id=vehicle["id"]).status == "ACTIVE"
+
+    def test_list_all_faults_for_distribution_queue(
+        self, authenticated_client: APIClient
+    ) -> None:
+        vehicle = create_vehicle(
+            authenticated_client, plate="12FLT004", vin="1HGCM82633A004358"
+        )
+        created = authenticated_client.post(
+            "/api/v1/faults/",
+            {
+                "vehicle_id": vehicle["id"],
+                "code": "BRK-02",
+                "description": "Brake vibration",
+                "severity": "MEDIUM",
+            },
+            format="json",
+        )
+        assert created.status_code == 201, created.data
+
+        listed = authenticated_client.get("/api/v1/faults/")
+
+        assert listed.status_code == 200
+        assert listed.data["count"] >= 1
+        assert created.data["id"] in {item["id"] for item in listed.data["results"]}
+
+    def test_distribution_marks_fault_vehicle_usable(
+        self, authenticated_client: APIClient
+    ) -> None:
+        vehicle = create_vehicle(
+            authenticated_client, plate="12FLT005", vin="1HGCM82633A004359"
+        )
+        created = authenticated_client.post(
+            "/api/v1/faults/",
+            {
+                "vehicle_id": vehicle["id"],
+                "code": "LGT-02",
+                "description": "چراغ سالم است",
+                "severity": "LOW",
+            },
+            format="json",
+        )
+        assert created.status_code == 201, created.data
+
+        decision = authenticated_client.post(
+            f"/api/v1/faults/{created.data['id']}/distribution-usable/",
+            {"note": "خودرو قابل استفاده است"},
+            format="json",
+        )
+
+        assert decision.status_code == 200, decision.data
+        assert decision.data["status"] == "CLOSED"
+        assert VehicleModel.objects.get(id=vehicle["id"]).status == "ACTIVE"
+
+    def test_distribution_marks_fault_vehicle_unusable(
+        self, authenticated_client: APIClient
+    ) -> None:
+        vehicle = create_vehicle(
+            authenticated_client, plate="12FLT006", vin="1HGCM82633A004360"
+        )
+        VehicleModel.objects.filter(id=vehicle["id"]).update(
+            driver1_customer_number="6000001001"
+        )
+        created = authenticated_client.post(
+            "/api/v1/faults/",
+            {
+                "vehicle_id": vehicle["id"],
+                "code": "ENG-02",
+                "description": "خودرو قابل استفاده نیست",
+                "severity": "HIGH",
+            },
+            format="json",
+        )
+        assert created.status_code == 201, created.data
+
+        decision = authenticated_client.post(
+            f"/api/v1/faults/{created.data['id']}/distribution-unusable/",
+            {"note": "نیازمند خودرو جایگزین"},
+            format="json",
+        )
+
+        assert decision.status_code == 200, decision.data
+        assert decision.data["status"] == "AWAITING_TRANSPORT"
+        assert VehicleModel.objects.get(id=vehicle["id"]).status == "OUT_OF_SERVICE"

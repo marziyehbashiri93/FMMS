@@ -92,6 +92,16 @@ class CloseFaultDTO:
 
 
 @dataclass(frozen=True)
+class DistributionFaultDecisionDTO:
+    """Input DTO for distribution unit decision about a reported fault."""
+
+    fault_id: uuid.UUID
+    request_id: str
+    decided_by: uuid.UUID
+    note: str = ""
+
+
+@dataclass(frozen=True)
 class FaultItemResponseDTO:
     """Output DTO for a single fault item."""
 
