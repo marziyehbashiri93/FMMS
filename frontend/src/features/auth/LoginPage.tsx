@@ -64,7 +64,8 @@ export function LoginPage() {
                     flex: '1 1 52%',
                     minHeight: '100vh',
                     position: 'relative',
-                    bgcolor: 'primary.dark',
+                    background: (theme) =>
+                        `linear-gradient(155deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 55%, ${theme.palette.secondary.dark} 100%)`,
                     color: '#ffffff',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -79,7 +80,7 @@ export function LoginPage() {
                         width: 260,
                         height: 260,
                         borderRadius: '50%',
-                        bgcolor: 'rgba(255,255,255,0.08)',
+                        bgcolor: 'rgba(231,166,153,0.18)',
                         right: -96,
                         bottom: -72,
                     }}
@@ -90,7 +91,7 @@ export function LoginPage() {
                         width: 112,
                         height: 112,
                         borderRadius: '50%',
-                        bgcolor: 'rgba(255,255,255,0.08)',
+                        bgcolor: 'rgba(149,198,194,0.22)',
                         left: 64,
                         top: 72,
                     }}
@@ -122,7 +123,7 @@ export function LoginPage() {
                     </Stack>
 
                     <Stack spacing={2.25} alignItems="flex-start" sx={{width: '100%'}}>
-                        {featureItems.map((item) => {
+                        {featureItems.map((item, index) => {
                             const Icon = item.icon;
                             return (
                                 <Stack key={item.label} direction="row" alignItems="center" spacing={1.5}
@@ -132,7 +133,7 @@ export function LoginPage() {
                                             width: 36,
                                             height: 36,
                                             borderRadius: (t) => t.radius('xl'),
-                                            bgcolor: 'primary.main',
+                                            bgcolor: index % 2 === 0 ? 'primary.main' : 'secondary.main',
                                             display: 'grid',
                                             placeItems: 'center',
                                             flexShrink: 0,

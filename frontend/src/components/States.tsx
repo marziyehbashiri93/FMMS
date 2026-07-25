@@ -17,7 +17,25 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry: () 
     <Alert
       severity="error"
       action={
-        <Button color="inherit" size="small" startIcon={<Refresh />} onClick={onRetry}>
+        <Button
+          variant="outlined"
+          color="error"
+          size="small"
+          startIcon={<Refresh />}
+          onClick={onRetry}
+          sx={{
+            minWidth: 'auto',
+            px: 1.5,
+            bgcolor: 'common.white',
+            borderColor: 'error.main',
+            color: 'error.dark',
+            fontWeight: 800,
+            '&:hover': {
+              bgcolor: 'rgba(239, 68, 68, 0.08)',
+              borderColor: 'error.dark',
+            },
+          }}
+        >
           تلاش مجدد
         </Button>
       }
@@ -43,8 +61,8 @@ export function EmptyState({
           width: 52,
           height: 52,
           borderRadius: (t) => t.radius('xl'),
-          bgcolor: 'primary.light',
-          color: 'primary.main',
+          bgcolor: 'secondary.light',
+          color: 'secondary.dark',
           display: 'grid',
           placeItems: 'center',
           mx: 'auto',

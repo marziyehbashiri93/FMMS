@@ -24,19 +24,6 @@ export function Button({loading, disabled, startIcon, endIcon, children, sx, ...
                     margin: 0,
                     '& svg': {fontSize: '1.1rem'},
                 },
-                '&:hover': {
-                    opacity: 1,
-                    ...(props.color === 'error'
-                        ? props.variant === 'outlined'
-                            ? {
-                                  backgroundColor: 'rgba(239, 68, 68, 0.08)',
-                                  borderColor: '#EF4444',
-                              }
-                            : {backgroundColor: '#b91c1c'}
-                        : props.variant === 'outlined'
-                          ? {backgroundColor: 'rgba(0, 120, 103, 0.08)'}
-                          : {backgroundColor: '#007867'}),
-                },
                 ...sx,
             }}
         >

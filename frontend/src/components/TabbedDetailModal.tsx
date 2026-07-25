@@ -124,8 +124,9 @@ export function TabbedDetailModal({
                   borderRadius: (t) => t.radius('xl'),
                   display: 'grid',
                   placeItems: 'center',
-                  bgcolor: 'primary.main',
-                  color: 'primary.contrastText',
+                  background: (theme) =>
+                    `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+                  color: 'common.white',
                   flexShrink: 0,
                 }}
               >
@@ -176,14 +177,14 @@ export function TabbedDetailModal({
                 '& .MuiTabs-indicator': {
                   height: 3,
                   borderRadius: (t) => t.radius('md'),
-                  bgcolor: 'primary.main',
+                  bgcolor: 'secondary.main',
                 },
                 '& .MuiTab-root': {
                   minHeight: 44,
                   fontWeight: 700,
                   textTransform: 'none',
                   color: 'text.secondary',
-                  '&.Mui-selected': { color: 'primary.main' },
+                  '&.Mui-selected': { color: 'primary.dark' },
                 },
               }}
             >

@@ -89,10 +89,10 @@ export function ComponentShowcasePage() {
         ]}
         actions={
           <>
-            <Button variant="outlined" startIcon={<Download />}>
+            <Button variant="outlined" color="secondary" startIcon={<Download />}>
               خروجی
             </Button>
-            <Button variant="contained" startIcon={<Add />}>
+            <Button variant="contained" color="primary" startIcon={<Add />}>
               اقدام اصلی
             </Button>
           </>
@@ -135,13 +135,13 @@ export function ComponentShowcasePage() {
                   <Stack spacing={1.5}>
                     <RtlTextField label="کیلومتر امروز" defaultValue="128430" fullWidth />
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-                      <Button variant="contained" startIcon={<Sync />} fullWidth>
+                      <Button variant="contained" color="primary" startIcon={<Sync />} fullWidth>
                         ثبت تغییر
                       </Button>
-                      <Button variant="outlined" fullWidth>
+                      <Button variant="outlined" color="secondary" fullWidth>
                         انصراف
                       </Button>
-                      <Button variant="contained" loading fullWidth>
+                      <Button variant="contained" color="secondary" loading fullWidth>
                         در حال ثبت
                       </Button>
                     </Stack>

@@ -46,8 +46,9 @@ const collapsedDrawerWidth = 88;
 const sidebarBg = '#141A21';
 const sidebarText = '#919EAB';
 const sidebarMuted = '#637381';
-const sidebarActive = '#5BE49B';
-const sidebarActiveBg = 'rgba(0, 167, 111, 0.08)';
+const sidebarActive = '#95C6C2';
+const sidebarActiveBg = 'rgba(110, 158, 162, 0.14)';
+const sidebarAccent = '#E7A699';
 const SIDEBAR_COLLAPSED_STORAGE_KEY = 'fmms.sidebarCollapsed';
 
 function readSidebarCollapsed(): boolean {
@@ -127,15 +128,15 @@ function HeaderProfileMenu({
           px: 0.75,
           py: 0.5,
           gap: 1,
-          '&:hover': { bgcolor: 'rgba(0, 167, 111, 0.06)' },
+          '&:hover': { bgcolor: 'rgba(231, 166, 153, 0.10)' },
         }}
       >
         <Avatar
           sx={{
             width: 40,
             height: 40,
-            bgcolor: 'primary.main',
-            color: 'primary.contrastText',
+            bgcolor: 'secondary.main',
+            color: 'secondary.contrastText',
             fontWeight: 800,
             fontSize: '0.85rem',
           }}
@@ -221,29 +222,21 @@ function BrandBlock({ compact = false, onDark = false }: { compact?: boolean; on
       style={{ direction: 'rtl', textAlign: 'right' }}
     >
       <Box
+        component="img"
+        src="/logo-golestan.webp"
+        alt="لوگوی گروه صنعتی گلستان"
         sx={{
-          width: compact ? 34 : 36,
-          height: compact ? 34 : 36,
-          borderRadius: (t) => t.radius('lg'),
-          bgcolor: compact && onDark ? 'transparent' : 'primary.main',
-          color: 'primary.contrastText',
-          display: 'grid',
-          placeItems: 'center',
-          fontWeight: 900,
-          boxShadow: '0 10px 24px rgba(31,111,74,0.22)',
+          width: compact ? 40 : 44,
+          height: compact ? 28 : 32,
+          objectFit: 'contain',
           flexShrink: 0,
-          border: compact && onDark ? '1px solid rgba(91, 228, 155, 0.36)' : 'none',
+          display: 'block',
         }}
-      >
-        گ
-      </Box>
+      />
       {!compact && (
         <Box minWidth={0} flex={1}>
           <Typography fontWeight={900} lineHeight={1.2} noWrap fontSize="0.86rem" color={onDark ? '#ffffff' : 'text.primary'}>
             مدیریت نگهداری ناوگان
-          </Typography>
-          <Typography variant="caption" color={onDark ? sidebarText : 'text.secondary'} noWrap>
-            گروه صنعتی گلستان
           </Typography>
         </Box>
       )}
@@ -266,11 +259,12 @@ const navItemSx = (selected: boolean, collapsed: boolean) =>
     px: collapsed ? 0.5 : 1,
     bgcolor: selected ? sidebarActiveBg : 'transparent',
     color: selected ? sidebarActive : sidebarText,
+    borderInlineStart: selected ? `3px solid ${sidebarAccent}` : '3px solid transparent',
     '&.Mui-selected': {
       bgcolor: sidebarActiveBg,
       color: sidebarActive,
     },
-    '&.Mui-selected:hover': { bgcolor: 'rgba(0, 167, 111, 0.12)' },
+    '&.Mui-selected:hover': { bgcolor: 'rgba(110, 158, 162, 0.22)' },
     '&:hover': { bgcolor: 'rgba(145, 158, 171, 0.08)' },
     '&.Mui-disabled': {
       opacity: 1,
@@ -315,7 +309,7 @@ function NavLeafButton({
           minWidth: 0,
           flex: collapsed ? 'initial' : 1,
           justifyContent: collapsed ? 'center' : 'flex-start',
-          gap: collapsed ? 0 : 1.25,
+          gap: collapsed ? 0 : 2,
           color: selected ? sidebarActive : sidebarMuted,
         }}
       >
@@ -415,7 +409,7 @@ function NavGroupItem({
                   onNavigate?.();
                 }}
               >
-                <ListItemIcon sx={{ minWidth: 36, color: selected ? 'primary.main' : 'inherit' }}>
+                <ListItemIcon sx={{ minWidth: 36, color: selected ? sidebarAccent : 'inherit' }}>
                   <ChildIcon fontSize="small" />
                 </ListItemIcon>
                 <ListItemText primary={child.label} />
@@ -441,7 +435,7 @@ function NavGroupItem({
             alignItems: 'center',
             minWidth: 0,
             flex: 1,
-            gap: 1.25,
+            gap: 2,
             color: childActive ? sidebarActive : sidebarMuted,
           }}
         >

@@ -22,12 +22,26 @@ export function PageHeader({
   return (
     <Card
       sx={{
+        bgcolor: 'background.paper',
+        border: '1px solid',
         borderColor: 'divider',
-        boxShadow: '0 8px 22px rgba(21, 95, 61, 0.06)',
+        boxShadow: '0 8px 22px rgba(51, 69, 71, 0.06)',
+        position: 'relative',
+        overflow: 'hidden',
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          insetInlineStart: 0,
+          top: 0,
+          bottom: 0,
+          width: 4,
+          background: (theme) =>
+            `linear-gradient(180deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+        },
       }}
     >
       <CardContent sx={{ p: { xs: 1.75, md: 2.25 }, '&:last-child': { pb: { xs: 1.75, md: 2.25 } } }}>
-        <Stack spacing={1.5}>
+        <Stack spacing={1.25}>
           <Breadcrumbs
             separator={<ArrowLeft sx={{ fontSize: 18, color: 'text.secondary' }} />}
             sx={{ '& .MuiBreadcrumbs-ol': { justifyContent: 'flex-start' } }}
@@ -36,30 +50,50 @@ export function PageHeader({
               const isLast = index === breadcrumbs.length - 1;
               if (crumb.to && !isLast) {
                 return (
-                  <Link key={crumb.label} component={RouterLink} to={crumb.to} underline="hover" color="text.secondary">
+                  <Link
+                    key={crumb.label}
+                    component={RouterLink}
+                    to={crumb.to}
+                    underline="hover"
+                    color="text.secondary"
+                  >
                     {crumb.label}
                   </Link>
                 );
               }
               return (
-                <Typography key={crumb.label} color={isLast ? 'text.primary' : 'text.secondary'} fontWeight={isLast ? 800 : 500}>
+                <Typography
+                  key={crumb.label}
+                  color={isLast ? 'text.primary' : 'text.secondary'}
+                  fontWeight={isLast ? 800 : 500}
+                >
                   {crumb.label}
                 </Typography>
               );
             })}
           </Breadcrumbs>
 
-          <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ md: 'center' }} gap={1.5}>
+          <Stack
+            direction={{ xs: 'column', md: 'row' }}
+            justifyContent="space-between"
+            alignItems={{ md: 'center' }}
+            gap={1.5}
+          >
             <Stack spacing={0.5} minWidth={0}>
               <Typography variant="h1">{title}</Typography>
               {description && (
-                <Typography color="text.secondary">
+                <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 640 }}>
                   {description}
                 </Typography>
               )}
             </Stack>
             {actions && (
-              <Stack direction="row" gap={1} flexWrap="wrap" justifyContent={{ xs: 'flex-start', md: 'flex-end' }}>
+              <Stack
+                direction="row"
+                gap={1}
+                flexWrap="wrap"
+                justifyContent={{ xs: 'flex-start', md: 'flex-end' }}
+              >
                 {actions}
               </Stack>
             )}

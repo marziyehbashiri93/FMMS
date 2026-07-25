@@ -143,26 +143,9 @@ export function DashboardPage() {
     <Stack spacing={{ xs: 1.5, md: 2.25 }} style={{ direction: 'rtl', textAlign: 'right' }}>
       <PageHeader
         title="داشبورد"
+        description="وضعیت خودروها، راننده‌ها و صف‌های توزیع و ترابری بر اساس آخرین داده‌های سامانه."
         breadcrumbs={[{ label: 'اصلی' }, { label: 'داشبورد' }]}
       />
-
-      <Card
-        sx={{
-          background: (theme) =>
-            `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 55%, ${theme.palette.success.dark} 100%)`,
-          color: 'common.white',
-          border: 'none',
-        }}
-      >
-        <CardContent sx={{ p: { xs: 2, md: 2.5 }, '&:last-child': { pb: { xs: 2, md: 2.5 } } }}>
-          <Typography variant="h2" color="inherit" mb={0.75}>
-            نمای کلی ناوگان
-          </Typography>
-          <Typography variant="body2" sx={{ opacity: 0.92, maxWidth: 520 }}>
-            وضعیت خودروها، راننده‌ها و صف‌های توزیع و ترابری بر اساس آخرین داده‌های سامانه.
-          </Typography>
-        </CardContent>
-      </Card>
 
       {error && <ErrorState message={error} onRetry={() => void load()} />}
       {loading && !error && <LoadingState label="در حال بارگذاری داشبورد..." />}
@@ -183,6 +166,7 @@ export function DashboardPage() {
               label="کل ناوگان فعال"
               value={toFaNumber(vehicleSummary?.active_fleet_count)}
               icon={DirectionsCar}
+              tone="primary"
             />
             <KpiCard
               label="عملیاتی"
@@ -200,7 +184,7 @@ export function DashboardPage() {
               label="خارج از سرویس"
               value={toFaNumber(vehicleSummary?.unusable_fleet_count)}
               icon={ErrorOutline}
-              tone="error"
+              tone="secondary"
             />
           </Box>
 
@@ -218,13 +202,13 @@ export function DashboardPage() {
               label="راننده فعال"
               value={toFaNumber(driverSummary?.active_count)}
               icon={PeopleAlt}
-              tone="success"
+              tone="primary"
             />
             <KpiCard
               label="راننده با خودرو"
               value={toFaNumber(driverSummary?.with_vehicle_count)}
               icon={DirectionsCar}
-              tone="info"
+              tone="secondary"
             />
             <KpiCard
               label="میانگین کیلومتر"

@@ -19,6 +19,7 @@ import {
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import {
+  CarRepair,
   Close,
   DirectionsCar,
   Error as ErrorIcon,
@@ -1133,16 +1134,16 @@ export function VehiclePage() {
           gap: 1.5,
         }}
       >
-        <KpiCard label="کل ناوگان فعال" value={summaryLoading ? '...' : toFaNumber(summary?.active_fleet_count)} icon={DirectionsCar} />
+        <KpiCard label="کل ناوگان فعال" value={summaryLoading ? '...' : toFaNumber(summary?.active_fleet_count)} icon={DirectionsCar} tone="primary" />
         <KpiCard label="عملیاتی" value={summaryLoading ? '...' : toFaNumber(summary?.operational_fleet_count)} icon={TaskAlt} tone="success" />
-        <KpiCard label="در تعمیر" value={summaryLoading ? '...' : toFaNumber(summary?.under_repair_fleet_count)} icon={Speed} tone="warning" />
+        <KpiCard label="در تعمیر" value={summaryLoading ? '...' : toFaNumber(summary?.under_repair_fleet_count)} icon={CarRepair} tone="secondary" />
         <KpiCard label="میانگین کیلومتر" value={summaryLoading ? '...' : toFaNumber(summary?.average_odometer_km)} icon={Speed} tone="info" />
         <KpiCard label="میانگین خرابی ماه" value={summaryLoading ? '...' : toFaNumber(summary?.average_faults_last_30_days)} icon={ErrorIcon} tone="warning" />
         <KpiCard
           label="آخرین همگام‌سازی SAP"
           value={summaryLoading ? '...' : formatDateTime(summary?.last_sap_sync_at)}
           icon={Sync}
-          tone="info"
+          tone="secondary"
         />
       </Box>
       {summaryError && <ErrorState message={summaryError} onRetry={reloadSummary} />}
