@@ -138,12 +138,15 @@ class DjangoVehicleRepository(IVehicleRepository):
         ordering: str = "",
         search: str = "",
     ) -> list[Vehicle]:
-        """Return vehicles filtered and ordered by database query."""
-        qs = (
-            VehicleModel.objects.filter(status=status.value)
-            if status is not None
-            else VehicleModel.objects.filter(status=VehicleStatus.ACTIVE.value)
-        )
+        """Return vehicles filtered and ordered by database query.
+
+        When ``status`` is omitted, all non-deleted vehicles are returned so
+        the UI ``همه وضعیت‌ها`` filter and plate/number search cover the full
+        fleet (not only ``ACTIVE``).
+        """
+        qs = VehicleModel.objects.filter(is_deleted=False)
+        if status is not None:
+            qs = qs.filter(status=status.value)
         needle = search.strip()
         if needle:
             qs = qs.filter(

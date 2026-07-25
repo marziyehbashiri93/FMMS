@@ -27,9 +27,7 @@ from apps.fault.domain.value_objects import FaultCode, FaultDescription, FaultSe
 from apps.repair.domain.entities import RepairOrder, RepairOrderStatus
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
 from apps.repair.domain.value_objects import TechnicianAssignment
-from apps.vehicle.application.dto.vehicle_dto import (
-    ChangeVehicleStatusDTO,
-)
+from apps.vehicle.application.dto.vehicle_dto import ChangeVehicleStatusDTO
 from apps.vehicle.application.services.change_vehicle_status_service import (
     ChangeVehicleStatusService,
 )
@@ -193,7 +191,9 @@ class FakeDriverRepository(IDriverRepository):
 
     def list_by_customer_numbers(self, customer_numbers: set[str]) -> list[Driver]:
         return [
-            d for d in self._store.values() if d.customer_number.value in customer_numbers
+            d
+            for d in self._store.values()
+            if d.customer_number.value in customer_numbers
         ]
 
     def exists_by_customer_number(self, customer_number: CustomerNumber) -> bool:
@@ -239,6 +239,11 @@ class FakeRepairOrderRepository(IRepairOrderRepository):
     def list_by_fault(self, fault_id: uuid.UUID):  # type: ignore[override]
         return [o for o in self._store.values() if o.fault_id == fault_id]
 
+    def list_all(self, status: RepairOrderStatus | None = None) -> list[RepairOrder]:
+        if status is None:
+            return list(self._store.values())
+        return [o for o in self._store.values() if o.status == status]
+
     def list_active_by_vehicle(self, vehicle_id: uuid.UUID) -> list:
         return [
             o
@@ -278,6 +283,11 @@ class FakeFaultRepository(IFaultRepository):
         if status is not None:
             faults = [f for f in faults if f.status == status]
         return faults
+
+    def list_all(self, status: FaultStatus | None = None) -> list[Fault]:
+        if status is None:
+            return list(self._store.values())
+        return [f for f in self._store.values() if f.status == status]
 
     def list_open_by_severity(self, severity: FaultSeverity) -> list[Fault]:
         return [
@@ -420,7 +430,7 @@ class TestGetVehicleService:
 
 
 class TestListVehiclesService:
-    def test_lists_active_vehicles_by_default(self) -> None:
+    def test_lists_all_vehicles_by_default(self) -> None:
         active = _make_vehicle(plate="ACTIVE001", status=VehicleStatus.ACTIVE)
         active.driver1_customer_number = "6000000002"
         inactive = _make_vehicle(plate="INACT0001", status=VehicleStatus.INACTIVE)
@@ -431,10 +441,10 @@ class TestListVehiclesService:
 
         results = ListVehiclesService(repo, driver_repo).execute()
 
-        assert len(results) == 1
-        assert results[0].license_plate == "ACTIVE001"
-        assert results[0].driver1 is not None
-        assert results[0].driver1.customer_number == "6000000002"
+        assert {item.license_plate for item in results} == {"ACTIVE001", "INACT0001"}
+        assigned = next(item for item in results if item.license_plate == "ACTIVE001")
+        assert assigned.driver1 is not None
+        assert assigned.driver1.customer_number == "6000000002"
 
     def test_filters_by_status(self) -> None:
         v1 = _make_vehicle(plate="ACT00001", status=VehicleStatus.ACTIVE)

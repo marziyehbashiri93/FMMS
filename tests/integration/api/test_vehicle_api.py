@@ -194,6 +194,24 @@ class TestVehicleAPI:
             by_number["id"]
         }
 
+    def test_search_includes_non_active_statuses_when_unfiltered(
+        self, authenticated_client: APIClient
+    ) -> None:
+        """Default list search must cover vehicles outside ACTIVE status."""
+        vehicle = create_vehicle(
+            authenticated_client,
+            vehicle_number="203299903",
+            plate="161ع43-44",
+            vin="1HGCM82633A004454",
+        )
+        VehicleModel.objects.filter(id=vehicle["id"]).update(
+            status=VehicleStatus.OUT_OF_SERVICE.value
+        )
+
+        response = authenticated_client.get("/api/v1/vehicles/?search=161")
+        assert response.status_code == 200
+        assert vehicle["id"] in {item["id"] for item in response.data["results"]}
+
     def test_summary_returns_vehicle_dashboard_counts(
         self, authenticated_client: APIClient, admin_user: Any
     ) -> None:

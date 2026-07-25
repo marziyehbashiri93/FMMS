@@ -68,19 +68,22 @@ def _open_fault_and_repair(client: APIClient, vehicle_id: str) -> tuple[dict, di
         format="json",
     )
     assert fault.status_code == 201, fault.data
-    order = client.post(
-        "/api/v1/repair-orders/",
-        {"vehicle_id": vehicle_id, "fault_id": fault.data["id"]},
+    unusable = client.post(
+        f"/api/v1/faults/{fault.data['id']}/distribution-unusable/",
+        {"note": "needs repair"},
         format="json",
     )
-    assert order.status_code == 201, order.data
-    return fault.data, order.data
+    assert unusable.status_code == 200, unusable.data
+    orders = client.get(f"/api/v1/repair-orders/?vehicle_id={vehicle_id}")
+    assert orders.status_code == 200, orders.data
+    assert orders.data["count"] >= 1
+    return unusable.data, orders.data["results"][0]
 
 
 class TestVehicleOpenWorkflowAPI:
     """Enforce a single open fault/repair flow per vehicle."""
 
-    def test_failed_inspection_creates_one_fault_with_multiple_items(
+    def test_failed_inspection_report_creates_fault_without_repair_order(
         self, authenticated_client: APIClient
     ) -> None:
         vehicle = create_vehicle(
@@ -97,21 +100,30 @@ class TestVehicleOpenWorkflowAPI:
         )
         assert submitted.status_code == 200, submitted.data
 
+        reported = authenticated_client.post(
+            f"/api/v1/inspections/{inspection_id}/report-fault/",
+            {},
+            format="json",
+        )
+        assert reported.status_code == 201, reported.data
+
         faults = authenticated_client.get(f"/api/v1/faults/?vehicle_id={vehicle['id']}")
         assert faults.status_code == 200
         assert faults.data["count"] == 1
         fault = faults.data["results"][0]
         assert len(fault["items"]) == 2
+        assert fault["status"] == "OPEN"
 
         orders = authenticated_client.get(
             f"/api/v1/repair-orders/?vehicle_id={vehicle['id']}"
         )
         assert orders.status_code == 200
-        assert orders.data["count"] == 1
+        assert orders.data["count"] == 0
 
-    def test_submit_failed_inspection_rejected_when_open_fault_exists(
+    def test_submit_failed_inspection_allowed_when_open_fault_exists(
         self, authenticated_client: APIClient
     ) -> None:
+        """Submit only finalizes the checklist; open-flow is checked on report."""
         vehicle = create_vehicle(
             authenticated_client, plate="12WF002", vin="1HGCM82633A004502"
         )
@@ -126,9 +138,8 @@ class TestVehicleOpenWorkflowAPI:
             format="json",
         )
 
-        assert response.status_code == 422, response.data
-        assert response.data["error_code"] == VEHICLE_OPEN_FLOW_ERROR_CODE
-        assert response.data["message"] == VEHICLE_OPEN_FLOW_MESSAGE
+        assert response.status_code == 200, response.data
+        assert response.data["has_failures"] is True
 
     def test_submit_failed_inspection_allowed_after_distribution_usable_close(
         self, authenticated_client: APIClient

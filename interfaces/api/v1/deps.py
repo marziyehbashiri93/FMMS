@@ -24,6 +24,9 @@ from apps.driver.infrastructure.vehicle_assignment_reader import (
 )
 from apps.fault.application.services.assign_fault_service import AssignFaultService
 from apps.fault.application.services.close_fault_service import CloseFaultService
+from apps.fault.application.services.distribution_fault_decision_service import (
+    DistributionFaultDecisionService,
+)
 from apps.fault.application.services.get_fault_service import (
     GetFaultService,
     ListFaultsService,
@@ -33,9 +36,7 @@ from apps.fault.application.services.sync_fault_catalog_from_sap_service import 
     ListFaultCatalogService,
     SyncFaultCatalogFromSAPService,
 )
-from apps.fault.infrastructure.catalog_repositories import (
-    DjangoFaultCatalogRepository,
-)
+from apps.fault.infrastructure.catalog_repositories import DjangoFaultCatalogRepository
 from apps.fault.infrastructure.repositories import DjangoFaultRepository
 from apps.handover.application.services.handover_service import (
     ConfirmVehicleHandoverService,
@@ -138,6 +139,8 @@ from apps.repair.application.services.approve_repair_order_service import (
     AcceptRepairOrderService,
     ApproveRepairOrderService,
     AssignWorkshopService,
+    ListExternalWorkshopReferralRequestsService,
+    RejectRepairOrderByTransportService,
     RejectRepairOrderService,
 )
 from apps.repair.application.services.assign_repair_order_service import (
@@ -177,7 +180,10 @@ from apps.repair.infrastructure.event_repositories import (
 from apps.repair.infrastructure.invoice_repositories import (
     DjangoExternalRepairInvoiceRepository,
 )
-from apps.repair.infrastructure.repositories import DjangoRepairOrderRepository
+from apps.repair.infrastructure.repositories import (
+    DjangoExternalWorkshopReferralRepository,
+    DjangoRepairOrderRepository,
+)
 from apps.vehicle.application.services.change_vehicle_status_service import (
     ChangeVehicleStatusService,
 )
@@ -200,6 +206,9 @@ from apps.vehicle.application.services.record_odometer_service import (
 from apps.vehicle.application.services.sync_vehicles_from_sap_service import (
     SyncVehiclesFromSAPService,
 )
+from apps.vehicle.infrastructure.odometer_readers import (
+    DjangoFaultVehicleOdometerReader,
+)
 from apps.vehicle.infrastructure.repositories import DjangoVehicleRepository
 from infrastructure.sap.adapters.bapi.pm_notification_bapi_adapter import (
     PMNotificationBAPIAdapter,
@@ -207,6 +216,12 @@ from infrastructure.sap.adapters.bapi.pm_notification_bapi_adapter import (
 from infrastructure.sap.adapters.bapi.pm_order_bapi_adapter import PMOrderBAPIAdapter
 from infrastructure.sap.adapters.bapi.purchase_requisition_bapi_adapter import (
     PurchaseRequisitionBAPIAdapter,
+)
+from infrastructure.sap.adapters.bapi.vehicle_assignment_bapi_adapter import (
+    VehicleAssignmentBAPIAdapter,
+)
+from infrastructure.sap.adapters.bapi.vehicle_measurement_bapi_adapter import (
+    VehicleMeasurementBAPIAdapter,
 )
 from infrastructure.sap.adapters.odata.fault_catalog_odata_adapter import (
     FaultCatalogODataAdapter,
@@ -313,6 +328,13 @@ def get_vehicle_handover_repository() -> DjangoVehicleHandoverRepository:
 def get_repair_order_repository() -> DjangoRepairOrderRepository:
     """Return the repair-order repository."""
     return DjangoRepairOrderRepository()
+
+
+def get_external_workshop_referral_repository() -> (
+    DjangoExternalWorkshopReferralRepository
+):
+    """Return external workshop referral repository."""
+    return DjangoExternalWorkshopReferralRepository()
 
 
 def get_external_invoice_repository() -> DjangoExternalRepairInvoiceRepository:
@@ -447,6 +469,8 @@ def get_driver_exit_center_service() -> DriverExitCenterService:
         get_driver_repository(),
         get_vehicle_repository(),
         get_inspection_repository(),
+        get_fault_repository(),
+        get_repair_order_repository(),
     )
 
 
@@ -492,10 +516,16 @@ def get_submit_inspection_service() -> SubmitInspectionService:
 
 def get_report_inspection_fault_service() -> ReportInspectionFaultService:
     """Return ReportInspectionFaultService."""
+    client = _sap_client()
     return ReportInspectionFaultService(
         get_inspection_repository(),
         get_fault_repository(),
         get_repair_order_repository(),
+        get_vehicle_repository(),
+        get_sap_transaction_manager(),
+        PMNotificationBAPIAdapter(client),
+        VehicleMeasurementBAPIAdapter(client),
+        DjangoFaultVehicleOdometerReader(),
     )
 
 
@@ -553,11 +583,16 @@ def get_list_sap_sync_runs_service() -> ListSAPSyncRunsService:
 
 def get_report_fault_service() -> ReportFaultService:
     """Return ReportFaultService."""
+    client = _sap_client()
     return ReportFaultService(
         get_fault_repository(),
         get_vehicle_repository(),
         get_repair_order_repository(),
         get_user_profile_reader(),
+        get_sap_transaction_manager(),
+        PMNotificationBAPIAdapter(client),
+        VehicleMeasurementBAPIAdapter(client),
+        DjangoFaultVehicleOdometerReader(),
     )
 
 
@@ -582,6 +617,19 @@ def get_close_fault_service() -> CloseFaultService:
         get_fault_repository(),
         get_repair_order_repository(),
         get_record_repair_order_event_service(),
+    )
+
+
+def get_distribution_fault_decision_service() -> DistributionFaultDecisionService:
+    """Return DistributionFaultDecisionService."""
+    client = _sap_client()
+    return DistributionFaultDecisionService(
+        get_fault_repository(),
+        get_vehicle_repository(),
+        get_repair_order_repository(),
+        get_record_repair_order_event_service(),
+        get_sap_transaction_manager(),
+        VehicleAssignmentBAPIAdapter(client),
     )
 
 
@@ -640,9 +688,31 @@ def get_assign_workshop_service() -> AssignWorkshopService:
     """Return AssignWorkshopService."""
     return AssignWorkshopService(
         get_repair_order_repository(),
+        get_external_workshop_referral_repository(),
         get_vehicle_repository(),
         get_create_vehicle_handover_service(),
         get_record_repair_order_event_service(),
+    )
+
+
+def get_reject_repair_order_by_transport_service() -> (
+    RejectRepairOrderByTransportService
+):
+    """Return RejectRepairOrderByTransportService."""
+    return RejectRepairOrderByTransportService(
+        get_repair_order_repository(),
+        get_fault_repository(),
+        get_vehicle_repository(),
+        get_record_repair_order_event_service(),
+    )
+
+
+def get_list_external_workshop_referral_requests_service() -> (
+    ListExternalWorkshopReferralRequestsService
+):
+    """Return ListExternalWorkshopReferralRequestsService."""
+    return ListExternalWorkshopReferralRequestsService(
+        get_external_workshop_referral_repository()
     )
 
 
@@ -854,6 +924,8 @@ def get_retry_failed_sap_transactions_service() -> RetryFailedSAPTransactionsSer
         PurchaseRequisitionBAPIAdapter(client),
         PMOrderBAPIAdapter(client),
         PMNotificationBAPIAdapter(client),
+        VehicleMeasurementBAPIAdapter(client),
+        VehicleAssignmentBAPIAdapter(client),
     )
 
 

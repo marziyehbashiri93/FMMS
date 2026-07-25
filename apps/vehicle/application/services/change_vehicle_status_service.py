@@ -88,7 +88,7 @@ def _close_faults_for_completed_repairs(
 
 def _close_open_fault(fault: Fault) -> None:
     """Close a non-closed fault through valid fault state transitions."""
-    if fault.status == FaultStatus.ASSIGNED:
+    if fault.status in {FaultStatus.ASSIGNED, FaultStatus.AWAITING_TRANSPORT}:
         fault.start_repair()
     fault.close()
 

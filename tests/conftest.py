@@ -42,6 +42,22 @@ def supervisor_user(db: None) -> "FMMSUser":  # type: ignore[name-defined]  # no
 
 
 @pytest.fixture
+def distribution_user(db: None) -> "FMMSUser":  # type: ignore[name-defined]  # noqa: F821
+    """Return a persisted FMMSUser with DISTRIBUTION role."""
+    from tests.factories.user_factory import FMMSUserFactory
+
+    return FMMSUserFactory(role="DISTRIBUTION")
+
+
+@pytest.fixture
+def transport_user(db: None) -> "FMMSUser":  # type: ignore[name-defined]  # noqa: F821
+    """Return a persisted FMMSUser with TRANSPORT role."""
+    from tests.factories.user_factory import FMMSUserFactory
+
+    return FMMSUserFactory(role="TRANSPORT")
+
+
+@pytest.fixture
 def technician_user(db: None) -> "FMMSUser":  # type: ignore[name-defined]  # noqa: F821
     """Return a persisted FMMSUser with TECHNICIAN role."""
     from tests.factories.user_factory import FMMSUserFactory
@@ -76,6 +92,22 @@ def supervisor_client(supervisor_user: "FMMSUser") -> APIClient:  # type: ignore
     """Return an API client authenticated as a supervisor."""
     client = APIClient()
     client.force_authenticate(user=supervisor_user)
+    return client
+
+
+@pytest.fixture
+def distribution_client(distribution_user: "FMMSUser") -> APIClient:  # type: ignore[name-defined]  # noqa: F821
+    """Return an API client authenticated as a distribution supervisor."""
+    client = APIClient()
+    client.force_authenticate(user=distribution_user)
+    return client
+
+
+@pytest.fixture
+def transport_client(transport_user: "FMMSUser") -> APIClient:  # type: ignore[name-defined]  # noqa: F821
+    """Return an API client authenticated as a transport supervisor."""
+    client = APIClient()
+    client.force_authenticate(user=transport_user)
     return client
 
 

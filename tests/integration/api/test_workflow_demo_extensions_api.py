@@ -11,7 +11,10 @@ from rest_framework.test import APIClient
 from apps.driver.domain.entities import DriverStatus
 from apps.driver.infrastructure.models import DriverModel
 from apps.vehicle.domain.entities import VehicleStatus
-from tests.integration.api.conftest import create_vehicle
+from tests.integration.api.conftest import (
+    create_repair_order_via_distribution,
+    create_vehicle,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -19,26 +22,11 @@ pytestmark = pytest.mark.django_db
 def _create_fault_and_repair(
     client: APIClient, plate: str, vin: str
 ) -> tuple[dict, dict]:
-    """Create vehicle, fault, and repair order."""
-    vehicle = create_vehicle(client, plate=plate, vin=vin)
-    fault = client.post(
-        "/api/v1/faults/",
-        {
-            "vehicle_id": vehicle["id"],
-            "code": "WF-01",
-            "description": "Workflow fault",
-            "severity": "HIGH",
-        },
-        format="json",
+    """Create vehicle, fault, and repair order via distribution-unusable."""
+    order = create_repair_order_via_distribution(
+        client, plate=plate, vin=vin, code="WF-01", description="Workflow fault"
     )
-    assert fault.status_code == 201, fault.data
-    order = client.post(
-        "/api/v1/repair-orders/",
-        {"vehicle_id": vehicle["id"], "fault_id": fault.data["id"]},
-        format="json",
-    )
-    assert order.status_code == 201, order.data
-    return vehicle, order.data
+    return order["vehicle"], order
 
 
 def _workshop_assigned_order(client: APIClient, plate: str, vin: str) -> dict:
@@ -167,7 +155,7 @@ class TestVehicleStatusAPI:
 
         open_fault = authenticated_client.get(f"/api/v1/faults/{fault_id}/")
         assert open_fault.status_code == 200
-        assert open_fault.data["status"] == "OPEN"
+        assert open_fault.data["status"] == "AWAITING_TRANSPORT"
 
         approved_final = supervisor_client.post(
             f"/api/v1/repair-orders/{order_id}/transport-handover-approve/",
@@ -259,6 +247,13 @@ class TestInspectionHistoryAPI:
                 f"/api/v1/inspections/{created.data['id']}/submit/", {}, format="json"
             )
             assert submitted.status_code == 200, submitted.data
+            if result == "FAIL":
+                reported = authenticated_client.post(
+                    f"/api/v1/inspections/{created.data['id']}/report-fault/",
+                    {},
+                    format="json",
+                )
+                assert reported.status_code == 201, reported.data
 
         listed = authenticated_client.get(
             f"/api/v1/inspections/?vehicle_id={vehicle['id']}"
@@ -337,7 +332,7 @@ class TestRepairTimelineAPI:
         )
         assert timeline.status_code == 200, timeline.data
         events = {item["event"] for item in timeline.data}
-        assert "FAULT_CREATED" in events
+        assert "DISTRIBUTION_APPROVED" in events
         assert "TRANSPORT_APPROVED" in events
         assert "WORKSHOP_ASSIGNED" in events
         assert "REPAIR_STARTED" in events

@@ -65,7 +65,7 @@ list = extend_schema(
     parameters=[
         OpenApiParameter(
             name="status",
-            description="Filter vehicles by lifecycle status. Omit to return active vehicles.",
+            description="Filter vehicles by lifecycle status. Omit to return all non-deleted vehicles.",
             required=False,
             type=str,
             enum=[item.value for item in VehicleStatus],

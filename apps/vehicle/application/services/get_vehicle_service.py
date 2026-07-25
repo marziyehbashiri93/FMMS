@@ -134,9 +134,9 @@ class ListVehiclesService:
     ) -> list[VehicleResponseDTO]:
         """Return vehicles optionally filtered by lifecycle status.
 
-        When ``status`` is ``None`` all active vehicles are returned via
-        ``IVehicleRepository.list_active()``.  When a specific status is
-        provided, ``IVehicleRepository.list_by_status()`` is used instead.
+        When ``status`` is ``None`` all non-deleted vehicles are returned (via
+        ``list_filtered`` when available).  When a specific status is provided,
+        only vehicles in that status are returned.
 
         Args:
             status: Optional status filter.
@@ -154,7 +154,7 @@ class ListVehiclesService:
                 "service": "ListVehiclesService",
                 "operation": "execute",
                 "request_id": request_id,
-                "status_filter": status.value if status else "ACTIVE",
+                "status_filter": status.value if status else "ALL",
                 "ordering": ordering,
                 "search": search,
             },
@@ -170,7 +170,15 @@ class ListVehiclesService:
             vehicles = (
                 self._repo.list_by_status(status)
                 if status is not None
-                else self._repo.list_active()
+                else [
+                    *self._repo.list_active(),
+                    *[
+                        vehicle
+                        for status_value in VehicleStatus
+                        if status_value != VehicleStatus.ACTIVE
+                        for vehicle in self._repo.list_by_status(status_value)
+                    ],
+                ]
             )
             vehicles = _filter_vehicles_by_search(vehicles, search)
             vehicles = _sort_vehicles(vehicles, ordering)

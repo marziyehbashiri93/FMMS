@@ -191,10 +191,25 @@ class TestDriverInspectionWorkflowAPI:
             ).count()
             == 1
         )
-        assert RepairOrderModel.objects.filter(vehicle_id=vehicle["id"]).count() == 1
+        # Repair order is deferred until distribution marks the vehicle unusable.
+        assert RepairOrderModel.objects.filter(vehicle_id=vehicle["id"]).count() == 0
 
         orm = VehicleModel.objects.get(id=vehicle["id"])
         assert orm.status == VehicleStatus.ACTIVE.value
+
+        fault = FaultModel.objects.get(
+            vehicle_id=vehicle["id"], inspection_id=created.data["id"]
+        )
+        unusable = authenticated_client.post(
+            f"/api/v1/faults/{fault.id}/distribution-unusable/",
+            {"note": "needs repair"},
+            format="json",
+        )
+        assert unusable.status_code == 200, unusable.data
+        assert unusable.data["status"] == "AWAITING_TRANSPORT"
+        assert RepairOrderModel.objects.filter(vehicle_id=vehicle["id"]).count() == 1
+        order = RepairOrderModel.objects.get(vehicle_id=vehicle["id"])
+        assert order.status == "CREATED"
 
     def test_distribution_supervisor_can_deactivate_after_failed_inspection(
         self, authenticated_client: APIClient
@@ -295,7 +310,8 @@ class TestDriverInspectionWorkflowAPI:
         assert fault is not None
         assert fault.description == "Multiple inspection failures"
         assert FaultItemModel.objects.filter(fault_id=fault.id).count() == 2
-        assert RepairOrderModel.objects.filter(vehicle_id=vehicle["id"]).count() == 1
+        # Repair order is deferred until distribution marks the vehicle unusable.
+        assert RepairOrderModel.objects.filter(vehicle_id=vehicle["id"]).count() == 0
 
         retrieved = authenticated_client.get(f"/api/v1/faults/{fault.id}/")
         assert retrieved.status_code == 200
@@ -357,29 +373,18 @@ class TestDistributionUsableWorkflowAPI:
             f"/api/v1/repair-orders/?vehicle_id={vehicle['id']}"
         )
         assert orders.status_code == 200
-        assert orders.data["count"] == 1
-        order = orders.data["results"][0]
-        assert order["status"] == "CREATED"
+        assert orders.data["count"] == 0
 
         vehicle_detail = authenticated_client.get(f"/api/v1/vehicles/{vehicle['id']}/")
         assert vehicle_detail.data["status"] == VehicleStatus.ACTIVE.value
 
-        closed = authenticated_client.post(
-            f"/api/v1/faults/{fault['id']}/close/", {}, format="json"
+        usable = authenticated_client.post(
+            f"/api/v1/faults/{fault['id']}/distribution-usable/",
+            {"note": "usable"},
+            format="json",
         )
-        assert closed.status_code == 200, closed.data
-        assert closed.data["status"] == "CLOSED"
-
-        cancelled = authenticated_client.get(f"/api/v1/repair-orders/{order['id']}/")
-        assert cancelled.status_code == 200
-        assert cancelled.data["status"] == "CANCELLED"
-
-        timeline = authenticated_client.get(
-            f"/api/v1/repair-orders/{order['id']}/timeline/"
-        )
-        assert timeline.status_code == 200, timeline.data
-        events = {item["event"] for item in timeline.data}
-        assert "DISTRIBUTION_APPROVED_USABLE" in events
+        assert usable.status_code == 200, usable.data
+        assert usable.data["status"] == "CLOSED"
 
         vehicle_after = authenticated_client.get(f"/api/v1/vehicles/{vehicle['id']}/")
         assert vehicle_after.data["status"] == VehicleStatus.ACTIVE.value

@@ -50,15 +50,20 @@ class TestAPIErrorMapping:
             format="json",
         )
         assert fault.status_code == 201, fault.data
-        created = authenticated_client.post(
-            "/api/v1/repair-orders/",
-            {"vehicle_id": vehicle["id"], "fault_id": fault.data["id"]},
+        unusable = authenticated_client.post(
+            f"/api/v1/faults/{fault.data['id']}/distribution-unusable/",
+            {"note": "needs repair"},
             format="json",
         )
-        assert created.status_code == 201, created.data
+        assert unusable.status_code == 200, unusable.data
+        orders = authenticated_client.get(
+            f"/api/v1/repair-orders/?vehicle_id={vehicle['id']}"
+        )
+        assert orders.status_code == 200, orders.data
+        created = {"id": orders.data["results"][0]["id"]}
 
         response = authenticated_client.post(
-            f"/api/v1/repair-orders/{created.data['id']}/start/",
+            f"/api/v1/repair-orders/{created['id']}/start/",
             {},
             format="json",
         )
@@ -116,21 +121,26 @@ class TestAPIErrorMapping:
             format="json",
         )
         assert fault.status_code == 201, fault.data
-        created = authenticated_client.post(
-            "/api/v1/repair-orders/",
-            {"vehicle_id": vehicle["id"], "fault_id": fault.data["id"]},
+        unusable = authenticated_client.post(
+            f"/api/v1/faults/{fault.data['id']}/distribution-unusable/",
+            {"note": "needs repair"},
             format="json",
         )
-        assert created.status_code == 201, created.data
+        assert unusable.status_code == 200, unusable.data
+        orders = authenticated_client.get(
+            f"/api/v1/repair-orders/?vehicle_id={vehicle['id']}"
+        )
+        assert orders.status_code == 200, orders.data
+        order_id = orders.data["results"][0]["id"]
 
         with patch("interfaces.api.v1.deps.get_sync_repair_to_sap_service") as factory:
             service = factory.return_value
             service.execute.side_effect = FMMSIntegrationError(
                 message="SAP unavailable",
-                details={"repair_order_id": created.data["id"]},
+                details={"repair_order_id": order_id},
             )
             response = authenticated_client.post(
-                f"/api/v1/repair-orders/{created.data['id']}/sync-sap/",
+                f"/api/v1/repair-orders/{order_id}/sync-sap/",
                 {
                     "order_type": "PM01",
                     "description": "Corrective",
