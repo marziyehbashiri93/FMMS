@@ -10,6 +10,7 @@ import { InspectionPage } from '../features/inspections/InspectionPage';
 import { DistributionFaultsPage } from '../features/faults/DistributionFaultsPage';
 import { ManualFaultPage } from '../features/faults/ManualFaultPage';
 import { TransportRepairsPage } from '../features/repairs/TransportRepairsPage';
+import { CentralWorkshopPage } from '../features/workshop/CentralWorkshopPage';
 import { HandoverPage } from '../features/handover/HandoverPage';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { SapTransactionsPage } from '../features/sap/SapTransactionsPage';
@@ -47,6 +48,7 @@ const dedicatedPaths = new Set([
   '/faults',
   '/faults/new',
   '/repairs',
+  '/workshop',
   '/handover',
   '/sap',
   '/components',
@@ -67,6 +69,7 @@ export function App() {
         <Route path="/faults" element={<DistributionFaultsPage />} />
         <Route path="/faults/new" element={<ManualFaultPage />} />
         <Route path="/repairs" element={<TransportRepairsPage />} />
+        <Route path="/workshop" element={<CentralWorkshopPage />} />
         <Route path="/handover" element={<HandoverPage />} />
         <Route path="/sap" element={<SapTransactionsPage />} />
         <Route path="/components" element={<ComponentShowcasePage />} />

@@ -62,6 +62,7 @@ const SYNC_ITEM_LABELS: Record<string, string> = {
   vehicles: 'خودروها',
   inspection_templates: 'قالب بازرسی',
   fault_catalog: 'کاتالوگ خرابی',
+  central_stock: 'موجودی انبار مرکزی',
 };
 
 type StatusFilter = '' | SAPTransactionStatus;

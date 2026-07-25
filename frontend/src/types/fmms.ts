@@ -186,6 +186,7 @@ export interface Fault {
   status: string;
   inspection_id?: string | null;
   sap_notification_number?: string | null;
+  distribution_decision_note?: string | null;
   items?: Array<{
     id: string;
     component: string;
@@ -218,6 +219,9 @@ export interface RepairOrder {
   workshop_type?: string;
   workshop_id?: string;
   sap_order_number?: string;
+  transport_rejection_reason?: string | null;
+  transport_approval_note?: string | null;
+  workshop_decision_note?: string | null;
   updated_at?: string;
   completed_at?: string | null;
   parts?: RepairPart[];

@@ -1,0 +1,586 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  Alert,
+  Box,
+  Card,
+  CardContent,
+  MenuItem,
+  Stack,
+  Typography,
+  useMediaQuery,
+} from '@mui/material';
+import { useTheme } from '@mui/material/styles';
+import {
+  Build,
+  CheckCircleOutline,
+  DoNotDisturbAlt,
+  Inventory2,
+} from '@mui/icons-material';
+import { api } from '../../api/client';
+import { Button } from '../../components/Button';
+import { ClearFiltersButton } from '../../components/ClearFiltersButton';
+import { DetailLine } from '../../components/DetailLine';
+import { FilterPanel } from '../../components/FilterPanel';
+import { KpiCard } from '../../components/KpiCard';
+import { PageHeader } from '../../components/PageHeader';
+import { EmptyState, ErrorState } from '../../components/States';
+import { PlainStatusBadge, VehicleStatusBadge } from '../../components/StatusBadge';
+import { RtlDataTable, type RtlDataTableColumn } from '../../components/RtlDataTable';
+import { RtlSelectField } from '../../components/RtlSelectField';
+import { RtlTextField } from '../../components/RtlTextField';
+import { TabbedDetailModal } from '../../components/TabbedDetailModal';
+import type { Fault, RepairOrder, Vehicle } from '../../types/fmms';
+import { formatDateTime, toFaNumber } from '../../utils/format';
+
+const REPAIR_STATUS_LABELS: Record<string, string> = {
+  WORKSHOP_ASSIGNED: 'صف تعمیرگاه مرکزی',
+  WAITING_WORKSHOP_CONFIRMATION: 'در انتظار تصمیم فنی',
+  IN_PROGRESS: 'در حال تعمیر',
+  WAITING_PARTS: 'در انتظار قطعات',
+  NO_REPAIR_NEEDED: 'عدم نیاز به تعمیر',
+  WAITING_DRIVER_CONFIRMATION: 'منتظر تایید راننده',
+  COMPLETED: 'تکمیل شده',
+};
+
+type StatusFilter =
+  | ''
+  | 'WORKSHOP_ASSIGNED'
+  | 'IN_PROGRESS'
+  | 'WAITING_PARTS'
+  | 'NO_REPAIR_NEEDED';
+
+type DetailState = {
+  order: RepairOrder;
+  fault: Fault | null;
+  vehicle: Vehicle | null;
+  history: RepairOrder[];
+  timeline: Array<{ event_type: string; description: string; created_at: string }>;
+  materialRequests: Array<Record<string, unknown>>;
+};
+
+function normalizePaginated<T>(payload: { results?: T[] } | T[]): T[] {
+  if (Array.isArray(payload)) return payload;
+  return payload.results ?? [];
+}
+
+function statusLabel(status: string): string {
+  return REPAIR_STATUS_LABELS[status] ?? status;
+}
+
+function statusTone(status: string): 'success' | 'warning' | 'error' | 'neutral' {
+  if (status === 'IN_PROGRESS' || status === 'COMPLETED') return 'success';
+  if (status === 'WAITING_PARTS' || status === 'WORKSHOP_ASSIGNED') return 'warning';
+  if (status === 'NO_REPAIR_NEEDED') return 'neutral';
+  return 'neutral';
+}
+
+function vehiclePlate(vehicle: Vehicle | null | undefined, vehicleId: string): string {
+  if (!vehicle) return vehicleId.slice(0, 8);
+  return vehicle.license_plate || vehicle.vehicle_number || vehicleId.slice(0, 8);
+}
+
+/**
+ * Central workshop inbox for technical inspection and parts handling.
+ */
+export function CentralWorkshopPage() {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
+  const [items, setItems] = useState<RepairOrder[]>([]);
+  const [vehicles, setVehicles] = useState<Map<string, Vehicle>>(new Map());
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [status, setStatus] = useState<StatusFilter>('WORKSHOP_ASSIGNED');
+  const [selected, setSelected] = useState<RepairOrder | null>(null);
+  const [detail, setDetail] = useState<DetailState | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState('');
+  const [decisionNote, setDecisionNote] = useState('');
+  const [partNumber, setPartNumber] = useState('');
+  const [partQty, setPartQty] = useState('1');
+  const [actionLoading, setActionLoading] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const statuses: string[] = status
+        ? [status]
+        : ['WORKSHOP_ASSIGNED', 'IN_PROGRESS', 'WAITING_PARTS', 'NO_REPAIR_NEEDED'];
+      const pages = await Promise.all(
+        statuses.map((itemStatus) =>
+          api.listRepairOrders({
+            status: itemStatus,
+            workshopType: 'INTERNAL',
+            page: 1,
+            pageSize: 100,
+          }),
+        ),
+      );
+      const list = pages.flatMap((page) => normalizePaginated(page));
+      list.sort((a, b) => String(b.updated_at ?? '').localeCompare(String(a.updated_at ?? '')));
+      setItems(list);
+
+      const vehicleIds = [...new Set(list.map((item) => item.vehicle_id))];
+      const vehicleResults = await Promise.all(
+        vehicleIds.map(async (id) => {
+          try {
+            return await api.getVehicle(id);
+          } catch {
+            return null;
+          }
+        }),
+      );
+      const nextVehicles = new Map<string, Vehicle>();
+      vehicleResults.forEach((vehicle) => {
+        if (vehicle) nextVehicles.set(vehicle.id, vehicle);
+      });
+      setVehicles(nextVehicles);
+    } catch (err) {
+      setItems([]);
+      setError(err instanceof Error ? err.message : 'دریافت کارتابل تعمیرگاه انجام نشد');
+    } finally {
+      setLoading(false);
+    }
+  }, [status]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const openDetail = async (row: RepairOrder) => {
+    setSelected(row);
+    setDetail(null);
+    setDetailError('');
+    setActionError('');
+    setSuccess('');
+    setDecisionNote('');
+    setDetailLoading(true);
+    try {
+      const [order, fault, vehicle, history, timeline, materials] = await Promise.all([
+        api.getRepairOrder(row.id),
+        api.getFault(row.fault_id).catch(() => null),
+        api.getVehicle(row.vehicle_id).catch(() => null),
+        api
+          .listRepairOrders({ vehicleId: row.vehicle_id, page: 1, pageSize: 20 })
+          .then(normalizePaginated)
+          .catch(() => [] as RepairOrder[]),
+        api.getRepairOrderTimeline(row.id).catch(() => []),
+        api.listMaterialRequests().catch(() => []),
+      ]);
+      setDetail({
+        order,
+        fault,
+        vehicle,
+        history: history.filter((item) => item.id !== order.id),
+        timeline,
+        materialRequests: materials.filter(
+          (item) => String(item.repair_order_id) === order.id,
+        ),
+      });
+    } catch (err) {
+      setDetailError(err instanceof Error ? err.message : 'دریافت جزئیات انجام نشد');
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const decide = async (repairable: boolean) => {
+    if (!selected) return;
+    setActionLoading(repairable ? 'repairable' : 'no-repair');
+    setActionError('');
+    try {
+      const result = await api.workshopTechnicalDecision(selected.id, {
+        repairable,
+        note: decisionNote,
+      });
+      setSuccess(result.message);
+      await load();
+      await openDetail({ ...selected, status: result.status });
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'ثبت تصمیم انجام نشد');
+    } finally {
+      setActionLoading('');
+    }
+  };
+
+  const requestParts = async () => {
+    if (!selected || !partNumber.trim()) return;
+    setActionLoading('parts');
+    setActionError('');
+    try {
+      await api.createRepairMaterialRequest(selected.id, [
+        {
+          material_number: partNumber.trim(),
+          quantity: Number(partQty) || 1,
+          unit_of_measure: 'EA',
+        },
+      ]);
+      setSuccess('درخواست قطعه ثبت شد و سفارش در انتظار قطعات قرار گرفت.');
+      setPartNumber('');
+      await load();
+      await openDetail(selected);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'ثبت درخواست قطعه انجام نشد');
+    } finally {
+      setActionLoading('');
+    }
+  };
+
+  const receiveParts = async (materialRequestId: string) => {
+    if (!selected) return;
+    setActionLoading(`receive-${materialRequestId}`);
+    setActionError('');
+    try {
+      await api.receiveMaterialRequest(materialRequestId);
+      setSuccess('دریافت قطعات ثبت شد؛ تعمیر ادامه می‌یابد.');
+      await load();
+      await openDetail(selected);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'ثبت دریافت قطعات انجام نشد');
+    } finally {
+      setActionLoading('');
+    }
+  };
+
+  const queueCount = items.filter((item) => item.status === 'WORKSHOP_ASSIGNED').length;
+  const inProgressCount = items.filter((item) => item.status === 'IN_PROGRESS').length;
+  const waitingPartsCount = items.filter((item) => item.status === 'WAITING_PARTS').length;
+
+  const columns: Array<RtlDataTableColumn<RepairOrder, string>> = useMemo(
+    () => [
+      {
+        key: 'plate',
+        label: 'پلاک',
+        render: (row) => (
+          <Typography fontWeight={800}>
+            {vehiclePlate(vehicles.get(row.vehicle_id), row.vehicle_id)}
+          </Typography>
+        ),
+      },
+      {
+        key: 'status',
+        label: 'وضعیت',
+        render: (row) => (
+          <PlainStatusBadge label={statusLabel(row.status)} tone={statusTone(row.status)} />
+        ),
+      },
+      {
+        key: 'sap',
+        label: 'PM Order',
+        render: (row) => row.sap_order_number || '—',
+      },
+      {
+        key: 'updated',
+        label: 'به‌روزرسانی',
+        render: (row) => formatDateTime(row.updated_at),
+      },
+      {
+        key: 'actions',
+        label: 'عملیات',
+        align: 'center',
+        render: (row) => (
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => void openDetail(row)}
+            sx={{ height: 36, minHeight: 36, px: 1.5 }}
+          >
+            بررسی
+          </Button>
+        ),
+      },
+    ],
+    [vehicles],
+  );
+
+  const canDecide =
+    detail?.order.status === 'WORKSHOP_ASSIGNED' ||
+    detail?.order.status === 'WAITING_WORKSHOP_CONFIRMATION';
+  const canRequestParts = detail?.order.status === 'IN_PROGRESS';
+  const canReceiveParts = detail?.order.status === 'WAITING_PARTS';
+
+  const tabs = detail
+    ? [
+        {
+          label: 'تصمیم فنی',
+          content: (
+            <Stack spacing={2}>
+              <Card variant="outlined">
+                <CardContent>
+                  <DetailLine
+                    label="پلاک"
+                    value={vehiclePlate(detail.vehicle, detail.order.vehicle_id)}
+                  />
+                  <DetailLine
+                    label="وضعیت خودرو"
+                    value={
+                      detail.vehicle ? (
+                        <VehicleStatusBadge status={detail.vehicle.status} />
+                      ) : (
+                        '—'
+                      )
+                    }
+                  />
+                  <DetailLine label="علت خرابی" value={detail.fault?.description || '—'} />
+                  <DetailLine
+                    label="شرح راننده"
+                    value={detail.fault?.description || '—'}
+                  />
+                  <DetailLine
+                    label="یادداشت توزیع"
+                    value={detail.fault?.distribution_decision_note || '—'}
+                  />
+                  <DetailLine
+                    label="یادداشت ترابری"
+                    value={detail.order.transport_approval_note || '—'}
+                  />
+                  <DetailLine
+                    label="یادداشت تعمیرگاه"
+                    value={detail.order.workshop_decision_note || '—'}
+                  />
+                  <DetailLine
+                    label="PM Order"
+                    value={detail.order.sap_order_number || 'هنوز ایجاد نشده'}
+                  />
+                  <DetailLine
+                    label="وضعیت سفارش"
+                    value={statusLabel(detail.order.status)}
+                  />
+                </CardContent>
+              </Card>
+
+              {success && <Alert severity="success">{success}</Alert>}
+              {actionError && <Alert severity="error">{actionError}</Alert>}
+
+              {canDecide && (
+                <>
+                  <RtlTextField
+                    fullWidth
+                    label="یادداشت تصمیم فنی"
+                    value={decisionNote}
+                    onChange={(event) => setDecisionNote(event.target.value)}
+                  />
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} useFlexGap>
+                    <Button
+                      color="success"
+                      variant="contained"
+                      startIcon={<CheckCircleOutline />}
+                      loading={actionLoading === 'repairable'}
+                      onClick={() => void decide(true)}
+                    >
+                      نیاز به تعمیر دارد
+                    </Button>
+                    <Button
+                      color="inherit"
+                      variant="outlined"
+                      startIcon={<DoNotDisturbAlt />}
+                      loading={actionLoading === 'no-repair'}
+                      onClick={() => void decide(false)}
+                    >
+                      عدم نیاز به تعمیر
+                    </Button>
+                  </Stack>
+                </>
+              )}
+
+              {canRequestParts && (
+                <Card variant="outlined">
+                  <CardContent>
+                    <Typography fontWeight={700} mb={1.5}>
+                      درخواست قطعه
+                    </Typography>
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} useFlexGap>
+                      <RtlTextField
+                        label="شماره قطعه"
+                        value={partNumber}
+                        onChange={(event) => setPartNumber(event.target.value)}
+                        size="small"
+                      />
+                      <RtlTextField
+                        label="تعداد"
+                        value={partQty}
+                        onChange={(event) => setPartQty(event.target.value)}
+                        size="small"
+                      />
+                      <Button
+                        variant="contained"
+                        startIcon={<Inventory2 />}
+                        loading={actionLoading === 'parts'}
+                        onClick={() => void requestParts()}
+                      >
+                        ثبت درخواست
+                      </Button>
+                    </Stack>
+                  </CardContent>
+                </Card>
+              )}
+
+              {canReceiveParts && (
+                <Stack spacing={1}>
+                  {detail.materialRequests.length === 0 ? (
+                    <Alert severity="info">درخواست قطعه‌ای برای دریافت ثبت نشده است.</Alert>
+                  ) : (
+                    detail.materialRequests.map((item) => (
+                      <Card key={String(item.id)} variant="outlined">
+                        <CardContent
+                          sx={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            gap: 1,
+                          }}
+                        >
+                          <Box>
+                            <Typography fontWeight={700}>
+                              درخواست {String(item.id).slice(0, 8)}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              وضعیت: {String(item.status)}
+                            </Typography>
+                          </Box>
+                          <Button
+                            size="small"
+                            variant="contained"
+                            loading={actionLoading === `receive-${String(item.id)}`}
+                            disabled={
+                              item.status !== 'STOCK_ISSUED' &&
+                              item.status !== 'PURCHASE_REQUIRED'
+                            }
+                            onClick={() => void receiveParts(String(item.id))}
+                          >
+                            ثبت دریافت
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
+                </Stack>
+              )}
+            </Stack>
+          ),
+        },
+        {
+          label: 'سوابق تعمیرات',
+          content:
+            detail.history.length === 0 ? (
+              <EmptyState title="سابقه تعمیر دیگری نیست" />
+            ) : (
+              <Stack spacing={1}>
+                {detail.history.map((item) => (
+                  <Card key={item.id} variant="outlined">
+                    <CardContent>
+                      <DetailLine label="وضعیت" value={statusLabel(item.status)} />
+                      <DetailLine
+                        label="PM Order"
+                        value={item.sap_order_number || '—'}
+                      />
+                      <DetailLine label="زمان" value={formatDateTime(item.updated_at)} />
+                    </CardContent>
+                  </Card>
+                ))}
+              </Stack>
+            ),
+        },
+        {
+          label: 'تاریخچه',
+          content:
+            detail.timeline.length === 0 ? (
+              <EmptyState title="رویدادی ثبت نشده" />
+            ) : (
+              <Stack spacing={1}>
+                {detail.timeline.map((event, index) => (
+                  <Card key={`${event.event_type}-${index}`} variant="outlined">
+                    <CardContent>
+                      <Typography fontWeight={700}>{event.description}</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {event.event_type} · {formatDateTime(event.created_at)}
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                ))}
+              </Stack>
+            ),
+        },
+      ]
+    : [];
+
+  return (
+    <Stack spacing={{ xs: 1.5, md: 2.25 }} style={{ direction: 'rtl', textAlign: 'right' }}>
+      <PageHeader
+        title="کارتابل تعمیرگاه مرکزی"
+        breadcrumbs={[{ label: 'تعمیرات' }, { label: 'تعمیرگاه مرکزی' }]}
+      />
+
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: {
+            xs: 'repeat(2, minmax(0, 1fr))',
+            md: 'repeat(3, minmax(0, 1fr))',
+          },
+          gap: 1.5,
+        }}
+      >
+        <KpiCard label="صف تصمیم فنی" value={toFaNumber(queueCount)} icon={Build} tone="warning" />
+        <KpiCard label="در حال تعمیر" value={toFaNumber(inProgressCount)} icon={Build} tone="success" />
+        <KpiCard
+          label="در انتظار قطعات"
+          value={toFaNumber(waitingPartsCount)}
+          icon={Inventory2}
+          tone="error"
+        />
+      </Box>
+
+      <FilterPanel>
+        <RtlSelectField
+          label="وضعیت"
+          value={status}
+          onChange={(event) => setStatus(event.target.value as StatusFilter)}
+          size="small"
+        >
+          <MenuItem value="WORKSHOP_ASSIGNED">صف تصمیم فنی</MenuItem>
+          <MenuItem value="IN_PROGRESS">در حال تعمیر</MenuItem>
+          <MenuItem value="WAITING_PARTS">در انتظار قطعات</MenuItem>
+          <MenuItem value="NO_REPAIR_NEEDED">عدم نیاز به تعمیر</MenuItem>
+          <MenuItem value="">همه</MenuItem>
+        </RtlSelectField>
+        <ClearFiltersButton onClick={() => setStatus('WORKSHOP_ASSIGNED')} disabled={status === 'WORKSHOP_ASSIGNED'} />
+      </FilterPanel>
+
+      {error && <ErrorState message={error} onRetry={() => void load()} />}
+      {!loading && !error && (
+        <RtlDataTable
+          rows={items}
+          columns={columns}
+          getRowKey={(row) => row.id}
+          emptyMessage="موردی در کارتابل تعمیرگاه نیست"
+          emptySubtitle="پس از ارجاع ترابری به تعمیرگاه مرکزی، اینجا نمایش داده می‌شود."
+          loading={loading}
+        />
+      )}
+      {loading && !error && (
+        <RtlDataTable rows={[]} columns={columns} loading emptyMessage="در حال بارگذاری" />
+      )}
+
+      <TabbedDetailModal
+        open={Boolean(selected)}
+        onClose={() => {
+          setSelected(null);
+          setDetail(null);
+        }}
+        title="جزئیات درخواست تعمیرگاه مرکزی"
+        icon={Build}
+        tabs={tabs}
+        loading={detailLoading}
+        error={detailError}
+        onRetry={selected ? () => void openDetail(selected) : undefined}
+        maxWidth="lg"
+      />
+
+      {isMobile && null}
+    </Stack>
+  );
+}

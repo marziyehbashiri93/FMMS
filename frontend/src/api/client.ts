@@ -355,12 +355,14 @@ export const api = {
   listRepairOrders(options?: {
     vehicleId?: string;
     status?: string;
+    workshopType?: string;
     page?: number;
     pageSize?: number;
   }) {
     const params = new URLSearchParams();
     if (options?.vehicleId) params.set('vehicle_id', options.vehicleId);
     if (options?.status) params.set('status', options.status);
+    if (options?.workshopType) params.set('workshop_type', options.workshopType);
     if (options?.page) params.set('page', String(options.page));
     if (options?.pageSize) params.set('page_size', String(options.pageSize));
     const query = params.toString() ? `?${params.toString()}` : '';
@@ -371,10 +373,10 @@ export const api = {
     return request<RepairOrder>(`/repair-orders/${id}/`);
   },
 
-  approveRepairOrder(id: string) {
+  approveRepairOrder(id: string, note?: string) {
     return request<{ id: string; status: string; message: string }>(
       `/repair-orders/${id}/approve/`,
-      { method: 'POST', body: JSON.stringify({}) },
+      { method: 'POST', body: JSON.stringify({ note: note ?? '' }) },
     );
   },
 
@@ -398,6 +400,46 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     });
+  },
+
+  workshopTechnicalDecision(
+    id: string,
+    payload: { repairable: boolean; note?: string },
+  ) {
+    return request<{ id: string; status: string; message: string }>(
+      `/repair-orders/${id}/technical-decision/`,
+      { method: 'POST', body: JSON.stringify(payload) },
+    );
+  },
+
+  createRepairMaterialRequest(
+    id: string,
+    items: Array<{ material_number: string; quantity: number; unit_of_measure: string }>,
+  ) {
+    return request(`/repair-orders/${id}/material-requests/`, {
+      method: 'POST',
+      body: JSON.stringify({ items }),
+    });
+  },
+
+  receiveMaterialRequest(id: string) {
+    return request(`/material-requests/${id}/receive/`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  },
+
+  listMaterialRequests(options?: { status?: string }) {
+    const params = new URLSearchParams();
+    if (options?.status) params.set('status', options.status);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return request<Array<Record<string, unknown>>>(`/material-requests/${query}`);
+  },
+
+  getRepairOrderTimeline(id: string) {
+    return request<Array<{ event_type: string; description: string; created_at: string }>>(
+      `/repair-orders/${id}/timeline/`,
+    );
   },
 
   listVehicleHandovers() {

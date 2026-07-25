@@ -21,6 +21,7 @@ import { formatDateTime, toFaNumber } from '../../utils/format';
 type QueueCounts = {
   openFaults: number;
   transportQueue: number;
+  workshopQueue: number;
 };
 
 type QuickLink = {
@@ -38,7 +39,11 @@ export function DashboardPage() {
   const [vehicleSummary, setVehicleSummary] = useState<VehicleSummary | null>(null);
   const [driverSummary, setDriverSummary] = useState<DriverSummary | null>(null);
   const [sapSummary, setSapSummary] = useState<SAPTransactionSummary | null>(null);
-  const [queues, setQueues] = useState<QueueCounts>({ openFaults: 0, transportQueue: 0 });
+  const [queues, setQueues] = useState<QueueCounts>({
+    openFaults: 0,
+    transportQueue: 0,
+    workshopQueue: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -46,13 +51,26 @@ export function DashboardPage() {
     setLoading(true);
     setError('');
     try {
-      const [vehicles, drivers, openFaults, transportCreated, transportApproved, sap] =
-        await Promise.all([
+      const [
+        vehicles,
+        drivers,
+        openFaults,
+        transportCreated,
+        transportApproved,
+        workshopQueue,
+        sap,
+      ] = await Promise.all([
           api.getVehicleSummary(),
           api.getDriverSummary(),
           api.listFaults(undefined, { status: 'OPEN', page: 1, pageSize: 1 }),
           api.listRepairOrders({ status: 'CREATED', page: 1, pageSize: 1 }),
           api.listRepairOrders({ status: 'APPROVED', page: 1, pageSize: 1 }),
+          api.listRepairOrders({
+            status: 'WORKSHOP_ASSIGNED',
+            workshopType: 'INTERNAL',
+            page: 1,
+            pageSize: 1,
+          }),
           api.getSapTransactionSummary().catch(() => null),
         ]);
       setVehicleSummary(vehicles);
@@ -61,6 +79,7 @@ export function DashboardPage() {
       setQueues({
         openFaults: openFaults.count ?? 0,
         transportQueue: (transportCreated.count ?? 0) + (transportApproved.count ?? 0),
+        workshopQueue: workshopQueue.count ?? 0,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'دریافت خلاصه داشبورد انجام نشد');
@@ -87,6 +106,13 @@ export function DashboardPage() {
       to: '/repairs',
       icon: Build,
       tone: 'error',
+    },
+    {
+      title: 'تعمیرگاه مرکزی',
+      subtitle: `${toFaNumber(queues.workshopQueue)} مورد در صف تصمیم فنی`,
+      to: '/workshop',
+      icon: Build,
+      tone: 'warning',
     },
     {
       title: 'لیست خودروها',
