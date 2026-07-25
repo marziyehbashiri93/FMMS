@@ -79,12 +79,15 @@ class CompleteRepairOrderDTO:
         completed_at: UTC timestamp when the repair was physically completed.
         request_id: Correlation ID for tracing.
         completed_by: UUID of the user marking the order complete.
+        no_parts_consumed: When True, allows completion without consumed-part rows
+            even if parts were requested and received.
     """
 
     repair_order_id: uuid.UUID
     completed_at: datetime
     request_id: str
     completed_by: uuid.UUID
+    no_parts_consumed: bool = False
 
 
 @dataclass(frozen=True)
@@ -139,6 +142,9 @@ class SyncRepairToSAPDTO:
     work_center: str | None = field(default=None)
 
 
+DEFAULT_REPAIR_PART_UOM = "-"
+
+
 @dataclass(frozen=True)
 class AddRepairPartDTO:
     """Input DTO for recording a spare part consumed during a repair.
@@ -146,16 +152,16 @@ class AddRepairPartDTO:
     Attributes:
         repair_order_id: UUID of the target repair order (must be mutable).
         material_number: SAP material number for the part.
-        quantity: Positive integer number of units consumed.
-        unit_of_measure: Unit of measure (e.g. "EA", "KG").
+        quantity: Positive integer quantity consumed for this part.
         request_id: Correlation ID for tracing.
+        unit_of_measure: Internal persistence default; not collected from clients.
     """
 
     repair_order_id: uuid.UUID
     material_number: str
     quantity: int
-    unit_of_measure: str
     request_id: str
+    unit_of_measure: str = DEFAULT_REPAIR_PART_UOM
 
 
 @dataclass(frozen=True)

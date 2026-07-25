@@ -34,6 +34,23 @@ VEHICLE_ORDERING_CHOICES = [
 ]
 
 
+class VehicleComponentHistoryResponseSerializer(serializers.Serializer):
+    """Serialize installed vehicle component history rows."""
+
+    id = serializers.UUIDField()
+    vehicle_id = serializers.UUIDField()
+    repair_order_id = serializers.UUIDField()
+    component_type = serializers.CharField()
+    material_number = serializers.CharField()
+    quantity = serializers.DecimalField(max_digits=12, decimal_places=3)
+    unit_of_measure = serializers.CharField()
+    description = serializers.CharField()
+    installed_at = serializers.DateTimeField()
+    recorded_by_id = serializers.UUIDField()
+    created_at = serializers.DateTimeField()
+    updated_at = serializers.DateTimeField()
+
+
 class VehicleAssignedDriverSerializer(serializers.Serializer):
     """Serialize assigned driver details in vehicle responses."""
 

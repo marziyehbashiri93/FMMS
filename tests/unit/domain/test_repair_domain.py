@@ -138,6 +138,15 @@ class TestRepairOrderLifecycle:
         with pytest.raises(RepairOrderInvalidStateTransitionError):
             order.assign_workshop(WorkshopType.EXTERNAL)
 
+    def test_cannot_reassign_workshop_after_assignment(self) -> None:
+        from apps.repair.domain.entities import WorkshopType
+
+        order = _make_order()
+        order.approve()
+        order.assign_workshop(WorkshopType.INTERNAL)
+        with pytest.raises(RepairOrderInvalidStateTransitionError):
+            order.assign_workshop(WorkshopType.EXTERNAL, workshop_id="EXT-001")
+
     def test_assign_technician_after_workshop_assigned(self) -> None:
         from apps.repair.domain.entities import WorkshopType
 

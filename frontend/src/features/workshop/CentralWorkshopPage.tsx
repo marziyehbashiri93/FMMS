@@ -4,6 +4,7 @@ import {
   Box,
   Card,
   CardContent,
+  Chip,
   MenuItem,
   Stack,
   Typography,
@@ -22,6 +23,11 @@ import { ClearFiltersButton } from '../../components/ClearFiltersButton';
 import { DetailLine } from '../../components/DetailLine';
 import { FilterPanel } from '../../components/FilterPanel';
 import { KpiCard } from '../../components/KpiCard';
+import {
+  EMPTY_MATERIAL_PICK,
+  MaterialStockPicker,
+  type MaterialPickValue,
+} from '../../components/MaterialStockPicker';
 import { PageHeader } from '../../components/PageHeader';
 import { EmptyState, ErrorState } from '../../components/States';
 import { PlainStatusBadge, VehicleStatusBadge } from '../../components/StatusBadge';
@@ -31,6 +37,34 @@ import { RtlTextField } from '../../components/RtlTextField';
 import { TabbedDetailModal } from '../../components/TabbedDetailModal';
 import type { Fault, RepairOrder, Vehicle } from '../../types/fmms';
 import { formatDateTime, toFaNumber } from '../../utils/format';
+
+type PartLineDraft = {
+  key: string;
+  materialNumber: string;
+  quantity: number;
+  fromCatalog: boolean;
+  materialName: string;
+  availableQuantity: string;
+};
+
+function draftFromPick(part: MaterialPickValue, quantity: number): PartLineDraft {
+  return {
+    key: `${part.materialNumber}-${Date.now()}`,
+    materialNumber: part.materialNumber.trim(),
+    quantity,
+    fromCatalog: part.fromCatalog,
+    materialName: part.materialName,
+    availableQuantity: part.availableQuantity || '0',
+  };
+}
+
+function lineChipLabel(line: PartLineDraft): string {
+  const name = line.materialName ? ` · ${line.materialName}` : '';
+  const stock = line.fromCatalog
+    ? ` · موجودی ${toFaNumber(line.availableQuantity || '0')}`
+    : ' · خارج از انبار';
+  return `${line.materialNumber}${name}${stock} · تعداد ${toFaNumber(line.quantity)}`;
+}
 
 const REPAIR_STATUS_LABELS: Record<string, string> = {
   WORKSHOP_ASSIGNED: 'صف تعمیرگاه مرکزی',
@@ -96,8 +130,12 @@ export function CentralWorkshopPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState('');
   const [decisionNote, setDecisionNote] = useState('');
-  const [partNumber, setPartNumber] = useState('');
-  const [partQty, setPartQty] = useState('1');
+  const [requestPart, setRequestPart] = useState<MaterialPickValue>(EMPTY_MATERIAL_PICK);
+  const [requestQty, setRequestQty] = useState('1');
+  const [requestLines, setRequestLines] = useState<PartLineDraft[]>([]);
+  const [consumedPart, setConsumedPart] = useState<MaterialPickValue>(EMPTY_MATERIAL_PICK);
+  const [consumedQty, setConsumedQty] = useState('1');
+  const [consumedLines, setConsumedLines] = useState<PartLineDraft[]>([]);
   const [actionLoading, setActionLoading] = useState('');
   const [actionError, setActionError] = useState('');
   const [success, setSuccess] = useState('');
@@ -206,20 +244,38 @@ export function CentralWorkshopPage() {
     }
   };
 
+  const addRequestLine = () => {
+    if (!requestPart.materialNumber.trim()) return;
+    const quantity = Math.max(1, Number(requestQty) || 1);
+    setRequestLines((prev) => [...prev, draftFromPick(requestPart, quantity)]);
+    setRequestPart(EMPTY_MATERIAL_PICK);
+    setRequestQty('1');
+  };
+
   const requestParts = async () => {
-    if (!selected || !partNumber.trim()) return;
+    if (!selected) return;
+    const draft =
+      requestLines.length > 0
+        ? requestLines
+        : requestPart.materialNumber.trim()
+          ? [draftFromPick(requestPart, Math.max(1, Number(requestQty) || 1))]
+          : [];
+    if (draft.length === 0) return;
     setActionLoading('parts');
     setActionError('');
     try {
-      await api.createRepairMaterialRequest(selected.id, [
-        {
-          material_number: partNumber.trim(),
-          quantity: Number(partQty) || 1,
-          unit_of_measure: 'EA',
-        },
-      ]);
+      await api.createRepairMaterialRequest(
+        selected.id,
+        draft.map((line) => ({
+          material_number: line.materialNumber,
+          quantity: line.quantity,
+          from_catalog: line.fromCatalog,
+        })),
+      );
       setSuccess('درخواست قطعه ثبت شد و سفارش در انتظار قطعات قرار گرفت.');
-      setPartNumber('');
+      setRequestPart(EMPTY_MATERIAL_PICK);
+      setRequestQty('1');
+      setRequestLines([]);
       await load();
       await openDetail(selected);
     } catch (err) {
@@ -240,6 +296,63 @@ export function CentralWorkshopPage() {
       await openDetail(selected);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'ثبت دریافت قطعات انجام نشد');
+    } finally {
+      setActionLoading('');
+    }
+  };
+
+  const addConsumedLine = () => {
+    if (!consumedPart.materialNumber.trim()) return;
+    const quantity = Math.max(1, Number(consumedQty) || 1);
+    setConsumedLines((prev) => [...prev, draftFromPick(consumedPart, quantity)]);
+    setConsumedPart(EMPTY_MATERIAL_PICK);
+    setConsumedQty('1');
+  };
+
+  const recordConsumedPart = async () => {
+    if (!selected) return;
+    const draft =
+      consumedLines.length > 0
+        ? consumedLines
+        : consumedPart.materialNumber.trim()
+          ? [draftFromPick(consumedPart, Math.max(1, Number(consumedQty) || 1))]
+          : [];
+    if (draft.length === 0) return;
+    setActionLoading('consumed');
+    setActionError('');
+    try {
+      for (const line of draft) {
+        await api.addRepairPart(selected.id, {
+          material_number: line.materialNumber,
+          quantity: line.quantity,
+        });
+      }
+      setSuccess('قطعه مصرفی ثبت شد (جدا از درخواست قطعه).');
+      setConsumedPart(EMPTY_MATERIAL_PICK);
+      setConsumedQty('1');
+      setConsumedLines([]);
+      await openDetail(selected);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'ثبت قطعه مصرفی انجام نشد');
+    } finally {
+      setActionLoading('');
+    }
+  };
+
+  const completeRepair = async (noPartsConsumed = false) => {
+    if (!selected) return;
+    setActionLoading(noPartsConsumed ? 'complete-empty' : 'complete');
+    setActionError('');
+    try {
+      await api.completeRepairOrder(selected.id, {
+        completed_at: new Date().toISOString(),
+        no_parts_consumed: noPartsConsumed,
+      });
+      setSuccess('تعمیر تکمیل شد و برای تایید راننده ارسال شد.');
+      setSelected(null);
+      await load();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'تکمیل تعمیر انجام نشد');
     } finally {
       setActionLoading('');
     }
@@ -301,6 +414,8 @@ export function CentralWorkshopPage() {
     detail?.order.status === 'WAITING_WORKSHOP_CONFIRMATION';
   const canRequestParts = detail?.order.status === 'IN_PROGRESS';
   const canReceiveParts = detail?.order.status === 'WAITING_PARTS';
+  const canCompleteRepair = detail?.order.status === 'IN_PROGRESS';
+  const canRecordConsumed = detail?.order.status === 'IN_PROGRESS';
 
   const tabs = detail
     ? [
@@ -392,27 +507,77 @@ export function CentralWorkshopPage() {
                     <Typography fontWeight={700} mb={1.5}>
                       درخواست قطعه
                     </Typography>
-                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} useFlexGap>
-                      <RtlTextField
-                        label="شماره قطعه"
-                        value={partNumber}
-                        onChange={(event) => setPartNumber(event.target.value)}
-                        size="small"
-                      />
-                      <RtlTextField
-                        label="تعداد"
-                        value={partQty}
-                        onChange={(event) => setPartQty(event.target.value)}
-                        size="small"
-                      />
-                      <Button
-                        variant="contained"
-                        startIcon={<Inventory2 />}
-                        loading={actionLoading === 'parts'}
-                        onClick={() => void requestParts()}
+                    <Typography variant="body2" color="text.secondary" mb={1.5}>
+                      برای هر قطعه تعداد جداگانه وارد کنید؛ سپس به لیست اضافه کرده و درخواست را ثبت کنید.
+                    </Typography>
+                    <Stack spacing={1.5}>
+                      <Stack
+                        direction={{ xs: 'column', sm: 'row' }}
+                        spacing={1}
+                        useFlexGap
+                        alignItems="flex-start"
                       >
-                        ثبت درخواست
-                      </Button>
+                        <MaterialStockPicker
+                          label="قطعه درخواستی"
+                          value={requestPart}
+                          onChange={setRequestPart}
+                        />
+                        <RtlTextField
+                          label="تعداد"
+                          value={requestQty}
+                          onChange={(event) => setRequestQty(event.target.value)}
+                          size="small"
+                          type="number"
+                          inputProps={{ min: 1 }}
+                          sx={{ width: { xs: '100%', sm: 110 } }}
+                        />
+                        <Button
+                          variant="outlined"
+                          disabled={!requestPart.materialNumber.trim()}
+                          onClick={addRequestLine}
+                          sx={{ mt: { sm: 0.5 } }}
+                        >
+                          افزودن به لیست
+                        </Button>
+                      </Stack>
+                      {requestLines.length > 0 ? (
+                        <Stack direction="row" flexWrap="wrap" gap={1}>
+                          {requestLines.map((line) => (
+                            <Chip
+                              key={line.key}
+                              color={line.fromCatalog ? 'default' : 'warning'}
+                              variant="outlined"
+                              label={lineChipLabel(line)}
+                              onDelete={() =>
+                                setRequestLines((prev) =>
+                                  prev.filter((item) => item.key !== line.key),
+                                )
+                              }
+                            />
+                          ))}
+                        </Stack>
+                      ) : null}
+                      <Stack
+                        direction="row"
+                        justifyContent="flex-end"
+                        sx={{
+                          pt: 1,
+                          borderTop: '1px solid',
+                          borderColor: 'divider',
+                        }}
+                      >
+                        <Button
+                          variant="contained"
+                          startIcon={<Inventory2 />}
+                          loading={actionLoading === 'parts'}
+                          disabled={
+                            requestLines.length === 0 && !requestPart.materialNumber.trim()
+                          }
+                          onClick={() => void requestParts()}
+                        >
+                          ثبت درخواست
+                        </Button>
+                      </Stack>
                     </Stack>
                   </CardContent>
                 </Card>
@@ -445,18 +610,118 @@ export function CentralWorkshopPage() {
                             size="small"
                             variant="contained"
                             loading={actionLoading === `receive-${String(item.id)}`}
-                            disabled={
-                              item.status !== 'STOCK_ISSUED' &&
-                              item.status !== 'PURCHASE_REQUIRED'
-                            }
+                            disabled={item.status !== 'STOCK_ISSUED'}
                             onClick={() => void receiveParts(String(item.id))}
                           >
-                            ثبت دریافت
+                            ثبت دریافت فیزیکی
                           </Button>
                         </CardContent>
                       </Card>
                     ))
                   )}
+                </Stack>
+              )}
+
+              {canRecordConsumed && (
+                <Card variant="outlined">
+                  <CardContent>
+                    <Typography fontWeight={700} mb={1.5}>
+                      قطعات مصرفی (واقعی)
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" mb={1.5}>
+                      برای هر قطعه مصرفی تعداد جداگانه ثبت کنید (متفاوت از درخواست قطعه).
+                    </Typography>
+                    <Stack spacing={1.5}>
+                      <Stack
+                        direction={{ xs: 'column', sm: 'row' }}
+                        spacing={1}
+                        useFlexGap
+                        alignItems="flex-start"
+                      >
+                        <MaterialStockPicker
+                          label="قطعه مصرفی"
+                          value={consumedPart}
+                          onChange={setConsumedPart}
+                        />
+                        <RtlTextField
+                          label="تعداد"
+                          value={consumedQty}
+                          onChange={(event) => setConsumedQty(event.target.value)}
+                          size="small"
+                          type="number"
+                          inputProps={{ min: 1 }}
+                          sx={{ width: { xs: '100%', sm: 110 } }}
+                        />
+                        <Button
+                          variant="outlined"
+                          disabled={!consumedPart.materialNumber.trim()}
+                          onClick={addConsumedLine}
+                          sx={{ mt: { sm: 0.5 } }}
+                        >
+                          افزودن به لیست
+                        </Button>
+                      </Stack>
+                      {consumedLines.length > 0 ? (
+                        <Stack direction="row" flexWrap="wrap" gap={1}>
+                          {consumedLines.map((line) => (
+                            <Chip
+                              key={line.key}
+                              color={line.fromCatalog ? 'success' : 'warning'}
+                              variant="outlined"
+                              label={lineChipLabel(line)}
+                              onDelete={() =>
+                                setConsumedLines((prev) =>
+                                  prev.filter((item) => item.key !== line.key),
+                                )
+                              }
+                            />
+                          ))}
+                        </Stack>
+                      ) : null}
+                      <Stack
+                        direction="row"
+                        justifyContent="flex-end"
+                        sx={{
+                          pt: 1,
+                          borderTop: '1px solid',
+                          borderColor: 'divider',
+                        }}
+                      >
+                        <Button
+                          variant="contained"
+                          color="success"
+                          loading={actionLoading === 'consumed'}
+                          disabled={
+                            consumedLines.length === 0 && !consumedPart.materialNumber.trim()
+                          }
+                          onClick={() => void recordConsumedPart()}
+                        >
+                          ثبت قطعه مصرفی
+                        </Button>
+                      </Stack>
+                    </Stack>
+                  </CardContent>
+                </Card>
+              )}
+
+              {canCompleteRepair && (
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} useFlexGap>
+                  <Button
+                    color="success"
+                    variant="contained"
+                    loading={actionLoading === 'complete'}
+                    onClick={() => void completeRepair(false)}
+                  >
+                    تکمیل تعمیر
+                  </Button>
+                  <Button
+                    color="inherit"
+                    variant="outlined"
+                    loading={actionLoading === 'complete-empty'}
+                    onClick={() => void completeRepair(true)}
+                  >
+                    تکمیل بدون مصرف قطعه
+                  </Button>
                 </Stack>
               )}
             </Stack>

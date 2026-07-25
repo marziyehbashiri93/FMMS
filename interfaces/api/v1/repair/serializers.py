@@ -76,6 +76,36 @@ class RepairCompleteSerializer(serializers.Serializer):
     """Validate repair completion input."""
 
     completed_at = serializers.DateTimeField()
+    no_parts_consumed = serializers.BooleanField(required=False, default=False)
+
+
+class InternalRepairCostRegisterSerializer(serializers.Serializer):
+    """Validate INTERNAL workshop financial registration."""
+
+    invoice_number = serializers.CharField(max_length=64, allow_blank=True, default="")
+    labor_cost = serializers.DecimalField(max_digits=15, decimal_places=2, default=0)
+    parts_cost = serializers.DecimalField(max_digits=15, decimal_places=2, default=0)
+    service_cost = serializers.DecimalField(max_digits=15, decimal_places=2, default=0)
+    currency = serializers.CharField(max_length=3, default="IRR")
+    notes = serializers.CharField(max_length=500, allow_blank=True, default="")
+
+
+class InternalRepairCostResponseSerializer(serializers.Serializer):
+    """Serialize internal repair cost documents."""
+
+    id = serializers.UUIDField()
+    repair_order_id = serializers.UUIDField()
+    invoice_number = serializers.CharField()
+    labor_cost = serializers.DecimalField(max_digits=15, decimal_places=2)
+    parts_cost = serializers.DecimalField(max_digits=15, decimal_places=2)
+    service_cost = serializers.DecimalField(max_digits=15, decimal_places=2)
+    total_cost = serializers.DecimalField(max_digits=15, decimal_places=2)
+    currency = serializers.CharField()
+    status = serializers.CharField()
+    notes = serializers.CharField()
+    registered_by_id = serializers.UUIDField()
+    created_at = serializers.DateTimeField()
+    updated_at = serializers.DateTimeField()
 
 
 class TransportHandoverRejectSerializer(serializers.Serializer):
@@ -101,7 +131,6 @@ class RepairPartCreateSerializer(serializers.Serializer):
 
     material_number = serializers.CharField(max_length=18)
     quantity = serializers.IntegerField(min_value=1)
-    unit_of_measure = serializers.CharField(max_length=10)
 
 
 class RepairSyncSAPSerializer(serializers.Serializer):
@@ -133,7 +162,6 @@ class RepairPartResponseSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     material_number = serializers.CharField()
     quantity = serializers.IntegerField()
-    unit_of_measure = serializers.CharField()
     goods_issue_id = serializers.UUIDField(allow_null=True)
     posted_at = serializers.DateTimeField(allow_null=True)
 

@@ -159,6 +159,30 @@ class ExternalRepairInvoiceModel(BaseModel):
         db_table = "external_repair_invoice"
 
 
+class InternalRepairCostModel(BaseModel):
+    """Financial registration for INTERNAL central-workshop repairs."""
+
+    repair_order_id = models.UUIDField(db_index=True)
+    invoice_number = models.CharField(max_length=64, blank=True, default="")
+    labor_cost = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    parts_cost = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    service_cost = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    currency = models.CharField(max_length=3, default="IRR")
+    status = models.CharField(max_length=20, db_index=True)
+    notes = models.CharField(max_length=500, blank=True, default="")
+    registered_by_id = models.UUIDField()
+
+    class Meta:
+        app_label = "repair"
+        db_table = "internal_repair_cost"
+        indexes = [
+            models.Index(
+                fields=["repair_order_id", "is_deleted"],
+                name="internal_cost_order_idx",
+            ),
+        ]
+
+
 class ExternalWorkshopReferralRequestModel(BaseModel):
     """Permission request for referring a repair order to an external workshop."""
 

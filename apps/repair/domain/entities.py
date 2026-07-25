@@ -318,8 +318,27 @@ class RepairOrder:
             workshop_type: ``INTERNAL`` or ``EXTERNAL``.
 
         Raises:
-            RepairOrderInvalidStateTransitionError: If not in APPROVED status.
+            RepairOrderInvalidStateTransitionError: If not in APPROVED status
+                or a workshop was already assigned.
         """
+        if self.status != RepairOrderStatus.APPROVED:
+            raise RepairOrderInvalidStateTransitionError(
+                current_status=self.status.value,
+                target_status=(
+                    RepairOrderStatus.WAITING_EXTERNAL_REFERRAL_APPROVAL.value
+                    if workshop_type == WorkshopType.EXTERNAL
+                    else RepairOrderStatus.WORKSHOP_ASSIGNED.value
+                ),
+            )
+        if self.workshop_type is not None:
+            raise RepairOrderInvalidStateTransitionError(
+                current_status=self.status.value,
+                target_status=(
+                    RepairOrderStatus.WAITING_EXTERNAL_REFERRAL_APPROVAL.value
+                    if workshop_type == WorkshopType.EXTERNAL
+                    else RepairOrderStatus.WORKSHOP_ASSIGNED.value
+                ),
+            )
         self.workshop_type = workshop_type
         self.workshop_id = workshop_id
         if workshop_type == WorkshopType.EXTERNAL:

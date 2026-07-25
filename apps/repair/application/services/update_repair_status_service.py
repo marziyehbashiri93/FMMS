@@ -193,25 +193,28 @@ class CompleteRepairOrderService:
             details={"repair_order_id": str(dto.repair_order_id)},
         )
 
+        from core.exceptions.base_exception import (  # noqa: PLC0415
+            FMMSConflictError,
+        )
+
+        material_requests = self._material_request_repo.list_by_repair_order(
+            dto.repair_order_id
+        )
         pending_material = [
             request
-            for request in self._material_request_repo.list_by_repair_order(
-                dto.repair_order_id
-            )
+            for request in material_requests
             if request.status
             not in {
                 MaterialRequestStatus.REJECTED,
-                MaterialRequestStatus.STOCK_ISSUED,
                 MaterialRequestStatus.RECEIVED,
             }
         ]
         if pending_material:
-            from core.exceptions.base_exception import (  # noqa: PLC0415
-                FMMSConflictError,
-            )
-
             raise FMMSConflictError(
-                message="Cannot complete repair order with pending material requests.",
+                message=(
+                    "Cannot complete repair until all material requests are "
+                    "physically received or rejected."
+                ),
                 error_code="PENDING_MATERIAL_REQUESTS",
                 details={
                     "repair_order_id": str(dto.repair_order_id),
@@ -219,6 +222,20 @@ class CompleteRepairOrderService:
                         str(item.id) for item in pending_material
                     ],
                 },
+            )
+
+        has_received_parts = any(
+            request.status == MaterialRequestStatus.RECEIVED
+            for request in material_requests
+        )
+        if has_received_parts and not order.parts and not dto.no_parts_consumed:
+            raise FMMSConflictError(
+                message=(
+                    "Record consumed spare parts before completing repair, "
+                    "or explicitly confirm no parts were consumed."
+                ),
+                error_code="CONSUMED_PARTS_REQUIRED",
+                details={"repair_order_id": str(dto.repair_order_id)},
             )
 
         order.complete_waiting_driver_confirmation(completed_at=dto.completed_at)

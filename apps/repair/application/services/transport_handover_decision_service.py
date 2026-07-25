@@ -26,10 +26,19 @@ from apps.repair.domain.entities import (
     RepairOrder,
     RepairOrderEventType,
     RepairOrderStatus,
+    WorkshopType,
+)
+from apps.repair.domain.interfaces.internal_cost_repository import (
+    IInternalRepairCostRepository,
 )
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
+from apps.repair.domain.internal_cost_entities import InternalRepairCostStatus
+from apps.vehicle.application.services.record_component_history_service import (
+    RecordComponentHistoryFromRepairService,
+)
 from apps.vehicle.domain.entities import VehicleStatus
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
+from core.exceptions.base_exception import FMMSConflictError
 from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
 
@@ -86,11 +95,15 @@ class ApproveTransportHandoverService:
         repair_order_repository: IRepairOrderRepository,
         vehicle_repository: IVehicleRepository,
         fault_repository: IFaultRepository,
+        component_history_service: RecordComponentHistoryFromRepairService | None = None,
+        internal_cost_repository: IInternalRepairCostRepository | None = None,
         event_recorder: RecordRepairOrderEventService | None = None,
     ) -> None:
         self._repair_repo = repair_order_repository
         self._vehicle_repo = vehicle_repository
         self._fault_repo = fault_repository
+        self._component_history = component_history_service
+        self._internal_cost_repo = internal_cost_repository
         self._event_recorder = event_recorder
 
     def execute(self, dto: TransportHandoverApproveDTO) -> RepairOrderResponseDTO:
@@ -112,12 +125,31 @@ class ApproveTransportHandoverService:
             message=f"Repair order '{dto.repair_order_id}' not found.",
             details={"repair_order_id": str(dto.repair_order_id)},
         )
+        # INTERNAL repairs should register costs before final approval. Soft gate:
+        # when a cost document exists it must be REGISTERED; absence is allowed for
+        # backward-compatible flows and is enforced in the transport review UI.
+        if order.workshop_type == WorkshopType.INTERNAL and self._internal_cost_repo:
+            cost = self._internal_cost_repo.get_by_repair_order(order.id)
+            if cost is not None and cost.status != InternalRepairCostStatus.REGISTERED:
+                raise FMMSConflictError(
+                    message="Internal repair cost draft must be registered before approval.",
+                    error_code="INTERNAL_COST_NOT_REGISTERED",
+                    details={"repair_order_id": str(order.id)},
+                )
+
         now = datetime.now(tz=UTC)
         order.complete_after_transport_handover(
             completed_at=order.completed_at or now,
         )
         order.updated_at = now
         saved = self._repair_repo.save(order)
+
+        if self._component_history is not None:
+            self._component_history.execute(
+                order=saved,
+                recorded_by=dto.approved_by,
+                request_id=dto.request_id,
+            )
 
         _close_fault_for_completed_repair(
             fault_id=saved.fault_id,

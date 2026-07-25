@@ -120,6 +120,39 @@ class VehicleDriverAssignmentHistoryModel(BaseModel):
         )
 
 
+class VehicleComponentHistoryModel(BaseModel):
+    """Installed/replaced component history for maintenance decisions."""
+
+    vehicle_id = models.UUIDField(db_index=True)
+    repair_order_id = models.UUIDField(db_index=True)
+    component_type = models.CharField(max_length=30, db_index=True)
+    material_number = models.CharField(max_length=40, db_index=True)
+    quantity = models.DecimalField(max_digits=12, decimal_places=3)
+    unit_of_measure = models.CharField(max_length=10)
+    description = models.CharField(max_length=255, blank=True, default="")
+    installed_at = models.DateTimeField(db_index=True)
+    recorded_by_id = models.UUIDField()
+
+    class Meta:
+        app_label = "vehicle"
+        db_table = "vehicle_component_history"
+        verbose_name = "Vehicle Component History"
+        verbose_name_plural = "Vehicle Component Histories"
+        indexes = [
+            models.Index(
+                fields=["vehicle_id", "installed_at"],
+                name="veh_comp_hist_vehicle_time_idx",
+            ),
+            models.Index(
+                fields=["vehicle_id", "component_type"],
+                name="veh_comp_hist_type_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.vehicle_id} {self.component_type}: {self.material_number}"
+
+
 class VehicleOdometerReadingModel(BaseModel):
     """Daily odometer reading recorded inside FMMS by operational users."""
 

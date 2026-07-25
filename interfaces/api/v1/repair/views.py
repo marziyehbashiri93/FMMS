@@ -27,6 +27,9 @@ from apps.repair.application.dto.repair_dto import (
     TransportHandoverRejectDTO,
     WorkshopTechnicalDecisionDTO,
 )
+from apps.repair.application.services.register_internal_repair_cost_service import (
+    RegisterInternalRepairCostDTO,
+)
 from apps.repair.domain.entities import (
     ExternalWorkshopReferralStatus,
     RepairOrderStatus,
@@ -35,7 +38,6 @@ from apps.repair.domain.entities import (
 from core.permissions import (
     IsDistributionSupervisorOrAbove,
     IsReadOnlyOrTechnicianOrAbove,
-    IsTechnicianOrAbove,
     IsTransportSupervisorOrAbove,
     IsWorkshopSupervisorOrAbove,
 )
@@ -46,6 +48,8 @@ from interfaces.api.v1.repair.external_invoice_views import (
 )
 from interfaces.api.v1.repair.serializers import (
     ExternalWorkshopReferralResponseSerializer,
+    InternalRepairCostRegisterSerializer,
+    InternalRepairCostResponseSerializer,
     RepairActivityCreateSerializer,
     RepairApproveSerializer,
     RepairAssignSerializer,
@@ -332,6 +336,9 @@ class RepairOrderViewSet(
                 completed_at=serializer.validated_data["completed_at"],
                 request_id=request_id_from(request),
                 completed_by=user_id_from(request),
+                no_parts_consumed=bool(
+                    serializer.validated_data.get("no_parts_consumed", False)
+                ),
             )
         )
         return Response(RepairOrderResponseSerializer(result).data)
@@ -375,19 +382,50 @@ class RepairOrderViewSet(
         request=RepairPartCreateSerializer,
         responses=RepairOrderResponseSerializer,
     )
-    @action(detail=True, methods=["post"], url_path="parts")
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="parts",
+        permission_classes=[IsWorkshopSupervisorOrAbove],
+    )
     def parts(self, request: Request, pk: str | None = None) -> Response:
-        """Add a repair part."""
+        """Record a consumed spare part (distinct from requested material items)."""
         serializer = RepairPartCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         result = deps.get_add_repair_part_service().execute(
             AddRepairPartDTO(
                 repair_order_id=uuid.UUID(str(pk)),
+                material_number=serializer.validated_data["material_number"],
+                quantity=serializer.validated_data["quantity"],
                 request_id=request_id_from(request),
-                **serializer.validated_data,
             )
         )
         return Response(RepairOrderResponseSerializer(result).data)
+
+    @extend_schema(
+        tags=[API_TAGS.repair],
+        request=InternalRepairCostRegisterSerializer,
+        responses=InternalRepairCostResponseSerializer,
+    )
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="internal-cost",
+        permission_classes=[IsTransportSupervisorOrAbove],
+    )
+    def internal_cost(self, request: Request, pk: str | None = None) -> Response:
+        """Register INTERNAL workshop financial/invoice document."""
+        serializer = InternalRepairCostRegisterSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        result = deps.get_register_internal_repair_cost_service().execute(
+            RegisterInternalRepairCostDTO(
+                repair_order_id=uuid.UUID(str(pk)),
+                request_id=request_id_from(request),
+                registered_by=user_id_from(request),
+                **serializer.validated_data,
+            )
+        )
+        return Response(InternalRepairCostResponseSerializer(result).data)
 
     @extend_schema(
         tags=[API_TAGS.repair], request=None, responses=RepairOrderResponseSerializer

@@ -16,13 +16,18 @@ from apps.vehicle.application.dto.vehicle_dto import (
     RecordVehicleOdometerDTO,
 )
 from apps.vehicle.domain.entities import VehicleStatus
-from core.permissions import IsReadOnlyOrTechnicianOrAbove, IsSupervisorOrAbove
+from core.permissions import (
+    IsReadOnlyOrDriverOrTechnicianOrAbove,
+    IsReadOnlyOrTechnicianOrAbove,
+    IsSupervisorOrAbove,
+)
 from interfaces.api.v1 import deps
 from interfaces.api.v1.inspection.serializers import InspectionResponseSerializer
 from interfaces.api.v1.utils import paginate_dto_list, request_id_from, user_id_from
 from interfaces.api.v1.vehicle import schema as vehicle_schema
 from interfaces.api.v1.vehicle.serializers import (
     DateRangeFilterSerializer,
+    VehicleComponentHistoryResponseSerializer,
     VehicleDriverAssignmentSnapshotResponseSerializer,
     VehicleListQuerySerializer,
     VehicleOdometerRecordSerializer,
@@ -107,7 +112,12 @@ class VehicleViewSet(GenericViewSet):
 
     @vehicle_schema.odometer_current
     @vehicle_schema.odometer_record
-    @action(detail=True, methods=["get", "post"], url_path="odometer")
+    @action(
+        detail=True,
+        methods=["get", "post"],
+        url_path="odometer",
+        permission_classes=[IsReadOnlyOrDriverOrTechnicianOrAbove],
+    )
     def odometer(self, request: Request, pk: str | None = None) -> Response:
         """Retrieve current odometer, or create/update a daily reading."""
         if request.method == "GET":
@@ -223,3 +233,18 @@ class VehicleViewSet(GenericViewSet):
         del request
         result = deps.get_get_vehicle_summary_service().execute()
         return Response(VehicleSummarySerializer(result).data)
+
+    @action(detail=True, methods=["get"], url_path="component-history")
+    def component_history(self, request: Request, pk: str | None = None) -> Response:
+        """List installed/replaced component history for one vehicle."""
+        items = deps.get_list_vehicle_component_history_service().execute(
+            uuid.UUID(str(pk))
+        )
+        page = paginate_dto_list(self, items)
+        serializer = VehicleComponentHistoryResponseSerializer(
+            page if page is not None else items,
+            many=True,
+        )
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response(serializer.data)

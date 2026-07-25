@@ -198,6 +198,25 @@ class TestRepairAssignWorkshopAPI:
         )
         assert response.status_code == 422
 
+    def test_cannot_reassign_workshop_after_assignment(
+        self, authenticated_client: APIClient
+    ) -> None:
+        order = self._approved_order(
+            authenticated_client, "12WS008", "1HGCM82633A004385"
+        )
+        first = authenticated_client.post(
+            f"/api/v1/repair-orders/{order['id']}/assign-workshop/",
+            {"workshop_type": "INTERNAL"},
+            format="json",
+        )
+        assert first.status_code == 200, first.data
+        second = authenticated_client.post(
+            f"/api/v1/repair-orders/{order['id']}/assign-workshop/",
+            {"workshop_type": "EXTERNAL", "workshop_id": "EXT-009"},
+            format="json",
+        )
+        assert second.status_code == 422
+
     def test_invalid_workshop_type_returns_400(
         self, authenticated_client: APIClient
     ) -> None:
