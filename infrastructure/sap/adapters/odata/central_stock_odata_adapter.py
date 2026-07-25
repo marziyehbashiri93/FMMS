@@ -74,6 +74,7 @@ class CentralStockODataAdapter(ISAPCentralStockPort):
             storage_location=str(data.get("StorageLocation", "")).strip(),
             inventory_stock_type=str(data.get("InventoryStockType", "")).strip(),
             material_code=str(data.get("MaterialCode", "")).strip(),
+            material_name=_material_name_from_row(data),
             inventory_stock_type_text=str(
                 data.get("InventoryStockTypeText", "")
             ).strip(),
@@ -82,6 +83,22 @@ class CentralStockODataAdapter(ISAPCentralStockPort):
             stock_value=_to_decimal(data.get("StockValueInDisplayCurrency")),
             display_currency=str(data.get("DisplayCurrency", "")).strip(),
         )
+
+
+def _material_name_from_row(data: dict[str, Any]) -> str:
+    """Extract material description from known SAP column aliases."""
+    for key in (
+        "MaterialName",
+        "MaterialDescription",
+        "ProductDescription",
+        "MaterialText",
+        "ProductDesc",
+        "MaterialDesc",
+    ):
+        value = str(data.get(key, "")).strip()
+        if value:
+            return value
+    return ""
 
 
 def _to_decimal(raw: Any) -> Decimal:

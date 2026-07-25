@@ -16,6 +16,7 @@ class SAPCentralStockDTO:
         storage_location: Storage location (e.g. KH08).
         inventory_stock_type: Stock type code (e.g. 01).
         material_code: Short material code without leading zeros.
+        material_name: Human-readable material description/name when provided.
         inventory_stock_type_text: Human-readable stock type.
         quantity: Warehouse stock quantity in material base unit.
         base_unit: Material base unit of measure.
@@ -33,3 +34,4 @@ class SAPCentralStockDTO:
     base_unit: str
     stock_value: Decimal
     display_currency: str
+    material_name: str = ""

@@ -26,3 +26,4 @@ class CentralStock:
     is_active: bool
     created_at: datetime
     updated_at: datetime
+    material_name: str = ""

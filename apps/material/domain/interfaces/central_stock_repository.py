@@ -34,6 +34,14 @@ class ICentralStockRepository(ABC):
         """
 
     @abstractmethod
+    def material_exists(self, material_number: str) -> bool:
+        """Return whether any active KH08 stock row exists for the material."""
+
+    @abstractmethod
+    def get_material_name(self, material_number: str) -> str:
+        """Return the first non-empty material name for the material, if any."""
+
+    @abstractmethod
     def list_active(
         self,
         *,

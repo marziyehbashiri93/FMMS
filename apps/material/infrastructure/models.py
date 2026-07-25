@@ -40,6 +40,12 @@ class MaterialRequestItemModel(models.Model):
     material_number = models.CharField(max_length=18)
     quantity = models.DecimalField(max_digits=12, decimal_places=3)
     unit_of_measure = models.CharField(max_length=10)
+    from_catalog = models.BooleanField(default=True)
+    decision = models.CharField(max_length=20, default="PENDING")
+    item_status = models.CharField(max_length=30, default="PENDING")
+    available_quantity_snapshot = models.DecimalField(
+        max_digits=18, decimal_places=3, null=True, blank=True
+    )
 
     class Meta:
         app_label = "material"
@@ -69,6 +75,7 @@ class CentralStockModel(BaseModel):
     storage_location = models.CharField(max_length=10, db_index=True)
     inventory_stock_type = models.CharField(max_length=10, db_index=True)
     material_code = models.CharField(max_length=40, db_index=True)
+    material_name = models.CharField(max_length=255, blank=True, default="")
     inventory_stock_type_text = models.CharField(max_length=100)
     quantity = models.DecimalField(max_digits=18, decimal_places=3, default=Decimal("0"))
     base_unit = models.CharField(max_length=10)

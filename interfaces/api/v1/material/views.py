@@ -15,8 +15,10 @@ from apps.material.application.dto.material_request_dto import (
     CreateMaterialRequestDTO,
     CreateMaterialRequestItemDTO,
     MaterialRequestDecisionDTO,
+    PartsAvailabilityDecisionDTO,
+    PartsItemDecisionDTO,
 )
-from apps.material.domain.entities import MaterialRequestStatus
+from apps.material.domain.entities import MaterialItemDecision, MaterialRequestStatus
 from core.permissions import (
     IsReadOnlyOrTechnicianOrAbove,
     IsTransportSupervisorOrAbove,
@@ -27,6 +29,7 @@ from interfaces.api.v1.material.serializers import (
     CentralStockResponseSerializer,
     MaterialRequestCreateSerializer,
     MaterialRequestResponseSerializer,
+    PartsAvailabilityDecisionSerializer,
 )
 from interfaces.api.v1.schema_tags import API_TAGS
 from interfaces.api.v1.utils import paginate_dto_list, request_id_from, user_id_from
@@ -57,7 +60,7 @@ class MaterialRequestViewSet(GenericViewSet):
         permission_classes=[IsTransportSupervisorOrAbove],
     )
     def approve(self, request: Request, pk: str | None = None) -> Response:
-        """Approve material request."""
+        """Approve material request (compat: auto inventory availability)."""
         result = deps.get_approve_material_request_service().execute(
             MaterialRequestDecisionDTO(
                 material_request_id=uuid.UUID(str(pk)),
@@ -68,21 +71,52 @@ class MaterialRequestViewSet(GenericViewSet):
         return Response(MaterialRequestResponseSerializer(result).data)
 
     @extend_schema(
+        tags=[API_TAGS.material],
+        request=PartsAvailabilityDecisionSerializer,
+        responses=MaterialRequestResponseSerializer,
+    )
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="availability-decision",
+        permission_classes=[IsTransportSupervisorOrAbove],
+    )
+    def availability_decision(self, request: Request, pk: str | None = None) -> Response:
+        """Transport decides stock vs purchase for each requested item."""
+        serializer = PartsAvailabilityDecisionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        result = deps.get_decide_parts_availability_service().execute(
+            PartsAvailabilityDecisionDTO(
+                material_request_id=uuid.UUID(str(pk)),
+                items=tuple(
+                    PartsItemDecisionDTO(
+                        item_id=item["item_id"],
+                        decision=MaterialItemDecision(item["decision"]),
+                    )
+                    for item in serializer.validated_data["items"]
+                ),
+                request_id=request_id_from(request),
+                decided_by=user_id_from(request),
+                note=serializer.validated_data.get("note", ""),
+            )
+        )
+        return Response(MaterialRequestResponseSerializer(result).data)
+
+    @extend_schema(
         tags=[API_TAGS.material], responses=MaterialRequestResponseSerializer
     )
     @action(
         detail=True,
         methods=["post"],
+        url_path="issue-purchased",
         permission_classes=[IsTransportSupervisorOrAbove],
     )
-    def reject(self, request: Request, pk: str | None = None) -> Response:
-        """Reject material request."""
-        result = deps.get_reject_material_request_service().execute(
-            MaterialRequestDecisionDTO(
-                material_request_id=uuid.UUID(str(pk)),
-                request_id=request_id_from(request),
-                decided_by=user_id_from(request),
-            )
+    def issue_purchased(self, request: Request, pk: str | None = None) -> Response:
+        """After goods receipt, allocate purchased parts and send to workshop."""
+        result = deps.get_issue_purchased_parts_service().execute(
+            material_request_id=uuid.UUID(str(pk)),
+            request_id=request_id_from(request),
+            decided_by=user_id_from(request),
         )
         return Response(MaterialRequestResponseSerializer(result).data)
 
@@ -160,7 +194,11 @@ class RepairOrderMaterialRequestMixin:
             CreateMaterialRequestDTO(
                 repair_order_id=uuid.UUID(str(pk)),
                 items=tuple(
-                    CreateMaterialRequestItemDTO(**item)
+                    CreateMaterialRequestItemDTO(
+                        material_number=item["material_number"],
+                        quantity=item["quantity"],
+                        from_catalog=item.get("from_catalog", True),
+                    )
                     for item in serializer.validated_data["items"]
                 ),
                 request_id=request_id_from(request),

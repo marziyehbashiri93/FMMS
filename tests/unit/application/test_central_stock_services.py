@@ -54,6 +54,23 @@ class FakeCentralStockRepository(ICentralStockRepository):
                 total += row.quantity
         return total
 
+    def material_exists(self, material_number: str) -> bool:
+        stripped = material_number.strip().lstrip("0") or "0"
+        return any(
+            row.is_active
+            and (row.material_code == stripped or row.material.endswith(stripped))
+            for row in self.rows.values()
+        )
+
+    def get_material_name(self, material_number: str) -> str:
+        stripped = material_number.strip().lstrip("0") or "0"
+        for row in self.rows.values():
+            if row.is_active and (
+                row.material_code == stripped or row.material.endswith(stripped)
+            ):
+                return row.material_name
+        return ""
+
     def list_active(
         self,
         *,
@@ -92,6 +109,7 @@ class FakeSAPCentralStockPort(ISAPCentralStockPort):
                 storage_location="KH08",
                 inventory_stock_type="01",
                 material_code="60001764",
+                material_name="روغن موتور",
                 inventory_stock_type_text="Unrestricted-Use Stock",
                 quantity=Decimal("149.500"),
                 base_unit="L",

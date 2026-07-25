@@ -189,7 +189,7 @@ class TestMaintenanceWorkflowV2API:
         assert approved.status_code == 200, approved.data
         assert approved.data["status"] == "STOCK_ISSUED"
 
-    def test_reject_material_request(
+    def test_per_item_availability_decision_purchase(
         self, supervisor_client: APIClient, authenticated_client: APIClient
     ) -> None:
         order = _create_order(authenticated_client, "12MWF205", "1HGCM82633A008205")
@@ -203,19 +203,33 @@ class TestMaintenanceWorkflowV2API:
             {
                 "items": [
                     {
-                        "material_number": "MAT000000000000003",
+                        "material_number": "252800000000000003",
                         "quantity": "2",
-                        "unit_of_measure": "EA",
+                        "from_catalog": False,
                     }
                 ]
             },
             format="json",
         )
-        rejected = supervisor_client.post(
+        assert created.status_code == 201, created.data
+        item_id = created.data["items"][0]["id"]
+        decided = supervisor_client.post(
+            f"/api/v1/material-requests/{created.data['id']}/availability-decision/",
+            {
+                "note": "not in warehouse",
+                "items": [{"item_id": item_id, "decision": "PURCHASE"}],
+            },
+            format="json",
+        )
+        assert decided.status_code == 200, decided.data
+        assert decided.data["status"] == "PURCHASE_REQUIRED"
+        assert decided.data["items"][0]["decision"] == "PURCHASE"
+        assert decided.data["items"][0]["item_status"] == "PURCHASE_REQUIRED"
+
+        missing = supervisor_client.post(
             f"/api/v1/material-requests/{created.data['id']}/reject/", {}, format="json"
         )
-        assert rejected.status_code == 200, rejected.data
-        assert rejected.data["status"] == "REJECTED"
+        assert missing.status_code == 404
 
     def test_complete_creates_handover_waiting_driver_confirmation(
         self, technician_client: APIClient, authenticated_client: APIClient
@@ -567,7 +581,10 @@ class TestMaintenanceWorkflowV2API:
 
         completed = authenticated_client.post(
             f"/api/v1/repair-orders/{order['id']}/complete/",
-            {"completed_at": datetime.now(tz=UTC).isoformat()},
+            {
+                "completed_at": datetime.now(tz=UTC).isoformat(),
+                "no_parts_consumed": True,
+            },
             format="json",
         )
         assert completed.status_code == 200, completed.data

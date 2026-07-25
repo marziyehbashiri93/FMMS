@@ -36,6 +36,7 @@ def _to_domain(orm: CentralStockModel) -> CentralStock:
         is_active=orm.is_active,
         created_at=orm.created_at,
         updated_at=orm.updated_at,
+        material_name=orm.material_name or "",
     )
 
 
@@ -78,22 +79,40 @@ class DjangoCentralStockRepository(ICentralStockRepository):
 
     def get_available_quantity(self, material_number: str) -> Decimal:
         """Return unrestricted quantity for a material across KH08 rows."""
-        padded, stripped = _normalize_material(material_number)
-        total = (
-            CentralStockModel.objects.filter(
-                is_active=True,
-                is_deleted=False,
-                inventory_stock_type="01",
-            )
-            .filter(
-                Q(material=padded)
-                | Q(material_code=stripped)
-                | Q(material_code=padded)
-                | Q(material__endswith=stripped)
-            )
-            .aggregate(total=Sum("quantity"))["total"]
+        qs = self._matching_active_rows(material_number).filter(
+            inventory_stock_type="01"
         )
+        total = qs.aggregate(total=Sum("quantity"))["total"]
         return total if total is not None else Decimal("0")
+
+    def material_exists(self, material_number: str) -> bool:
+        """Return whether any active KH08 stock row exists for the material."""
+        return self._matching_active_rows(material_number).exists()
+
+    def get_material_name(self, material_number: str) -> str:
+        """Return the first non-empty material name for the material, if any."""
+        row = (
+            self._matching_active_rows(material_number)
+            .exclude(material_name="")
+            .order_by("material_code")
+            .first()
+        )
+        if row is None:
+            return ""
+        return row.material_name or ""
+
+    def _matching_active_rows(self, material_number: str):
+        """Filter active stock rows matching padded or short material number."""
+        padded, stripped = _normalize_material(material_number)
+        return CentralStockModel.objects.filter(
+            is_active=True,
+            is_deleted=False,
+        ).filter(
+            Q(material=padded)
+            | Q(material_code=stripped)
+            | Q(material_code=padded)
+            | Q(material__endswith=stripped)
+        )
 
     def list_active(
         self,
@@ -112,6 +131,7 @@ class DjangoCentralStockRepository(ICentralStockRepository):
             qs = qs.filter(
                 Q(material__icontains=search)
                 | Q(material_code__icontains=search)
+                | Q(material_name__icontains=search)
                 | Q(inventory_stock_type_text__icontains=search)
             )
         return [
@@ -127,6 +147,7 @@ class DjangoCentralStockRepository(ICentralStockRepository):
             "storage_location": stock.storage_location,
             "inventory_stock_type": stock.inventory_stock_type,
             "material_code": stock.material_code,
+            "material_name": stock.material_name,
             "inventory_stock_type_text": stock.inventory_stock_type_text,
             "quantity": stock.quantity,
             "base_unit": stock.base_unit,
