@@ -70,6 +70,12 @@ function pickOutsideCatalog(code: string, name = ''): MaterialPickValue {
   };
 }
 
+function optionLabel(option: MaterialOption): string {
+  return option.materialName
+    ? `${option.materialNumber} — ${option.materialName}`
+    : option.materialNumber;
+}
+
 /**
  * Searchable warehouse material dropdown; out-of-catalog codes select in-place.
  */
@@ -79,12 +85,14 @@ export function MaterialStockPicker({
   onChange,
   disabled = false,
   size = 'small',
+  showSelectedChip = true,
 }: {
   label?: string;
   value: MaterialPickValue;
   onChange: (next: MaterialPickValue) => void;
   disabled?: boolean;
   size?: 'small' | 'medium';
+  showSelectedChip?: boolean;
 }) {
   const [options, setOptions] = useState<MaterialOption[]>([]);
   const [loading, setLoading] = useState(false);
@@ -122,6 +130,11 @@ export function MaterialStockPicker({
     };
   }, []);
 
+  const selected = useMemo(() => {
+    if (!value.materialNumber || !value.fromCatalog) return null;
+    return options.find((item) => item.materialNumber === value.materialNumber) ?? null;
+  }, [options, value.materialNumber, value.fromCatalog]);
+
   useEffect(() => {
     if (!value.materialNumber) {
       setInputValue('');
@@ -129,17 +142,27 @@ export function MaterialStockPicker({
     }
     if (!value.fromCatalog) {
       setInputValue(value.materialNumber);
+      return;
     }
-  }, [value.materialNumber, value.fromCatalog]);
+    setInputValue(selected ? optionLabel(selected) : value.materialNumber);
+  }, [selected, value.materialNumber, value.fromCatalog]);
 
-  const selected = useMemo(() => {
-    if (!value.materialNumber || !value.fromCatalog) return null;
-    return options.find((item) => item.materialNumber === value.materialNumber) ?? null;
-  }, [options, value.materialNumber, value.fromCatalog]);
+  const normalizedInput = inputValue.trim();
+  const inputMatchesCatalog = useMemo(() => {
+    if (!normalizedInput) return false;
+    const query = normalizedInput.toLowerCase();
+    return options.some(
+      (item) =>
+        item.materialNumber.toLowerCase() === query ||
+        item.materialCode.toLowerCase() === query,
+    );
+  }, [normalizedInput, options]);
+  const canAddOutsideCatalog =
+    !disabled && Boolean(normalizedInput) && !value.fromCatalog && !inputMatchesCatalog;
 
   const applyOutsideCatalog = (rawCode: string) => {
     const code = rawCode.trim();
-    if (!code) return;
+    if (!code || inputMatchesCatalog) return;
     onChange(pickOutsideCatalog(code));
     setInputValue(code);
   };
@@ -169,8 +192,18 @@ export function MaterialStockPicker({
         value={selected}
         inputValue={inputValue}
         onInputChange={(_event, next, reason) => {
-          if (reason === 'reset') return;
+          if (reason === 'reset') {
+            setInputValue(next);
+            return;
+          }
           setInputValue(next);
+          if (value.materialNumber && value.fromCatalog) {
+            const currentLabel = selected ? optionLabel(selected) : value.materialNumber;
+            const typed = next.trim();
+            if (typed && typed !== value.materialNumber && typed !== currentLabel) {
+              onChange(EMPTY_MATERIAL_PICK);
+            }
+          }
           if (value.materialNumber && !value.fromCatalog && next !== value.materialNumber) {
             onChange(EMPTY_MATERIAL_PICK);
           }
@@ -191,13 +224,9 @@ export function MaterialStockPicker({
             materialName: next.materialName,
             availableQuantity: next.quantity || '0',
           });
-          setInputValue('');
+          setInputValue(optionLabel(next));
         }}
-        getOptionLabel={(option) =>
-          option.materialName
-            ? `${option.materialNumber} — ${option.materialName}`
-            : option.materialNumber
-        }
+        getOptionLabel={optionLabel}
         isOptionEqualToValue={(option, current) =>
           option.materialNumber === current.materialNumber
         }
@@ -316,7 +345,7 @@ export function MaterialStockPicker({
         )}
       />
 
-      {selected ? (
+      {showSelectedChip && selected ? (
         <Chip
           size="small"
           color="success"
@@ -331,7 +360,7 @@ export function MaterialStockPicker({
         />
       ) : null}
 
-      {value.materialNumber && !value.fromCatalog ? (
+      {showSelectedChip && value.materialNumber && !value.fromCatalog ? (
         <Chip
           size="small"
           color="warning"
@@ -346,7 +375,7 @@ export function MaterialStockPicker({
         size="small"
         variant="text"
         startIcon={<AddCircleOutline />}
-        disabled={disabled || !inputValue.trim()}
+        disabled={!canAddOutsideCatalog}
         onClick={() => applyOutsideCatalog(inputValue)}
         sx={{ alignSelf: 'flex-start' }}
       >

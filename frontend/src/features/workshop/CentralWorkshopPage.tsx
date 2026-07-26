@@ -304,19 +304,13 @@ export function CentralWorkshopPage() {
 
   const requestParts = async () => {
     if (!selected) return;
-    const draft =
-      requestLines.length > 0
-        ? requestLines
-        : requestPart.materialNumber.trim()
-          ? [draftFromPick(requestPart, Math.max(1, Number(requestQty) || 1))]
-          : [];
-    if (draft.length === 0) return;
+    if (requestLines.length === 0) return;
     setActionLoading('parts');
     setActionError('');
     try {
       await api.createRepairMaterialRequest(
         selected.id,
-        draft.map((line) => ({
+        requestLines.map((line) => ({
           material_number: line.materialNumber,
           quantity: line.quantity,
           from_catalog: line.fromCatalog,
@@ -361,17 +355,11 @@ export function CentralWorkshopPage() {
 
   const recordConsumedPart = async () => {
     if (!selected) return;
-    const draft =
-      consumedLines.length > 0
-        ? consumedLines
-        : consumedPart.materialNumber.trim()
-          ? [draftFromPick(consumedPart, Math.max(1, Number(consumedQty) || 1))]
-          : [];
-    if (draft.length === 0) return;
+    if (consumedLines.length === 0) return;
     setActionLoading('consumed');
     setActionError('');
     try {
-      for (const line of draft) {
+      for (const line of consumedLines) {
         await api.addRepairPart(selected.id, {
           material_number: line.materialNumber,
           quantity: line.quantity,
@@ -571,6 +559,7 @@ export function CentralWorkshopPage() {
                           label="قطعه درخواستی"
                           value={requestPart}
                           onChange={setRequestPart}
+                          showSelectedChip={false}
                         />
                         <RtlTextField
                           label="تعداد"
@@ -620,9 +609,7 @@ export function CentralWorkshopPage() {
                           variant="contained"
                           startIcon={<Inventory2 />}
                           loading={actionLoading === 'parts'}
-                          disabled={
-                            requestLines.length === 0 && !requestPart.materialNumber.trim()
-                          }
+                          disabled={requestLines.length === 0}
                           onClick={() => void requestParts()}
                         >
                           ثبت درخواست
@@ -692,6 +679,7 @@ export function CentralWorkshopPage() {
                           label="قطعه مصرفی"
                           value={consumedPart}
                           onChange={setConsumedPart}
+                          showSelectedChip={false}
                         />
                         <RtlTextField
                           label="تعداد"
@@ -741,9 +729,7 @@ export function CentralWorkshopPage() {
                           variant="contained"
                           color="success"
                           loading={actionLoading === 'consumed'}
-                          disabled={
-                            consumedLines.length === 0 && !consumedPart.materialNumber.trim()
-                          }
+                          disabled={consumedLines.length === 0}
                           onClick={() => void recordConsumedPart()}
                         >
                           ثبت قطعه مصرفی

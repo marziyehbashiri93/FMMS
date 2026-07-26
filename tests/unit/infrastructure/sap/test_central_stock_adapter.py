@@ -26,7 +26,8 @@ class TestCentralStockODataAdapter:
         assert first.storage_location == "KH08"
         assert first.inventory_stock_type == "01"
         assert first.material_code == "60001764"
-        assert first.material_name
+        # Fixture XML has no MaterialName/Description column.
+        assert first.material_name == ""
         assert first.quantity == Decimal("149.500")
         assert first.base_unit == "L"
         assert first.display_currency == "IRR"

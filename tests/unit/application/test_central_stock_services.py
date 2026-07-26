@@ -167,6 +167,51 @@ class TestSyncCentralStockFromSAPService:
         assert result.updated == 1
         assert repo.rows[existing_id].quantity == Decimal("149.500")
 
+    def test_clears_local_name_when_sap_has_no_description(self) -> None:
+        now = datetime.now(tz=UTC)
+        repo = FakeCentralStockRepository()
+        existing_id = uuid.uuid4()
+        repo.save(
+            CentralStock(
+                id=existing_id,
+                material="000000000060001764",
+                plant="1000",
+                storage_location="KH08",
+                inventory_stock_type="01",
+                material_code="60001764",
+                inventory_stock_type_text="Unrestricted-Use Stock",
+                quantity=Decimal("10"),
+                base_unit="L",
+                stock_value=Decimal("1"),
+                display_currency="IRR",
+                is_active=True,
+                created_at=now,
+                updated_at=now,
+                material_name="روغن / مایع — 60001764",
+            )
+        )
+        sap = FakeSAPCentralStockPort(
+            [
+                SAPCentralStockDTO(
+                    material="000000000060001764",
+                    plant="1000",
+                    storage_location="KH08",
+                    inventory_stock_type="01",
+                    material_code="60001764",
+                    material_name="",
+                    inventory_stock_type_text="Unrestricted-Use Stock",
+                    quantity=Decimal("149.500"),
+                    base_unit="L",
+                    stock_value=Decimal("3225552.20"),
+                    display_currency="IRR",
+                )
+            ]
+        )
+
+        SyncCentralStockFromSAPService(repo, sap).execute()
+
+        assert repo.rows[existing_id].material_name == ""
+
 
 class TestListCentralStockService:
     """Cover list filters for central stock."""

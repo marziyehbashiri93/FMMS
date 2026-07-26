@@ -141,7 +141,9 @@ class SyncCentralStockFromSAPService:
         now = datetime.now(tz=UTC)
         if existing is not None:
             existing.material_code = sap_dto.material_code
-            existing.material_name = sap_dto.material_name or existing.material_name
+            # Always take SAP value (including empty). Do not keep local
+            # synthetic/placeholder names when OData has no description.
+            existing.material_name = sap_dto.material_name
             existing.inventory_stock_type_text = sap_dto.inventory_stock_type_text
             existing.quantity = sap_dto.quantity
             existing.base_unit = sap_dto.base_unit
