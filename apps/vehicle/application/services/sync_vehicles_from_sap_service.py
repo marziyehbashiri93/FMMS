@@ -115,6 +115,26 @@ class SyncVehiclesFromSAPService:
         )
 
         sap_rows = self._sap.list_vehicle_drivers(plant=plant)
+        if not sap_rows:
+            logger.warning(
+                "SAP vehicle-driver response was empty; skipping decommission",
+                extra={
+                    "domain": "vehicle",
+                    "service": "SyncVehiclesFromSAPService",
+                    "operation": "execute",
+                    "request_id": request_id,
+                    "plant": plant,
+                    "review_status": "NEEDS_REVIEW",
+                },
+            )
+            return VehicleSAPSyncResultDTO(
+                total_received=0,
+                created=0,
+                updated=0,
+                decommissioned=0,
+                failed=1,
+            )
+
         created = 0
         updated = 0
         decommissioned = 0
@@ -127,7 +147,9 @@ class SyncVehiclesFromSAPService:
         for sap_dto in sap_rows:
             try:
                 with self._atomic_if_supported():
-                    seen_vehicle_numbers.add(SAPVehicleNumber(sap_dto.vehicle_number).value)
+                    seen_vehicle_numbers.add(
+                        SAPVehicleNumber(sap_dto.vehicle_number).value
+                    )
                     seen_driver_customer_numbers.update(
                         _driver_customer_numbers_from_sap(sap_dto)
                     )

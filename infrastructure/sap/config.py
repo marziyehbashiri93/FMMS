@@ -17,9 +17,12 @@ Optional environment variables:
     SAP_USE_MOCK        — Use MockSAPClient instead of real SAP (default: True)
     SAP_LANG            — SAP logon language (default: EN)
     SAP_VERIFY_SSL      — Verify SAP HTTPS certificates (default: True)
-    SAP_VEHICLE_DRIVER_SERVICE    — Vehicle-driver OData service
+    SAP_VEHICLE_DRIVER_ODATA_SERVICE — Vehicle-driver OData service
         (default: ZC_VEHICLEDRIVER_CDS)
-    SAP_VEHICLE_DRIVER_ENTITY_SET — Vehicle-driver entity set (default: empty)
+    SAP_VEHICLE_DRIVER_ODATA_ENTITY  — Vehicle-driver entity set
+        (default: ZC_VehicleDriver)
+    SAP_VEHICLE_DRIVER_SERVICE / SAP_VEHICLE_DRIVER_ENTITY_SET are supported
+        as backward-compatible fallbacks.
     SAP_OBJECT_PART_CATALOG_SERVICE    — Object-part catalog OData service
         (default: ZI_FLEET_CAT_B_CDS)
     SAP_OBJECT_PART_CATALOG_ENTITY_SET — Object-part catalog entity set
@@ -99,13 +102,15 @@ class SAPConfig:
         sysnr = os.environ.get("SAP_SYSNR", "00")
         lang = os.environ.get("SAP_LANG", "EN")
         verify_ssl = _env_bool("SAP_VERIFY_SSL", default=True)
-        vehicle_driver_service = os.environ.get(
+        vehicle_driver_service = _env_first(
+            "SAP_VEHICLE_DRIVER_ODATA_SERVICE",
             "SAP_VEHICLE_DRIVER_SERVICE",
-            "ZC_VEHICLEDRIVER_CDS",
+            default="ZC_VEHICLEDRIVER_CDS",
         )
-        vehicle_driver_entity_set = os.environ.get(
+        vehicle_driver_entity_set = _env_first(
+            "SAP_VEHICLE_DRIVER_ODATA_ENTITY",
             "SAP_VEHICLE_DRIVER_ENTITY_SET",
-            "",
+            default="ZC_VehicleDriver",
         )
         object_part_catalog_service = os.environ.get(
             "SAP_OBJECT_PART_CATALOG_SERVICE",
@@ -184,3 +189,12 @@ def _env_bool(name: str, default: bool) -> bool:
     if raw is None:
         return default
     return raw.strip().lower() in ("true", "1", "yes")
+
+
+def _env_first(*names: str, default: str) -> str:
+    """Return the first non-empty environment value from ``names``."""
+    for name in names:
+        value = os.environ.get(name)
+        if value not in (None, ""):
+            return value.strip()
+    return default

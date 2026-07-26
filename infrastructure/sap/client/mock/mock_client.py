@@ -62,6 +62,7 @@ _ODATA_GET_ROUTES: dict[tuple[str, str], dict] = {
     ("API_PRODUCT_SRV", "A_ProductPlant"): sc.ODATA_MATERIAL_LIST,
     ("API_MATERIAL_STOCK_SRV", "MatlStkInAcctMod("): sc.ODATA_STOCK_SINGLE,
     ("API_MATERIAL_STOCK_SRV", "MatlStkInAcctMod"): sc.ODATA_STOCK_LIST,
+    ("ZC_VEHICLEDRIVER_CDS", "ZC_VehicleDriver"): sc.ODATA_VEHICLE_DRIVER_LIST,
 }
 
 _BASE_DIR = Path(__file__).resolve().parents[4]

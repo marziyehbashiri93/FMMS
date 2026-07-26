@@ -186,11 +186,21 @@ class TestFMMSUserModel:
         assert FMMSUser is not None
 
     def test_user_model_role_choices(self) -> None:
-        """FMMSUserRole must define all four required roles."""
+        """FMMSUserRole must define all supported FMMS roles."""
         from apps.authentication.infrastructure.models import FMMSUserRole
 
         roles = {choice[0] for choice in FMMSUserRole.choices}
-        assert roles == {"ADMIN", "SUPERVISOR", "TECHNICIAN", "VIEWER"}
+        assert roles == {
+            "ADMIN",
+            "SUPERVISOR",
+            "DISTRIBUTION",
+            "TRANSPORT",
+            "WAREHOUSE",
+            "WORKSHOP_SUPERVISOR",
+            "TECHNICIAN",
+            "DRIVER",
+            "VIEWER",
+        }
 
     def test_user_model_username_field(self) -> None:
         """FMMSUser must use username as the login identifier."""

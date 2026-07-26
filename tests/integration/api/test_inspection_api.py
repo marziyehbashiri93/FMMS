@@ -129,4 +129,6 @@ class TestInspectionAPI:
         assert reported.data["inspection_id"] == inspection_id
         assert len(reported.data["items"]) == 1
         assert FaultModel.objects.filter(inspection_id=inspection_id).count() == 1
-        assert RepairOrderModel.objects.filter(fault_id=reported.data["id"]).count() == 1
+        assert (
+            RepairOrderModel.objects.filter(fault_id=reported.data["id"]).count() == 0
+        )

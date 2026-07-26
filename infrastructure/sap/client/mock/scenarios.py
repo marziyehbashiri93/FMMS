@@ -211,6 +211,34 @@ ODATA_STOCK_LIST: dict = {
 }
 
 # ---------------------------------------------------------------------------
+# OData — ZC_VEHICLEDRIVER_CDS
+# ---------------------------------------------------------------------------
+
+ODATA_VEHICLE_DRIVER_LIST: dict = {
+    "d": {
+        "results": [
+            {
+                "VehicleNumber": "20320",
+                "LicensePlate": "237ع51-11",
+                "CommissioningDate": "20150326",
+                "Driver1CustomerNo": "6000000250",
+                "Driver1Name": "مجتبي  رحيم پناه",
+                "Driver1Mobile": "09120000001",
+                "Driver1PersonnelNo": "250",
+                "Driver1Gender": "M",
+                "Driver1NilofarCode": "N250",
+                "Driver2CustomerNo": "6000000160",
+                "Driver2Name": "اصغر مولائي باروق",
+                "Driver2Mobile": "09120000002",
+                "Driver2PersonnelNo": "160",
+                "Driver2Gender": "M",
+                "Driver2NilofarCode": "N160",
+            }
+        ]
+    }
+}
+
+# ---------------------------------------------------------------------------
 # BAPI — PM Notification
 # ---------------------------------------------------------------------------
 

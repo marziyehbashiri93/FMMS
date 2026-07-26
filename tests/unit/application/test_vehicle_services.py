@@ -48,6 +48,7 @@ from core.exceptions.base_exception import (
 )
 from core.sap.dtos.vehicle_driver import SAPVehicleDriverDTO
 from core.sap.ports.vehicle_driver_port import ISAPVehicleDriverPort
+from infrastructure.sap.client.base import SAPClientError
 
 # ---------------------------------------------------------------------------
 # Fakes
@@ -92,6 +93,7 @@ class FakeVehicleRepository(IVehicleRepository):
     def __init__(self, initial: list[Vehicle] | None = None) -> None:
         self._store: dict[uuid.UUID, Vehicle] = {v.id: v for v in (initial or [])}
         self.driver_assignment_snapshots: list[dict[str, object]] = []
+        self.decommission_calls = 0
 
     def get_by_id(self, vehicle_id: uuid.UUID) -> Vehicle | None:
         return self._store.get(vehicle_id)
@@ -120,6 +122,7 @@ class FakeVehicleRepository(IVehicleRepository):
         return vehicle
 
     def decommission_missing_from_sap(self, seen_vehicle_numbers: set[str]) -> int:
+        self.decommission_calls += 1
         count = 0
         for vehicle in self._store.values():
             if (
@@ -170,6 +173,7 @@ class FakeDriverRepository(IDriverRepository):
 
     def __init__(self, initial: list[Driver] | None = None) -> None:
         self._store: dict[uuid.UUID, Driver] = {d.id: d for d in (initial or [])}
+        self.decommission_calls = 0
 
     def get_by_id(self, driver_id: uuid.UUID) -> Driver:
         driver = self._store.get(driver_id)
@@ -189,9 +193,8 @@ class FakeDriverRepository(IDriverRepository):
             return None
         for driver in self._store.values():
             if (
-                (driver.personnel_number or "") == needle
-                and driver.status == DriverStatus.ACTIVE
-            ):
+                driver.personnel_number or ""
+            ) == needle and driver.status == DriverStatus.ACTIVE:
                 return driver
         return None
 
@@ -212,6 +215,7 @@ class FakeDriverRepository(IDriverRepository):
         return any(d.customer_number == customer_number for d in self._store.values())
 
     def decommission_missing_from_sap(self, seen_customer_numbers: set[str]) -> int:
+        self.decommission_calls += 1
         count = 0
         for driver in self._store.values():
             if (
@@ -251,7 +255,9 @@ class FakeRepairOrderRepository(IRepairOrderRepository):
     def list_by_fault(self, fault_id: uuid.UUID):  # type: ignore[override]
         return [o for o in self._store.values() if o.fault_id == fault_id]
 
-    def list_all(self, status: RepairOrderStatus | None = None, workshop_type=None) -> list[RepairOrder]:
+    def list_all(
+        self, status: RepairOrderStatus | None = None, workshop_type=None
+    ) -> list[RepairOrder]:
         if status is None:
             return list(self._store.values())
         return [o for o in self._store.values() if o.status == status]
@@ -332,9 +338,11 @@ class FakeSAPVehicleDriverPort(ISAPVehicleDriverPort):
         self,
         dto: SAPVehicleDriverDTO | None = None,
         vehicle_drivers: list[SAPVehicleDriverDTO] | None = None,
+        error: Exception | None = None,
     ) -> None:
         self._dto = dto
         self._vehicle_drivers = vehicle_drivers or ([dto] if dto is not None else [])
+        self._error = error
 
     def get_vehicle_driver(self, vehicle_number: str) -> SAPVehicleDriverDTO:
         if self._dto is not None and self._dto.vehicle_number == vehicle_number:
@@ -348,6 +356,8 @@ class FakeSAPVehicleDriverPort(ISAPVehicleDriverPort):
         self,
         plant: str | None = None,
     ) -> list[SAPVehicleDriverDTO]:
+        if self._error is not None:
+            raise self._error
         return list(self._vehicle_drivers)
 
 
@@ -643,6 +653,39 @@ class TestSyncVehiclesFromSAPService:
         assert driver_repo.get_by_id(seen.id).status == DriverStatus.ACTIVE
         assert driver_repo.get_by_id(seen.id).name == "Ali Driver"
         assert driver_repo.get_by_id(missing.id).status == DriverStatus.DECOMMISSIONED
+
+    def test_empty_sap_response_does_not_decommission_all_vehicles(self) -> None:
+        existing = _make_vehicle(plate="237ع51-11", sap_eq="20320")
+        repo = FakeVehicleRepository(initial=[existing])
+        driver_repo = FakeDriverRepository(
+            initial=[_make_driver(customer_number="6000000250")]
+        )
+        sap_port = FakeSAPVehicleDriverPort(vehicle_drivers=[])
+
+        result = SyncVehiclesFromSAPService(repo, sap_port, driver_repo).execute()
+
+        assert result.total_received == 0
+        assert result.created == 0
+        assert result.updated == 0
+        assert result.decommissioned == 0
+        assert result.failed == 1
+        assert repo.get_by_id(existing.id).status == VehicleStatus.ACTIVE
+        assert repo.decommission_calls == 0
+        assert driver_repo.decommission_calls == 0
+
+    def test_transport_error_prevents_local_changes(self) -> None:
+        existing = _make_vehicle(plate="237ع51-11", sap_eq="20320")
+        repo = FakeVehicleRepository(initial=[existing])
+        sap_port = FakeSAPVehicleDriverPort(
+            error=SAPClientError("SAP OData GET request error: timed out")
+        )
+
+        with pytest.raises(SAPClientError, match="timed out"):
+            SyncVehiclesFromSAPService(repo, sap_port).execute()
+
+        assert repo.get_by_id(existing.id).status == VehicleStatus.ACTIVE
+        assert len(repo.driver_assignment_snapshots) == 0
+        assert repo.decommission_calls == 0
 
 
 # ---------------------------------------------------------------------------

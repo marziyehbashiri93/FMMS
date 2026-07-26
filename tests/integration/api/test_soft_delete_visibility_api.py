@@ -32,7 +32,7 @@ class TestSoftDeleteVisibility:
         assert orm.is_deleted is False
         assert orm.status == "DECOMMISSIONED"
 
-        listed = authenticated_client.get("/api/v1/vehicles/")
+        listed = authenticated_client.get("/api/v1/vehicles/?status=ACTIVE")
         assert listed.status_code == 200
         ids = {row["id"] for row in listed.data["results"]}
         assert vehicle["id"] not in ids

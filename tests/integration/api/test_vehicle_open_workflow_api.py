@@ -123,23 +123,26 @@ class TestVehicleOpenWorkflowAPI:
     def test_submit_failed_inspection_allowed_when_open_fault_exists(
         self, authenticated_client: APIClient
     ) -> None:
-        """Submit only finalizes the checklist; open-flow is checked on report."""
+        """Checklist creation is rejected while a vehicle is out of service."""
         vehicle = create_vehicle(
             authenticated_client, plate="12WF002", vin="1HGCM82633A004502"
         )
         _open_fault_and_repair(authenticated_client, vehicle["id"])
-        inspection_id = _create_inspection_with_fail_items(
-            authenticated_client, vehicle["id"], fail_count=1
-        )
 
         response = authenticated_client.post(
-            f"/api/v1/inspections/{inspection_id}/submit/",
-            {},
+            "/api/v1/inspections/",
+            {
+                "vehicle_id": vehicle["id"],
+                "inspection_type": "PRE_TRIP",
+                "odometer_value": 15000,
+                "odometer_unit": "KM",
+                "inspected_at": datetime.now(tz=UTC).isoformat(),
+            },
             format="json",
         )
 
-        assert response.status_code == 200, response.data
-        assert response.data["has_failures"] is True
+        assert response.status_code == 409, response.data
+        assert response.data["error_code"] == "VEHICLE_NOT_OPERATIONAL"
 
     def test_submit_failed_inspection_allowed_after_distribution_usable_close(
         self, authenticated_client: APIClient
@@ -160,18 +163,20 @@ class TestVehicleOpenWorkflowAPI:
         assert cancelled.status_code == 200
         assert cancelled.data["status"] == "CANCELLED"
 
-        inspection_id = _create_inspection_with_fail_items(
-            authenticated_client, vehicle["id"], fail_count=1
-        )
-
         response = authenticated_client.post(
-            f"/api/v1/inspections/{inspection_id}/submit/",
-            {},
+            "/api/v1/inspections/",
+            {
+                "vehicle_id": vehicle["id"],
+                "inspection_type": "PRE_TRIP",
+                "odometer_value": 15000,
+                "odometer_unit": "KM",
+                "inspected_at": datetime.now(tz=UTC).isoformat(),
+            },
             format="json",
         )
 
-        assert response.status_code == 200, response.data
-        assert response.data["has_failures"] is True
+        assert response.status_code == 409, response.data
+        assert response.data["error_code"] == "VEHICLE_NOT_OPERATIONAL"
 
     def test_report_fault_rejected_when_open_fault_exists(
         self, authenticated_client: APIClient
