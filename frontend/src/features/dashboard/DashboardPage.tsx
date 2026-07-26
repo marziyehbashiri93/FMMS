@@ -83,7 +83,7 @@ export function DashboardPage() {
         workshopQueue: workshopQueue.count ?? 0,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'دریافت خلاصه داشبورد انجام نشد');
+      setError(err instanceof Error ? err.message : 'خلاصه داشبورد بارگذاری نشد');
     } finally {
       setLoading(false);
     }
@@ -95,45 +95,45 @@ export function DashboardPage() {
 
   const quickLinks: QuickLink[] = [
     {
-      title: 'لیست خرابی‌ها',
-      subtitle: `${toFaNumber(queues.openFaults)} مورد در انتظار تصمیم توزیع`,
+      title: 'کارتابل توزیع',
+      subtitle: `${toFaNumber(queues.openFaults)} خرابی در انتظار تصمیم توزیع`,
       to: '/faults',
       icon: CarRepair,
       tone: 'warning',
     },
     {
       title: 'کارتابل ترابری',
-      subtitle: `${toFaNumber(queues.transportQueue)} مورد در صف ترابری`,
+      subtitle: `${toFaNumber(queues.transportQueue)} درخواست در صف ترابری`,
       to: '/repairs',
       icon: Build,
       tone: 'error',
     },
     {
       title: 'تعمیرگاه مرکزی',
-      subtitle: `${toFaNumber(queues.workshopQueue)} مورد در صف تصمیم فنی`,
+      subtitle: `${toFaNumber(queues.workshopQueue)} درخواست در انتظار تصمیم فنی`,
       to: '/workshop',
       icon: Build,
       tone: 'warning',
     },
     {
-      title: 'لیست خودروها',
+      title: 'خودروها',
       subtitle: `${toFaNumber(vehicleSummary?.active_fleet_count)} خودرو فعال`,
       to: '/vehicles',
       icon: DirectionsCar,
       tone: 'primary',
     },
     {
-      title: 'لیست راننده‌ها',
+      title: 'راننده‌ها',
       subtitle: `${toFaNumber(driverSummary?.active_count)} راننده فعال`,
       to: '/drivers',
       icon: PeopleAlt,
       tone: 'success',
     },
     {
-      title: 'لاگ SAP',
+      title: 'وضعیت SAP',
       subtitle: sapSummary
         ? `${toFaNumber(sapSummary.failed + sapSummary.exhausted)} ناموفق · ${toFaNumber(sapSummary.success)} موفق`
-        : 'مشاهده تراکنش‌های SAP',
+        : 'مشاهده وضعیت همگام‌سازی و تراکنش‌ها',
       to: '/sap',
       icon: Sync,
       tone: 'primary',
@@ -143,37 +143,37 @@ export function DashboardPage() {
   return (
     <FeaturePage>
       <PageHeader
-        title="داشبورد"
-        description="وضعیت خودروها، راننده‌ها و صف‌های توزیع و ترابری بر اساس آخرین داده‌های سامانه."
-        breadcrumbs={[{ label: 'اصلی' }, { label: 'داشبورد' }]}
+        title="نمای کلی عملیات ناوگان"
+        description="خلاصه وضعیت ناوگان، راننده‌ها و صف‌های عملیاتی بر اساس آخرین داده‌ها."
+        breadcrumbs={[{ label: 'داشبورد' }]}
       />
 
       {error && <ErrorState message={error} onRetry={() => void load()} />}
-      {loading && !error && <LoadingState label="در حال بارگذاری داشبورد..." />}
+      {loading && !error && <LoadingState label="در حال بارگذاری داشبورد…" />}
 
       {!loading && !error && (
         <>
           <KpiGrid mdColumns={4}>
             <KpiCard
-              label="کل ناوگان فعال"
+              label="خودروهای فعال"
               value={toFaNumber(vehicleSummary?.active_fleet_count)}
               icon={DirectionsCar}
               tone="primary"
             />
             <KpiCard
-              label="عملیاتی"
+              label="آماده بهره‌برداری"
               value={toFaNumber(vehicleSummary?.operational_fleet_count)}
               icon={TaskAlt}
               tone="success"
             />
             <KpiCard
-              label="در تعمیر"
+              label="خودروهای در تعمیر"
               value={toFaNumber(vehicleSummary?.under_repair_fleet_count)}
               icon={Build}
               tone="warning"
             />
             <KpiCard
-              label="خارج از سرویس"
+              label="خودروهای خارج از سرویس"
               value={toFaNumber(vehicleSummary?.unusable_fleet_count)}
               icon={ErrorOutline}
               tone="error"
@@ -182,25 +182,25 @@ export function DashboardPage() {
 
           <KpiGrid mdColumns={4}>
             <KpiCard
-              label="راننده فعال"
+              label="راننده‌های فعال"
               value={toFaNumber(driverSummary?.active_count)}
               icon={PeopleAlt}
               tone="primary"
             />
             <KpiCard
-              label="راننده با خودرو"
+              label="راننده‌های دارای خودرو"
               value={toFaNumber(driverSummary?.with_vehicle_count)}
               icon={DirectionsCar}
               tone="info"
             />
             <KpiCard
-              label="میانگین کیلومتر"
+              label="میانگین کارکرد خودروها"
               value={toFaNumber(vehicleSummary?.average_odometer_km)}
               icon={Speed}
               tone="info"
             />
             <KpiCard
-              label="میانگین خرابی ۳۰ روز"
+              label="میانگین خرابی در ۳۰ روز اخیر"
               value={toFaNumber(vehicleSummary?.average_faults_last_30_days)}
               icon={CarRepair}
               tone="warning"
@@ -270,12 +270,12 @@ export function DashboardPage() {
                 <Stack direction="row" spacing={1.25} alignItems="center">
                   <Sync color="action" />
                   <Box>
-                    <Typography fontWeight={800}>لاگ و همگام‌سازی SAP</Typography>
+                    <Typography fontWeight={800}>همگام‌سازی و تراکنش‌های SAP</Typography>
                     <Typography variant="body2" color="text.secondary">
                       خودرو: {formatDateTime(vehicleSummary?.last_sap_sync_at)} · راننده:{' '}
                       {formatDateTime(driverSummary?.last_sap_sync_at)}
                       {sapSummary
-                        ? ` · تراکنش‌ها: ${toFaNumber(sapSummary.total)} (ناموفق: ${toFaNumber(sapSummary.failed + sapSummary.exhausted)})`
+                        ? ` · کل تراکنش‌ها: ${toFaNumber(sapSummary.total)} · ناموفق: ${toFaNumber(sapSummary.failed + sapSummary.exhausted)}`
                         : ''}
                     </Typography>
                   </Box>
