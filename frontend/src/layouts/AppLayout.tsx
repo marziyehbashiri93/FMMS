@@ -564,10 +564,14 @@ export function AppLayout() {
           }}
           sx={{
             width: activeDrawerWidth,
+            height: '100dvh',
+            display: 'flex',
+            flexDirection: 'column',
             borderLeft: '1px solid',
             borderColor: 'rgba(154, 171, 163, 0.16)',
             bgcolor: sidebarBg,
-            overflowY: 'visible',
+            // Keep visible so the collapse control can sit on the content edge
+            overflow: 'visible',
             boxShadow: '8px 0 24px rgba(20, 26, 33, 0.06)',
             transition: theme.transitions.create('width', { duration: theme.transitions.duration.shorter }),
           }}
@@ -575,30 +579,53 @@ export function AppLayout() {
           <IconButton
             size="small"
             onClick={() => setSidebarCollapsed((current) => !current)}
-            style={{
+            aria-label={sidebarCollapsed ? 'باز کردن سایدبار' : 'بستن سایدبار'}
+            sx={{
               position: 'absolute',
               left: -14,
-              top: 24,
-            }}
-            sx={{
+              top: 22,
               width: 28,
               height: 28,
-              bgcolor: sidebarBg,
+              bgcolor: '#FFFFFF',
               border: '1px solid',
-              borderColor: 'rgba(154, 171, 163, 0.24)',
-              color: sidebarText,
-              boxShadow: '0 8px 18px rgba(0, 0, 0, 0.16)',
-              zIndex: 2,
-              '&:hover': { bgcolor: sidebarActiveBg, color: sidebarActive },
+              borderColor: 'divider',
+              color: 'primary.main',
+              boxShadow: '0 4px 12px rgba(15, 107, 76, 0.18)',
+              zIndex: (t) => t.zIndex.drawer + 1,
+              '&:hover': {
+                bgcolor: 'primary.main',
+                borderColor: 'primary.main',
+                color: '#FFFFFF',
+                boxShadow: '0 6px 14px rgba(15, 107, 76, 0.28)',
+              },
             }}
           >
             {sidebarCollapsed ? <ChevronLeft fontSize="small" /> : <ChevronRight fontSize="small" />}
           </IconButton>
-          <Box px={sidebarCollapsed ? 1 : 2} py={2.25}>
+          <Box px={sidebarCollapsed ? 1 : 2} py={2.25} flexShrink={0}>
             <BrandBlock compact={sidebarCollapsed} onDark />
           </Box>
-          <Divider sx={{ borderColor: 'rgba(154, 171, 163, 0.12)' }} />
-          <Box sx={{ height: 'calc(100vh - 81px)', overflowY: 'auto', overflowX: 'hidden' }}>
+          <Divider sx={{ borderColor: 'rgba(154, 171, 163, 0.12)', flexShrink: 0 }} />
+          <Box
+            sx={{
+              flex: 1,
+              minHeight: 0,
+              overflowY: 'auto',
+              overflowX: 'hidden',
+              '&::-webkit-scrollbar': { width: 8 },
+              '&::-webkit-scrollbar-track': { background: 'transparent' },
+              '&::-webkit-scrollbar-thumb': {
+                background: 'rgba(154, 171, 163, 0.35)',
+                borderRadius: 999,
+                border: '2px solid transparent',
+                backgroundClip: 'padding-box',
+              },
+              '&::-webkit-scrollbar-thumb:hover': {
+                background: 'rgba(196, 92, 74, 0.65)',
+                backgroundClip: 'padding-box',
+              },
+            }}
+          >
             <NavigationList user={user} collapsed={sidebarCollapsed} />
           </Box>
         </Box>

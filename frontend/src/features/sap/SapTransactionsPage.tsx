@@ -14,6 +14,7 @@ import {
 import { useTheme } from '@mui/material/styles';
 import { Sync } from '@mui/icons-material';
 import { api } from '../../api/client';
+import { canRunSapFullSync } from '../../app/access';
 import { Button } from '../../components/Button';
 import { ClearFiltersButton } from '../../components/ClearFiltersButton';
 import { DetailLine } from '../../components/DetailLine';
@@ -25,8 +26,10 @@ import { EmptyState, ErrorState, LoadingState } from '../../components/States';
 import { PlainStatusBadge } from '../../components/StatusBadge';
 import { RtlDataTable, type RtlDataTableColumn } from '../../components/RtlDataTable';
 import { RtlSelectField } from '../../components/RtlSelectField';
+import { StatusFilterTabs, type StatusTabOption } from '../../components/StatusFilterTabs';
 import { TabbedDetailModal } from '../../components/TabbedDetailModal';
 import type {
+  AuthUser,
   SAPObjectType,
   SAPSyncRun,
   SAPTransaction,
@@ -68,6 +71,16 @@ const SYNC_ITEM_LABELS: Record<string, string> = {
 
 type StatusFilter = '' | SAPTransactionStatus;
 type MainTab = 0 | 1;
+
+const STATUS_TAB_OPTIONS: ReadonlyArray<StatusTabOption<SAPTransactionStatus>> = [
+  { value: '', label: 'همه' },
+  ...Object.entries(STATUS_LABELS)
+    .filter(([value]) => value !== 'PARTIAL_SUCCESS')
+    .map(([value, label]) => ({
+      value: value as SAPTransactionStatus,
+      label,
+    })),
+];
 
 function statusTone(status: string): 'success' | 'warning' | 'error' | 'neutral' {
   if (status === 'SUCCESS') return 'success';
@@ -130,28 +143,56 @@ export function SapTransactionsPage() {
   const [summary, setSummary] = useState<SAPTransactionSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [status, setStatus] = useState<StatusFilter>('');
+  const [statusTab, setStatusTab] = useState<StatusFilter>('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('');
+  const status = statusTab || statusFilter;
   const [objectType, setObjectType] = useState<SAPObjectType | ''>('');
   const [selected, setSelected] = useState<SAPTransaction | null>(null);
   const [selectedSync, setSelectedSync] = useState<SAPSyncRun | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState('');
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncMessage, setSyncMessage] = useState('');
+  const [syncError, setSyncError] = useState('');
+
+  const canSync = canRunSapFullSync(user);
+
+  useEffect(() => {
+    let cancelled = false;
+    void api
+      .me()
+      .then((profile) => {
+        if (!cancelled) setUser(profile);
+      })
+      .catch(() => {
+        if (!cancelled) setUser(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const refreshSummary = useCallback(async () => {
+    try {
+      const txnSummary = await api.getSapTransactionSummary();
+      setSummary(txnSummary);
+    } catch {
+      // Keep last summary snapshot; list error is handled separately.
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const [txns, txnSummary] = await Promise.all([
-        api.listSapTransactions({
-          status: status || undefined,
-          objectType: objectType || undefined,
-          page: 1,
-          pageSize: 100,
-        }),
-        api.getSapTransactionSummary(),
-      ]);
+      const txns = await api.listSapTransactions({
+        status: status || undefined,
+        objectType: objectType || undefined,
+        page: 1,
+        pageSize: 100,
+      });
       setItems(txns.results ?? []);
-      setSummary(txnSummary);
 
       try {
         const syncHistory = await api.listSapSyncHistory({ page: 1, pageSize: 50 });
@@ -163,7 +204,6 @@ export function SapTransactionsPage() {
     } catch (err) {
       setItems([]);
       setSyncRuns([]);
-      setSummary(null);
       setError(err instanceof Error ? err.message : 'دریافت لاگ SAP انجام نشد');
     } finally {
       setLoading(false);
@@ -171,8 +211,30 @@ export function SapTransactionsPage() {
   }, [status, objectType]);
 
   useEffect(() => {
+    void refreshSummary();
+  }, [refreshSummary]);
+
+  useEffect(() => {
     void load();
   }, [load]);
+
+  const runManualSync = async () => {
+    if (!canSync || syncLoading) return;
+    setSyncLoading(true);
+    setSyncError('');
+    setSyncMessage('');
+    try {
+      const result = await api.runSapSync();
+      const label = statusLabel(result.status);
+      setSyncMessage(`همگام‌سازی دستی انجام شد — وضعیت: ${label}`);
+      setMainTab(1);
+      await Promise.all([load(), refreshSummary()]);
+    } catch (err) {
+      setSyncError(err instanceof Error ? err.message : 'همگام‌سازی دستی انجام نشد');
+    } finally {
+      setSyncLoading(false);
+    }
+  };
 
   const openDetail = async (row: SAPTransaction) => {
     setSelected(row);
@@ -189,11 +251,11 @@ export function SapTransactionsPage() {
   };
 
   const resetFilters = () => {
-    setStatus('');
+    setStatusFilter('');
     setObjectType('');
   };
 
-  const hasActiveFilters = Boolean(status || objectType);
+  const hasActiveFilters = Boolean(statusFilter || objectType);
 
   const txnColumns: Array<RtlDataTableColumn<SAPTransaction, string>> = useMemo(
     () => [
@@ -433,12 +495,28 @@ export function SapTransactionsPage() {
       <PageHeader
         title="لاگ یکپارچه‌سازی SAP"
         breadcrumbs={[{ label: 'مدیریت' }, { label: 'یکپارچه‌سازی SAP' }]}
+        actions={
+          canSync ? (
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<Sync />}
+              loading={syncLoading}
+              onClick={() => void runManualSync()}
+            >
+              همگام‌سازی دستی
+            </Button>
+          ) : undefined
+        }
       />
 
       <Alert severity="info">
         تراکنش‌های نوشتن (BAPI) با درخواست و پاسخ کامل ذخیره می‌شوند. همگام‌سازی خواندن
         (OData) در تب جداگانه به‌صورت خلاصه اجرا نمایش داده می‌شود.
       </Alert>
+
+      {syncMessage && <Alert severity="success">{syncMessage}</Alert>}
+      {syncError && <Alert severity="error">{syncError}</Alert>}
 
       {summary && (
         <KpiGrid mdColumns={5}>
@@ -480,41 +558,63 @@ export function SapTransactionsPage() {
         <Tab label="همگام‌سازی خواندن (OData)" />
       </Tabs>
 
-      {error && <ErrorState message={error} onRetry={() => void load()} />}
+      {error && (
+        <ErrorState
+          message={error}
+          onRetry={() => {
+            void Promise.all([load(), refreshSummary()]);
+          }}
+        />
+      )}
       {loading && !error && <LoadingState label="در حال بارگذاری لاگ SAP..." />}
 
       {!loading && !error && mainTab === 0 && (
         <>
-          <FilterPanel>
-            <RtlSelectField
-              label="وضعیت"
-              value={status}
-              onChange={(event) => setStatus(event.target.value as StatusFilter)}
-              size="small"
-            >
-              <MenuItem value="">همه</MenuItem>
-              {Object.entries(STATUS_LABELS)
-                .filter(([value]) => value !== 'PARTIAL_SUCCESS')
-                .map(([value, label]) => (
-                  <MenuItem key={value} value={value}>
-                    {label}
+          <StatusFilterTabs
+            value={statusTab}
+            options={STATUS_TAB_OPTIONS}
+            onChange={(next) => {
+              setStatusTab(next);
+              if (next) {
+                setStatusFilter('');
+                setObjectType('');
+              }
+            }}
+            ariaLabel="وضعیت تراکنش SAP"
+          />
+
+          {statusTab === '' && (
+            <FilterPanel>
+              <RtlSelectField
+                label="وضعیت"
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
+                size="small"
+              >
+                <MenuItem value="">همه</MenuItem>
+                {Object.entries(STATUS_LABELS)
+                  .filter(([value]) => value !== 'PARTIAL_SUCCESS')
+                  .map(([value, label]) => (
+                    <MenuItem key={value} value={value}>
+                      {label}
+                    </MenuItem>
+                  ))}
+              </RtlSelectField>
+              <RtlSelectField
+                label="بخش"
+                value={objectType}
+                onChange={(event) => setObjectType(event.target.value as SAPObjectType | '')}
+                size="small"
+              >
+                {OBJECT_TYPE_OPTIONS.map((option) => (
+                  <MenuItem key={option.value || 'all'} value={option.value}>
+                    {option.label}
                   </MenuItem>
                 ))}
-            </RtlSelectField>
-            <RtlSelectField
-              label="بخش"
-              value={objectType}
-              onChange={(event) => setObjectType(event.target.value as SAPObjectType | '')}
-              size="small"
-            >
-              {OBJECT_TYPE_OPTIONS.map((option) => (
-                <MenuItem key={option.value || 'all'} value={option.value}>
-                  {option.label}
-                </MenuItem>
-              ))}
-            </RtlSelectField>
-            <ClearFiltersButton onClick={resetFilters} disabled={!hasActiveFilters} />
-          </FilterPanel>
+              </RtlSelectField>
+              <ClearFiltersButton onClick={resetFilters} disabled={!hasActiveFilters} />
+            </FilterPanel>
+          )}
 
           <RtlDataTable
             rows={items}

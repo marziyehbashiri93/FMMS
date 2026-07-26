@@ -40,6 +40,7 @@ import { PlainStatusBadge, VehicleStatusBadge } from '../../components/StatusBad
 import { RtlDataTable, type RtlDataTableColumn } from '../../components/RtlDataTable';
 import { RtlSelectField } from '../../components/RtlSelectField';
 import { RtlTextField } from '../../components/RtlTextField';
+import { StatusFilterTabs, type StatusTabOption } from '../../components/StatusFilterTabs';
 import { TabbedDetailModal } from '../../components/TabbedDetailModal';
 import type { Fault, Inspection, Vehicle } from '../../types/fmms';
 import { formatDateTime, toFaNumber } from '../../utils/format';
@@ -101,6 +102,15 @@ type FaultStatusFilter =
   | 'ASSIGNED'
   | 'IN_REPAIR'
   | 'CLOSED';
+
+const STATUS_TAB_OPTIONS: ReadonlyArray<StatusTabOption<Exclude<FaultStatusFilter, ''>>> = [
+  { value: '', label: 'همه' },
+  { value: 'OPEN', label: 'در انتظار تصمیم' },
+  { value: 'AWAITING_TRANSPORT', label: 'صف ترابری' },
+  { value: 'ASSIGNED', label: 'تخصیص‌یافته' },
+  { value: 'IN_REPAIR', label: 'در تعمیر' },
+  { value: 'CLOSED', label: 'بسته شده' },
+];
 
 function normalizePaginated<T>(payload: { results?: T[] } | T[]): T[] {
   if (Array.isArray(payload)) return payload;
@@ -168,7 +178,9 @@ export function DistributionFaultsPage() {
   const [error, setError] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState<FaultStatusFilter>('');
+  const [statusTab, setStatusTab] = useState<FaultStatusFilter>('');
+  const [statusFilter, setStatusFilter] = useState<FaultStatusFilter>('');
+  const status = statusTab || statusFilter;
   const [selected, setSelected] = useState<Fault | null>(null);
   const [detail, setDetail] = useState<DetailState | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -355,10 +367,10 @@ export function DistributionFaultsPage() {
   const resetFilters = () => {
     setSearchInput('');
     setSearch('');
-    setStatus('');
+    setStatusFilter('');
   };
 
-  const hasActiveFilters = search !== '' || status !== '';
+  const hasActiveFilters = search !== '' || statusFilter !== '';
   const decisionDisabled = detail?.fault.status !== 'OPEN';
 
   const columns: Array<RtlDataTableColumn<Fault, string>> = [
@@ -755,76 +767,92 @@ export function DistributionFaultsPage() {
       <KpiGrid mdColumns={4}>
         <KpiCard
           label="کل خرابی‌ها"
-          value={loading ? '...' : toFaNumber(kpi.total)}
+          value={toFaNumber(kpi.total)}
           icon={ReportProblem}
         />
         <KpiCard
           label="در انتظار تصمیم"
-          value={loading ? '...' : toFaNumber(kpi.openCount)}
+          value={toFaNumber(kpi.openCount)}
           icon={WarningAmber}
           tone="warning"
         />
         <KpiCard
           label="شدت بالا / بحرانی"
-          value={loading ? '...' : toFaNumber(kpi.criticalCount)}
+          value={toFaNumber(kpi.criticalCount)}
           icon={ReportProblem}
           tone="error"
         />
         <KpiCard
           label="بسته شده"
-          value={loading ? '...' : toFaNumber(kpi.closedCount)}
+          value={toFaNumber(kpi.closedCount)}
           icon={CheckCircleOutline}
           tone="success"
         />
       </KpiGrid>
 
-      <FilterPanel>
-        <RtlTextField
-          value={searchInput}
-          onChange={(event) => setSearchInput(event.target.value)}
-          label="جستجو"
-          placeholder="پلاک، شرح، کد یا SAP"
-          size="small"
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Search fontSize="small" />
-              </InputAdornment>
-            ),
-          }}
-          sx={{ width: { xs: '100%', md: 300 }, flexShrink: 0 }}
-        />
-        <RtlSelectField<FaultStatusFilter>
-          value={status}
-          label="وضعیت"
-          size="small"
-          fullWidth={false}
-          displayEmpty
-          onChange={(event) => setStatus(event.target.value as FaultStatusFilter)}
-          renderValue={(selected) => {
-            if (!selected) return <PlainStatusBadge label="همه وضعیت‌ها" />;
-            return (
-              <PlainStatusBadge
-                label={faultStatusLabel(String(selected))}
-                tone={statusTone(String(selected))}
-              />
-            );
-          }}
-          sx={{ width: { xs: '100%', md: 240 }, flexShrink: 0 }}
-        >
-          <MenuItem value="">
-            <PlainStatusBadge label="همه وضعیت‌ها" />
-          </MenuItem>
-          {(Object.keys(FAULT_STATUS_LABELS) as Array<Exclude<FaultStatusFilter, ''>>).map(
-            (value) => (
-              <MenuItem key={value} value={value}>
-                <PlainStatusBadge label={faultStatusLabel(value)} tone={statusTone(value)} />
-              </MenuItem>
-            ),
-          )}
-        </RtlSelectField>
-        <ClearFiltersButton onClick={resetFilters} disabled={!hasActiveFilters} />
-      </FilterPanel>
+      <StatusFilterTabs
+        value={statusTab}
+        options={STATUS_TAB_OPTIONS}
+        onChange={(next) => {
+          setStatusTab(next);
+          if (next) {
+            setStatusFilter('');
+            setSearchInput('');
+            setSearch('');
+          }
+        }}
+        ariaLabel="وضعیت توزیع خودرو"
+      />
+
+      {statusTab === '' && (
+        <FilterPanel>
+          <RtlTextField
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+            label="جستجو"
+            placeholder="پلاک، شرح، کد یا SAP"
+            size="small"
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search fontSize="small" />
+                </InputAdornment>
+              ),
+            }}
+            sx={{ width: { xs: '100%', md: 300 }, flexShrink: 0 }}
+          />
+          <RtlSelectField<FaultStatusFilter>
+            value={statusFilter}
+            label="وضعیت"
+            size="small"
+            fullWidth={false}
+            displayEmpty
+            onChange={(event) => setStatusFilter(event.target.value as FaultStatusFilter)}
+            renderValue={(selected) => {
+              if (!selected) return <PlainStatusBadge label="همه وضعیت‌ها" />;
+              return (
+                <PlainStatusBadge
+                  label={faultStatusLabel(String(selected))}
+                  tone={statusTone(String(selected))}
+                />
+              );
+            }}
+            sx={{ width: { xs: '100%', md: 240 }, flexShrink: 0 }}
+          >
+            <MenuItem value="">
+              <PlainStatusBadge label="همه وضعیت‌ها" />
+            </MenuItem>
+            {(Object.keys(FAULT_STATUS_LABELS) as Array<Exclude<FaultStatusFilter, ''>>).map(
+              (value) => (
+                <MenuItem key={value} value={value}>
+                  <PlainStatusBadge label={faultStatusLabel(value)} tone={statusTone(value)} />
+                </MenuItem>
+              ),
+            )}
+          </RtlSelectField>
+          <ClearFiltersButton onClick={resetFilters} disabled={!hasActiveFilters} />
+        </FilterPanel>
+      )}
 
       {success && <Alert severity="success">{success}</Alert>}
       {error && <ErrorState message={error} onRetry={() => void loadFaults()} />}

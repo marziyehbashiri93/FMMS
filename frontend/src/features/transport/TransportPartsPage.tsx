@@ -29,6 +29,7 @@ import { PlainStatusBadge } from '../../components/StatusBadge';
 import { RtlDataTable, type RtlDataTableColumn } from '../../components/RtlDataTable';
 import { RtlSelectField } from '../../components/RtlSelectField';
 import { RtlTextField } from '../../components/RtlTextField';
+import { StatusFilterTabs, type StatusTabOption } from '../../components/StatusFilterTabs';
 import { TabbedDetailModal } from '../../components/TabbedDetailModal';
 import { formatDateTime, toFaNumber } from '../../utils/format';
 
@@ -57,6 +58,15 @@ type StatusFilter =
   | 'PARTIALLY_ISSUED'
   | 'STOCK_ISSUED'
   | 'RECEIVED';
+
+const STATUS_TAB_OPTIONS: ReadonlyArray<StatusTabOption<Exclude<StatusFilter, ''>>> = [
+  { value: '', label: 'همه' },
+  { value: 'REQUESTED', label: 'در انتظار بررسی' },
+  { value: 'PURCHASE_REQUIRED', label: 'نیاز به خرید' },
+  { value: 'PARTIALLY_ISSUED', label: 'تخصیص جزئی' },
+  { value: 'STOCK_ISSUED', label: 'ارسال‌شده' },
+  { value: 'RECEIVED', label: 'دریافت‌شده' },
+];
 
 type MaterialRequestItem = {
   id: string;
@@ -218,13 +228,34 @@ export function TransportPartsPage() {
   const [items, setItems] = useState<MaterialRequestRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [status, setStatus] = useState<StatusFilter>('');
+  const [statusTab, setStatusTab] = useState<StatusFilter>('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('');
+  const status = statusTab || statusFilter;
   const [selected, setSelected] = useState<MaterialRequestRow | null>(null);
   const [note, setNote] = useState('');
   const [itemDecisions, setItemDecisions] = useState<Record<string, ItemDecision>>({});
   const [actionLoading, setActionLoading] = useState('');
   const [actionError, setActionError] = useState('');
   const [success, setSuccess] = useState('');
+  const [kpis, setKpis] = useState({ requested: 0, purchase: 0, issued: 0 });
+
+  const computeKpis = (rows: MaterialRequestRow[]) => ({
+    requested: rows.filter((item) => item.status === 'REQUESTED').length,
+    purchase: rows.filter(
+      (item) =>
+        item.status === 'PURCHASE_REQUIRED' || item.status === 'PARTIALLY_ISSUED',
+    ).length,
+    issued: rows.filter((item) => item.status === 'STOCK_ISSUED').length,
+  });
+
+  const refreshKpis = useCallback(async () => {
+    try {
+      const rows = (await api.listMaterialRequests(undefined)) as MaterialRequestRow[];
+      setKpis(computeKpis(Array.isArray(rows) ? rows : []));
+    } catch {
+      // Keep last KPI snapshot; list error is handled separately.
+    }
+  }, []);
 
   const load = useCallback(async (statusOverride?: StatusFilter) => {
     const filter = statusOverride ?? status;
@@ -246,6 +277,10 @@ export function TransportPartsPage() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    void refreshKpis();
+  }, [refreshKpis]);
+
   const itemKey = (item: MaterialRequestItem) => String(item.id);
 
   const openSelected = useCallback((row: MaterialRequestRow) => {
@@ -263,16 +298,6 @@ export function TransportPartsPage() {
     setSuccess('');
     setSelected(row);
   }, []);
-
-  const kpis = useMemo(() => {
-    const requested = items.filter((item) => item.status === 'REQUESTED').length;
-    const purchase = items.filter(
-      (item) =>
-        item.status === 'PURCHASE_REQUIRED' || item.status === 'PARTIALLY_ISSUED',
-    ).length;
-    const issued = items.filter((item) => item.status === 'STOCK_ISSUED').length;
-    return { requested, purchase, issued };
-  }, [items]);
 
   const columns = useMemo<Array<RtlDataTableColumn<MaterialRequestRow, string>>>(
     () => [
@@ -333,12 +358,13 @@ export function TransportPartsPage() {
   const applyDecisionResult = async (result: MaterialRequestRow) => {
     const nextFilter = filterForStatus(result.status);
     if (nextFilter !== status) {
-      setStatus(nextFilter);
+      setStatusTab(nextFilter);
+      setStatusFilter('');
     }
     setSelected(result);
     setItemDecisions({});
     setNote('');
-    await load(nextFilter);
+    await Promise.all([load(nextFilter), refreshKpis()]);
 
     if (needsPurchaseFollowUp(result.status)) {
       setSuccess(
@@ -390,10 +416,11 @@ export function TransportPartsPage() {
       )) as MaterialRequestRow;
       const nextFilter = filterForStatus(result.status);
       if (nextFilter !== status) {
-        setStatus(nextFilter);
+        setStatusTab(nextFilter);
+        setStatusFilter('');
       }
       setSelected(result);
-      await load(nextFilter);
+      await Promise.all([load(nextFilter), refreshKpis()]);
       setSuccess(
         'رسید خرید ثبت و قطعات به تعمیرگاه ارسال شد. منتظر دریافت فیزیکی در تعمیرگاه باشید.',
       );
@@ -433,40 +460,55 @@ export function TransportPartsPage() {
       <KpiGrid>
         <KpiCard
           label="در انتظار تصمیم"
-          value={loading ? '...' : toFaNumber(kpis.requested)}
+          value={toFaNumber(kpis.requested)}
           icon={Inventory2}
           tone="warning"
         />
         <KpiCard
           label="نیاز به خرید / جزئی"
-          value={loading ? '...' : toFaNumber(kpis.purchase)}
+          value={toFaNumber(kpis.purchase)}
           icon={ShoppingCart}
           tone="error"
         />
         <KpiCard
           label="ارسال‌شده"
-          value={loading ? '...' : toFaNumber(kpis.issued)}
+          value={toFaNumber(kpis.issued)}
           icon={CheckCircleOutline}
           tone="success"
         />
       </KpiGrid>
 
-      <FilterPanel>
-        <RtlSelectField
-          label="وضعیت"
-          value={status}
-          onChange={(event) => setStatus(event.target.value as StatusFilter)}
-          size="small"
-        >
-          <MenuItem value="">همه</MenuItem>
-          <MenuItem value="REQUESTED">در انتظار بررسی</MenuItem>
-          <MenuItem value="PURCHASE_REQUIRED">نیاز به خرید</MenuItem>
-          <MenuItem value="PARTIALLY_ISSUED">تخصیص جزئی</MenuItem>
-          <MenuItem value="STOCK_ISSUED">ارسال‌شده</MenuItem>
-          <MenuItem value="RECEIVED">دریافت‌شده</MenuItem>
-        </RtlSelectField>
-        <ClearFiltersButton onClick={() => setStatus('')} disabled={status === ''} />
-      </FilterPanel>
+      <StatusFilterTabs
+        value={statusTab}
+        options={STATUS_TAB_OPTIONS}
+        onChange={(next) => {
+          setStatusTab(next);
+          if (next) setStatusFilter('');
+        }}
+        ariaLabel="وضعیت درخواست قطعات"
+      />
+
+      {statusTab === '' && (
+        <FilterPanel>
+          <RtlSelectField
+            label="وضعیت"
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
+            size="small"
+          >
+            <MenuItem value="">همه</MenuItem>
+            <MenuItem value="REQUESTED">در انتظار بررسی</MenuItem>
+            <MenuItem value="PURCHASE_REQUIRED">نیاز به خرید</MenuItem>
+            <MenuItem value="PARTIALLY_ISSUED">تخصیص جزئی</MenuItem>
+            <MenuItem value="STOCK_ISSUED">ارسال‌شده</MenuItem>
+            <MenuItem value="RECEIVED">دریافت‌شده</MenuItem>
+          </RtlSelectField>
+          <ClearFiltersButton
+            onClick={() => setStatusFilter('')}
+            disabled={statusFilter === ''}
+          />
+        </FilterPanel>
+      )}
 
       {success ? <Alert severity="success">{success}</Alert> : null}
       {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}

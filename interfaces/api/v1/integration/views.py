@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
 from apps.integration.domain.entities import SAPObjectType, SAPTransactionStatus
-from core.permissions import IsFMMSAuthenticated, IsSupervisorOrAbove
+from core.permissions import IsAdminRole, IsFMMSAuthenticated, IsSupervisorOrAbove
 from interfaces.api.v1 import deps
 from interfaces.api.v1.integration.serializers import (
     SAPSyncRunHistorySerializer,
@@ -100,6 +100,12 @@ class SAPSyncViewSet(GenericViewSet):
     """Expose a single API for running all SAP read synchronisations."""
 
     permission_classes = [IsSupervisorOrAbove]
+
+    def get_permissions(self) -> list[object]:
+        """Restrict manual full sync to ADMIN; history stays supervisor+."""
+        if getattr(self, "action", None) == "create":
+            return [IsAdminRole()]
+        return list(super().get_permissions())
 
     @extend_schema(
         tags=[API_TAGS.integration],

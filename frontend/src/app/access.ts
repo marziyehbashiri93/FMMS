@@ -75,6 +75,13 @@ export function isTransportRole(user: AuthUser | null | undefined): boolean {
   return Boolean(user && user.role === 'TRANSPORT');
 }
 
+/** Manual SAP full sync is limited to ADMIN (and Django superuser). */
+export function canRunSapFullSync(user: AuthUser | null | undefined): boolean {
+  return Boolean(
+    user && (user.is_superuser || user.role === 'ADMIN'),
+  );
+}
+
 export function moduleKeyForPath(pathname: string): string | null {
   if (PATH_MODULE_KEYS[pathname]) return PATH_MODULE_KEYS[pathname];
   if (pathname.startsWith('/drivers/')) return 'drivers';

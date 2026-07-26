@@ -38,6 +38,7 @@ import { PlainStatusBadge, VehicleStatusBadge } from '../../components/StatusBad
 import { RtlDataTable, type RtlDataTableColumn } from '../../components/RtlDataTable';
 import { RtlSelectField } from '../../components/RtlSelectField';
 import { RtlTextField } from '../../components/RtlTextField';
+import { StatusFilterTabs, type StatusTabOption } from '../../components/StatusFilterTabs';
 import { TabbedDetailModal } from '../../components/TabbedDetailModal';
 import type { Fault, Inspection, RepairOrder, Vehicle } from '../../types/fmms';
 import { formatDateTime, toFaNumber } from '../../utils/format';
@@ -103,6 +104,12 @@ const WORKSHOP_LABELS: Record<string, string> = {
 
 type StatusFilter = '' | 'CREATED' | 'APPROVED';
 
+const STATUS_TAB_OPTIONS: ReadonlyArray<StatusTabOption<Exclude<StatusFilter, ''>>> = [
+  { value: '', label: 'همه' },
+  { value: 'CREATED', label: 'در انتظار تصمیم' },
+  { value: 'APPROVED', label: 'ارجاع به تعمیرگاه' },
+];
+
 type DetailState = {
   order: RepairOrder;
   fault: Fault | null;
@@ -152,7 +159,10 @@ export function TransportRepairsPage() {
   const [faultSummaries, setFaultSummaries] = useState<Map<string, Fault>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [status, setStatus] = useState<StatusFilter>('');
+  const [statusTab, setStatusTab] = useState<StatusFilter>('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('');
+  const status = statusTab || statusFilter;
+  const [kpi, setKpi] = useState({ total: 0, created: 0, approved: 0 });
   const [selected, setSelected] = useState<RepairOrder | null>(null);
   const [detail, setDetail] = useState<DetailState | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -232,11 +242,23 @@ export function TransportRepairsPage() {
     void load();
   }, [load]);
 
-  const kpi = useMemo(() => {
-    const created = orders.filter((item) => item.status === 'CREATED').length;
-    const approved = orders.filter((item) => item.status === 'APPROVED').length;
-    return { total: orders.length, created, approved };
-  }, [orders]);
+  const refreshKpis = useCallback(async () => {
+    try {
+      const [createdPage, approvedPage] = await Promise.all([
+        api.listRepairOrders({ status: 'CREATED', page: 1, pageSize: PAGE_SIZE }),
+        api.listRepairOrders({ status: 'APPROVED', page: 1, pageSize: PAGE_SIZE }),
+      ]);
+      const created = (createdPage.results ?? []).length;
+      const approved = (approvedPage.results ?? []).length;
+      setKpi({ total: created + approved, created, approved });
+    } catch {
+      // Keep last KPI snapshot; list error is handled separately.
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshKpis();
+  }, [refreshKpis]);
 
   const openDetail = async (order: RepairOrder) => {
     setSelected(order);
@@ -311,7 +333,10 @@ export function TransportRepairsPage() {
   };
 
   const refreshOrderInDetail = async (orderId: string, preferredStatus?: StatusFilter) => {
-    if (preferredStatus) setStatus(preferredStatus);
+    if (preferredStatus) {
+      setStatusTab(preferredStatus);
+      setStatusFilter('');
+    }
     const refreshed = await api.listRepairOrders({
       status: preferredStatus || status || undefined,
       page: 1,
@@ -340,6 +365,7 @@ export function TransportRepairsPage() {
       setSuccess('تعمیر تایید شد. نوع تعمیرگاه را انتخاب کنید.');
       setRejectReason('');
       await refreshOrderInDetail(order.id, 'APPROVED');
+      await refreshKpis();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'تایید تعمیر انجام نشد');
     } finally {
@@ -357,7 +383,7 @@ export function TransportRepairsPage() {
       await api.rejectRepairOrderByTransport(order.id, rejectReason.trim());
       closeDetail();
       setSuccess('درخواست تعمیر رد شد و به صف توزیع برگشت.');
-      await load();
+      await Promise.all([load(), refreshKpis()]);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'رد درخواست انجام نشد');
     } finally {
@@ -388,7 +414,7 @@ export function TransportRepairsPage() {
           ? 'درخواست مجوز تعمیرگاه بیرونی ثبت شد.'
           : 'سفارش به تعمیرگاه مرکزی ارجاع شد.',
       );
-      await load();
+      await Promise.all([load(), refreshKpis()]);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'ثبت انتخاب تعمیرگاه انجام نشد');
     } finally {
@@ -396,8 +422,6 @@ export function TransportRepairsPage() {
     }
   };
 
-  const resetFilters = () => setStatus('');
-  const hasActiveFilters = status !== '';
   const currentOrder = detail?.order ?? selected;
   const canDecide = currentOrder?.status === 'CREATED';
   const workshopAlreadyAssigned = Boolean(currentOrder?.workshop_type);
@@ -851,39 +875,54 @@ export function TransportRepairsPage() {
       <KpiGrid>
         <KpiCard
           label="موارد صف"
-          value={loading ? '...' : toFaNumber(kpi.total)}
+          value={toFaNumber(kpi.total)}
           icon={LocalShipping}
         />
         <KpiCard
           label="منتظر تصمیم"
-          value={loading ? '...' : toFaNumber(kpi.created)}
+          value={toFaNumber(kpi.created)}
           icon={Build}
           tone="warning"
         />
         <KpiCard
           label="ارجاع به تعمیرگاه"
-          value={loading ? '...' : toFaNumber(kpi.approved)}
+          value={toFaNumber(kpi.approved)}
           icon={CheckCircleOutline}
           tone="success"
         />
       </KpiGrid>
 
-      <FilterPanel>
-        <RtlSelectField<StatusFilter>
-          value={status}
-          label="وضعیت صف"
-          size="small"
-          fullWidth={false}
-          displayEmpty
-          onChange={(event) => setStatus(event.target.value as StatusFilter)}
-          sx={{ width: { xs: '100%', md: 260 }, flexShrink: 0 }}
-        >
-          <MenuItem value="">همه</MenuItem>
-          <MenuItem value="CREATED">در انتظار تصمیم</MenuItem>
-          <MenuItem value="APPROVED">ارجاع به تعمیرگاه</MenuItem>
-        </RtlSelectField>
-        <ClearFiltersButton onClick={resetFilters} disabled={!hasActiveFilters} />
-      </FilterPanel>
+      <StatusFilterTabs
+        value={statusTab}
+        options={STATUS_TAB_OPTIONS}
+        onChange={(next) => {
+          setStatusTab(next);
+          if (next) setStatusFilter('');
+        }}
+        ariaLabel="وضعیت صف ترابری"
+      />
+
+      {statusTab === '' && (
+        <FilterPanel>
+          <RtlSelectField<StatusFilter>
+            value={statusFilter}
+            label="وضعیت صف"
+            size="small"
+            fullWidth={false}
+            displayEmpty
+            onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
+            sx={{ width: { xs: '100%', md: 260 }, flexShrink: 0 }}
+          >
+            <MenuItem value="">همه</MenuItem>
+            <MenuItem value="CREATED">در انتظار تصمیم</MenuItem>
+            <MenuItem value="APPROVED">ارجاع به تعمیرگاه</MenuItem>
+          </RtlSelectField>
+          <ClearFiltersButton
+            onClick={() => setStatusFilter('')}
+            disabled={statusFilter === ''}
+          />
+        </FilterPanel>
+      )}
 
       {success && <Alert severity="success">{success}</Alert>}
       {error && <ErrorState message={error} onRetry={() => void load()} />}

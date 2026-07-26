@@ -526,8 +526,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
                     styles={(t) => ({
                         html: {
                             direction: 'rtl',
-                            scrollbarGutter: 'stable',
-                            overflowY: 'scroll',
+                            // Avoid reserved scrollbar gutter — in RTL it can show as a
+                            // light strip beside the fixed dark sidebar.
+                            overflowY: 'auto',
                             scrollBehavior: 'smooth',
                             WebkitFontSmoothing: 'antialiased',
                             MozOsxFontSmoothing: 'grayscale',

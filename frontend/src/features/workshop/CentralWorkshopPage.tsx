@@ -35,6 +35,7 @@ import { PlainStatusBadge, VehicleStatusBadge } from '../../components/StatusBad
 import { RtlDataTable, type RtlDataTableColumn } from '../../components/RtlDataTable';
 import { RtlSelectField } from '../../components/RtlSelectField';
 import { RtlTextField } from '../../components/RtlTextField';
+import { StatusFilterTabs, type StatusTabOption } from '../../components/StatusFilterTabs';
 import { TabbedDetailModal } from '../../components/TabbedDetailModal';
 import type { Fault, RepairOrder, Vehicle } from '../../types/fmms';
 import { formatDateTime, toFaNumber } from '../../utils/format';
@@ -84,6 +85,14 @@ type StatusFilter =
   | 'WAITING_PARTS'
   | 'NO_REPAIR_NEEDED';
 
+const STATUS_TAB_OPTIONS: ReadonlyArray<StatusTabOption<Exclude<StatusFilter, ''>>> = [
+  { value: '', label: 'همه' },
+  { value: 'WORKSHOP_ASSIGNED', label: 'صف تصمیم فنی' },
+  { value: 'IN_PROGRESS', label: 'در حال تعمیر' },
+  { value: 'WAITING_PARTS', label: 'در انتظار قطعات' },
+  { value: 'NO_REPAIR_NEEDED', label: 'عدم نیاز به تعمیر' },
+];
+
 type DetailState = {
   order: RepairOrder;
   fault: Fault | null;
@@ -125,7 +134,14 @@ export function CentralWorkshopPage() {
   const [vehicles, setVehicles] = useState<Map<string, Vehicle>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [status, setStatus] = useState<StatusFilter>('');
+  const [statusTab, setStatusTab] = useState<StatusFilter>('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('');
+  const status = statusTab || statusFilter;
+  const [kpiCounts, setKpiCounts] = useState({
+    queue: 0,
+    inProgress: 0,
+    waitingParts: 0,
+  });
   const [selected, setSelected] = useState<RepairOrder | null>(null);
   const [detail, setDetail] = useState<DetailState | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -189,6 +205,39 @@ export function CentralWorkshopPage() {
     void load();
   }, [load]);
 
+  const refreshKpis = useCallback(async () => {
+    try {
+      const statuses = [
+        'WORKSHOP_ASSIGNED',
+        'IN_PROGRESS',
+        'WAITING_PARTS',
+        'NO_REPAIR_NEEDED',
+      ] as const;
+      const pages = await Promise.all(
+        statuses.map((itemStatus) =>
+          api.listRepairOrders({
+            status: itemStatus,
+            workshopType: 'INTERNAL',
+            page: 1,
+            pageSize: 100,
+          }),
+        ),
+      );
+      const list = pages.flatMap((page) => normalizePaginated(page));
+      setKpiCounts({
+        queue: list.filter((item) => item.status === 'WORKSHOP_ASSIGNED').length,
+        inProgress: list.filter((item) => item.status === 'IN_PROGRESS').length,
+        waitingParts: list.filter((item) => item.status === 'WAITING_PARTS').length,
+      });
+    } catch {
+      // Keep last KPI snapshot; list error is handled separately.
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshKpis();
+  }, [refreshKpis]);
+
   const openDetail = async (row: RepairOrder) => {
     setSelected(row);
     setDetail(null);
@@ -236,7 +285,7 @@ export function CentralWorkshopPage() {
         note: decisionNote,
       });
       setSuccess(result.message);
-      await load();
+      await Promise.all([load(), refreshKpis()]);
       await openDetail({ ...selected, status: result.status });
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'ثبت تصمیم انجام نشد');
@@ -277,7 +326,7 @@ export function CentralWorkshopPage() {
       setRequestPart(EMPTY_MATERIAL_PICK);
       setRequestQty('1');
       setRequestLines([]);
-      await load();
+      await Promise.all([load(), refreshKpis()]);
       await openDetail(selected);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'ثبت درخواست قطعه انجام نشد');
@@ -293,7 +342,7 @@ export function CentralWorkshopPage() {
     try {
       await api.receiveMaterialRequest(materialRequestId);
       setSuccess('دریافت قطعات ثبت شد؛ تعمیر ادامه می‌یابد.');
-      await load();
+      await Promise.all([load(), refreshKpis()]);
       await openDetail(selected);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'ثبت دریافت قطعات انجام نشد');
@@ -351,7 +400,7 @@ export function CentralWorkshopPage() {
       });
       setSuccess('تعمیر تکمیل شد و برای تایید راننده ارسال شد.');
       setSelected(null);
-      await load();
+      await Promise.all([load(), refreshKpis()]);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'تکمیل تعمیر انجام نشد');
     } finally {
@@ -359,9 +408,9 @@ export function CentralWorkshopPage() {
     }
   };
 
-  const queueCount = items.filter((item) => item.status === 'WORKSHOP_ASSIGNED').length;
-  const inProgressCount = items.filter((item) => item.status === 'IN_PROGRESS').length;
-  const waitingPartsCount = items.filter((item) => item.status === 'WAITING_PARTS').length;
+  const queueCount = kpiCounts.queue;
+  const inProgressCount = kpiCounts.inProgress;
+  const waitingPartsCount = kpiCounts.waitingParts;
 
   const columns: Array<RtlDataTableColumn<RepairOrder, string>> = useMemo(
     () => [
@@ -791,21 +840,36 @@ export function CentralWorkshopPage() {
         />
       </KpiGrid>
 
-      <FilterPanel>
-        <RtlSelectField
-          label="وضعیت"
-          value={status}
-          onChange={(event) => setStatus(event.target.value as StatusFilter)}
-          size="small"
-        >
-          <MenuItem value="WORKSHOP_ASSIGNED">صف تصمیم فنی</MenuItem>
-          <MenuItem value="IN_PROGRESS">در حال تعمیر</MenuItem>
-          <MenuItem value="WAITING_PARTS">در انتظار قطعات</MenuItem>
-          <MenuItem value="NO_REPAIR_NEEDED">عدم نیاز به تعمیر</MenuItem>
-          <MenuItem value="">همه</MenuItem>
-        </RtlSelectField>
-        <ClearFiltersButton onClick={() => setStatus('')} disabled={status === ''} />
-      </FilterPanel>
+      <StatusFilterTabs
+        value={statusTab}
+        options={STATUS_TAB_OPTIONS}
+        onChange={(next) => {
+          setStatusTab(next);
+          if (next) setStatusFilter('');
+        }}
+        ariaLabel="وضعیت تعمیرگاه مرکزی"
+      />
+
+      {statusTab === '' && (
+        <FilterPanel>
+          <RtlSelectField
+            label="وضعیت"
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
+            size="small"
+          >
+            <MenuItem value="">همه</MenuItem>
+            <MenuItem value="WORKSHOP_ASSIGNED">صف تصمیم فنی</MenuItem>
+            <MenuItem value="IN_PROGRESS">در حال تعمیر</MenuItem>
+            <MenuItem value="WAITING_PARTS">در انتظار قطعات</MenuItem>
+            <MenuItem value="NO_REPAIR_NEEDED">عدم نیاز به تعمیر</MenuItem>
+          </RtlSelectField>
+          <ClearFiltersButton
+            onClick={() => setStatusFilter('')}
+            disabled={statusFilter === ''}
+          />
+        </FilterPanel>
+      )}
 
       {error && <ErrorState message={error} onRetry={() => void load()} />}
       {!loading && !error && (

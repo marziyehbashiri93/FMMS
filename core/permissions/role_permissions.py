@@ -28,13 +28,18 @@ class IsFMMSAuthenticated(BasePermission):
 
 
 class IsAdminRole(BasePermission):
-    """Allow only users with the ADMIN role."""
+    """Allow only users with the ADMIN role (or Django superuser)."""
 
     def has_permission(self, request: Request, view: APIView) -> bool:
-        """Return True for authenticated ADMIN users."""
+        """Return True for authenticated ADMIN users or superusers."""
         user: Any = request.user
         return bool(
-            user and user.is_authenticated and _normalized_role(user) == "ADMIN"
+            user
+            and user.is_authenticated
+            and (
+                getattr(user, "is_superuser", False)
+                or _normalized_role(user) == "ADMIN"
+            )
         )
 
 

@@ -708,6 +708,11 @@ export const api = {
     return request<Paginated<SAPSyncRun>>(`/sap-sync/history/${query}`);
   },
 
+  /** Trigger the global SAP OData read sync (ADMIN only). */
+  runSapSync() {
+    return request<SAPSyncRun>('/sap-sync/', { method: 'POST', body: '{}' });
+  },
+
   setAccessToken,
   setRefreshToken,
   setAuthSession,
