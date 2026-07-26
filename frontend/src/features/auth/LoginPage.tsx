@@ -13,7 +13,6 @@ import {
 import {Analytics, DirectionsCar, Lock, Person, PrecisionManufacturing, Sync} from '@mui/icons-material';
 import {api, ApiError} from '../../api/client';
 import { RtlTextField } from '../../components/RtlTextField';
-import { brandHeroGradient } from '../../theme/gradients';
 
 const featureItems = [
     {label: 'کنترل وضعیت ناوگان و خودروهای عملیاتی', icon: DirectionsCar},
@@ -66,8 +65,11 @@ export function LoginPage() {
                     minHeight: '100vh',
                     position: 'relative',
                     background: (theme) =>
-                        brandHeroGradient(theme.palette.primary, theme.palette.secondary),
-                    color: 'secondary.dark',
+                        [
+                            'radial-gradient(ellipse 65% 55% at 20% 15%, rgba(255,255,255,0.78) 0%, transparent 60%)',
+                            `linear-gradient(155deg, #FFFFFF 0%, ${theme.palette.primary.light} 30%, ${theme.palette.primary.main} 76%, ${theme.palette.primary.dark} 100%)`,
+                        ].join(', '),
+                    color: 'primary.dark',
                     alignItems: 'center',
                     justifyContent: 'center',
                     px: {md: 5, lg: 8},
@@ -97,43 +99,51 @@ export function LoginPage() {
                             fontWeight: 900,
                             lineHeight: 1.45,
                             textAlign: 'right',
-                            color: 'secondary.dark',
+                            color: 'primary.dark',
                         }}>
                             پلتفرم مدیریت هوشمند نگهداری ناوگان
                         </Typography>
                         <Typography sx={{
-                            color: 'rgba(158,63,49,0.82)',
+                            color: 'primary.dark',
                             fontSize: '1rem',
                             lineHeight: 1.9,
                             textAlign: 'right',
+                            opacity: 0.82,
                         }}>
                             کنترل خودروها، پیمایش روزانه، خرابی‌ها و تعمیرات با یک جریان متمرکز و قابل اتصال به SAP
                         </Typography>
                     </Stack>
 
-                    <Stack spacing={2.25} alignItems="flex-start" sx={{width: '100%'}}>
-                        {featureItems.map((item, index) => {
+                    <Stack spacing={1.75} alignItems="flex-start" sx={{width: '100%'}}>
+                        {featureItems.map((item) => {
                             const Icon = item.icon;
                             return (
-                                <Stack key={item.label} direction="row" alignItems="center" spacing={1.5}
-                                       sx={{width: '100%', justifyContent: 'flex-start'}}>
+                                <Stack
+                                    key={item.label}
+                                    direction="row"
+                                    alignItems="center"
+                                    spacing={2}
+                                    sx={{width: '100%', justifyContent: 'flex-start'}}
+
+                                >
                                     <Box
                                         sx={{
                                             width: 36,
                                             height: 36,
                                             borderRadius: (t) => t.radius('xl'),
-                                            bgcolor: index % 2 === 0 ? 'secondary.main' : 'common.white',
-                                            color: index % 2 === 0 ? 'common.white' : 'secondary.dark',
+                                            bgcolor: 'primary.main',
+                                            color: 'common.white',
                                             border: '1px solid',
-                                            borderColor: 'secondary.main',
+                                            borderColor: 'primary.main',
                                             display: 'grid',
                                             placeItems: 'center',
                                             flexShrink: 0,
+
                                         }}
                                     >
                                         <Icon fontSize="small"/>
                                     </Box>
-                                    <Typography sx={{color: 'secondary.dark', fontWeight: 700}}>
+                                    <Typography sx={{color: 'primary.dark', fontWeight: 700,paddingRight:'10px'}}>
                                         {item.label}
                                     </Typography>
                                 </Stack>
