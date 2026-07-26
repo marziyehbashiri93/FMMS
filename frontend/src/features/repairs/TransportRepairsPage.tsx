@@ -879,7 +879,7 @@ export function TransportRepairsPage() {
     <FeaturePage>
       <PageHeader
         title="کارتابل ترابری"
-        breadcrumbs={[{ label: 'ترابری' }, { label: 'درخواست‌های تعمیر' }]}
+        breadcrumbs={[{ label: 'ترابری' }, { label: 'کارتابل ترابری' }]}
       />
 
       <KpiGrid>

@@ -761,8 +761,8 @@ export function DistributionFaultsPage() {
   return (
     <FeaturePage>
       <PageHeader
-        title="لیست خرابی‌ها"
-        breadcrumbs={[{ label: 'توزیع خودرو' }, { label: 'لیست خرابی‌ها' }]}
+        title="کارتابل توزیع"
+        breadcrumbs={[{ label: 'توزیع خودرو' }, { label: 'کارتابل توزیع' }]}
       />
 
       <KpiGrid mdColumns={4}>
