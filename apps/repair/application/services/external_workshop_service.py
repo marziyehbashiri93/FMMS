@@ -416,7 +416,10 @@ class ReviewExternalRepairService:
             id=existing.id if existing else uuid.uuid4(),
             assignment_id=assignment.id,
             repair_order_id=order.id,
-            invoice_attachment=(dto.invoice_attachment or "").strip() or None,
+            invoice_attachment=(
+                (dto.invoice_attachment or "").strip()
+                or (existing.invoice_attachment if existing else None)
+            ),
             repair_services=dto.repair_services,
             replaced_parts=dto.replaced_parts,
             repair_cost=dto.repair_cost,

@@ -5,6 +5,7 @@ import {
   Card,
   CardContent,
   Divider,
+  Link,
   MenuItem,
   Stack,
   Tab,
@@ -14,6 +15,7 @@ import {
 import {
   Add,
   AssignmentTurnedIn,
+  AttachFile,
   CheckCircleOutline,
   DirectionsCar,
   FactCheck,
@@ -37,6 +39,13 @@ import { formatDateTime } from '../../utils/format';
 type TabKey = 'driver' | 'transport';
 type DriverExternalFilter = '' | 'WAITING_DELIVERY' | 'IN_REPAIR' | 'COMPLETED';
 type TransportInvoiceFilter = '' | 'WAITING_PICKUP' | 'WAITING_INVOICE' | 'DRAFT' | 'COMPLETED';
+const API_ORIGIN = (() => {
+  try {
+    return new URL(import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api/v1').origin;
+  } catch {
+    return '';
+  }
+})();
 
 function normalizeList<T>(payload: { results?: T[] } | T[]): T[] {
   if (Array.isArray(payload)) return payload;
@@ -94,6 +103,31 @@ function invoiceStateTone(item: ExternalWorkshopAssignment): 'neutral' | 'warnin
   return 'warning';
 }
 
+function cleanAttachmentPath(value: string): string {
+  return value.trim().replace(/^"+|"+$/g, '');
+}
+
+function attachmentFileName(value: string): string {
+  const cleanValue = cleanAttachmentPath(value);
+  if (!cleanValue) return '';
+  const path = cleanValue.split(/[?#]/)[0];
+  const fileName = path.split('/').filter(Boolean).pop() ?? cleanValue;
+  try {
+    return decodeURIComponent(fileName);
+  } catch {
+    return fileName;
+  }
+}
+
+function attachmentHref(value: string): string {
+  const cleanValue = cleanAttachmentPath(value);
+  if (!cleanValue) return '';
+  if (/^https?:\/\//i.test(cleanValue)) return cleanValue;
+  if (cleanValue.startsWith('/media/') && API_ORIGIN) return `${API_ORIGIN}${cleanValue}`;
+  if (cleanValue.startsWith('/')) return cleanValue;
+  return '';
+}
+
 const emptyDelivery = {
   workshop_name: '',
   workshop_address: '',
@@ -108,6 +142,7 @@ const emptyPickup = {
 };
 
 const emptyReview = {
+  invoice_attachment: '',
   repair_cost: '',
   additional_notes: '',
 };
@@ -130,6 +165,7 @@ export function ExternalWorkshopPage({ mode }: { mode?: TabKey }) {
   const [delivery, setDelivery] = useState(emptyDelivery);
   const [pickup, setPickup] = useState(emptyPickup);
   const [review, setReview] = useState(emptyReview);
+  const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
   const [serviceLines, setServiceLines] = useState<ServiceLine[]>([]);
   const [partLines, setPartLines] = useState<PartLine[]>([]);
   const [draftService, setDraftService] = useState<ServiceLine>(blankService());
@@ -206,9 +242,11 @@ export function ExternalWorkshopPage({ mode }: { mode?: TabKey }) {
       notes: fresh.pickup?.notes ?? '',
     });
     setReview({
+      invoice_attachment: fresh.review?.invoice_attachment ?? '',
       repair_cost: fresh.review?.repair_cost ? String(fresh.review.repair_cost) : '',
       additional_notes: fresh.review?.additional_notes ?? '',
     });
+    setInvoiceFile(null);
     setServiceLines(
       fresh.review?.repair_services?.length
         ? fresh.review.repair_services.map((item) => ({
@@ -299,6 +337,7 @@ export function ExternalWorkshopPage({ mode }: { mode?: TabKey }) {
       .filter((line) => line.name),
     repair_cost: review.repair_cost || null,
     additional_notes: review.additional_notes,
+    invoice_file: invoiceFile,
   });
 
   const saveReview = async () => {
@@ -308,6 +347,12 @@ export function ExternalWorkshopPage({ mode }: { mode?: TabKey }) {
     try {
       const updated = await api.reviewExternalRepair(selected.id, buildReviewPayload());
       setSelected(updated);
+      setInvoiceFile(null);
+      setReview({
+        invoice_attachment: updated.review?.invoice_attachment ?? '',
+        repair_cost: updated.review?.repair_cost ? String(updated.review.repair_cost) : '',
+        additional_notes: updated.review?.additional_notes ?? '',
+      });
       setSuccess('پیش‌نویس اطلاعات ترابری ذخیره شد.');
       await load();
     } catch (err) {
@@ -544,6 +589,7 @@ export function ExternalWorkshopPage({ mode }: { mode?: TabKey }) {
                 <FormPanel title="اطلاعات فاکتور" icon={<ReceiptLong fontSize="small" />}>
                   {selectedReviewCompleted ? (
                     <ResponsiveFields>
+                      <AttachmentTile value={review.invoice_attachment} />
                       <InfoTile label="هزینه تعمیر" value={review.repair_cost || '—'} />
                       <InfoTile label="یادداشت تکمیلی" value={review.additional_notes || '—'} />
                     </ResponsiveFields>
@@ -551,6 +597,12 @@ export function ExternalWorkshopPage({ mode }: { mode?: TabKey }) {
                     <>
                       <ResponsiveFields>
                         <RtlTextField label="هزینه تعمیر" value={review.repair_cost} disabled={!canEditSelectedReview} onChange={(e) => setReview({ ...review, repair_cost: e.target.value })} fullWidth />
+                        <InvoiceFilePicker
+                          disabled={!canEditSelectedReview}
+                          fileName={invoiceFile?.name ?? ''}
+                          savedPath={review.invoice_attachment}
+                          onChange={setInvoiceFile}
+                        />
                       </ResponsiveFields>
                       <RtlTextField label="یادداشت تکمیلی" value={review.additional_notes} disabled={!canEditSelectedReview} onChange={(e) => setReview({ ...review, additional_notes: e.target.value })} fullWidth multiline minRows={2} />
                     </>
@@ -770,6 +822,93 @@ function SummaryPanel({
         </Stack>
       </CardContent>
     </Card>
+  );
+}
+
+function InvoiceFilePicker({
+  disabled,
+  fileName,
+  savedPath,
+  onChange,
+}: {
+  disabled: boolean;
+  fileName: string;
+  savedPath: string;
+  onChange: (file: File | null) => void;
+}) {
+  const displayValue = fileName || attachmentFileName(savedPath) || 'فایلی انتخاب نشده';
+  const href = attachmentHref(savedPath);
+  return (
+    <Box
+      sx={{
+        minHeight: 64,
+        p: 1.25,
+        borderRadius: 1,
+        bgcolor: 'rgba(15, 23, 42, 0.035)',
+        border: '1px solid',
+        borderColor: 'rgba(15, 23, 42, 0.08)',
+        display: 'grid',
+        gridTemplateColumns: { xs: '1fr', sm: 'auto minmax(0, 1fr)' },
+        gap: 1,
+        alignItems: 'center',
+      }}
+    >
+      <Button
+        variant="outlined"
+        component="label"
+        startIcon={<AttachFile />}
+        disabled={disabled}
+        sx={{ minHeight: 40 }}
+      >
+        انتخاب فایل
+        <input
+          hidden
+          type="file"
+          accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx"
+          onChange={(event) => onChange(event.target.files?.[0] ?? null)}
+        />
+      </Button>
+      <Box sx={{ minWidth: 0 }}>
+        <Typography variant="caption" color="text.secondary" display="block" mb={0.2}>
+          پیوست فاکتور
+        </Typography>
+        <Typography fontWeight={800} sx={{ overflowWrap: 'anywhere', lineHeight: 1.7 }}>
+          {href && !fileName ? (
+            <Link href={href} target="_blank" rel="noreferrer" underline="hover">
+              {displayValue}
+            </Link>
+          ) : displayValue}
+        </Typography>
+      </Box>
+    </Box>
+  );
+}
+
+function AttachmentTile({ value }: { value: string }) {
+  const fileName = attachmentFileName(value);
+  const href = attachmentHref(value);
+  return (
+    <Box
+      sx={{
+        minHeight: 64,
+        p: 1.25,
+        borderRadius: 1,
+        bgcolor: 'rgba(15, 23, 42, 0.035)',
+        border: '1px solid',
+        borderColor: 'rgba(15, 23, 42, 0.08)',
+      }}
+    >
+      <Typography variant="caption" color="text.secondary" display="block" mb={0.4}>
+        پیوست فاکتور
+      </Typography>
+      <Typography fontWeight={800} sx={{ overflowWrap: 'anywhere', lineHeight: 1.8 }}>
+        {href && fileName ? (
+          <Link href={href} target="_blank" rel="noreferrer" underline="hover">
+            {fileName}
+          </Link>
+        ) : fileName || '—'}
+      </Typography>
+    </Box>
   );
 }
 

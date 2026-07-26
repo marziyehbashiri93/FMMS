@@ -156,6 +156,9 @@ class ExternalRepairReviewSerializer(serializers.Serializer):
     invoice_attachment = serializers.CharField(
         max_length=500, required=False, allow_null=True, allow_blank=True
     )
+    invoice_file = serializers.FileField(
+        required=False, allow_null=True, allow_empty_file=False
+    )
     repair_services = ExternalRepairServiceLineSerializer(
         many=True, required=False, default=list
     )
