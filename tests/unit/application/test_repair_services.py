@@ -33,12 +33,20 @@ from apps.repair.application.dto.repair_dto import (
     CloseRepairOrderDTO,
     CompleteRepairOrderDTO,
     CreateRepairOrderDTO,
+    DeleteRepairActivityDTO,
+    DeleteRepairPartDTO,
     RepairOrderResponseDTO,
     SyncRepairToSAPDTO,
+    UpdateRepairActivityDTO,
+    UpdateRepairPartDTO,
 )
 from apps.repair.application.services.add_repair_activity_service import (
     AddRepairActivityService,
     AddRepairPartService,
+    DeleteRepairActivityService,
+    DeleteRepairPartService,
+    UpdateRepairActivityService,
+    UpdateRepairPartService,
 )
 from apps.repair.application.services.assign_repair_order_service import (
     AssignRepairOrderService,
@@ -621,6 +629,61 @@ class TestAddRepairActivityService:
             )
 
 
+class TestUpdateRepairActivityService:
+    def test_updates_activity(self) -> None:
+        order = _make_order(status=RepairOrderStatus.IN_PROGRESS)
+        added = AddRepairActivityService(FakeRepairRepository([order])).execute(
+            AddRepairActivityDTO(
+                repair_order_id=order.id,
+                description="Initial",
+                labor_hours=Decimal("1"),
+                performed_by_id=uuid.uuid4(),
+                performed_at=datetime.now(tz=UTC),
+                request_id="req-act",
+            )
+        )
+
+        result = UpdateRepairActivityService(FakeRepairRepository([order])).execute(
+            UpdateRepairActivityDTO(
+                repair_order_id=order.id,
+                activity_id=added.activities[0].id,
+                description="Replaced alternator",
+                labor_hours=Decimal("3"),
+                notes="bench tested",
+                request_id="req-edit",
+            )
+        )
+
+        assert result.activities[0].description == "Replaced alternator"
+        assert result.activities[0].labor_hours == Decimal("3")
+        assert result.activities[0].notes == "bench tested"
+
+
+class TestDeleteRepairActivityService:
+    def test_deletes_activity(self) -> None:
+        order = _make_order(status=RepairOrderStatus.IN_PROGRESS)
+        added = AddRepairActivityService(FakeRepairRepository([order])).execute(
+            AddRepairActivityDTO(
+                repair_order_id=order.id,
+                description="Initial",
+                labor_hours=Decimal("1"),
+                performed_by_id=uuid.uuid4(),
+                performed_at=datetime.now(tz=UTC),
+                request_id="req-act",
+            )
+        )
+
+        result = DeleteRepairActivityService(FakeRepairRepository([order])).execute(
+            DeleteRepairActivityDTO(
+                repair_order_id=order.id,
+                activity_id=added.activities[0].id,
+                request_id="req-del",
+            )
+        )
+
+        assert result.activities == []
+
+
 class TestAddRepairPartService:
     def test_adds_part(self) -> None:
         order = _make_order(status=RepairOrderStatus.IN_PROGRESS)
@@ -637,6 +700,58 @@ class TestAddRepairPartService:
         assert len(result.parts) == 1
         assert result.parts[0].material_number == "MAT-001"
         assert result.parts[0].quantity == 2
+
+
+class TestUpdateRepairPartService:
+    def test_updates_part(self) -> None:
+        order = _make_order(status=RepairOrderStatus.IN_PROGRESS)
+        added = AddRepairPartService(FakeRepairRepository([order])).execute(
+            AddRepairPartDTO(
+                repair_order_id=order.id,
+                material_number="MAT-001",
+                quantity=2,
+                unit_of_measure="EA",
+                request_id="req-part",
+            )
+        )
+
+        result = UpdateRepairPartService(FakeRepairRepository([order])).execute(
+            UpdateRepairPartDTO(
+                repair_order_id=order.id,
+                part_id=added.parts[0].id,
+                material_number="MAT-002",
+                quantity=4,
+                unit_of_measure="EA",
+                request_id="req-part-edit",
+            )
+        )
+
+        assert result.parts[0].material_number == "MAT-002"
+        assert result.parts[0].quantity == 4
+
+
+class TestDeleteRepairPartService:
+    def test_deletes_part(self) -> None:
+        order = _make_order(status=RepairOrderStatus.IN_PROGRESS)
+        added = AddRepairPartService(FakeRepairRepository([order])).execute(
+            AddRepairPartDTO(
+                repair_order_id=order.id,
+                material_number="MAT-001",
+                quantity=2,
+                unit_of_measure="EA",
+                request_id="req-part",
+            )
+        )
+
+        result = DeleteRepairPartService(FakeRepairRepository([order])).execute(
+            DeleteRepairPartDTO(
+                repair_order_id=order.id,
+                part_id=added.parts[0].id,
+                request_id="req-part-del",
+            )
+        )
+
+        assert result.parts == []
 
 
 # ---------------------------------------------------------------------------

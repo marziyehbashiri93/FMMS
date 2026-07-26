@@ -6,6 +6,8 @@ import {
   CardContent,
   MenuItem,
   Stack,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
   useMediaQuery,
 } from '@mui/material';
@@ -284,15 +286,7 @@ export function TransportPartsPage() {
   const itemKey = (item: MaterialRequestItem) => String(item.id);
 
   const openSelected = useCallback((row: MaterialRequestRow) => {
-    const defaults: Record<string, ItemDecision> = {};
-    for (const item of row.items ?? []) {
-      // Pre-select stock when possible; leave purchase-only items undecided
-      // so the user must explicitly confirm via «خرید از بیرون».
-      if (canAllocateFromStock(item)) {
-        defaults[itemKey(item)] = 'FROM_STOCK';
-      }
-    }
-    setItemDecisions(defaults);
+    setItemDecisions({});
     setNote('');
     setActionError('');
     setSuccess('');
@@ -435,18 +429,13 @@ export function TransportPartsPage() {
     void runDecide(decisions);
   };
 
-  const chooseDecision = (itemId: string, decision: ItemDecision, submitNow = false) => {
+  const chooseDecision = (itemId: string, decision: ItemDecision) => {
     if (!selected) return;
     const next: Record<string, ItemDecision> = {
       ...itemDecisions,
       [String(itemId)]: decision,
     };
     setItemDecisions(next);
-    if (!submitNow) return;
-    const ready = selected.items.every((item) => Boolean(next[itemKey(item)]));
-    if (ready) {
-      submitDecisions(next);
-    }
   };
 
   return (
@@ -564,7 +553,6 @@ export function TransportPartsPage() {
                   const stockOk = canAllocateFromStock(item);
                   const key = itemKey(item);
                   const decision = itemDecisions[key];
-                  const purchaseOnly = !stockOk;
                   return (
                     <Card key={key} variant="outlined">
                       <CardContent>
@@ -586,59 +574,82 @@ export function TransportPartsPage() {
                             }
                           />
                           {selected.status === 'REQUESTED' ? (
-                            <Stack spacing={1}>
-                              <Stack
-                                direction={{ xs: 'column', sm: 'row' }}
-                                spacing={1}
-                                useFlexGap
+                            <Stack spacing={1.25}>
+                              <Typography variant="caption" fontWeight={800}>
+                                روش تامین این قلم
+                              </Typography>
+                              <ToggleButtonGroup
+                                exclusive
+                                fullWidth
+                                value={decision || null}
+                                onChange={(_event, next: ItemDecision | null) => {
+                                  if (next) chooseDecision(key, next);
+                                }}
+                                sx={{
+                                  gap: 1,
+                                  '& .MuiToggleButtonGroup-grouped': {
+                                    border: '1px solid',
+                                    borderColor: 'divider',
+                                    borderRadius: (t) => `${t.radius('sm')} !important`,
+                                    minHeight: 44,
+                                    px: 1.5,
+                                    py: 0.75,
+                                    flex: 1,
+                                    fontWeight: 800,
+                                    textTransform: 'none',
+                                    justifyContent: 'center',
+                                    gap: 0.75,
+                                    '&:not(:first-of-type)': {
+                                      ml: 0,
+                                      borderRadius: (t) => `${t.radius('sm')} !important`,
+                                    },
+                                    '&:first-of-type': {
+                                      borderRadius: (t) => `${t.radius('sm')} !important`,
+                                    },
+                                  },
+                                }}
                               >
-                                {stockOk ? (
-                                  <Button
-                                    type="button"
-                                    color="success"
-                                    variant={
-                                      decision === 'FROM_STOCK' ? 'contained' : 'outlined'
-                                    }
-                                    startIcon={<CheckCircleOutline />}
-                                    onClick={() => chooseDecision(key, 'FROM_STOCK')}
-                                  >
-                                    تخصیص از انبار
-                                  </Button>
-                                ) : (
-                                  <Alert severity="info" sx={{ flex: 1, py: 0.5 }}>
-                                    تخصیص از انبار برای این قلم ممکن نیست.
-                                  </Alert>
-                                )}
-                                <Button
-                                  type="button"
-                                  color="warning"
-                                  variant={
-                                    purchaseOnly || decision === 'PURCHASE'
-                                      ? 'contained'
-                                      : 'outlined'
-                                  }
-                                  startIcon={<ShoppingCart />}
-                                  loading={
-                                    purchaseOnly && actionLoading === 'decide'
-                                  }
-                                  disabled={actionLoading === 'decide'}
-                                  onClick={() =>
-                                    chooseDecision(key, 'PURCHASE', purchaseOnly)
-                                  }
+                                <ToggleButton
+                                  value="FROM_STOCK"
+                                  disabled={!stockOk || actionLoading === 'decide'}
+                                  sx={{
+                                    color: 'text.secondary',
+                                    bgcolor: 'background.paper',
+                                    '&.Mui-selected, &.Mui-selected:hover': {
+                                      bgcolor: 'success.main',
+                                      borderColor: 'success.main',
+                                      color: 'success.contrastText',
+                                    },
+                                  }}
                                 >
+                                  <Inventory2 fontSize="small" />
+                                  از انبار مرکزی
+                                </ToggleButton>
+                                <ToggleButton
+                                  value="PURCHASE"
+                                  disabled={actionLoading === 'decide'}
+                                  sx={{
+                                    color: 'text.secondary',
+                                    bgcolor: 'background.paper',
+                                    '&.Mui-selected, &.Mui-selected:hover': {
+                                      bgcolor: 'warning.main',
+                                      borderColor: 'warning.main',
+                                      color: 'warning.contrastText',
+                                    },
+                                  }}
+                                >
+                                  <ShoppingCart fontSize="small" />
                                   خرید از بیرون
-                                </Button>
-                              </Stack>
-                              {decision === 'PURCHASE' && !purchaseOnly ? (
+                                </ToggleButton>
+                              </ToggleButtonGroup>
+                              {!stockOk ? (
                                 <Typography variant="caption" color="text.secondary">
-                                  انتخاب شد: خرید از بیرون — برای نهایی کردن، «ثبت
-                                  تصمیم‌ها» را بزنید.
+                                  موجودی کافی برای تامین از انبار مرکزی وجود ندارد.
                                 </Typography>
                               ) : null}
-                              {decision === 'FROM_STOCK' ? (
+                              {decision ? (
                                 <Typography variant="caption" color="text.secondary">
-                                  انتخاب شد: تخصیص از انبار — برای نهایی کردن، «ثبت
-                                  تصمیم‌ها» را بزنید.
+                                  روش انتخاب‌شده: {DECISION_LABELS[decision]}
                                 </Typography>
                               ) : null}
                             </Stack>
@@ -680,7 +691,7 @@ export function TransportPartsPage() {
                       disabled={!allItemsDecided || actionLoading === 'decide'}
                       onClick={() => submitDecisions()}
                     >
-                      ثبت تصمیم‌ها
+                      ثبت روش تامین قطعات
                     </Button>
                   </Stack>
                 ) : null}

@@ -30,6 +30,7 @@ from interfaces.api.v1.fault.serializers import (
     FaultCatalogResponseSerializer,
     FaultCreateSerializer,
     FaultDistributionDecisionSerializer,
+    FaultDistributionRejectSerializer,
     FaultListQuerySerializer,
     FaultResponseSerializer,
 )
@@ -146,7 +147,7 @@ class FaultViewSet(GenericViewSet):
 
     @extend_schema(
         tags=[API_TAGS.fault],
-        request=FaultDistributionDecisionSerializer,
+        request=FaultDistributionRejectSerializer,
         responses=FaultResponseSerializer,
     )
     @action(
@@ -157,7 +158,7 @@ class FaultViewSet(GenericViewSet):
     )
     def distribution_usable(self, request: Request, pk: str | None = None) -> Response:
         """Distribution rejected the fault: vehicle is usable."""
-        serializer = FaultDistributionDecisionSerializer(data=request.data)
+        serializer = FaultDistributionRejectSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         result = deps.get_distribution_fault_decision_service().mark_usable(
             DistributionFaultDecisionDTO(

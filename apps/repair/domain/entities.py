@@ -12,8 +12,10 @@ from decimal import Decimal
 from enum import StrEnum
 
 from apps.repair.domain.exceptions import (
+    RepairActivityNotFoundError,
     RepairOrderInvalidStateError,
     RepairOrderInvalidStateTransitionError,
+    RepairPartNotFoundError,
 )
 from apps.repair.domain.value_objects import (
     LaborHours,
@@ -490,6 +492,34 @@ class RepairOrder:
         self._assert_mutable("add_activity")
         self.activities.append(activity)
 
+    def update_activity(
+        self,
+        activity_id: uuid.UUID,
+        *,
+        description: str,
+        labor_hours: LaborHours,
+        notes: str | None,
+    ) -> None:
+        """Update an existing repair activity on a mutable order."""
+        self._assert_mutable("update_activity")
+        for activity in self.activities:
+            if activity.id == activity_id:
+                activity.description = description
+                activity.labor_hours = labor_hours
+                activity.notes = notes
+                return
+        raise RepairActivityNotFoundError(activity_id)
+
+    def delete_activity(self, activity_id: uuid.UUID) -> None:
+        """Remove an existing repair activity from a mutable order."""
+        self._assert_mutable("delete_activity")
+        next_activities = [
+            activity for activity in self.activities if activity.id != activity_id
+        ]
+        if len(next_activities) == len(self.activities):
+            raise RepairActivityNotFoundError(activity_id)
+        self.activities = next_activities
+
     def add_part(self, part: RepairPart) -> None:
         """Add a spare part consumption record to this order.
 
@@ -501,6 +531,28 @@ class RepairOrder:
         """
         self._assert_mutable("add_part")
         self.parts.append(part)
+
+    def update_part(
+        self,
+        part_id: uuid.UUID,
+        *,
+        part_quantity: PartQuantity,
+    ) -> None:
+        """Update an existing consumed part record on a mutable order."""
+        self._assert_mutable("update_part")
+        for part in self.parts:
+            if part.id == part_id:
+                part.part_quantity = part_quantity
+                return
+        raise RepairPartNotFoundError(part_id)
+
+    def delete_part(self, part_id: uuid.UUID) -> None:
+        """Remove an existing consumed part record from a mutable order."""
+        self._assert_mutable("delete_part")
+        next_parts = [part for part in self.parts if part.id != part_id]
+        if len(next_parts) == len(self.parts):
+            raise RepairPartNotFoundError(part_id)
+        self.parts = next_parts
 
     def link_sap_order(self, sap_order_number: str) -> None:
         """Record the SAP PM order number after successful SAP sync.

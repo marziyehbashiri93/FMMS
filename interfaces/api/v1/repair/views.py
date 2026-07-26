@@ -22,10 +22,14 @@ from apps.repair.application.dto.repair_dto import (
     CloseRepairOrderDTO,
     CompleteRepairOrderDTO,
     CreateRepairOrderDTO,
+    DeleteRepairActivityDTO,
+    DeleteRepairPartDTO,
     RejectRepairOrderByTransportDTO,
     SyncRepairToSAPDTO,
     TransportHandoverApproveDTO,
     TransportHandoverRejectDTO,
+    UpdateRepairActivityDTO,
+    UpdateRepairPartDTO,
     WorkshopTechnicalDecisionDTO,
 )
 from apps.repair.application.services.register_internal_repair_cost_service import (
@@ -386,6 +390,44 @@ class RepairOrderViewSet(
 
     @extend_schema(
         tags=[API_TAGS.repair],
+        request=RepairActivityCreateSerializer,
+        responses=RepairOrderResponseSerializer,
+    )
+    @action(
+        detail=True,
+        methods=["patch", "delete"],
+        url_path=r"activities/(?P<activity_id>[^/.]+)",
+    )
+    def update_activity(
+        self, request: Request, pk: str | None = None, activity_id: str | None = None
+    ) -> Response:
+        """Edit or delete a repair activity."""
+        if request.method == "DELETE":
+            result = deps.get_delete_repair_activity_service().execute(
+                DeleteRepairActivityDTO(
+                    repair_order_id=uuid.UUID(str(pk)),
+                    activity_id=uuid.UUID(str(activity_id)),
+                    request_id=request_id_from(request),
+                )
+            )
+            return Response(RepairOrderResponseSerializer(result).data)
+
+        serializer = RepairActivityCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        result = deps.get_update_repair_activity_service().execute(
+            UpdateRepairActivityDTO(
+                repair_order_id=uuid.UUID(str(pk)),
+                activity_id=uuid.UUID(str(activity_id)),
+                description=serializer.validated_data["description"],
+                labor_hours=serializer.validated_data["labor_hours"],
+                request_id=request_id_from(request),
+                notes=serializer.validated_data.get("notes") or None,
+            )
+        )
+        return Response(RepairOrderResponseSerializer(result).data)
+
+    @extend_schema(
+        tags=[API_TAGS.repair],
         request=RepairPartCreateSerializer,
         responses=RepairOrderResponseSerializer,
     )
@@ -402,6 +444,44 @@ class RepairOrderViewSet(
         result = deps.get_add_repair_part_service().execute(
             AddRepairPartDTO(
                 repair_order_id=uuid.UUID(str(pk)),
+                material_number=serializer.validated_data["material_number"],
+                quantity=serializer.validated_data["quantity"],
+                request_id=request_id_from(request),
+            )
+        )
+        return Response(RepairOrderResponseSerializer(result).data)
+
+    @extend_schema(
+        tags=[API_TAGS.repair],
+        request=RepairPartCreateSerializer,
+        responses=RepairOrderResponseSerializer,
+    )
+    @action(
+        detail=True,
+        methods=["patch", "delete"],
+        url_path=r"parts/(?P<part_id>[^/.]+)",
+        permission_classes=[IsWorkshopSupervisorOrAbove],
+    )
+    def update_part(
+        self, request: Request, pk: str | None = None, part_id: str | None = None
+    ) -> Response:
+        """Edit or delete a consumed spare part."""
+        if request.method == "DELETE":
+            result = deps.get_delete_repair_part_service().execute(
+                DeleteRepairPartDTO(
+                    repair_order_id=uuid.UUID(str(pk)),
+                    part_id=uuid.UUID(str(part_id)),
+                    request_id=request_id_from(request),
+                )
+            )
+            return Response(RepairOrderResponseSerializer(result).data)
+
+        serializer = RepairPartCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        result = deps.get_update_repair_part_service().execute(
+            UpdateRepairPartDTO(
+                repair_order_id=uuid.UUID(str(pk)),
+                part_id=uuid.UUID(str(part_id)),
                 material_number=serializer.validated_data["material_number"],
                 quantity=serializer.validated_data["quantity"],
                 request_id=request_id_from(request),

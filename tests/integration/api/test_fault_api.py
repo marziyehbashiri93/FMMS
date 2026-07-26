@@ -159,6 +159,32 @@ class TestFaultAPI:
         assert decision.data["status"] == "CLOSED"
         assert VehicleModel.objects.get(id=vehicle["id"]).status == "ACTIVE"
 
+    def test_distribution_reject_requires_reason(
+        self, authenticated_client: APIClient
+    ) -> None:
+        vehicle = create_vehicle(
+            authenticated_client, plate="12FLT015", vin="1HGCM82633A004369"
+        )
+        created = authenticated_client.post(
+            "/api/v1/faults/",
+            {
+                "vehicle_id": vehicle["id"],
+                "code": "LGT-03",
+                "description": "چراغ بررسی شود",
+                "severity": "LOW",
+            },
+            format="json",
+        )
+        assert created.status_code == 201, created.data
+
+        decision = authenticated_client.post(
+            f"/api/v1/faults/{created.data['id']}/distribution-usable/",
+            {"note": "   "},
+            format="json",
+        )
+
+        assert decision.status_code == 400, decision.data
+
     def test_distribution_marks_fault_vehicle_unusable(
         self, authenticated_client: APIClient
     ) -> None:

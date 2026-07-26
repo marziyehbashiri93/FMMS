@@ -114,6 +114,27 @@ class AddRepairActivityDTO:
 
 
 @dataclass(frozen=True)
+class UpdateRepairActivityDTO:
+    """Input DTO for editing a repair activity on an active order."""
+
+    repair_order_id: uuid.UUID
+    activity_id: uuid.UUID
+    description: str
+    labor_hours: Decimal
+    request_id: str
+    notes: str | None = field(default=None)
+
+
+@dataclass(frozen=True)
+class DeleteRepairActivityDTO:
+    """Input DTO for deleting a repair activity."""
+
+    repair_order_id: uuid.UUID
+    activity_id: uuid.UUID
+    request_id: str
+
+
+@dataclass(frozen=True)
 class SyncRepairToSAPDTO:
     """Input DTO for syncing a repair order to SAP as a PM Order.
 
@@ -162,6 +183,27 @@ class AddRepairPartDTO:
     quantity: int
     request_id: str
     unit_of_measure: str = DEFAULT_REPAIR_PART_UOM
+
+
+@dataclass(frozen=True)
+class UpdateRepairPartDTO:
+    """Input DTO for editing a consumed repair part."""
+
+    repair_order_id: uuid.UUID
+    part_id: uuid.UUID
+    material_number: str
+    quantity: int
+    request_id: str
+    unit_of_measure: str = DEFAULT_REPAIR_PART_UOM
+
+
+@dataclass(frozen=True)
+class DeleteRepairPartDTO:
+    """Input DTO for deleting a consumed repair part."""
+
+    repair_order_id: uuid.UUID
+    part_id: uuid.UUID
+    request_id: str
 
 
 @dataclass(frozen=True)

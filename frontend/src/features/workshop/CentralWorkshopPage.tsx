@@ -13,8 +13,11 @@ import {
 import { useTheme } from '@mui/material/styles';
 import {
   Build,
+  Cancel,
   CheckCircleOutline,
+  DeleteOutline,
   DoNotDisturbAlt,
+  Edit,
   Inventory2,
 } from '@mui/icons-material';
 import { api } from '../../api/client';
@@ -78,6 +81,28 @@ const REPAIR_STATUS_LABELS: Record<string, string> = {
   COMPLETED: 'تکمیل شده',
 };
 
+const MATERIAL_REQUEST_STATUS_LABELS: Record<string, string> = {
+  REQUESTED: 'در انتظار بررسی ترابری',
+  WAITING_STOCK: 'منتظر موجودی/خرید',
+  PURCHASE_REQUIRED: 'نیاز به خرید',
+  PARTIALLY_ISSUED: 'تخصیص جزئی — منتظر خرید',
+  STOCK_ISSUED: 'ارسال‌شده به تعمیرگاه',
+  RECEIVED: 'دریافت‌شده در تعمیرگاه',
+};
+
+const MATERIAL_DECISION_LABELS: Record<string, string> = {
+  FROM_STOCK: 'از انبار مرکزی',
+  PURCHASE: 'خرید از بیرون',
+  PENDING: 'ثبت‌نشده',
+};
+
+const MATERIAL_ITEM_STATUS_LABELS: Record<string, string> = {
+  PENDING: 'در انتظار تصمیم',
+  STOCK_ISSUED: 'ارسال‌شده از انبار',
+  PURCHASE_REQUIRED: 'نیاز به خرید',
+  RECEIVED: 'دریافت‌شده',
+};
+
 type StatusFilter =
   | ''
   | 'WORKSHOP_ASSIGNED'
@@ -99,7 +124,28 @@ type DetailState = {
   vehicle: Vehicle | null;
   history: RepairOrder[];
   timeline: Array<{ event_type: string; description: string; created_at: string }>;
-  materialRequests: Array<Record<string, unknown>>;
+  materialRequests: MaterialRequestSummary[];
+};
+
+type MaterialRequestItemSummary = {
+  id: string;
+  material_number: string;
+  quantity: string | number;
+  from_catalog?: boolean;
+  decision?: string;
+  item_status?: string;
+  material_name?: string;
+  available_quantity?: string | number;
+  in_catalog?: boolean;
+};
+
+type MaterialRequestSummary = {
+  id: string;
+  repair_order_id: string;
+  status: string;
+  created_at?: string;
+  updated_at?: string;
+  items?: MaterialRequestItemSummary[];
 };
 
 function normalizePaginated<T>(payload: { results?: T[] } | T[]): T[] {
@@ -153,9 +199,11 @@ export function CentralWorkshopPage() {
   const [consumedPart, setConsumedPart] = useState<MaterialPickValue>(EMPTY_MATERIAL_PICK);
   const [consumedQty, setConsumedQty] = useState('1');
   const [consumedLines, setConsumedLines] = useState<PartLineDraft[]>([]);
+  const [editingPartId, setEditingPartId] = useState('');
   const [activityDescription, setActivityDescription] = useState('');
   const [activityHours, setActivityHours] = useState('');
   const [activityNotes, setActivityNotes] = useState('');
+  const [editingActivityId, setEditingActivityId] = useState('');
   const [actionLoading, setActionLoading] = useState('');
   const [actionError, setActionError] = useState('');
   const [success, setSuccess] = useState('');
@@ -251,6 +299,8 @@ export function CentralWorkshopPage() {
     setActivityDescription('');
     setActivityHours('');
     setActivityNotes('');
+    setEditingActivityId('');
+    setEditingPartId('');
     setDetailLoading(true);
     try {
       const [order, fault, vehicle, history, timeline, materials] = await Promise.all([
@@ -262,7 +312,10 @@ export function CentralWorkshopPage() {
           .then(normalizePaginated)
           .catch(() => [] as RepairOrder[]),
         api.getRepairOrderTimeline(row.id).catch(() => []),
-        api.listMaterialRequests().catch(() => []),
+        api
+          .listMaterialRequests()
+          .then((payload) => payload as MaterialRequestSummary[])
+          .catch(() => [] as MaterialRequestSummary[]),
       ]);
       setDetail({
         order,
@@ -361,23 +414,74 @@ export function CentralWorkshopPage() {
 
   const recordConsumedPart = async () => {
     if (!selected) return;
-    if (consumedLines.length === 0) return;
+    if (!editingPartId && consumedLines.length === 0) return;
     setActionLoading('consumed');
     setActionError('');
     try {
-      for (const line of consumedLines) {
-        await api.addRepairPart(selected.id, {
-          material_number: line.materialNumber,
-          quantity: line.quantity,
+      if (editingPartId) {
+        const quantity = Math.max(1, Number(consumedQty) || 1);
+        await api.updateRepairPart(selected.id, editingPartId, {
+          material_number: consumedPart.materialNumber.trim(),
+          quantity,
         });
+      } else {
+        for (const line of consumedLines) {
+          await api.addRepairPart(selected.id, {
+            material_number: line.materialNumber,
+            quantity: line.quantity,
+          });
+        }
       }
-      setSuccess('قطعه مصرفی ثبت شد (جدا از درخواست قطعه).');
+      const message = editingPartId
+        ? 'قطعه مصرفی ویرایش شد.'
+        : 'قطعه مصرفی ثبت شد (جدا از درخواست قطعه).';
       setConsumedPart(EMPTY_MATERIAL_PICK);
       setConsumedQty('1');
       setConsumedLines([]);
+      setEditingPartId('');
       await openDetail(selected);
+      setSuccess(message);
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'ثبت قطعه مصرفی انجام نشد');
+      setActionError(
+        err instanceof Error ? err.message : 'ثبت/ویرایش قطعه مصرفی انجام نشد',
+      );
+    } finally {
+      setActionLoading('');
+    }
+  };
+
+  const startEditPart = (part: NonNullable<RepairOrder['parts']>[number]) => {
+    setEditingPartId(part.id);
+    setConsumedPart({
+      materialNumber: part.material_number,
+      fromCatalog: true,
+      materialName: '',
+      availableQuantity: '',
+    });
+    setConsumedQty(String(part.quantity));
+    setConsumedLines([]);
+    setActionError('');
+  };
+
+  const cancelEditPart = () => {
+    setEditingPartId('');
+    setConsumedPart(EMPTY_MATERIAL_PICK);
+    setConsumedQty('1');
+    setConsumedLines([]);
+  };
+
+  const deleteConsumedPart = async (partId: string) => {
+    if (!selected) return;
+    if (!window.confirm('این قطعه مصرفی حذف شود؟')) return;
+    setActionLoading(`delete-part-${partId}`);
+    setActionError('');
+    try {
+      await api.deleteRepairPart(selected.id, partId);
+      if (editingPartId === partId) cancelEditPart();
+      await openDetail(selected);
+      setSuccess('قطعه مصرفی حذف شد.');
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'حذف قطعه مصرفی انجام نشد');
     } finally {
       setActionLoading('');
     }
@@ -391,18 +495,60 @@ export function CentralWorkshopPage() {
     setActionLoading('activity');
     setActionError('');
     try {
-      await api.addRepairActivity(selected.id, {
+      const payload = {
         description,
         labor_hours: activityHours,
         notes: activityNotes.trim() || undefined,
-      });
+      };
+      if (editingActivityId) {
+        await api.updateRepairActivity(selected.id, editingActivityId, payload);
+      } else {
+        await api.addRepairActivity(selected.id, payload);
+      }
       setActivityDescription('');
       setActivityHours('');
       setActivityNotes('');
+      setEditingActivityId('');
       await openDetail(selected);
-      setSuccess('فعالیت تعمیرگاه ثبت شد.');
+      setSuccess(
+        editingActivityId ? 'فعالیت تعمیرگاه ویرایش شد.' : 'فعالیت تعمیرگاه ثبت شد.',
+      );
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'ثبت فعالیت تعمیرگاه انجام نشد');
+      setActionError(
+        err instanceof Error ? err.message : 'ثبت/ویرایش فعالیت تعمیرگاه انجام نشد',
+      );
+    } finally {
+      setActionLoading('');
+    }
+  };
+
+  const startEditActivity = (activity: NonNullable<RepairOrder['activities']>[number]) => {
+    setEditingActivityId(activity.id);
+    setActivityDescription(activity.description);
+    setActivityHours(String(activity.labor_hours));
+    setActivityNotes(activity.notes || '');
+    setActionError('');
+  };
+
+  const cancelEditActivity = () => {
+    setEditingActivityId('');
+    setActivityDescription('');
+    setActivityHours('');
+    setActivityNotes('');
+  };
+
+  const deleteActivity = async (activityId: string) => {
+    if (!selected) return;
+    if (!window.confirm('این فعالیت حذف شود؟')) return;
+    setActionLoading(`delete-activity-${activityId}`);
+    setActionError('');
+    try {
+      await api.deleteRepairActivity(selected.id, activityId);
+      if (editingActivityId === activityId) cancelEditActivity();
+      await openDetail(selected);
+      setSuccess('فعالیت تعمیرگاه حذف شد.');
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'حذف فعالیت تعمیرگاه انجام نشد');
     } finally {
       setActionLoading('');
     }
@@ -485,9 +631,12 @@ export function CentralWorkshopPage() {
   const canReceiveParts = detail?.order.status === 'WAITING_PARTS';
   const canCompleteRepair = detail?.order.status === 'IN_PROGRESS';
   const canRecordConsumed = detail?.order.status === 'IN_PROGRESS';
-  const hasRecordedParts = Boolean(detail?.order.parts?.length);
-  const canShowConsumedParts = canRecordConsumed || hasRecordedParts;
   const canRecordActivity = detail?.order.status === 'IN_PROGRESS';
+  const canSubmitConsumed = editingPartId
+    ? Boolean(consumedPart.materialNumber.trim()) &&
+      Number.isFinite(Number(consumedQty)) &&
+      Number(consumedQty) > 0
+    : consumedLines.length > 0;
   const canSubmitActivity =
     activityDescription.trim().length > 0 &&
     Number.isFinite(Number(activityHours)) &&
@@ -569,7 +718,342 @@ export function CentralWorkshopPage() {
                 </>
               )}
 
-              {canRequestParts && (
+              {canCompleteRepair && (
+                <Button
+                  fullWidth
+                  size="large"
+                  color="success"
+                  variant="contained"
+                  loading={actionLoading === 'complete'}
+                  onClick={() => void completeRepair(false)}
+                  sx={{ minHeight: 52, fontWeight: 900 }}
+                >
+                  تکمیل تعمیر
+                </Button>
+              )}
+            </Stack>
+          ),
+        },
+        {
+          label: 'فعالیت‌ها',
+          content: (
+            <Stack spacing={2}>
+              {canRecordActivity ? (
+                <Card variant="outlined">
+                  <CardContent>
+                    <Typography fontWeight={700} mb={1.5}>
+                      {editingActivityId ? 'ویرایش فعالیت' : 'ثبت فعالیت'}
+                    </Typography>
+                    <Stack spacing={1.5}>
+                      <Stack
+                        direction={{ xs: 'column', sm: 'row' }}
+                        spacing={1}
+                        useFlexGap
+                        alignItems="flex-start"
+                      >
+                        <RtlTextField
+                          label="شرح فعالیت"
+                          value={activityDescription}
+                          onChange={(event) => setActivityDescription(event.target.value)}
+                          size="small"
+                          placeholder="مثلا تعویض دینام"
+                          sx={{ flex: 1, minWidth: { xs: '100%', sm: 280 } }}
+                        />
+                        <RtlTextField
+                          label="ساعت"
+                          value={activityHours}
+                          onChange={(event) => setActivityHours(event.target.value)}
+                          size="small"
+                          type="number"
+                          inputProps={{ min: 0.25, step: 0.25 }}
+                          sx={{ width: { xs: '100%', sm: 110 } }}
+                        />
+                        <Button
+                          variant="contained"
+                          loading={actionLoading === 'activity'}
+                          disabled={!canSubmitActivity}
+                          onClick={() => void recordActivity()}
+                          sx={{ mt: { sm: 0.5 }, whiteSpace: 'nowrap' }}
+                        >
+                          {editingActivityId ? 'ثبت ویرایش' : 'ثبت فعالیت'}
+                        </Button>
+                        {editingActivityId ? (
+                          <Button
+                            variant="outlined"
+                            color="inherit"
+                            startIcon={<Cancel />}
+                            onClick={cancelEditActivity}
+                            sx={{ mt: { sm: 0.5 }, whiteSpace: 'nowrap' }}
+                          >
+                            انصراف
+                          </Button>
+                        ) : null}
+                      </Stack>
+                      <RtlTextField
+                        fullWidth
+                        label="یادداشت"
+                        value={activityNotes}
+                        onChange={(event) => setActivityNotes(event.target.value)}
+                        size="small"
+                        multiline
+                        minRows={2}
+                      />
+                    </Stack>
+                  </CardContent>
+                </Card>
+              ) : null}
+
+              {detail.order.activities && detail.order.activities.length > 0 ? (
+                <Stack spacing={1}>
+                  {detail.order.activities.map((activity) => {
+                    const editing = editingActivityId === activity.id;
+                    return (
+                      <Box
+                        key={activity.id}
+                        sx={{
+                          border: '1px solid',
+                          borderColor: editing ? 'primary.main' : 'divider',
+                          borderRadius: 1,
+                          px: 1.5,
+                          py: 1,
+                          bgcolor: editing
+                            ? 'rgba(25, 118, 210, 0.06)'
+                            : 'background.paper',
+                        }}
+                      >
+                        <Stack
+                          direction={{ xs: 'column', sm: 'row' }}
+                          justifyContent="space-between"
+                          gap={1}
+                        >
+                          <Box>
+                            <Typography fontWeight={800}>
+                              {activity.description}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {toFaNumber(activity.labor_hours)} ساعت ·{' '}
+                              {formatDateTime(activity.performed_at)}
+                            </Typography>
+                            {activity.notes ? (
+                              <Typography variant="body2" color="text.secondary" mt={0.5}>
+                                {activity.notes}
+                              </Typography>
+                            ) : null}
+                          </Box>
+                          {canRecordActivity ? (
+                            <Stack
+                              direction={{ xs: 'column', sm: 'row' }}
+                              spacing={1}
+                              sx={{ alignSelf: { xs: 'stretch', sm: 'flex-start' } }}
+                            >
+                              <Button
+                                size="small"
+                                variant={editing ? 'contained' : 'outlined'}
+                                startIcon={<Edit />}
+                                onClick={() => startEditActivity(activity)}
+                              >
+                                ویرایش
+                              </Button>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                color="error"
+                                startIcon={<DeleteOutline />}
+                                loading={actionLoading === `delete-activity-${activity.id}`}
+                                onClick={() => void deleteActivity(activity.id)}
+                              >
+                                حذف
+                              </Button>
+                            </Stack>
+                          ) : null}
+                        </Stack>
+                      </Box>
+                    );
+                  })}
+                </Stack>
+              ) : canRecordActivity ? null : (
+                <EmptyState title="فعالیتی ثبت نشده است" />
+              )}
+            </Stack>
+          ),
+        },
+        {
+          label: 'قطعات مصرفی',
+          content: (
+            <Stack spacing={2}>
+              {canRecordConsumed ? (
+                <Card variant="outlined">
+                  <CardContent>
+                    <Typography fontWeight={700} mb={1.5}>
+                      {editingPartId ? 'ویرایش قطعه مصرفی' : 'ثبت قطعه مصرفی'}
+                    </Typography>
+                    <Stack spacing={1.5}>
+                      <Typography variant="body2" color="text.secondary">
+                        برای هر قطعه مصرفی تعداد جداگانه ثبت کنید (متفاوت از درخواست قطعه).
+                      </Typography>
+                      <Stack
+                        direction={{ xs: 'column', sm: 'row' }}
+                        spacing={1}
+                        useFlexGap
+                        alignItems="flex-start"
+                      >
+                        <MaterialStockPicker
+                          label="قطعه مصرفی"
+                          value={consumedPart}
+                          onChange={setConsumedPart}
+                          showSelectedChip={false}
+                        />
+                        <RtlTextField
+                          label="تعداد"
+                          value={consumedQty}
+                          onChange={(event) => setConsumedQty(event.target.value)}
+                          size="small"
+                          type="number"
+                          inputProps={{ min: 1 }}
+                          sx={{ width: { xs: '100%', sm: 110 } }}
+                        />
+                        <Button
+                          variant="outlined"
+                          disabled={
+                            editingPartId !== '' || !consumedPart.materialNumber.trim()
+                          }
+                          onClick={addConsumedLine}
+                          sx={{ mt: { sm: 0.5 } }}
+                        >
+                          افزودن به لیست
+                        </Button>
+                        {editingPartId ? (
+                          <Button
+                            variant="outlined"
+                            color="inherit"
+                            startIcon={<Cancel />}
+                            onClick={cancelEditPart}
+                            sx={{ mt: { sm: 0.5 }, whiteSpace: 'nowrap' }}
+                          >
+                            انصراف
+                          </Button>
+                        ) : null}
+                      </Stack>
+                      {!editingPartId && consumedLines.length > 0 ? (
+                        <Stack direction="row" flexWrap="wrap" gap={1}>
+                          {consumedLines.map((line) => (
+                            <Chip
+                              key={line.key}
+                              color={line.fromCatalog ? 'success' : 'warning'}
+                              variant="outlined"
+                              label={lineChipLabel(line)}
+                              onDelete={() =>
+                                setConsumedLines((prev) =>
+                                  prev.filter((item) => item.key !== line.key),
+                                )
+                              }
+                            />
+                          ))}
+                        </Stack>
+                      ) : null}
+                      <Stack
+                        direction="row"
+                        justifyContent="flex-end"
+                        sx={{
+                          pt: 1,
+                          borderTop: '1px solid',
+                          borderColor: 'divider',
+                        }}
+                      >
+                        <Button
+                          variant="contained"
+                          color="success"
+                          loading={actionLoading === 'consumed'}
+                          disabled={!canSubmitConsumed}
+                          onClick={() => void recordConsumedPart()}
+                        >
+                          {editingPartId ? 'ثبت ویرایش' : 'ثبت قطعه مصرفی'}
+                        </Button>
+                      </Stack>
+                    </Stack>
+                  </CardContent>
+                </Card>
+              ) : null}
+
+              {detail.order.parts && detail.order.parts.length > 0 ? (
+                <Stack spacing={1}>
+                  {detail.order.parts.map((part) => {
+                    const editing = editingPartId === part.id;
+                    return (
+                      <Box
+                        key={part.id}
+                        sx={{
+                          border: '1px solid',
+                          borderColor: editing ? 'primary.main' : 'divider',
+                          borderRadius: 1,
+                          px: 1.5,
+                          py: 1,
+                          bgcolor: editing
+                            ? 'rgba(25, 118, 210, 0.06)'
+                            : 'background.paper',
+                        }}
+                      >
+                        <Stack
+                          direction={{ xs: 'column', sm: 'row' }}
+                          justifyContent="space-between"
+                          gap={1}
+                        >
+                          <Box>
+                            <Typography fontWeight={800}>
+                              {part.material_number}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              تعداد {toFaNumber(part.quantity)}
+                              {part.unit_of_measure && part.unit_of_measure !== '-'
+                                ? ` ${part.unit_of_measure}`
+                                : ''}
+                              {part.posted_at
+                                ? ` · ثبت انبار ${formatDateTime(part.posted_at)}`
+                                : ''}
+                            </Typography>
+                          </Box>
+                          {canRecordConsumed ? (
+                            <Stack
+                              direction={{ xs: 'column', sm: 'row' }}
+                              spacing={1}
+                              sx={{ alignSelf: { xs: 'stretch', sm: 'flex-start' } }}
+                            >
+                              <Button
+                                size="small"
+                                variant={editing ? 'contained' : 'outlined'}
+                                startIcon={<Edit />}
+                                onClick={() => startEditPart(part)}
+                              >
+                                ویرایش
+                              </Button>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                color="error"
+                                startIcon={<DeleteOutline />}
+                                loading={actionLoading === `delete-part-${part.id}`}
+                                onClick={() => void deleteConsumedPart(part.id)}
+                              >
+                                حذف
+                              </Button>
+                            </Stack>
+                          ) : null}
+                        </Stack>
+                      </Box>
+                    );
+                  })}
+                </Stack>
+              ) : canRecordConsumed ? null : (
+                <EmptyState title="قطعه مصرفی ثبت نشده است" />
+              )}
+            </Stack>
+          ),
+        },
+        {
+          label: 'درخواست و دریافت قطعات',
+          content: (
+            <Stack spacing={2}>
+              {canRequestParts ? (
                 <Card variant="outlined">
                   <CardContent>
                     <Typography fontWeight={700} mb={1.5}>
@@ -648,265 +1132,164 @@ export function CentralWorkshopPage() {
                     </Stack>
                   </CardContent>
                 </Card>
-              )}
+              ) : null}
 
-              {canReceiveParts && (
+              {detail.materialRequests.length === 0 ? (
+                canRequestParts ? null : (
+                  <EmptyState title="درخواست قطعه‌ای برای این تعمیر ثبت نشده است" />
+                )
+              ) : (
                 <Stack spacing={1}>
-                  {detail.materialRequests.length === 0 ? (
-                    <Alert severity="info">درخواست قطعه‌ای برای دریافت ثبت نشده است.</Alert>
-                  ) : (
-                    detail.materialRequests.map((item) => (
-                      <Card key={String(item.id)} variant="outlined">
-                        <CardContent
-                          sx={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            gap: 1,
-                          }}
+                  {detail.materialRequests.map((request) => {
+                const readyToReceive =
+                  canReceiveParts && request.status === 'STOCK_ISSUED';
+                const received = request.status === 'RECEIVED';
+                return (
+                  <Card
+                    key={String(request.id)}
+                    variant="outlined"
+                    sx={{
+                      borderRight: '4px solid',
+                      borderRightColor: readyToReceive
+                        ? 'warning.main'
+                        : received
+                          ? 'success.main'
+                          : 'divider',
+                      borderColor: readyToReceive
+                        ? 'warning.main'
+                        : received
+                          ? 'success.light'
+                          : 'divider',
+                      bgcolor: readyToReceive
+                        ? 'rgba(237, 108, 2, 0.08)'
+                        : received
+                          ? 'rgba(46, 125, 50, 0.06)'
+                          : 'background.paper',
+                      boxShadow: readyToReceive
+                        ? '0 6px 18px rgba(160, 104, 0, 0.12)'
+                        : 'none',
+                    }}
+                  >
+                    <CardContent>
+                      <Stack spacing={1.5}>
+                        <Stack
+                          direction={{ xs: 'column', sm: 'row' }}
+                          justifyContent="space-between"
+                          alignItems={{ xs: 'stretch', sm: 'center' }}
+                          gap={1}
                         >
-                          <Box>
-                            <Typography fontWeight={700}>
-                              درخواست {String(item.id).slice(0, 8)}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              وضعیت: {String(item.status)}
-                            </Typography>
-                          </Box>
-                          <Button
-                            size="small"
-                            variant="contained"
-                            loading={actionLoading === `receive-${String(item.id)}`}
-                            disabled={item.status !== 'STOCK_ISSUED'}
-                            onClick={() => void receiveParts(String(item.id))}
-                          >
-                            ثبت دریافت فیزیکی
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    ))
-                  )}
-                </Stack>
-              )}
-
-              {canRecordActivity && (
-                <Card variant="outlined">
-                  <CardContent>
-                    <Typography fontWeight={700} mb={1.5}>
-                      فعالیت‌های تعمیرگاه
-                    </Typography>
-                    <Stack spacing={1.5}>
-                      <Stack
-                        direction={{ xs: 'column', sm: 'row' }}
-                        spacing={1}
-                        useFlexGap
-                        alignItems="flex-start"
-                      >
-                        <RtlTextField
-                          label="شرح فعالیت"
-                          value={activityDescription}
-                          onChange={(event) => setActivityDescription(event.target.value)}
-                          size="small"
-                          placeholder="مثلا تعویض دینام"
-                          sx={{ flex: 1, minWidth: { xs: '100%', sm: 280 } }}
-                        />
-                        <RtlTextField
-                          label="ساعت"
-                          value={activityHours}
-                          onChange={(event) => setActivityHours(event.target.value)}
-                          size="small"
-                          type="number"
-                          inputProps={{ min: 0.25, step: 0.25 }}
-                          sx={{ width: { xs: '100%', sm: 110 } }}
-                        />
-                        <Button
-                          variant="contained"
-                          loading={actionLoading === 'activity'}
-                          disabled={!canSubmitActivity}
-                          onClick={() => void recordActivity()}
-                          sx={{ mt: { sm: 0.5 } }}
-                        >
-                          ثبت فعالیت
-                        </Button>
-                      </Stack>
-                      <RtlTextField
-                        fullWidth
-                        label="یادداشت"
-                        value={activityNotes}
-                        onChange={(event) => setActivityNotes(event.target.value)}
-                        size="small"
-                        multiline
-                        minRows={2}
-                      />
-                      {detail.order.activities && detail.order.activities.length > 0 ? (
-                        <Stack spacing={1}>
-                          {detail.order.activities.map((activity) => (
-                            <Box
-                              key={activity.id}
-                              sx={{
-                                border: '1px solid',
-                                borderColor: 'divider',
-                                borderRadius: 1,
-                                px: 1.5,
-                                py: 1,
-                              }}
-                            >
-                              <Typography fontWeight={800}>{activity.description}</Typography>
-                              <Typography variant="body2" color="text.secondary">
-                                {toFaNumber(activity.labor_hours)} ساعت ·{' '}
-                                {formatDateTime(activity.performed_at)}
+                          <Stack direction="row" spacing={1} alignItems="flex-start">
+                            {received ? (
+                              <CheckCircleOutline color="success" sx={{ mt: 0.25 }} />
+                            ) : null}
+                            <Box>
+                              <Typography fontWeight={800}>
+                                درخواست {String(request.id).slice(0, 8)}
                               </Typography>
-                              {activity.notes ? (
-                                <Typography variant="body2" color="text.secondary" mt={0.5}>
-                                  {activity.notes}
+                              <Typography
+                                variant="body2"
+                                color={readyToReceive ? 'warning.dark' : 'text.secondary'}
+                                fontWeight={readyToReceive ? 800 : 500}
+                              >
+                                {readyToReceive
+                                  ? 'آماده ثبت دریافت فیزیکی'
+                                  : `وضعیت: ${
+                                      MATERIAL_REQUEST_STATUS_LABELS[request.status] ??
+                                      request.status
+                                    }`}
+                              </Typography>
+                              {request.updated_at ? (
+                                <Typography variant="body2" color="text.secondary">
+                                  آخرین به‌روزرسانی:{' '}
+                                  {formatDateTime(request.updated_at)}
                                 </Typography>
                               ) : null}
                             </Box>
-                          ))}
-                        </Stack>
-                      ) : null}
-                    </Stack>
-                  </CardContent>
-                </Card>
-              )}
-
-              {canShowConsumedParts && (
-                <Card variant="outlined">
-                  <CardContent>
-                    <Typography fontWeight={700} mb={1.5}>
-                      قطعات مصرفی (واقعی)
-                    </Typography>
-                    <Stack spacing={1.5}>
-                      {canRecordConsumed ? (
-                        <>
-                          <Typography variant="body2" color="text.secondary">
-                            برای هر قطعه مصرفی تعداد جداگانه ثبت کنید (متفاوت از درخواست قطعه).
-                          </Typography>
-                          <Stack
-                            direction={{ xs: 'column', sm: 'row' }}
-                            spacing={1}
-                            useFlexGap
-                            alignItems="flex-start"
-                          >
-                            <MaterialStockPicker
-                              label="قطعه مصرفی"
-                              value={consumedPart}
-                              onChange={setConsumedPart}
-                              showSelectedChip={false}
-                            />
-                            <RtlTextField
-                              label="تعداد"
-                              value={consumedQty}
-                              onChange={(event) => setConsumedQty(event.target.value)}
-                              size="small"
-                              type="number"
-                              inputProps={{ min: 1 }}
-                              sx={{ width: { xs: '100%', sm: 110 } }}
-                            />
-                            <Button
-                              variant="outlined"
-                              disabled={!consumedPart.materialNumber.trim()}
-                              onClick={addConsumedLine}
-                              sx={{ mt: { sm: 0.5 } }}
-                            >
-                              افزودن به لیست
-                            </Button>
                           </Stack>
-                          {consumedLines.length > 0 ? (
-                            <Stack direction="row" flexWrap="wrap" gap={1}>
-                              {consumedLines.map((line) => (
-                                <Chip
-                                  key={line.key}
-                                  color={line.fromCatalog ? 'success' : 'warning'}
-                                  variant="outlined"
-                                  label={lineChipLabel(line)}
-                                  onDelete={() =>
-                                    setConsumedLines((prev) =>
-                                      prev.filter((item) => item.key !== line.key),
-                                    )
-                                  }
-                                />
-                              ))}
-                            </Stack>
-                          ) : null}
-                        </>
-                      ) : null}
-                      {detail.order.parts && detail.order.parts.length > 0 ? (
-                        <Stack spacing={1}>
-                          <Typography variant="body2" fontWeight={800}>
-                            قطعات ثبت‌شده
-                          </Typography>
-                          {detail.order.parts.map((part) => (
-                            <Box
-                              key={part.id}
-                              sx={{
-                                border: '1px solid',
-                                borderColor: 'divider',
-                                borderRadius: 1,
-                                px: 1.5,
-                                py: 1,
-                              }}
+                          {readyToReceive ? (
+                            <Button
+                              size="small"
+                              variant="contained"
+                              color="warning"
+                              loading={actionLoading === `receive-${String(request.id)}`}
+                              onClick={() => void receiveParts(String(request.id))}
                             >
-                              <Typography fontWeight={800}>
-                                {part.material_number}
-                              </Typography>
-                              <Typography variant="body2" color="text.secondary">
-                                تعداد {toFaNumber(part.quantity)}
-                                {part.unit_of_measure && part.unit_of_measure !== '-'
-                                  ? ` ${part.unit_of_measure}`
-                                  : ''}
-                                {part.posted_at
-                                  ? ` · ثبت انبار ${formatDateTime(part.posted_at)}`
-                                  : ''}
-                              </Typography>
-                            </Box>
-                          ))}
+                              ثبت دریافت فیزیکی
+                            </Button>
+                          ) : (
+                            <Chip
+                              size="small"
+                              variant={received ? 'filled' : 'outlined'}
+                              color={received ? 'success' : 'default'}
+                              label={
+                                received
+                                  ? 'دریافت فیزیکی ثبت شده'
+                                  : MATERIAL_REQUEST_STATUS_LABELS[request.status] ??
+                                    request.status
+                              }
+                            />
+                          )}
                         </Stack>
-                      ) : null}
-                      {canRecordConsumed ? (
-                        <Stack
-                          direction="row"
-                          justifyContent="flex-end"
-                          sx={{
-                            pt: 1,
-                            borderTop: '1px solid',
-                            borderColor: 'divider',
-                          }}
-                        >
-                          <Button
-                            variant="contained"
-                            color="success"
-                            loading={actionLoading === 'consumed'}
-                            disabled={consumedLines.length === 0}
-                            onClick={() => void recordConsumedPart()}
-                          >
-                            ثبت قطعه مصرفی
-                          </Button>
-                        </Stack>
-                      ) : null}
-                    </Stack>
-                  </CardContent>
-                </Card>
-              )}
 
-              {canCompleteRepair && (
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} useFlexGap>
-                  <Button
-                    color="success"
-                    variant="contained"
-                    loading={actionLoading === 'complete'}
-                    onClick={() => void completeRepair(false)}
-                  >
-                    تکمیل تعمیر
-                  </Button>
-                  <Button
-                    color="inherit"
-                    variant="outlined"
-                    loading={actionLoading === 'complete-empty'}
-                    onClick={() => void completeRepair(true)}
-                  >
-                    تکمیل بدون مصرف قطعه
-                  </Button>
+                        <Stack spacing={1}>
+                          {(request.items ?? []).length === 0 ? (
+                            <Alert severity="info" sx={{ py: 0.5 }}>
+                              جزئیات اقلام این درخواست در دسترس نیست.
+                            </Alert>
+                          ) : (
+                            (request.items ?? []).map((line) => (
+                              <Box
+                                key={String(line.id)}
+                                sx={{
+                                  p: 1,
+                                  border: '1px solid',
+                                  borderColor: received ? 'success.light' : 'divider',
+                                  borderRadius: (t) => t.radius('sm'),
+                                  bgcolor: received
+                                    ? 'rgba(46, 125, 50, 0.04)'
+                                    : 'background.default',
+                                }}
+                              >
+                                <Stack spacing={0.5}>
+                                  <Typography fontWeight={800}>
+                                    {line.material_number}
+                                    {line.material_name
+                                      ? ` · ${line.material_name}`
+                                      : ''}
+                                  </Typography>
+                                  <Stack
+                                    direction={{ xs: 'column', sm: 'row' }}
+                                    spacing={{ xs: 0.25, sm: 2 }}
+                                    useFlexGap
+                                  >
+                                    <Typography variant="body2" color="text.secondary">
+                                      تعداد: {toFaNumber(String(line.quantity))}
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                      تامین:{' '}
+                                      {MATERIAL_DECISION_LABELS[line.decision ?? ''] ||
+                                        line.decision ||
+                                        '—'}
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                      وضعیت قلم:{' '}
+                                      {MATERIAL_ITEM_STATUS_LABELS[
+                                        line.item_status ?? ''
+                                      ] ||
+                                        line.item_status ||
+                                        '—'}
+                                    </Typography>
+                                  </Stack>
+                                </Stack>
+                              </Box>
+                            ))
+                          )}
+                        </Stack>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                );
+                  })}
                 </Stack>
               )}
             </Stack>

@@ -61,6 +61,17 @@ class FaultDistributionDecisionSerializer(serializers.Serializer):
     )
 
 
+class FaultDistributionRejectSerializer(serializers.Serializer):
+    """Validate distribution rejection reason when the vehicle is usable."""
+
+    note = serializers.CharField(
+        max_length=500,
+        required=True,
+        allow_blank=False,
+        trim_whitespace=True,
+    )
+
+
 class UserProfileSummarySerializer(serializers.Serializer):
     """Serialize nested user profile summaries."""
 

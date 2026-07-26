@@ -602,7 +602,7 @@ export function DistributionFaultsPage() {
                 <>
                   <RtlTextField
                     fullWidth
-                    label="یادداشت تصمیم توزیع"
+                    label="یادداشت/دلیل تصمیم توزیع"
                     value={decisionNote}
                     onChange={(event) => setDecisionNote(event.target.value)}
                   />
@@ -617,23 +617,6 @@ export function DistributionFaultsPage() {
                       variant="contained"
                       size="small"
                       startIcon={<CheckCircleOutline />}
-                      loading={decisionLoading === 'usable'}
-                      onClick={() => void decide('usable')}
-                      sx={{
-                        height: 40,
-                        minHeight: 40,
-                        px: 1.75,
-                        whiteSpace: 'nowrap',
-                        flexShrink: 0,
-                      }}
-                    >
-                      خودرو قابل استفاده است
-                    </Button>
-                    <Button
-                      color="error"
-                      variant="contained"
-                      size="small"
-                      startIcon={<DoNotDisturbAlt />}
                       loading={decisionLoading === 'unusable'}
                       onClick={() => void decide('unusable')}
                       sx={{
@@ -644,7 +627,25 @@ export function DistributionFaultsPage() {
                         flexShrink: 0,
                       }}
                     >
-                      خودرو قابل استفاده نیست
+                      بله — تایید خرابی
+                    </Button>
+                    <Button
+                      color="error"
+                      variant="contained"
+                      size="small"
+                      startIcon={<DoNotDisturbAlt />}
+                      loading={decisionLoading === 'usable'}
+                      disabled={!decisionNote.trim()}
+                      onClick={() => void decide('usable')}
+                      sx={{
+                        height: 40,
+                        minHeight: 40,
+                        px: 1.75,
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0,
+                      }}
+                    >
+                      خیر — رد خرابی
                     </Button>
                   </Stack>
                 </>
