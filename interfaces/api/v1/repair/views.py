@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 
+from django.core.files.storage import default_storage
 from django.db import transaction
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
@@ -115,6 +119,30 @@ def _json_safe_services(items: list[dict]) -> list[dict]:
             next_item["cost"] = str(next_item["cost"])
         result.append(next_item)
     return result
+
+
+def _review_request_data(request: Request) -> dict:
+    """Normalize JSON and multipart review payloads into serializer-friendly data."""
+    data = {key: request.data.get(key) for key in request.data.keys()}
+    for key in ("repair_services", "replaced_parts"):
+        value = data.get(key)
+        if isinstance(value, str):
+            try:
+                data[key] = json.loads(value or "[]")
+            except json.JSONDecodeError as exc:
+                raise ValidationError({key: "Invalid JSON payload."}) from exc
+    return data
+
+
+def _save_external_invoice_file(request: Request, assignment_id: str) -> str | None:
+    uploaded = request.FILES.get("invoice_file")
+    if uploaded is None:
+        return None
+    saved_path = default_storage.save(
+        f"external-repair-invoices/{assignment_id}/{uploaded.name}",
+        uploaded,
+    )
+    return default_storage.url(saved_path)
 
 
 class RepairOrderViewSet(
@@ -777,19 +805,20 @@ class ExternalWorkshopAssignmentViewSet(GenericViewSet):
         methods=["post", "patch"],
         url_path="review",
         permission_classes=[IsTransportSupervisorOrAbove],
+        parser_classes=[JSONParser, MultiPartParser, FormParser],
     )
     def review(self, request: Request, pk: str | None = None) -> Response:
         """Transportation saves external repair review draft."""
-        serializer = ExternalRepairReviewSerializer(data=request.data)
+        serializer = ExternalRepairReviewSerializer(data=_review_request_data(request))
         serializer.is_valid(raise_exception=True)
+        invoice_attachment = _save_external_invoice_file(request, str(pk))
         result = deps.get_review_external_repair_service().execute(
             ReviewExternalRepairDTO(
                 assignment_id=uuid.UUID(str(pk)),
                 request_id=request_id_from(request),
                 reviewed_by=user_id_from(request),
-                invoice_attachment=serializer.validated_data.get(
-                    "invoice_attachment"
-                ),
+                invoice_attachment=invoice_attachment
+                or serializer.validated_data.get("invoice_attachment"),
                 repair_services=_json_safe_services(
                     serializer.validated_data.get("repair_services", [])
                 ),

@@ -189,7 +189,9 @@ async function request<T>(path: string, init: ApiRequestInit = {}): Promise<T> {
   const { auth = true, retryOnUnauthorized = true, ...fetchInit } = init;
   const token = auth ? await getValidAccessToken() : '';
   const headers = new Headers(init.headers);
-  headers.set('Content-Type', 'application/json');
+  if (!(fetchInit.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json');
+  }
   if (token) headers.set('Authorization', `Bearer ${token}`);
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -466,12 +468,27 @@ export const api = {
   reviewExternalRepair(
     id: string,
     payload: {
+      invoice_file?: File | null;
       repair_services?: Array<Record<string, unknown>>;
       replaced_parts?: Array<Record<string, unknown>>;
       repair_cost?: string | number | null;
       additional_notes?: string;
     },
   ) {
+    if (payload.invoice_file) {
+      const formData = new FormData();
+      formData.append('invoice_file', payload.invoice_file);
+      formData.append('repair_services', JSON.stringify(payload.repair_services ?? []));
+      formData.append('replaced_parts', JSON.stringify(payload.replaced_parts ?? []));
+      if (payload.repair_cost !== undefined && payload.repair_cost !== null) {
+        formData.append('repair_cost', String(payload.repair_cost));
+      }
+      formData.append('additional_notes', payload.additional_notes ?? '');
+      return request<ExternalWorkshopAssignment>(`/external-workshop-assignments/${id}/review/`, {
+        method: 'POST',
+        body: formData,
+      });
+    }
     return request<ExternalWorkshopAssignment>(`/external-workshop-assignments/${id}/review/`, {
       method: 'POST',
       body: JSON.stringify(payload),

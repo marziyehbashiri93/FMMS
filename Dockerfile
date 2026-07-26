@@ -22,8 +22,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # ── Development Stage ─────────────────────────────────────────────────────────
 FROM base AS development
 
-COPY requirements/development.txt .
-RUN pip install --no-cache-dir -r development.txt
+COPY requirements/ ./requirements/
+RUN pip install --no-cache-dir -r requirements/development.txt
 
 COPY . .
 
@@ -40,8 +40,8 @@ FROM base AS production
 # Create non-root user before installing packages
 RUN useradd --create-home --shell /bin/bash --uid 1001 fmms
 
-COPY requirements/production.txt .
-RUN pip install --no-cache-dir -r production.txt
+COPY requirements/ ./requirements/
+RUN pip install --no-cache-dir -r requirements/production.txt
 
 COPY --chown=fmms:fmms . .
 
