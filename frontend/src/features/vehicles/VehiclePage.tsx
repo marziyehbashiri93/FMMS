@@ -1136,18 +1136,24 @@ export function VehiclePage() {
 
   useEffect(() => {
     const vehicleId = searchParams.get('vehicleId');
-    if (!vehicleId) return;
+    if (!vehicleId) {
+      if (selected) setSelected(null);
+      return;
+    }
 
-    const clearParam = () => {
-      const next = new URLSearchParams(searchParams);
-      next.delete('vehicleId');
-      setSearchParams(next, { replace: true });
+    if (selected?.id === vehicleId) return;
+
+    const removeInvalidParam = () => {
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        next.delete('vehicleId');
+        return next;
+      }, { replace: true });
     };
 
     const fromList = vehicles.find((item) => item.id === vehicleId);
     if (fromList) {
       setSelected(fromList);
-      clearParam();
       return;
     }
 
@@ -1159,17 +1165,34 @@ export function VehiclePage() {
       .then((vehicle) => {
         if (!cancelled) {
           setSelected(vehicle);
-          clearParam();
         }
       })
       .catch(() => {
-        if (!cancelled) clearParam();
+        if (!cancelled) removeInvalidParam();
       });
 
     return () => {
       cancelled = true;
     };
-  }, [loading, searchParams, setSearchParams, vehicles]);
+  }, [loading, searchParams, selected, setSearchParams, vehicles]);
+
+  const openVehicleDetail = (vehicle: Vehicle) => {
+    setSelected(vehicle);
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.set('vehicleId', vehicle.id);
+      return next;
+    });
+  };
+
+  const closeVehicleDetail = () => {
+    setSelected(null);
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete('vehicleId');
+      return next;
+    });
+  };
 
   const changeSort = (key: VehicleSortKey) => {
     setPage(1);
@@ -1272,13 +1295,19 @@ export function VehiclePage() {
       {!error && isMobile && !loading && vehicles.length === 0 && <EmptyState title="خودرویی یافت نشد" icon={Inbox} />}
       {!error && isMobile && !loading && vehicles.length > 0 && (
         <Stack spacing={1}>
-          {vehicles.map((vehicle) => <VehicleCard key={vehicle.id} vehicle={vehicle} onOpen={setSelected} />)}
+          {vehicles.map((vehicle) => (
+            <VehicleCard
+              key={vehicle.id}
+              vehicle={vehicle}
+              onOpen={openVehicleDetail}
+            />
+          ))}
         </Stack>
       )}
       {!error && !isMobile && (
         <VehicleTable
           vehicles={vehicles}
-          onOpen={setSelected}
+          onOpen={openVehicleDetail}
           orderBy={orderBy}
           order={order}
           onSort={changeSort}
@@ -1301,7 +1330,7 @@ export function VehiclePage() {
       <VehicleDetailModal
         vehicle={selected}
         open={Boolean(selected)}
-        onClose={() => setSelected(null)}
+        onClose={closeVehicleDetail}
       />
     </FeaturePage>
   );
