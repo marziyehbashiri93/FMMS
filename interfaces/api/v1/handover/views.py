@@ -11,12 +11,16 @@ from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
 from apps.handover.application.dto.handover_dto import ConfirmVehicleHandoverDTO
-from core.permissions import IsReadOnlyOrTechnicianOrAbove
+from core.permissions import (
+    IsDriverOrTechnicianOrAbove,
+    IsReadOnlyOrTechnicianOrAbove,
+)
 from interfaces.api.v1 import deps
 from interfaces.api.v1.handover.serializers import (
     VehicleHandoverConfirmSerializer,
     VehicleHandoverResponseSerializer,
 )
+from interfaces.api.v1.schema_tags import API_TAGS
 from interfaces.api.v1.utils import request_id_from, user_id_from
 
 
@@ -25,17 +29,25 @@ class VehicleHandoverViewSet(GenericViewSet):
 
     permission_classes = [IsReadOnlyOrTechnicianOrAbove]
 
-    @extend_schema(responses=VehicleHandoverResponseSerializer(many=True))
+    @extend_schema(
+        tags=[API_TAGS.handover],
+        responses=VehicleHandoverResponseSerializer(many=True),
+    )
     def list(self, request: Request) -> Response:
         """List all vehicle handovers."""
         items = deps.get_list_vehicle_handovers_service().execute()
         return Response(VehicleHandoverResponseSerializer(items, many=True).data)
 
     @extend_schema(
+        tags=[API_TAGS.handover],
         request=VehicleHandoverConfirmSerializer,
         responses=VehicleHandoverResponseSerializer,
     )
-    @action(detail=True, methods=["post"])
+    @action(
+        detail=True,
+        methods=["post"],
+        permission_classes=[IsDriverOrTechnicianOrAbove],
+    )
     def confirm(self, request: Request, pk: str | None = None) -> Response:
         """Confirm driver handover result."""
         serializer = VehicleHandoverConfirmSerializer(data=request.data)
@@ -47,6 +59,13 @@ class VehicleHandoverViewSet(GenericViewSet):
                 comment=serializer.validated_data.get("comment"),
                 request_id=request_id_from(request),
                 confirmed_by=user_id_from(request),
+                invoice_amount=serializer.validated_data.get("invoice_amount"),
+                invoice_currency=serializer.validated_data.get("invoice_currency")
+                or None,
+                invoice_vendor_id=serializer.validated_data.get("invoice_vendor_id")
+                or None,
+                invoice_document=serializer.validated_data.get("invoice_document")
+                or None,
             )
         )
         return Response(VehicleHandoverResponseSerializer(result).data)

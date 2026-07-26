@@ -20,9 +20,9 @@ from apps.repair.application.services.transport_handover_decision_service import
 )
 from apps.repair.domain.entities import RepairOrder, RepairOrderStatus
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
-from apps.vehicle.domain.entities import Vehicle, VehicleCategory, VehicleStatus
+from apps.vehicle.domain.entities import Vehicle, VehicleStatus
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
-from apps.vehicle.domain.value_objects import VIN, PlateNumber
+from apps.vehicle.domain.value_objects import PlateNumber, SAPVehicleNumber
 from core.exceptions.base_exception import FMMSNotFoundError
 
 
@@ -64,12 +64,8 @@ def _make_vehicle(*, vehicle_id: uuid.UUID) -> Vehicle:
     now = datetime.now(tz=UTC)
     return Vehicle(
         id=vehicle_id,
-        plate_number=PlateNumber("12TRN001"),
-        vin=VIN("1HGCM82633A009001"),
-        make="Toyota",
-        model="Hilux",
-        year=2022,
-        category=VehicleCategory.LIGHT,
+        vehicle_number=SAPVehicleNumber("300004"),
+        license_plate=PlateNumber("12TRN001"),
         status=VehicleStatus.WAITING_DRIVER_CONFIRMATION,
         created_at=now,
         updated_at=now,
@@ -95,6 +91,13 @@ class FakeRepairRepository(IRepairOrderRepository):
 
     def list_by_fault(self, fault_id: uuid.UUID) -> list[RepairOrder]:
         return [o for o in self._store.values() if o.fault_id == fault_id]
+
+    def list_all(
+        self, status: RepairOrderStatus | None = None
+    ) -> list[RepairOrder]:
+        if status is None:
+            return list(self._store.values())
+        return [o for o in self._store.values() if o.status == status]
 
     def list_active_by_vehicle(self, vehicle_id: uuid.UUID) -> list[RepairOrder]:
         terminal = {
@@ -128,6 +131,11 @@ class FakeFaultRepository(IFaultRepository):
 
     def list_by_vehicle(self, vehicle_id: uuid.UUID) -> list[Fault]:
         return [f for f in self._store.values() if f.vehicle_id == vehicle_id]
+
+    def list_all(self, status: FaultStatus | None = None) -> list[Fault]:
+        if status is None:
+            return list(self._store.values())
+        return [f for f in self._store.values() if f.status == status]
 
     def list_open_by_severity(self, severity: FaultSeverity) -> list[Fault]:
         return [
@@ -163,7 +171,7 @@ class FakeVehicleRepository(IVehicleRepository):
     def get_by_plate(self, plate_number: PlateNumber) -> Vehicle | None:
         return None
 
-    def get_by_sap_equipment_number(self, sap_equipment_number) -> Vehicle | None:
+    def get_by_vehicle_number(self, vehicle_number) -> Vehicle | None:
         return None
 
     def exists_by_plate(self, plate_number: PlateNumber) -> bool:
@@ -178,6 +186,17 @@ class FakeVehicleRepository(IVehicleRepository):
     def save(self, vehicle: Vehicle) -> Vehicle:
         self._store[vehicle.id] = vehicle
         return vehicle
+
+    def decommission_missing_from_sap(self, seen_vehicle_numbers: set[str]) -> int:
+        count = 0
+        for vehicle in self._store.values():
+            if vehicle.vehicle_number.value not in seen_vehicle_numbers:
+                vehicle.decommission()
+                count += 1
+        return count
+
+    def record_driver_assignment_snapshot(self, **kwargs: object) -> None:
+        return None
 
     def delete(self, vehicle_id: uuid.UUID) -> None:
         self._store.pop(vehicle_id, None)

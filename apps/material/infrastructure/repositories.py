@@ -7,6 +7,8 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 from apps.material.domain.entities import (
+    MaterialItemDecision,
+    MaterialItemStatus,
     MaterialRequest,
     MaterialRequestItem,
     MaterialRequestStatus,
@@ -40,6 +42,10 @@ def _to_domain(orm: MaterialRequestModel) -> MaterialRequest:
                 material_number=item.material_number,
                 quantity=item.quantity,
                 unit_of_measure=item.unit_of_measure,
+                from_catalog=bool(item.from_catalog),
+                decision=MaterialItemDecision(item.decision),
+                item_status=MaterialItemStatus(item.item_status),
+                available_quantity_snapshot=item.available_quantity_snapshot,
             )
             for item in orm.items.all()
         ],
@@ -97,6 +103,10 @@ class DjangoMaterialRequestRepository(IMaterialRequestRepository):
                     material_number=item.material_number,
                     quantity=item.quantity,
                     unit_of_measure=item.unit_of_measure,
+                    from_catalog=item.from_catalog,
+                    decision=item.decision.value,
+                    item_status=item.item_status.value,
+                    available_quantity_snapshot=item.available_quantity_snapshot,
                 )
                 for item in material_request.items
             ]

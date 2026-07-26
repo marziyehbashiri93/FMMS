@@ -186,6 +186,9 @@ class FakeRepairRepository(IRepairOrderRepository):
     def list_by_fault(self, fault_id: uuid.UUID) -> list[RepairOrder]:
         return []
 
+    def list_all(self, status: RepairOrderStatus | None = None, workshop_type=None) -> list[RepairOrder]:
+        return []
+
     def list_active_by_vehicle(self, vehicle_id: uuid.UUID) -> list[RepairOrder]:
         return []
 

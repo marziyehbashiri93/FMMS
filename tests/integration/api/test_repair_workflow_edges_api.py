@@ -8,34 +8,22 @@ from uuid import uuid4
 import pytest
 from rest_framework.test import APIClient
 
-from tests.integration.api.conftest import create_vehicle
+from tests.integration.api.conftest import create_repair_order_via_distribution
 
 pytestmark = pytest.mark.django_db
 
 
 def _create_order(client: APIClient, *, plate: str, vin: str) -> tuple[dict, str]:
     """Create a vehicle+fault+repair order; return (vehicle, order_id)."""
-    vehicle = create_vehicle(
-        client, plate=plate, vin=vin, sap_equipment_number="100010"
+    order = create_repair_order_via_distribution(
+        client,
+        plate=plate,
+        vin=vin,
+        code="WF-01",
+        description="Workflow edge",
+        severity="MEDIUM",
     )
-    fault = client.post(
-        "/api/v1/faults/",
-        {
-            "vehicle_id": vehicle["id"],
-            "code": "WF-01",
-            "description": "Workflow edge",
-            "severity": "MEDIUM",
-        },
-        format="json",
-    )
-    assert fault.status_code == 201, fault.data
-    created = client.post(
-        "/api/v1/repair-orders/",
-        {"vehicle_id": vehicle["id"], "fault_id": fault.data["id"]},
-        format="json",
-    )
-    assert created.status_code == 201, created.data
-    return vehicle, created.data["id"]
+    return order["vehicle"], order["id"]
 
 
 class TestRepairWorkflowEdges:

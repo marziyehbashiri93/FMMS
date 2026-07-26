@@ -1,0 +1,24 @@
+# FMMS Demo v2 — SAP connectivity test override.
+#
+# Usage:
+#   SAP_USERNAME=... SAP_PASSWORD=... \
+#   docker compose -f docker-compose.demo.yml -f docker-compose.sap-v2.yml up --build backend
+#
+# Then run the sync command:
+#   docker compose -f docker-compose.demo.yml -f docker-compose.sap-v2.yml exec backend \
+#     python manage.py sync_sap_vehicles
+
+services:
+  backend:
+    image: fmms-demo-backend:v2
+    environment:
+      SAP_USE_MOCK: "False"
+      SAP_BASE_URL: ${SAP_BASE_URL:-http://ghsapsnd-app.gbgnetwork.net:8000/sap/opu/odata/sap}
+      SAP_CLIENT: ${SAP_CLIENT:-100}
+      SAP_USERNAME: ${SAP_USERNAME:?SAP_USERNAME is required}
+      SAP_PASSWORD: ${SAP_PASSWORD:?SAP_PASSWORD is required}
+      SAP_ASHOST: ${SAP_ASHOST:-GHSAP-APP1.gbgnetwork.net}
+      SAP_SYSNR: ${SAP_SYSNR:-01}
+      SAP_VERIFY_SSL: ${SAP_VERIFY_SSL:-False}
+      SAP_VEHICLE_DRIVER_SERVICE: ${SAP_VEHICLE_DRIVER_SERVICE:-ZC_VEHICLEDRIVER_CDS}
+      SAP_VEHICLE_DRIVER_ENTITY_SET: ${SAP_VEHICLE_DRIVER_ENTITY_SET:-}

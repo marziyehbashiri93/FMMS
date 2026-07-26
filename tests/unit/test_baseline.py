@@ -193,15 +193,16 @@ class TestFMMSUserModel:
         assert roles == {"ADMIN", "SUPERVISOR", "TECHNICIAN", "VIEWER"}
 
     def test_user_model_username_field(self) -> None:
-        """FMMSUser must use email as the login identifier."""
+        """FMMSUser must use username as the login identifier."""
         from apps.authentication.infrastructure.models import FMMSUser
 
-        assert FMMSUser.USERNAME_FIELD == "email"
+        assert FMMSUser.USERNAME_FIELD == "username"
 
     def test_user_model_required_fields(self) -> None:
-        """full_name must be a required field."""
+        """email and full_name must be required fields."""
         from apps.authentication.infrastructure.models import FMMSUser
 
+        assert "email" in FMMSUser.REQUIRED_FIELDS
         assert "full_name" in FMMSUser.REQUIRED_FIELDS
 
     def test_base_model_importable(self) -> None:

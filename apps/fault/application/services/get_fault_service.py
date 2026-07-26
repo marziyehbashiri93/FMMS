@@ -10,6 +10,7 @@ import uuid
 from apps.authentication.domain.interfaces.user_profile_reader import IUserProfileReader
 from apps.fault.application.dto.fault_dto import FaultResponseDTO
 from apps.fault.application.services.report_fault_service import _to_response_dto
+from apps.fault.domain.entities import FaultStatus
 from apps.fault.domain.interfaces.fault_repository import IFaultRepository
 from apps.fault.domain.value_objects import FaultSeverity
 from core.exceptions.translation import load_or_not_found
@@ -98,6 +99,7 @@ class ListFaultsService:
     def execute(
         self,
         vehicle_id: uuid.UUID | None = None,
+        status: FaultStatus | None = None,
         open_by_severity: FaultSeverity | None = None,
         request_id: str = "",
     ) -> list[FaultResponseDTO]:
@@ -133,7 +135,7 @@ class ListFaultsService:
         elif open_by_severity is not None:
             faults = self._repo.list_open_by_severity(open_by_severity)
         else:
-            faults = []
+            faults = self._repo.list_all(status=status)
 
         logger.info(
             "Faults listed",

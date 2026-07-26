@@ -6,7 +6,7 @@ in-memory fakes — no database, no network.
 Design choices:
 - ``FakeVehicleRepository`` stores entities in a ``dict`` keyed by UUID.
 - ``FakeRepairOrderRepository`` allows tests to pre-seed active orders.
-- ``FakeSAPEquipmentPort`` returns canned ``SAPEquipmentDTO`` responses.
+- ``FakeSAPVehicleDriverPort`` returns canned ``SAPVehicleDriverDTO`` responses.
 """
 
 from __future__ import annotations
@@ -16,6 +16,10 @@ from datetime import UTC, datetime
 
 import pytest
 
+from apps.driver.domain.entities import Driver, DriverStatus
+from apps.driver.domain.exceptions import DriverNotFoundError
+from apps.driver.domain.interfaces.driver_repository import IDriverRepository
+from apps.driver.domain.value_objects import CustomerNumber
 from apps.fault.domain.entities import Fault, FaultStatus
 from apps.fault.domain.exceptions import FaultNotFoundError
 from apps.fault.domain.interfaces.fault_repository import IFaultRepository
@@ -23,42 +27,27 @@ from apps.fault.domain.value_objects import FaultCode, FaultDescription, FaultSe
 from apps.repair.domain.entities import RepairOrder, RepairOrderStatus
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
 from apps.repair.domain.value_objects import TechnicianAssignment
-from apps.vehicle.application.dto.vehicle_dto import (
-    ActivateVehicleDTO,
-    CreateVehicleDTO,
-    DeactivateVehicleDTO,
-    UpdateVehicleDTO,
-    VehicleResponseDTO,
-)
-from apps.vehicle.application.services.activate_vehicle_service import (
-    ActivateVehicleService,
-)
-from apps.vehicle.application.services.create_vehicle_service import (
-    CreateVehicleService,
-)
-from apps.vehicle.application.services.deactivate_vehicle_service import (
-    DeactivateVehicleService,
+from apps.vehicle.application.dto.vehicle_dto import ChangeVehicleStatusDTO
+from apps.vehicle.application.services.change_vehicle_status_service import (
+    ChangeVehicleStatusService,
 )
 from apps.vehicle.application.services.get_vehicle_service import (
     GetVehicleService,
     ListVehiclesService,
 )
-from apps.vehicle.application.services.sync_sap_equipment_service import (
-    SyncSAPEquipmentService,
-)
 from apps.vehicle.application.services.sync_vehicles_from_sap_service import (
     SyncVehiclesFromSAPService,
 )
-from apps.vehicle.application.services.update_vehicle_service import (
-    UpdateVehicleService,
-)
-from apps.vehicle.domain.entities import Vehicle, VehicleCategory, VehicleStatus
-from apps.vehicle.domain.exceptions import VehicleInvalidStateTransitionError
+from apps.vehicle.domain.entities import Vehicle, VehicleStatus
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
-from apps.vehicle.domain.value_objects import VIN, PlateNumber, SAPEquipmentNumber
-from core.exceptions.base_exception import FMMSConflictError, FMMSNotFoundError
-from core.sap.dtos.equipment import SAPEquipmentDTO
-from core.sap.ports.equipment_port import ISAPEquipmentPort
+from apps.vehicle.domain.value_objects import PlateNumber, SAPVehicleNumber
+from core.exceptions.base_exception import (
+    FMMSConflictError,
+    FMMSNotFoundError,
+    FMMSValidationError,
+)
+from core.sap.dtos.vehicle_driver import SAPVehicleDriverDTO
+from core.sap.ports.vehicle_driver_port import ISAPVehicleDriverPort
 
 # ---------------------------------------------------------------------------
 # Fakes
@@ -67,22 +56,33 @@ from core.sap.ports.equipment_port import ISAPEquipmentPort
 
 def _make_vehicle(
     plate: str = "12TEST34",
-    vin: str = "1HGCM82633A004352",
-    sap_eq: str | None = None,  # must be digits-only per SAPEquipmentNumber VO
+    sap_eq: str | None = None,  # must be digits-only per SAPVehicleNumber VO
     status: VehicleStatus = VehicleStatus.ACTIVE,
 ) -> Vehicle:
+    vehicle_number = sap_eq or str(abs(hash(plate)) % 10**12)
     return Vehicle(
         id=uuid.uuid4(),
-        plate_number=PlateNumber(plate),
-        vin=VIN(vin),
-        make="Toyota",
-        model="Hilux",
-        year=2022,
-        category=VehicleCategory.LIGHT,
+        vehicle_number=SAPVehicleNumber(vehicle_number),
+        license_plate=PlateNumber(plate),
         status=status,
         created_at=datetime.now(tz=UTC),
         updated_at=datetime.now(tz=UTC),
-        sap_equipment_number=SAPEquipmentNumber(sap_eq) if sap_eq else None,
+    )
+
+
+def _make_driver(
+    *,
+    customer_number: str,
+    status: DriverStatus = DriverStatus.ACTIVE,
+) -> Driver:
+    now = datetime.now(tz=UTC)
+    return Driver(
+        id=uuid.uuid4(),
+        customer_number=CustomerNumber(customer_number),
+        name=f"Driver {customer_number}",
+        status=status,
+        created_at=now,
+        updated_at=now,
     )
 
 
@@ -91,31 +91,23 @@ class FakeVehicleRepository(IVehicleRepository):
 
     def __init__(self, initial: list[Vehicle] | None = None) -> None:
         self._store: dict[uuid.UUID, Vehicle] = {v.id: v for v in (initial or [])}
+        self.driver_assignment_snapshots: list[dict[str, object]] = []
 
     def get_by_id(self, vehicle_id: uuid.UUID) -> Vehicle | None:
         return self._store.get(vehicle_id)
 
-    def get_by_plate(self, plate_number: PlateNumber) -> Vehicle | None:
-        return next(
-            (v for v in self._store.values() if v.plate_number == plate_number),
-            None,
-        )
-
-    def get_by_sap_equipment_number(
-        self, sap_equipment_number: SAPEquipmentNumber
+    def get_by_vehicle_number(
+        self,
+        vehicle_number: SAPVehicleNumber,
     ) -> Vehicle | None:
         return next(
             (
                 v
                 for v in self._store.values()
-                if v.sap_equipment_number is not None
-                and v.sap_equipment_number == sap_equipment_number
+                if v.vehicle_number is not None and v.vehicle_number == vehicle_number
             ),
             None,
         )
-
-    def exists_by_plate(self, plate_number: PlateNumber) -> bool:
-        return self.get_by_plate(plate_number) is not None
 
     def list_active(self) -> list[Vehicle]:
         return [v for v in self._store.values() if v.status == VehicleStatus.ACTIVE]
@@ -127,8 +119,112 @@ class FakeVehicleRepository(IVehicleRepository):
         self._store[vehicle.id] = vehicle
         return vehicle
 
-    def delete(self, vehicle_id: uuid.UUID) -> None:
-        self._store.pop(vehicle_id, None)
+    def decommission_missing_from_sap(self, seen_vehicle_numbers: set[str]) -> int:
+        count = 0
+        for vehicle in self._store.values():
+            if (
+                vehicle.vehicle_number is not None
+                and vehicle.vehicle_number.value not in seen_vehicle_numbers
+                and vehicle.status != VehicleStatus.DECOMMISSIONED
+            ):
+                vehicle.decommission()
+                count += 1
+        return count
+
+    def record_driver_assignment_snapshot(
+        self,
+        *,
+        vehicle: Vehicle,
+        sync_run_id: uuid.UUID,
+        synced_at: datetime,
+        request_id: str = "",
+    ) -> None:
+        self.driver_assignment_snapshots.extend(
+            [
+                {
+                    "sync_run_id": sync_run_id,
+                    "synced_at": synced_at,
+                    "request_id": request_id,
+                    "vehicle_id": vehicle.id,
+                    "vehicle_number": vehicle.vehicle_number.value,
+                    "license_plate": vehicle.license_plate.value,
+                    "driver_role": "DRIVER",
+                    "driver_customer_number": vehicle.driver1_customer_number or "",
+                },
+                {
+                    "sync_run_id": sync_run_id,
+                    "synced_at": synced_at,
+                    "request_id": request_id,
+                    "vehicle_id": vehicle.id,
+                    "vehicle_number": vehicle.vehicle_number.value,
+                    "license_plate": vehicle.license_plate.value,
+                    "driver_role": "ASSISTANT",
+                    "driver_customer_number": vehicle.driver2_customer_number or "",
+                },
+            ]
+        )
+
+
+class FakeDriverRepository(IDriverRepository):
+    """In-memory driver repository stub for SAP sync tests."""
+
+    def __init__(self, initial: list[Driver] | None = None) -> None:
+        self._store: dict[uuid.UUID, Driver] = {d.id: d for d in (initial or [])}
+
+    def get_by_id(self, driver_id: uuid.UUID) -> Driver:
+        driver = self._store.get(driver_id)
+        if driver is None:
+            raise DriverNotFoundError(driver_id)
+        return driver
+
+    def get_by_customer_number(self, customer_number: CustomerNumber) -> Driver:
+        for driver in self._store.values():
+            if driver.customer_number == customer_number:
+                return driver
+        raise DriverNotFoundError(customer_number.value)
+
+    def find_by_personnel_number(self, personnel_number: str) -> Driver | None:
+        needle = personnel_number.strip()
+        if not needle:
+            return None
+        for driver in self._store.values():
+            if (
+                (driver.personnel_number or "") == needle
+                and driver.status == DriverStatus.ACTIVE
+            ):
+                return driver
+        return None
+
+    def list_by_status(self, status: DriverStatus) -> list[Driver]:
+        return [d for d in self._store.values() if d.status == status]
+
+    def list_all(self) -> list[Driver]:
+        return list(self._store.values())
+
+    def list_by_customer_numbers(self, customer_numbers: set[str]) -> list[Driver]:
+        return [
+            d
+            for d in self._store.values()
+            if d.customer_number.value in customer_numbers
+        ]
+
+    def exists_by_customer_number(self, customer_number: CustomerNumber) -> bool:
+        return any(d.customer_number == customer_number for d in self._store.values())
+
+    def decommission_missing_from_sap(self, seen_customer_numbers: set[str]) -> int:
+        count = 0
+        for driver in self._store.values():
+            if (
+                driver.customer_number.value not in seen_customer_numbers
+                and driver.status != DriverStatus.DECOMMISSIONED
+            ):
+                driver.decommission()
+                count += 1
+        return count
+
+    def save(self, driver: Driver) -> Driver:
+        self._store[driver.id] = driver
+        return driver
 
 
 class FakeRepairOrderRepository(IRepairOrderRepository):
@@ -155,8 +251,17 @@ class FakeRepairOrderRepository(IRepairOrderRepository):
     def list_by_fault(self, fault_id: uuid.UUID):  # type: ignore[override]
         return [o for o in self._store.values() if o.fault_id == fault_id]
 
+    def list_all(self, status: RepairOrderStatus | None = None, workshop_type=None) -> list[RepairOrder]:
+        if status is None:
+            return list(self._store.values())
+        return [o for o in self._store.values() if o.status == status]
+
     def list_active_by_vehicle(self, vehicle_id: uuid.UUID) -> list:
-        return [o for o in self._store.values() if o.vehicle_id == vehicle_id and o.is_active]
+        return [
+            o
+            for o in self._store.values()
+            if o.vehicle_id == vehicle_id and o.is_active
+        ]
 
     def has_open_repair_order_for_vehicle(self, vehicle_id: uuid.UUID) -> bool:
         return bool(self.list_active_by_vehicle(vehicle_id))
@@ -191,6 +296,11 @@ class FakeFaultRepository(IFaultRepository):
             faults = [f for f in faults if f.status == status]
         return faults
 
+    def list_all(self, status: FaultStatus | None = None) -> list[Fault]:
+        if status is None:
+            return list(self._store.values())
+        return [f for f in self._store.values() if f.status == status]
+
     def list_open_by_severity(self, severity: FaultSeverity) -> list[Fault]:
         return [
             f
@@ -215,207 +325,89 @@ class FakeFaultRepository(IFaultRepository):
         self._store.pop(fault_id, None)
 
 
-class FakeSAPEquipmentPort(ISAPEquipmentPort):
-    """Returns canned SAP equipment DTO(s)."""
+class FakeSAPVehicleDriverPort(ISAPVehicleDriverPort):
+    """Returns canned SAP vehicle-driver DTO(s)."""
 
     def __init__(
         self,
-        dto: SAPEquipmentDTO | None = None,
-        equipment: list[SAPEquipmentDTO] | None = None,
+        dto: SAPVehicleDriverDTO | None = None,
+        vehicle_drivers: list[SAPVehicleDriverDTO] | None = None,
     ) -> None:
         self._dto = dto
-        self._equipment = equipment or ([dto] if dto is not None else [])
+        self._vehicle_drivers = vehicle_drivers or ([dto] if dto is not None else [])
 
-    def get_equipment(self, equipment_number: str) -> SAPEquipmentDTO:
-        if self._dto is not None and self._dto.equipment_number == equipment_number:
+    def get_vehicle_driver(self, vehicle_number: str) -> SAPVehicleDriverDTO:
+        if self._dto is not None and self._dto.vehicle_number == vehicle_number:
             return self._dto
-        for item in self._equipment:
-            if item.equipment_number == equipment_number:
+        for item in self._vehicle_drivers:
+            if item.vehicle_number == vehicle_number:
                 return item
-        return self._equipment[0]
+        return self._vehicle_drivers[0]
 
-    def list_equipment(self, plant: str | None = None) -> list[SAPEquipmentDTO]:
-        return list(self._equipment)
-
-
-# ---------------------------------------------------------------------------
-# CreateVehicleService
-# ---------------------------------------------------------------------------
-
-
-class TestCreateVehicleService:
-    def _dto(self, plate: str = "NEWPLATE1") -> CreateVehicleDTO:
-        return CreateVehicleDTO(
-            plate_number=plate,
-            vin="1HGCM82633A004352",
-            make="Toyota",
-            model="Hilux",
-            year=2022,
-            category=VehicleCategory.LIGHT,
-            request_id="req-001",
-            created_by=uuid.uuid4(),
-        )
-
-    def test_creates_vehicle_and_returns_response_dto(self) -> None:
-        repo = FakeVehicleRepository()
-        service = CreateVehicleService(repo)
-
-        result = service.execute(self._dto())
-
-        assert isinstance(result, VehicleResponseDTO)
-        assert result.plate_number == "NEWPLATE1"
-        assert result.status == VehicleStatus.ACTIVE
-
-    def test_persists_vehicle_in_repository(self) -> None:
-        repo = FakeVehicleRepository()
-        service = CreateVehicleService(repo)
-
-        result = service.execute(self._dto())
-
-        assert repo.get_by_id(result.id) is not None
-
-    def test_raises_conflict_on_duplicate_plate(self) -> None:
-        existing = _make_vehicle(plate="DUPPLATE1")
-        repo = FakeVehicleRepository(initial=[existing])
-        service = CreateVehicleService(repo)
-
-        with pytest.raises(FMMSConflictError):
-            service.execute(self._dto(plate="DUPPLATE1"))
-
-    def test_optional_fields_are_none_by_default(self) -> None:
-        repo = FakeVehicleRepository()
-        result = CreateVehicleService(repo).execute(self._dto())
-
-        assert result.chassis_number is None
-        assert result.sap_equipment_number is None
-
-    def test_sap_equipment_number_stored_when_provided(self) -> None:
-        repo = FakeVehicleRepository()
-        dto = CreateVehicleDTO(
-            plate_number="SAPPLATE2",
-            vin="1HGCM82633A004352",
-            make="Toyota",
-            model="Hilux",
-            year=2022,
-            category=VehicleCategory.LIGHT,
-            request_id="req-sap",
-            created_by=uuid.uuid4(),
-            sap_equipment_number="9999",
-        )
-        result = CreateVehicleService(repo).execute(dto)
-
-        assert result.sap_equipment_number == "9999"
+    def list_vehicle_drivers(
+        self,
+        plant: str | None = None,
+    ) -> list[SAPVehicleDriverDTO]:
+        return list(self._vehicle_drivers)
 
 
 # ---------------------------------------------------------------------------
-# UpdateVehicleService
+# ChangeVehicleStatusService
 # ---------------------------------------------------------------------------
 
 
-class TestUpdateVehicleService:
-    def test_updates_make_and_model(self) -> None:
-        vehicle = _make_vehicle()
-        repo = FakeVehicleRepository(initial=[vehicle])
-        service = UpdateVehicleService(repo)
-
-        result = service.execute(
-            UpdateVehicleDTO(
-                vehicle_id=vehicle.id,
-                request_id="req-upd",
-                updated_by=uuid.uuid4(),
-                make="Ford",
-                model="Ranger",
-            )
-        )
-
-        assert result.make == "Ford"
-        assert result.model == "Ranger"
-
-    def test_only_provided_fields_change(self) -> None:
-        vehicle = _make_vehicle()
-        repo = FakeVehicleRepository(initial=[vehicle])
-        original_year = vehicle.year
-
-        result = UpdateVehicleService(repo).execute(
-            UpdateVehicleDTO(
-                vehicle_id=vehicle.id,
-                request_id="req-partial",
-                updated_by=uuid.uuid4(),
-                make="Nissan",
-            )
-        )
-
-        assert result.make == "Nissan"
-        assert result.year == original_year
-
-    def test_raises_not_found_for_missing_vehicle(self) -> None:
-        repo = FakeVehicleRepository()
-        service = UpdateVehicleService(repo)
-
-        with pytest.raises(FMMSNotFoundError):
-            service.execute(
-                UpdateVehicleDTO(
-                    vehicle_id=uuid.uuid4(),
-                    request_id="req-missing",
-                    updated_by=uuid.uuid4(),
-                    make="Ghost",
-                )
-            )
-
-
-# ---------------------------------------------------------------------------
-# DeactivateVehicleService
-# ---------------------------------------------------------------------------
-
-
-class TestDeactivateVehicleService:
+class TestChangeVehicleStatusService:
     def _make_service(
         self,
         vehicle: Vehicle,
-    ) -> DeactivateVehicleService:
-        return DeactivateVehicleService(
+        *,
+        repair_orders: list[RepairOrder] | None = None,
+        faults: list[Fault] | None = None,
+    ) -> ChangeVehicleStatusService:
+        return ChangeVehicleStatusService(
             vehicle_repository=FakeVehicleRepository(initial=[vehicle]),
+            repair_order_repository=FakeRepairOrderRepository(repair_orders),
+            fault_repository=FakeFaultRepository(faults),
         )
 
-    def test_deactivates_vehicle(self) -> None:
+    def _dto(
+        self,
+        vehicle_id: uuid.UUID,
+        status: VehicleStatus,
+    ) -> ChangeVehicleStatusDTO:
+        return ChangeVehicleStatusDTO(
+            vehicle_id=vehicle_id,
+            status=status,
+            request_id="req-status",
+            requested_by=uuid.uuid4(),
+        )
+
+    def test_changes_vehicle_to_inactive(self) -> None:
         vehicle = _make_vehicle()
         service = self._make_service(vehicle)
 
-        result = service.execute(
-            DeactivateVehicleDTO(
-                vehicle_id=vehicle.id,
-                request_id="req-deact-repair",
-                requested_by=uuid.uuid4(),
-            )
-        )
+        result = service.execute(self._dto(vehicle.id, VehicleStatus.INACTIVE))
 
         assert result.status == VehicleStatus.INACTIVE
 
     def test_raises_not_found_for_missing_vehicle(self) -> None:
         repo = FakeVehicleRepository()
-        service = DeactivateVehicleService(vehicle_repository=repo)
+        service = ChangeVehicleStatusService(
+            vehicle_repository=repo,
+            repair_order_repository=FakeRepairOrderRepository(),
+            fault_repository=FakeFaultRepository(),
+        )
 
         with pytest.raises(FMMSNotFoundError):
-            service.execute(
-                DeactivateVehicleDTO(
-                    vehicle_id=uuid.uuid4(),
-                    request_id="req-ghost",
-                    requested_by=uuid.uuid4(),
-                )
-            )
+            service.execute(self._dto(uuid.uuid4(), VehicleStatus.INACTIVE))
 
-    def test_raises_state_error_when_already_inactive(self) -> None:
+    def test_same_status_is_idempotent(self) -> None:
         vehicle = _make_vehicle(status=VehicleStatus.INACTIVE)
         service = self._make_service(vehicle)
 
-        with pytest.raises(VehicleInvalidStateTransitionError):
-            service.execute(
-                DeactivateVehicleDTO(
-                    vehicle_id=vehicle.id,
-                    request_id="req-already",
-                    requested_by=uuid.uuid4(),
-                )
-            )
+        result = service.execute(self._dto(vehicle.id, VehicleStatus.INACTIVE))
+
+        assert result.status == VehicleStatus.INACTIVE
 
 
 # ---------------------------------------------------------------------------
@@ -426,85 +418,81 @@ class TestDeactivateVehicleService:
 class TestGetVehicleService:
     def test_returns_dto_for_existing_vehicle(self) -> None:
         vehicle = _make_vehicle()
+        vehicle.driver1_customer_number = "6000000001"
         repo = FakeVehicleRepository(initial=[vehicle])
+        driver_repo = FakeDriverRepository(
+            initial=[_make_driver(customer_number="6000000001")]
+        )
 
-        result = GetVehicleService(repo).execute(vehicle.id, request_id="req-get")
+        result = GetVehicleService(repo, driver_repo).execute(
+            vehicle.id,
+            request_id="req-get",
+        )
 
         assert result.id == vehicle.id
-        assert result.plate_number == vehicle.plate_number.value
+        assert result.license_plate == vehicle.license_plate.value
+        assert result.driver1 is not None
+        assert result.driver1.customer_number == "6000000001"
 
     def test_raises_not_found_for_missing_vehicle(self) -> None:
         repo = FakeVehicleRepository()
 
         with pytest.raises(FMMSNotFoundError):
-            GetVehicleService(repo).execute(uuid.uuid4())
+            GetVehicleService(repo, FakeDriverRepository()).execute(uuid.uuid4())
 
 
 class TestListVehiclesService:
-    def test_lists_active_vehicles_by_default(self) -> None:
+    def test_lists_all_vehicles_by_default(self) -> None:
         active = _make_vehicle(plate="ACTIVE001", status=VehicleStatus.ACTIVE)
+        active.driver1_customer_number = "6000000002"
         inactive = _make_vehicle(plate="INACT0001", status=VehicleStatus.INACTIVE)
         repo = FakeVehicleRepository(initial=[active, inactive])
+        driver_repo = FakeDriverRepository(
+            initial=[_make_driver(customer_number="6000000002")]
+        )
 
-        results = ListVehiclesService(repo).execute()
+        results = ListVehiclesService(repo, driver_repo).execute()
 
-        assert len(results) == 1
-        assert results[0].plate_number == "ACTIVE001"
+        assert {item.license_plate for item in results} == {"ACTIVE001", "INACT0001"}
+        assigned = next(item for item in results if item.license_plate == "ACTIVE001")
+        assert assigned.driver1 is not None
+        assert assigned.driver1.customer_number == "6000000002"
 
     def test_filters_by_status(self) -> None:
         v1 = _make_vehicle(plate="ACT00001", status=VehicleStatus.ACTIVE)
-        v2 = _make_vehicle(
-            plate="SUSPENDED", vin="2HGCM82633A004352", status=VehicleStatus.SUSPENDED
-        )
+        v2 = _make_vehicle(plate="SUSPENDED", status=VehicleStatus.SUSPENDED)
         repo = FakeVehicleRepository(initial=[v1, v2])
 
-        results = ListVehiclesService(repo).execute(status=VehicleStatus.SUSPENDED)
+        results = ListVehiclesService(repo, FakeDriverRepository()).execute(
+            status=VehicleStatus.SUSPENDED
+        )
 
         assert len(results) == 1
         assert results[0].status == VehicleStatus.SUSPENDED
 
+    def test_orders_by_license_plate(self) -> None:
+        second = _make_vehicle(plate="B-002", sap_eq="2002")
+        first = _make_vehicle(plate="A-001", sap_eq="1001")
+        repo = FakeVehicleRepository(initial=[second, first])
+
+        results = ListVehiclesService(repo, FakeDriverRepository()).execute(
+            ordering="license_plate"
+        )
+
+        assert [item.license_plate for item in results] == ["A-001", "B-002"]
+
+    def test_rejects_unsupported_ordering_field(self) -> None:
+        repo = FakeVehicleRepository(initial=[_make_vehicle()])
+
+        with pytest.raises(FMMSValidationError, match="Unsupported vehicle ordering"):
+            ListVehiclesService(repo, FakeDriverRepository()).execute(ordering="make")
+
     def test_returns_empty_list_when_none_match(self) -> None:
         repo = FakeVehicleRepository()
 
-        results = ListVehiclesService(repo).execute()
+        results = ListVehiclesService(repo, FakeDriverRepository()).execute()
 
         assert results == []
-
-
-# ---------------------------------------------------------------------------
-# SyncSAPEquipmentService
-# ---------------------------------------------------------------------------
-
-
-class TestSyncSAPEquipmentService:
-    def _sap_dto(
-        self, equipment_number: str, description: str = "Synced Model"
-    ) -> SAPEquipmentDTO:
-        return SAPEquipmentDTO(
-            equipment_number=equipment_number,
-            description=description,
-            plant="1000",
-        )
-
-    def test_updates_model_from_sap_description(self) -> None:
-        vehicle = _make_vehicle(plate="SAPVEH001", sap_eq="100001")
-        repo = FakeVehicleRepository(initial=[vehicle])
-        sap_port = FakeSAPEquipmentPort(
-            self._sap_dto("100001", description="Ranger XL")
-        )
-
-        result = SyncSAPEquipmentService(repo, sap_port).execute(
-            "100001", request_id="req-sync"
-        )
-
-        assert result.model == "Ranger XL"
-
-    def test_raises_not_found_when_no_vehicle_linked(self) -> None:
-        repo = FakeVehicleRepository()
-        sap_port = FakeSAPEquipmentPort(self._sap_dto("999999"))
-
-        with pytest.raises(FMMSNotFoundError):
-            SyncSAPEquipmentService(repo, sap_port).execute("999999")
 
 
 # ---------------------------------------------------------------------------
@@ -513,22 +501,17 @@ class TestSyncSAPEquipmentService:
 
 
 class TestSyncVehiclesFromSAPService:
-    def test_creates_vehicles_from_sap_equipment(self) -> None:
+    def test_creates_vehicles_from_sap_vehicle_drivers(self) -> None:
         repo = FakeVehicleRepository()
-        sap_port = FakeSAPEquipmentPort(
-            equipment=[
-                SAPEquipmentDTO(
-                    equipment_number="10000001",
-                    description="Fleet Vehicle — Toyota Land Cruiser",
-                    plant="P001",
-                    serial_number="SN-LC-001",
-                    category="F",
+        sap_port = FakeSAPVehicleDriverPort(
+            vehicle_drivers=[
+                SAPVehicleDriverDTO(
+                    vehicle_number="20320",
+                    license_plate="237ع51-11",
                 ),
-                SAPEquipmentDTO(
-                    equipment_number="10000002",
-                    description="Fleet Vehicle — Isuzu D-Max",
-                    plant="P001",
-                    category="F",
+                SAPVehicleDriverDTO(
+                    vehicle_number="20322",
+                    license_plate="394ع22-11",
                 ),
             ]
         )
@@ -542,18 +525,16 @@ class TestSyncVehiclesFromSAPService:
         assert result.updated == 0
         assert result.failed == 0
         assert len(repo.list_active()) == 2
+        assert len(repo.driver_assignment_snapshots) == 4
 
-    def test_updates_existing_vehicle_by_sap_equipment_number(self) -> None:
-        vehicle = _make_vehicle(plate="EQ10000001", sap_eq="10000001")
-        vehicle.model = "Old"
+    def test_updates_existing_vehicle_by_vehicle_number(self) -> None:
+        vehicle = _make_vehicle(plate="237ع51-11", sap_eq="20320")
         repo = FakeVehicleRepository(initial=[vehicle])
-        sap_port = FakeSAPEquipmentPort(
-            equipment=[
-                SAPEquipmentDTO(
-                    equipment_number="10000001",
-                    description="Fleet Vehicle — Toyota Land Cruiser",
-                    plant="P001",
-                    category="F",
+        sap_port = FakeSAPVehicleDriverPort(
+            vehicle_drivers=[
+                SAPVehicleDriverDTO(
+                    vehicle_number="20320",
+                    license_plate="237ع51-11",
                 )
             ]
         )
@@ -563,17 +544,16 @@ class TestSyncVehiclesFromSAPService:
         assert result.created == 0
         assert result.updated == 1
         assert result.failed == 0
-        assert repo.get_by_id(vehicle.id).model == "Land Cruiser"
+        assert repo.get_by_id(vehicle.id).vehicle_number.value == "20320"
+        assert len(repo.driver_assignment_snapshots) == 2
 
     def test_sync_is_idempotent(self) -> None:
         repo = FakeVehicleRepository()
-        sap_port = FakeSAPEquipmentPort(
-            equipment=[
-                SAPEquipmentDTO(
-                    equipment_number="10000001",
-                    description="Fleet Vehicle — Toyota Land Cruiser",
-                    plant="P001",
-                    category="F",
+        sap_port = FakeSAPVehicleDriverPort(
+            vehicle_drivers=[
+                SAPVehicleDriverDTO(
+                    vehicle_number="20320",
+                    license_plate="237ع51-11",
                 )
             ]
         )
@@ -586,10 +566,87 @@ class TestSyncVehiclesFromSAPService:
         assert second.created == 0
         assert second.updated == 1
         assert len(repo.list_active()) == 1
+        assert len(repo.driver_assignment_snapshots) == 4
+        assert (
+            repo.driver_assignment_snapshots[0]["sync_run_id"]
+            != repo.driver_assignment_snapshots[2]["sync_run_id"]
+        )
+
+    def test_maps_vehicle_driver_odata_fields(self) -> None:
+        repo = FakeVehicleRepository()
+        sap_port = FakeSAPVehicleDriverPort(
+            vehicle_drivers=[
+                SAPVehicleDriverDTO(
+                    vehicle_number="20320",
+                    license_plate="237ع51-11",
+                    commissioning_date="20150326",
+                    driver1_customer_number="6000000250",
+                    driver2_customer_number="6000000160",
+                )
+            ]
+        )
+
+        result = SyncVehiclesFromSAPService(repo, sap_port).execute()
+        vehicle = repo.list_active()[0]
+
+        assert result.created == 1
+        assert vehicle.vehicle_number.value == "20320"
+        assert vehicle.license_plate.value == "237ع51-11"
+        assert vehicle.commissioning_date == "20150326"
+        assert vehicle.driver1_customer_number == "6000000250"
+        assert vehicle.driver2_customer_number == "6000000160"
+        assert repo.driver_assignment_snapshots == [
+            {
+                "sync_run_id": repo.driver_assignment_snapshots[0]["sync_run_id"],
+                "synced_at": repo.driver_assignment_snapshots[0]["synced_at"],
+                "request_id": "",
+                "vehicle_id": vehicle.id,
+                "vehicle_number": "20320",
+                "license_plate": "237ع51-11",
+                "driver_role": "DRIVER",
+                "driver_customer_number": "6000000250",
+            },
+            {
+                "sync_run_id": repo.driver_assignment_snapshots[1]["sync_run_id"],
+                "synced_at": repo.driver_assignment_snapshots[1]["synced_at"],
+                "request_id": "",
+                "vehicle_id": vehicle.id,
+                "vehicle_number": "20320",
+                "license_plate": "237ع51-11",
+                "driver_role": "ASSISTANT",
+                "driver_customer_number": "6000000160",
+            },
+        ]
+
+    def test_sync_decommissions_drivers_missing_from_sap(self) -> None:
+        repo = FakeVehicleRepository()
+        seen = _make_driver(
+            customer_number="6000000250",
+            status=DriverStatus.DECOMMISSIONED,
+        )
+        missing = _make_driver(customer_number="6000009999")
+        driver_repo = FakeDriverRepository(initial=[seen, missing])
+        sap_port = FakeSAPVehicleDriverPort(
+            vehicle_drivers=[
+                SAPVehicleDriverDTO(
+                    vehicle_number="20320",
+                    license_plate="237ع51-11",
+                    driver1_customer_number="6000000250",
+                    driver1_name="Ali Driver",
+                )
+            ]
+        )
+
+        result = SyncVehiclesFromSAPService(repo, sap_port, driver_repo).execute()
+
+        assert result.failed == 0
+        assert driver_repo.get_by_id(seen.id).status == DriverStatus.ACTIVE
+        assert driver_repo.get_by_id(seen.id).name == "Ali Driver"
+        assert driver_repo.get_by_id(missing.id).status == DriverStatus.DECOMMISSIONED
 
 
 # ---------------------------------------------------------------------------
-# ActivateVehicleService
+# ChangeVehicleStatusService activation behavior
 # ---------------------------------------------------------------------------
 
 
@@ -632,23 +689,24 @@ def _make_completed_order(*, vehicle_id: uuid.UUID, fault_id: uuid.UUID) -> Repa
     return order
 
 
-class TestActivateVehicleService:
+class TestChangeVehicleStatusActivation:
     def _service(
         self,
         vehicle: Vehicle,
         *,
         repair_orders: list[RepairOrder] | None = None,
         faults: list[Fault] | None = None,
-    ) -> ActivateVehicleService:
-        return ActivateVehicleService(
+    ) -> ChangeVehicleStatusService:
+        return ChangeVehicleStatusService(
             vehicle_repository=FakeVehicleRepository(initial=[vehicle]),
             repair_order_repository=FakeRepairOrderRepository(repair_orders),
             fault_repository=FakeFaultRepository(faults),
         )
 
-    def _dto(self, vehicle_id: uuid.UUID) -> ActivateVehicleDTO:
-        return ActivateVehicleDTO(
+    def _dto(self, vehicle_id: uuid.UUID) -> ChangeVehicleStatusDTO:
+        return ChangeVehicleStatusDTO(
             vehicle_id=vehicle_id,
+            status=VehicleStatus.ACTIVE,
             request_id="req-activate",
             requested_by=uuid.uuid4(),
         )
@@ -658,7 +716,7 @@ class TestActivateVehicleService:
         fault = _make_fault(vehicle.id, status=FaultStatus.OPEN)
         order = _make_completed_order(vehicle_id=vehicle.id, fault_id=fault.id)
         fault_repo = FakeFaultRepository([fault])
-        service = ActivateVehicleService(
+        service = ChangeVehicleStatusService(
             FakeVehicleRepository([vehicle]),
             FakeRepairOrderRepository([order]),
             fault_repo,
@@ -713,14 +771,12 @@ class TestActivateVehicleService:
         with pytest.raises(FMMSConflictError):
             service.execute(self._dto(vehicle.id))
 
-    def test_returns_early_when_vehicle_already_active(self) -> None:
+    def test_rejects_already_active_vehicle_when_open_fault_exists(self) -> None:
         vehicle = _make_vehicle(status=VehicleStatus.ACTIVE)
         fault = _make_fault(vehicle.id, status=FaultStatus.OPEN)
-        order = _make_completed_order(vehicle_id=vehicle.id, fault_id=fault.id)
         fault_repo = FakeFaultRepository([fault])
-        service = self._service(vehicle, repair_orders=[order], faults=[fault])
+        service = self._service(vehicle, faults=[fault])
 
-        result = service.execute(self._dto(vehicle.id))
-
-        assert result.status == VehicleStatus.ACTIVE
+        with pytest.raises(FMMSConflictError):
+            service.execute(self._dto(vehicle.id))
         assert fault_repo.get_by_id(fault.id).status == FaultStatus.OPEN

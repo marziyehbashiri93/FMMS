@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import uuid
 
-from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.request import Request
@@ -12,21 +11,29 @@ from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
 from apps.vehicle.application.dto.vehicle_dto import (
-    ActivateVehicleDTO,
-    CreateVehicleDTO,
-    DeactivateVehicleDTO,
-    UpdateVehicleDTO,
+    ChangeVehicleStatusDTO,
+    RecordVehicleOdometerDTO,
 )
-from apps.vehicle.domain.entities import VehicleCategory, VehicleStatus
-from core.permissions import IsReadOnlyOrTechnicianOrAbove, IsSupervisorOrAbove
+from apps.vehicle.domain.entities import VehicleStatus
+from core.permissions import (
+    IsReadOnlyOrDriverOrTechnicianOrAbove,
+    IsReadOnlyOrTechnicianOrAbove,
+    IsSupervisorOrAbove,
+)
 from interfaces.api.v1 import deps
+from interfaces.api.v1.filters import DateRangeFilterSerializer, date_range_to_datetimes
+from interfaces.api.v1.inspection.serializers import InspectionResponseSerializer
 from interfaces.api.v1.utils import paginate_dto_list, request_id_from, user_id_from
+from interfaces.api.v1.vehicle import schema as vehicle_schema
 from interfaces.api.v1.vehicle.serializers import (
-    SAPEquipmentSyncSerializer,
-    VehicleCreateSerializer,
+    VehicleComponentHistoryResponseSerializer,
+    VehicleDriverAssignmentSnapshotResponseSerializer,
+    VehicleListQuerySerializer,
+    VehicleOdometerRecordSerializer,
+    VehicleOdometerResponseSerializer,
     VehicleResponseSerializer,
-    VehicleSAPSyncResultSerializer,
-    VehicleUpdateSerializer,
+    VehicleStatusChangeSerializer,
+    VehicleSummarySerializer,
 )
 
 
@@ -35,7 +42,7 @@ class VehicleViewSet(GenericViewSet):
 
     permission_classes = [IsReadOnlyOrTechnicianOrAbove]
 
-    @extend_schema(responses=VehicleResponseSerializer)
+    @vehicle_schema.retrieve
     def retrieve(self, request: Request, pk: str | None = None) -> Response:
         """Retrieve one vehicle."""
         result = deps.get_get_vehicle_service().execute(
@@ -43,13 +50,20 @@ class VehicleViewSet(GenericViewSet):
         )
         return Response(VehicleResponseSerializer(result).data)
 
-    @extend_schema(responses=VehicleResponseSerializer(many=True))
+    @vehicle_schema.list
     def list(self, request: Request) -> Response:
         """List non-deleted vehicles, optionally filtered by status."""
-        raw_status = request.query_params.get("status")
+        query_serializer = VehicleListQuerySerializer(data=request.query_params)
+        query_serializer.is_valid(raise_exception=True)
+        raw_status = query_serializer.validated_data.get("status")
+        ordering = query_serializer.validated_data.get("ordering", "")
+        search = query_serializer.validated_data.get("search", "").strip()
         vehicle_status = VehicleStatus(raw_status) if raw_status else None
         items = deps.get_list_vehicles_service().execute(
-            vehicle_status, request_id_from(request)
+            vehicle_status,
+            ordering=ordering,
+            search=search,
+            request_id=request_id_from(request),
         )
         page = paginate_dto_list(self, items)
         serializer = VehicleResponseSerializer(
@@ -61,92 +75,162 @@ class VehicleViewSet(GenericViewSet):
             else Response(serializer.data)
         )
 
-    @extend_schema(request=VehicleCreateSerializer, responses=VehicleResponseSerializer)
-    def create(self, request: Request) -> Response:
-        """Create a vehicle through its application service."""
-        serializer = VehicleCreateSerializer(data=request.data)
+    @vehicle_schema.change_status
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="status",
+        permission_classes=[IsSupervisorOrAbove],
+    )
+    def status(self, request: Request, pk: str | None = None) -> Response:
+        """Change an FMMS-controlled vehicle status."""
+        serializer = VehicleStatusChangeSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        data = dict(serializer.validated_data)
-        category = VehicleCategory(data.pop("category"))
-        result = deps.get_create_vehicle_service().execute(
-            CreateVehicleDTO(
-                **data,
-                category=category,
-                request_id=request_id_from(request),
-                created_by=user_id_from(request),
-            )
-        )
-        return Response(
-            VehicleResponseSerializer(result).data,
-            status=status.HTTP_201_CREATED,
-        )
-
-    @extend_schema(request=VehicleUpdateSerializer, responses=VehicleResponseSerializer)
-    def partial_update(self, request: Request, pk: str | None = None) -> Response:
-        """Update mutable vehicle properties."""
-        serializer = VehicleUpdateSerializer(data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        values = serializer.validated_data
-        result = deps.get_update_vehicle_service().execute(
-            UpdateVehicleDTO(
+        result = deps.get_change_vehicle_status_service().execute(
+            ChangeVehicleStatusDTO(
                 vehicle_id=uuid.UUID(str(pk)),
-                request_id=request_id_from(request),
-                updated_by=user_id_from(request),
-                category=(
-                    VehicleCategory(values["category"])
-                    if "category" in values
-                    else None
-                ),
-                **{key: value for key, value in values.items() if key != "category"},
-            )
-        )
-        return Response(VehicleResponseSerializer(result).data)
-
-    @extend_schema(request=None, responses=VehicleResponseSerializer)
-    @action(detail=True, methods=["post"], permission_classes=[IsSupervisorOrAbove])
-    def deactivate(self, request: Request, pk: str | None = None) -> Response:
-        """Deactivate a vehicle."""
-        result = deps.get_deactivate_vehicle_service().execute(
-            DeactivateVehicleDTO(
-                uuid.UUID(str(pk)), request_id_from(request), user_id_from(request)
-            )
-        )
-        return Response(VehicleResponseSerializer(result).data)
-
-    @extend_schema(request=None, responses=VehicleResponseSerializer)
-    @action(detail=True, methods=["post"], permission_classes=[IsSupervisorOrAbove])
-    def activate(self, request: Request, pk: str | None = None) -> Response:
-        """Re-activate a vehicle after maintenance when no open repairs remain."""
-        result = deps.get_activate_vehicle_service().execute(
-            ActivateVehicleDTO(
-                vehicle_id=uuid.UUID(str(pk)),
+                status=VehicleStatus(serializer.validated_data["status"]),
                 request_id=request_id_from(request),
                 requested_by=user_id_from(request),
             )
         )
         return Response(VehicleResponseSerializer(result).data)
 
-    @extend_schema(
-        request=None,
-        responses=VehicleSAPSyncResultSerializer,
+    @vehicle_schema.odometer_current
+    @vehicle_schema.odometer_record
+    @action(
+        detail=True,
+        methods=["get", "post"],
+        url_path="odometer",
+        permission_classes=[IsReadOnlyOrDriverOrTechnicianOrAbove],
     )
-    @action(detail=False, methods=["post"], url_path="sync-sap")
-    def sync_sap_bulk(self, request: Request) -> Response:
-        """Import/create/update vehicles from SAP equipment master data."""
-        result = deps.get_sync_vehicles_from_sap_service().execute(
-            request_id_from(request)
-        )
-        return Response(VehicleSAPSyncResultSerializer(result).data)
+    def odometer(self, request: Request, pk: str | None = None) -> Response:
+        """Retrieve current odometer, or create/update a daily reading."""
+        if request.method == "GET":
+            result = deps.get_get_vehicle_current_odometer_service().execute(
+                uuid.UUID(str(pk)),
+                request_id=request_id_from(request),
+            )
+            return Response(VehicleOdometerResponseSerializer(result).data)
 
-    @extend_schema(
-        request=SAPEquipmentSyncSerializer, responses=VehicleResponseSerializer
-    )
-    @action(detail=True, methods=["post"], url_path="sync-sap")
-    def sync_sap(self, request: Request, pk: str | None = None) -> Response:
-        """Synchronize a vehicle using its SAP equipment number."""
-        serializer = SAPEquipmentSyncSerializer(data=request.data)
+        serializer = VehicleOdometerRecordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        result = deps.get_sync_sap_equipment_service().execute(
-            serializer.validated_data["sap_equipment_number"], request_id_from(request)
+        result = deps.get_record_vehicle_odometer_service().execute(
+            RecordVehicleOdometerDTO(
+                vehicle_id=uuid.UUID(str(pk)),
+                reading_date=serializer.validated_data["reading_date"],
+                odometer_km=serializer.validated_data["odometer_km"],
+                source=serializer.validated_data["source"],
+                request_id=request_id_from(request),
+                recorded_by=user_id_from(request),
+            )
         )
-        return Response(VehicleResponseSerializer(result).data)
+        return Response(VehicleOdometerResponseSerializer(result).data)
+
+    @vehicle_schema.odometer_history
+    @action(detail=True, methods=["get"], url_path="odometer-history")
+    def odometer_history(self, request: Request, pk: str | None = None) -> Response:
+        """List vehicle odometer history with optional date filters."""
+        filters = DateRangeFilterSerializer(data=request.query_params)
+        filters.is_valid(raise_exception=True)
+        result = deps.get_list_vehicle_odometer_history_service().execute(
+            uuid.UUID(str(pk)),
+            from_date=filters.validated_data.get("from_date"),
+            to_date=filters.validated_data.get("to_date"),
+            request_id=request_id_from(request),
+        )
+        return Response(VehicleOdometerResponseSerializer(result, many=True).data)
+
+    @vehicle_schema.driver_assignment_history
+    @action(detail=True, methods=["get"], url_path="driver-assignment-history")
+    def driver_assignment_history(
+        self, request: Request, pk: str | None = None
+    ) -> Response:
+        """List SAP driver-assignment history for one vehicle."""
+        filters = DateRangeFilterSerializer(data=request.query_params)
+        filters.is_valid(raise_exception=True)
+        result = deps.get_list_vehicle_driver_assignment_history_service().execute(
+            uuid.UUID(str(pk)),
+            from_date=filters.validated_data.get("from_date"),
+            to_date=filters.validated_data.get("to_date"),
+        )
+        return Response(
+            VehicleDriverAssignmentSnapshotResponseSerializer(result, many=True).data
+        )
+
+    @vehicle_schema.checklist_history
+    @action(detail=True, methods=["get"], url_path="checklists")
+    def checklists(self, request: Request, pk: str | None = None) -> Response:
+        """List registered checklist inspections for one vehicle."""
+        vehicle_id = uuid.UUID(str(pk))
+        deps.get_get_vehicle_service().execute(
+            vehicle_id,
+            request_id=request_id_from(request),
+        )
+        filters = DateRangeFilterSerializer(data=request.query_params)
+        filters.is_valid(raise_exception=True)
+        from_datetime, to_datetime = date_range_to_datetimes(filters)
+        result = deps.get_list_inspections_service().execute(
+            vehicle_id,
+            from_date=from_datetime,
+            to_date=to_datetime,
+            request_id=request_id_from(request),
+        )
+        page = paginate_dto_list(self, result)
+        serializer = InspectionResponseSerializer(
+            page if page is not None else result,
+            many=True,
+        )
+        return (
+            self.get_paginated_response(serializer.data)
+            if page is not None
+            else Response(serializer.data)
+        )
+
+    @vehicle_schema.checklist_detail
+    @action(
+        detail=True,
+        methods=["get"],
+        url_path=r"checklists/(?P<inspection_id>[^/.]+)",
+    )
+    def checklist_detail(
+        self,
+        request: Request,
+        pk: str | None = None,
+        inspection_id: str | None = None,
+    ) -> Response:
+        """Retrieve one registered checklist inspection for one vehicle."""
+        vehicle_id = uuid.UUID(str(pk))
+        result = deps.get_get_inspection_service().execute(
+            uuid.UUID(str(inspection_id)),
+            request_id=request_id_from(request),
+        )
+        if result.vehicle_id != vehicle_id:
+            return Response(
+                {"detail": "Checklist inspection was not found for this vehicle."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(InspectionResponseSerializer(result).data)
+
+    @vehicle_schema.summary
+    @action(detail=False, methods=["get"], url_path="summary")
+    def summary(self, request: Request) -> Response:
+        """Return summary values for vehicle dashboard cards."""
+        del request
+        result = deps.get_get_vehicle_summary_service().execute()
+        return Response(VehicleSummarySerializer(result).data)
+
+    @action(detail=True, methods=["get"], url_path="component-history")
+    def component_history(self, request: Request, pk: str | None = None) -> Response:
+        """List installed/replaced component history for one vehicle."""
+        items = deps.get_list_vehicle_component_history_service().execute(
+            uuid.UUID(str(pk))
+        )
+        page = paginate_dto_list(self, items)
+        serializer = VehicleComponentHistoryResponseSerializer(
+            page if page is not None else items,
+            many=True,
+        )
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response(serializer.data)

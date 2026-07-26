@@ -8,7 +8,7 @@ from apps.repair.application.dto.repair_dto import RepairOrderResponseDTO
 from apps.repair.application.services.create_repair_order_service import (
     _to_response_dto,
 )
-from apps.repair.domain.entities import RepairOrderStatus
+from apps.repair.domain.entities import RepairOrderStatus, WorkshopType
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
 from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
@@ -85,20 +85,12 @@ class ListRepairOrdersService:
 
     def execute(
         self,
-        vehicle_id: uuid.UUID,
+        vehicle_id: uuid.UUID | None = None,
         status: RepairOrderStatus | None = None,
+        workshop_type: WorkshopType | None = None,
         request_id: str = "",
     ) -> list[RepairOrderResponseDTO]:
-        """Return repair orders for ``vehicle_id``, with optional status filter.
-
-        Args:
-            vehicle_id: Target vehicle UUID.
-            status: Optional status filter.
-            request_id: Optional correlation ID for structured logging.
-
-        Returns:
-            Ordered list of ``RepairOrderResponseDTO`` objects.
-        """
+        """Return repair orders with optional vehicle/status/workshop filters."""
         logger.info(
             "Listing repair orders",
             extra={
@@ -108,10 +100,16 @@ class ListRepairOrdersService:
                 "request_id": request_id,
                 "vehicle_id": str(vehicle_id),
                 "status_filter": status.value if status else None,
+                "workshop_type": workshop_type.value if workshop_type else None,
             },
         )
 
-        orders = self._repo.list_by_vehicle(vehicle_id=vehicle_id, status=status)
+        if vehicle_id is None:
+            orders = self._repo.list_all(status=status, workshop_type=workshop_type)
+        else:
+            orders = self._repo.list_by_vehicle(vehicle_id=vehicle_id, status=status)
+            if workshop_type is not None:
+                orders = [o for o in orders if o.workshop_type == workshop_type]
 
         logger.info(
             "Repair orders listed",

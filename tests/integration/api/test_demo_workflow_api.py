@@ -17,68 +17,107 @@ pytestmark = pytest.mark.django_db
 
 
 class TestVehicleSAPBulkSyncAPI:
-    """Cover POST /api/v1/vehicles/sync-sap/ bulk import."""
+    """Vehicle SAP sync is scheduled/operational, not a phase-1 public API."""
 
-    def test_sync_creates_vehicles_from_mock_sap(
+    def test_vehicle_sync_api_is_not_available_in_phase_1(
         self, authenticated_client: APIClient
     ) -> None:
         response = authenticated_client.post(
             "/api/v1/vehicles/sync-sap/", {}, format="json"
         )
 
-        assert response.status_code == 200, response.data
-        assert response.data["total_received"] >= 1
-        assert response.data["created"] >= 1
-        assert response.data["failed"] == 0
-
-        listed = authenticated_client.get("/api/v1/vehicles/")
-        assert listed.status_code == 200
-        assert listed.data["count"] >= response.data["created"]
-
-    def test_sync_updates_existing_and_is_idempotent(
-        self, authenticated_client: APIClient
-    ) -> None:
-        first = authenticated_client.post(
-            "/api/v1/vehicles/sync-sap/", {}, format="json"
-        )
-        assert first.status_code == 200
-        second = authenticated_client.post(
-            "/api/v1/vehicles/sync-sap/", {}, format="json"
-        )
-        assert second.status_code == 200
-
-        assert second.data["created"] == 0
-        assert second.data["updated"] == first.data["created"] + first.data["updated"]
-        assert second.data["failed"] == 0
+        assert response.status_code == 405
 
 
 class TestInspectionTemplateSAPSyncAPI:
-    """Cover inspection-template sync and list APIs."""
+    """Cover inspection-template list API after global SAP sync."""
 
-    def test_sync_and_list_templates(self, authenticated_client: APIClient) -> None:
-        synced = authenticated_client.post(
-            "/api/v1/inspection-templates/sync-sap/", {}, format="json"
-        )
+    def test_sync_and_list_templates(
+        self, authenticated_client: APIClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("SAP_USE_MOCK", "True")
+
+        synced = authenticated_client.post("/api/v1/sap-sync/", {}, format="json")
         assert synced.status_code == 200, synced.data
-        assert synced.data["total_received"] >= 4
-        assert synced.data["created"] >= 4
-        assert synced.data["failed"] == 0
+        items = {item["name"]: item for item in synced.data["items"]}
+        assert items["inspection_templates"]["summary"]["total_received"] >= 4
+        assert items["inspection_templates"]["summary"]["failed"] == 0
 
         listed = authenticated_client.get("/api/v1/inspection-templates/")
         assert listed.status_code == 200
         results = listed.data["results"] if "results" in listed.data else listed.data
-        descriptions = {item["description"] for item in results}
-        assert "Seat belt" in descriptions
-        assert "Front light" in descriptions
-        assert "Refrigerator" in descriptions
-        assert "Safety equipment" in descriptions
+        descriptions = {item["code_text"] for item in results}
+        assert all("group_text" in item and "code_text" in item for item in results)
+        assert all("code_group" in item and "code" in item for item in results)
+        assert all("GroupText" not in item and "CodeText" not in item for item in results)
+        assert all("CodeGroup" not in item and "Code" not in item for item in results)
+        assert "ترمز جلو" in descriptions
+        assert "چراغ جلو" in descriptions
+        assert "موتور اصلی" in descriptions
+        assert "باتری/دینام" in descriptions
+        brake_item = next(
+            item
+            for item in results
+            if item["code_group"] == "FL-BRK" and item["code"] == "B002"
+        )
+        assert brake_item["group_text"] == "سیستم ترمز"
+        assert brake_item["code_text"] == "ترمز عقب"
+        for group_text in {item["group_text"] for item in results}:
+            group_codes = [
+                item["code"] for item in results if item["group_text"] == group_text
+            ]
+            assert group_codes == sorted(group_codes)
 
-        again = authenticated_client.post(
+    def test_manual_template_sync_api_is_not_available(
+        self, authenticated_client: APIClient
+    ) -> None:
+        response = authenticated_client.post(
             "/api/v1/inspection-templates/sync-sap/", {}, format="json"
         )
-        assert again.status_code == 200
-        assert again.data["created"] == 0
-        assert again.data["updated"] >= 4
+
+        assert response.status_code == 404
+
+
+class TestFaultCatalogAPI:
+    """Cover fault catalog list API after global SAP sync."""
+
+    def test_sync_and_list_fault_catalog(
+        self, authenticated_client: APIClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("SAP_USE_MOCK", "True")
+        synced = authenticated_client.post("/api/v1/sap-sync/", {}, format="json")
+        assert synced.status_code == 200, synced.data
+
+        listed = authenticated_client.get("/api/v1/fault-catalogs/?search=ترمز")
+
+        assert listed.status_code == 200, listed.data
+        results = listed.data["results"] if "results" in listed.data else listed.data
+        assert {item["code_text"] for item in results}
+        assert all("defect_class" in item for item in results)
+        ordered = [(item["group_text"], item["code"]) for item in results]
+        assert ordered == sorted(ordered)
+
+
+class TestCentralStockAPI:
+    """Cover central warehouse stock list API after global SAP sync."""
+
+    def test_sync_and_list_central_stock(
+        self, authenticated_client: APIClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("SAP_USE_MOCK", "True")
+        synced = authenticated_client.post("/api/v1/sap-sync/", {}, format="json")
+        assert synced.status_code == 200, synced.data
+
+        listed = authenticated_client.get(
+            "/api/v1/central-stock/?storage_location=KH08&search=60001764"
+        )
+
+        assert listed.status_code == 200, listed.data
+        results = listed.data["results"] if "results" in listed.data else listed.data
+        assert len(results) >= 1
+        assert all(item["storage_location"] == "KH08" for item in results)
+        assert all("quantity" in item for item in results)
+        assert any(item["material_code"] == "60001764" for item in results)
 
 
 class TestDriverInspectionWorkflowAPI:
@@ -122,7 +161,7 @@ class TestDriverInspectionWorkflowAPI:
         assert FaultModel.objects.filter(vehicle_id=vehicle["id"]).count() == 0
         assert RepairOrderModel.objects.filter(vehicle_id=vehicle["id"]).count() == 0
 
-    def test_submit_fail_creates_fault_repair_and_out_of_service(
+    def test_failed_inspection_requires_explicit_fault_report(
         self, authenticated_client: APIClient
     ) -> None:
         vehicle = create_vehicle(
@@ -160,12 +199,39 @@ class TestDriverInspectionWorkflowAPI:
             FaultModel.objects.filter(
                 vehicle_id=vehicle["id"], inspection_id=created.data["id"]
             ).count()
+            == 0
+        )
+        reported = authenticated_client.post(
+            f"/api/v1/inspections/{created.data['id']}/report-fault/",
+            {},
+            format="json",
+        )
+        assert reported.status_code == 201, reported.data
+        assert (
+            FaultModel.objects.filter(
+                vehicle_id=vehicle["id"], inspection_id=created.data["id"]
+            ).count()
             == 1
         )
-        assert RepairOrderModel.objects.filter(vehicle_id=vehicle["id"]).count() == 1
+        # Repair order is deferred until distribution marks the vehicle unusable.
+        assert RepairOrderModel.objects.filter(vehicle_id=vehicle["id"]).count() == 0
 
         orm = VehicleModel.objects.get(id=vehicle["id"])
         assert orm.status == VehicleStatus.ACTIVE.value
+
+        fault = FaultModel.objects.get(
+            vehicle_id=vehicle["id"], inspection_id=created.data["id"]
+        )
+        unusable = authenticated_client.post(
+            f"/api/v1/faults/{fault.id}/distribution-unusable/",
+            {"note": "needs repair"},
+            format="json",
+        )
+        assert unusable.status_code == 200, unusable.data
+        assert unusable.data["status"] == "AWAITING_TRANSPORT"
+        assert RepairOrderModel.objects.filter(vehicle_id=vehicle["id"]).count() == 1
+        order = RepairOrderModel.objects.get(vehicle_id=vehicle["id"])
+        assert order.status == "CREATED"
 
     def test_distribution_supervisor_can_deactivate_after_failed_inspection(
         self, authenticated_client: APIClient
@@ -204,14 +270,14 @@ class TestDriverInspectionWorkflowAPI:
         assert detail.data["status"] == VehicleStatus.ACTIVE.value
 
         deactivated = authenticated_client.post(
-            f"/api/v1/vehicles/{vehicle['id']}/deactivate/",
-            {},
+            f"/api/v1/vehicles/{vehicle['id']}/status/",
+            {"status": VehicleStatus.INACTIVE.value},
             format="json",
         )
         assert deactivated.status_code == 200, deactivated.data
         assert deactivated.data["status"] == VehicleStatus.INACTIVE.value
 
-    def test_submit_multiple_failures_create_one_fault_with_items(
+    def test_report_failed_inspection_creates_one_fault_with_items(
         self, authenticated_client: APIClient
     ) -> None:
         vehicle = create_vehicle(
@@ -252,6 +318,12 @@ class TestDriverInspectionWorkflowAPI:
         assert submitted.status_code == 200, submitted.data
         assert submitted.data["has_failures"] is True
 
+        reported = authenticated_client.post(
+            f"/api/v1/inspections/{created.data['id']}/report-fault/",
+            {},
+            format="json",
+        )
+        assert reported.status_code == 201, reported.data
         faults = FaultModel.objects.filter(
             vehicle_id=vehicle["id"], inspection_id=created.data["id"]
         )
@@ -260,7 +332,8 @@ class TestDriverInspectionWorkflowAPI:
         assert fault is not None
         assert fault.description == "Multiple inspection failures"
         assert FaultItemModel.objects.filter(fault_id=fault.id).count() == 2
-        assert RepairOrderModel.objects.filter(vehicle_id=vehicle["id"]).count() == 1
+        # Repair order is deferred until distribution marks the vehicle unusable.
+        assert RepairOrderModel.objects.filter(vehicle_id=vehicle["id"]).count() == 0
 
         retrieved = authenticated_client.get(f"/api/v1/faults/{fault.id}/")
         assert retrieved.status_code == 200
@@ -306,6 +379,12 @@ class TestDistributionUsableWorkflowAPI:
         assert submitted.status_code == 200, submitted.data
         assert submitted.data["has_failures"] is True
 
+        reported = authenticated_client.post(
+            f"/api/v1/inspections/{created.data['id']}/report-fault/",
+            {},
+            format="json",
+        )
+        assert reported.status_code == 201, reported.data
         faults = authenticated_client.get(f"/api/v1/faults/?vehicle_id={vehicle['id']}")
         assert faults.status_code == 200
         assert faults.data["count"] == 1
@@ -316,29 +395,18 @@ class TestDistributionUsableWorkflowAPI:
             f"/api/v1/repair-orders/?vehicle_id={vehicle['id']}"
         )
         assert orders.status_code == 200
-        assert orders.data["count"] == 1
-        order = orders.data["results"][0]
-        assert order["status"] == "CREATED"
+        assert orders.data["count"] == 0
 
         vehicle_detail = authenticated_client.get(f"/api/v1/vehicles/{vehicle['id']}/")
         assert vehicle_detail.data["status"] == VehicleStatus.ACTIVE.value
 
-        closed = authenticated_client.post(
-            f"/api/v1/faults/{fault['id']}/close/", {}, format="json"
+        usable = authenticated_client.post(
+            f"/api/v1/faults/{fault['id']}/distribution-usable/",
+            {"note": "usable"},
+            format="json",
         )
-        assert closed.status_code == 200, closed.data
-        assert closed.data["status"] == "CLOSED"
-
-        cancelled = authenticated_client.get(f"/api/v1/repair-orders/{order['id']}/")
-        assert cancelled.status_code == 200
-        assert cancelled.data["status"] == "CANCELLED"
-
-        timeline = authenticated_client.get(
-            f"/api/v1/repair-orders/{order['id']}/timeline/"
-        )
-        assert timeline.status_code == 200, timeline.data
-        events = {item["event"] for item in timeline.data}
-        assert "DISTRIBUTION_APPROVED_USABLE" in events
+        assert usable.status_code == 200, usable.data
+        assert usable.data["status"] == "CLOSED"
 
         vehicle_after = authenticated_client.get(f"/api/v1/vehicles/{vehicle['id']}/")
         assert vehicle_after.data["status"] == VehicleStatus.ACTIVE.value

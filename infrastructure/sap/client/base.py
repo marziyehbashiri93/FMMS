@@ -58,7 +58,7 @@ class ISAPClient(ABC):
         """Execute a GET request against an OData service entity.
 
         Args:
-            service: The OData service name (e.g. ``"API_EQUIPMENT"``)
+            service: The OData service name (e.g. ``"ZC_VEHICLEDRIVER_CDS"``)
             entity: The entity set or entity key expression
                 (e.g. ``"EquipmentSet"`` or ``"Equipment('10000001')"``)
             params: Optional OData query parameters (``$filter``, ``$select``, etc.)
@@ -69,6 +69,15 @@ class ISAPClient(ABC):
         Raises:
             SAPClientError: On any transport or protocol-level failure.
         """
+
+    @abstractmethod
+    def odata_get_xml(
+        self,
+        service: str,
+        entity: str = "",
+        params: dict[str, Any] | None = None,
+    ) -> str:
+        """Execute a GET request and return the raw XML response body."""
 
     @abstractmethod
     def odata_post(

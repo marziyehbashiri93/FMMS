@@ -19,6 +19,7 @@ env = environ.Env(
     LOG_LEVEL=(str, "INFO"),
     ALLOWED_HOSTS=(list, []),
     CORS_ALLOWED_ORIGINS=(list, []),
+    VEHICLE_SYNC_INTERVAL_HOURS=(int, 24),
 )
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -216,6 +217,13 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.ScopedRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "auth_token_obtain": "10/min",
+        "auth_token_refresh": "30/min",
+    },
     "DEFAULT_PAGINATION_CLASS": "core.pagination.standard_pagination.FMMSPageNumberPagination",
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
@@ -233,6 +241,25 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "Fleet Maintenance Management System REST API.",
     "VERSION": "v1",
     "SERVE_INCLUDE_SCHEMA": False,
+    "TAGS": [
+        {"name": "auth", "description": "Authentication and current user APIs."},
+        {"name": "vehicle", "description": "Vehicle master data and odometer APIs."},
+        {"name": "driver", "description": "Driver master data APIs."},
+        {
+            "name": "inspection",
+            "description": "Inspection and checklist template APIs.",
+        },
+        {"name": "fault", "description": "Fault registration and workflow APIs."},
+        {"name": "repair", "description": "Repair order workflow APIs."},
+        {"name": "material", "description": "Material request APIs."},
+        {"name": "handover", "description": "Vehicle handover APIs."},
+        {
+            "name": "preventive-maintenance",
+            "description": "Preventive maintenance plan and work-order APIs.",
+        },
+        {"name": "procurement", "description": "Purchase requisition and order APIs."},
+        {"name": "integration", "description": "SAP integration transaction APIs."},
+    ],
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -252,12 +279,16 @@ CELERY_IMPORTS = (
     "infrastructure.messaging.tasks.sap_sync_tasks",
     "infrastructure.messaging.tasks.maintenance_tasks",
 )
-# Reduced M8 scope: retry + overdue PM. Single-equipment sync is on-demand only
-# (requires sap_equipment_number) and is not beat-scheduled.
+VEHICLE_SYNC_INTERVAL_HOURS = env("VEHICLE_SYNC_INTERVAL_HOURS")
+
 CELERY_BEAT_SCHEDULE = {
     "retry-failed-sap-every-15m": {
         "task": "fmms.retry_failed_sap_transactions",
         "schedule": 15 * 60,
+    },
+    "sync-vehicles-from-sap": {
+        "task": "fmms.sync_vehicles_from_sap",
+        "schedule": VEHICLE_SYNC_INTERVAL_HOURS * 60 * 60,
     },
     "trigger-overdue-pm-daily": {
         "task": "fmms.trigger_overdue_pm_work_orders",

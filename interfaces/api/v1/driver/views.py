@@ -4,28 +4,34 @@ from __future__ import annotations
 
 import uuid
 
-from drf_spectacular.utils import extend_schema
-from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
 from apps.driver.application.dto.driver_dto import (
-    AssignDriverToVehicleDTO,
-    RegisterDriverDTO,
-    SuspendDriverDTO,
+    DriverExitCenterDTO,
 )
+from apps.driver.application.services.get_driver_service import DriverAssignmentRole
 from apps.driver.domain.entities import DriverStatus
-from apps.driver.domain.value_objects import LicenseClass
-from core.permissions import IsReadOnlyOrTechnicianOrAbove, IsSupervisorOrAbove
-from interfaces.api.v1 import deps
-from interfaces.api.v1.driver.serializers import (
-    DriverAssignSerializer,
-    DriverCreateSerializer,
-    DriverResponseSerializer,
+from core.permissions import (
+    IsReadOnlyOrDriverOrTechnicianOrAbove,
+    IsReadOnlyOrTechnicianOrAbove,
 )
+from interfaces.api.v1 import deps
+from interfaces.api.v1.driver import schema as driver_schema
+from interfaces.api.v1.driver.serializers import (
+    DriverExitCenterSerializer,
+    DriverListQuerySerializer,
+    DriverResponseSerializer,
+    DriverSummarySerializer,
+)
+from interfaces.api.v1.filters import DateRangeFilterSerializer
 from interfaces.api.v1.utils import paginate_dto_list, request_id_from, user_id_from
+from interfaces.api.v1.vehicle.serializers import (
+    VehicleDriverAssignmentHistoryResponseSerializer,
+    VehicleResponseSerializer,
+)
 
 
 class DriverViewSet(GenericViewSet):
@@ -33,7 +39,7 @@ class DriverViewSet(GenericViewSet):
 
     permission_classes = [IsReadOnlyOrTechnicianOrAbove]
 
-    @extend_schema(responses=DriverResponseSerializer)
+    @driver_schema.retrieve
     def retrieve(self, request: Request, pk: str | None = None) -> Response:
         """Retrieve one driver."""
         result = deps.get_get_driver_service().execute(
@@ -41,13 +47,20 @@ class DriverViewSet(GenericViewSet):
         )
         return Response(DriverResponseSerializer(result).data)
 
-    @extend_schema(responses=DriverResponseSerializer(many=True))
+    @driver_schema.list
     def list(self, request: Request) -> Response:
-        """List drivers, optionally filtered by status."""
-        raw_status = request.query_params.get("status")
-        driver_status = DriverStatus(raw_status) if raw_status else DriverStatus.ACTIVE
+        """List drivers, optionally filtered by status and search text."""
+        query = DriverListQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        filters = query.validated_data
+        raw_status = filters.get("status")
+        raw_role = filters.get("role")
         items = deps.get_list_drivers_service().execute(
-            driver_status, request_id_from(request)
+            DriverStatus(raw_status) if raw_status else None,
+            ordering=filters.get("ordering", ""),
+            search=filters.get("search", ""),
+            role=DriverAssignmentRole(raw_role) if raw_role else None,
+            request_id=request_id_from(request),
         )
         page = paginate_dto_list(self, items)
         serializer = DriverResponseSerializer(
@@ -57,51 +70,59 @@ class DriverViewSet(GenericViewSet):
             return self.get_paginated_response(serializer.data)
         return Response(serializer.data)
 
-    @extend_schema(request=DriverCreateSerializer, responses=DriverResponseSerializer)
-    def create(self, request: Request) -> Response:
-        """Register a driver through its application service."""
-        serializer = DriverCreateSerializer(data=request.data)
+    @driver_schema.summary
+    @action(detail=False, methods=["get"], url_path="summary")
+    def summary(self, request: Request) -> Response:
+        """Return summary values for driver dashboard cards."""
+        del request
+        result = deps.get_get_driver_summary_service().execute()
+        return Response(DriverSummarySerializer(result).data)
+
+    @driver_schema.exit_center
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="exit-center",
+        permission_classes=[IsReadOnlyOrDriverOrTechnicianOrAbove],
+    )
+    def exit_center(self, request: Request, pk: str | None = None) -> Response:
+        """Mark the assigned vehicle as exited from the fleet center."""
+        serializer = DriverExitCenterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        data = dict(serializer.validated_data)
-        license_class = LicenseClass(data.pop("license_class"))
-        result = deps.get_register_driver_service().execute(
-            RegisterDriverDTO(
-                **data,
-                license_class=license_class,
+        driver_id = uuid.UUID(str(pk))
+        if getattr(request.user, "role", None) == "DRIVER":
+            personnel = str(getattr(request.user, "personnel_number", "") or "").strip()
+            linked = deps.get_driver_repository().find_by_personnel_number(personnel)
+            if linked is None or linked.id != driver_id:
+                from rest_framework.exceptions import PermissionDenied  # noqa: PLC0415
+
+                raise PermissionDenied(
+                    detail="Drivers may only exit for their own linked SAP identity."
+                )
+        result = deps.get_driver_exit_center_service().execute(
+            DriverExitCenterDTO(
+                driver_id=driver_id,
+                vehicle_id=serializer.validated_data["vehicle_id"],
+                inspection_id=serializer.validated_data["inspection_id"],
                 request_id=request_id_from(request),
-                created_by=user_id_from(request),
+                requested_by_user_id=user_id_from(request),
             )
+        )
+        return Response(VehicleResponseSerializer(result).data)
+
+    @driver_schema.vehicle_assignment_history
+    @action(detail=True, methods=["get"], url_path="vehicle-assignment-history")
+    def vehicle_assignment_history(
+        self, request: Request, pk: str | None = None
+    ) -> Response:
+        """List SAP vehicle-assignment history for one driver."""
+        filters = DateRangeFilterSerializer(data=request.query_params)
+        filters.is_valid(raise_exception=True)
+        result = deps.get_list_driver_vehicle_assignment_history_service().execute(
+            uuid.UUID(str(pk)),
+            from_date=filters.validated_data.get("from_date"),
+            to_date=filters.validated_data.get("to_date"),
         )
         return Response(
-            DriverResponseSerializer(result).data,
-            status=status.HTTP_201_CREATED,
+            VehicleDriverAssignmentHistoryResponseSerializer(result, many=True).data
         )
-
-    @extend_schema(request=DriverAssignSerializer, responses=DriverResponseSerializer)
-    @action(detail=True, methods=["post"])
-    def assign(self, request: Request, pk: str | None = None) -> Response:
-        """Assign a driver to a vehicle."""
-        serializer = DriverAssignSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        result = deps.get_assign_driver_to_vehicle_service().execute(
-            AssignDriverToVehicleDTO(
-                driver_id=uuid.UUID(str(pk)),
-                vehicle_id=serializer.validated_data["vehicle_id"],
-                request_id=request_id_from(request),
-                assigned_by=user_id_from(request),
-            )
-        )
-        return Response(DriverResponseSerializer(result).data)
-
-    @extend_schema(request=None, responses=DriverResponseSerializer)
-    @action(detail=True, methods=["post"], permission_classes=[IsSupervisorOrAbove])
-    def suspend(self, request: Request, pk: str | None = None) -> Response:
-        """Suspend a driver."""
-        result = deps.get_suspend_driver_service().execute(
-            SuspendDriverDTO(
-                driver_id=uuid.UUID(str(pk)),
-                request_id=request_id_from(request),
-                requested_by=user_id_from(request),
-            )
-        )
-        return Response(DriverResponseSerializer(result).data)

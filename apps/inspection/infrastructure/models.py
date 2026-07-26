@@ -81,13 +81,12 @@ class InspectionItemModel(models.Model):
 
 
 class InspectionTemplateModel(BaseModel):
-    """Local cache of SAP object-part catalog entries for driver checklists."""
+    """Local cache of SAP inspection-template catalog entries."""
 
-    sap_code = models.CharField(max_length=40, db_index=True)
     code_group = models.CharField(max_length=40, db_index=True)
-    category = models.CharField(max_length=100)
-    description = models.CharField(max_length=500)
-    catalog_type = models.CharField(max_length=10, default="B")
+    code = models.CharField(max_length=40, db_index=True)
+    group_text = models.CharField(max_length=100)
+    code_text = models.CharField(max_length=500)
     is_active = models.BooleanField(default=True, db_index=True)
 
     class Meta:
@@ -97,7 +96,7 @@ class InspectionTemplateModel(BaseModel):
         verbose_name_plural = "Inspection Templates"
         constraints = [
             models.UniqueConstraint(
-                fields=["sap_code", "code_group", "catalog_type"],
+                fields=["code", "code_group"],
                 condition=models.Q(is_deleted=False),
                 name="unique_active_inspection_template_sap_key",
             ),
@@ -110,4 +109,4 @@ class InspectionTemplateModel(BaseModel):
         ]
 
     def __str__(self) -> str:
-        return f"{self.sap_code}/{self.code_group}: {self.description}"
+        return f"{self.code_group}/{self.code}: {self.code_text}"

@@ -1,0 +1,277 @@
+<?xml version="1.0"?>
+<Root>
+<Columns>
+	<Column Name="CodeGroup"></Column>
+	<Column Name="Code"></Column>
+	<Column Name="GroupText"></Column>
+	<Column Name="CodeText"></Column>
+	<Column Name="DefectClass"></Column>
+	<Column Name="DefectClassText"></Column>
+</Columns>
+<Rows>
+	<Row>
+		<Value>BODY-D</Value>
+		<Value>C001</Value>
+		<Value>بدنه و کابین</Value>
+		<Value>در/شیشه معیوب</Value>
+		<Value>S3</Value>
+		<Value>Minor / جزئی</Value>
+	</Row>
+	<Row>
+		<Value>BODY-D</Value>
+		<Value>C002</Value>
+		<Value>بدنه و کابین</Value>
+		<Value>آینه شکسته</Value>
+		<Value>S2</Value>
+		<Value>Major / جدی</Value>
+	</Row>
+	<Row>
+		<Value>BODY-D</Value>
+		<Value>C003</Value>
+		<Value>بدنه و کابین</Value>
+		<Value>صندلی/کمربند</Value>
+		<Value>S2</Value>
+		<Value>Major / جدی</Value>
+	</Row>
+	<Row>
+		<Value>BRAKE-D</Value>
+		<Value>B001</Value>
+		<Value>سیستم ترمز</Value>
+		<Value>ترمز ضعیف</Value>
+		<Value>S1</Value>
+		<Value>Critical / بحرانی</Value>
+	</Row>
+	<Row>
+		<Value>BRAKE-D</Value>
+		<Value>B002</Value>
+		<Value>سیستم ترمز</Value>
+		<Value>لرزش هنگام ترمز</Value>
+		<Value>S2</Value>
+		<Value>Major / جدی</Value>
+	</Row>
+	<Row>
+		<Value>BRAKE-D</Value>
+		<Value>B003</Value>
+		<Value>سیستم ترمز</Value>
+		<Value>چراغ ترمز روشن</Value>
+		<Value>S2</Value>
+		<Value>Major / جدی</Value>
+	</Row>
+	<Row>
+		<Value>BRAKE-D</Value>
+		<Value>B004</Value>
+		<Value>سیستم ترمز</Value>
+		<Value>ترمز دستی معیوب</Value>
+		<Value>S2</Value>
+		<Value>Major / جدی</Value>
+	</Row>
+	<Row>
+		<Value>CARGO-D</Value>
+		<Value>G001</Value>
+		<Value>بارگیری و بدنه بار</Value>
+		<Value>درب بار معیوب</Value>
+		<Value>S3</Value>
+		<Value>Minor / جزئی</Value>
+	</Row>
+	<Row>
+		<Value>CARGO-D</Value>
+		<Value>G002</Value>
+		<Value>بارگیری و بدنه بار</Value>
+		<Value>قفل/بست بار</Value>
+		<Value>S2</Value>
+		<Value>Major / جدی</Value>
+	</Row>
+	<Row>
+		<Value>CARGO-D</Value>
+		<Value>G003</Value>
+		<Value>بارگیری و بدنه بار</Value>
+		<Value>کف بارگیر آسیب‌دیده</Value>
+		<Value>S4</Value>
+		<Value>Observation / مشاهده</Value>
+	</Row>
+	<Row>
+		<Value>COOL-D</Value>
+		<Value>R001</Value>
+		<Value>سیستم خنک‌کاری</Value>
+		<Value>دمای بالای موتور</Value>
+		<Value>S1</Value>
+		<Value>Critical / بحرانی</Value>
+	</Row>
+	<Row>
+		<Value>COOL-D</Value>
+		<Value>R002</Value>
+		<Value>سیستم خنک‌کاری</Value>
+		<Value>هیتر/کولر معیوب</Value>
+		<Value>S4</Value>
+		<Value>Observation / مشاهده</Value>
+	</Row>
+	<Row>
+		<Value>ENG-DIST</Value>
+		<Value>E001</Value>
+		<Value>موتور و انتقال قدرت</Value>
+		<Value>روشن نشدن موتور</Value>
+		<Value>S1</Value>
+		<Value>Critical / بحرانی</Value>
+	</Row>
+	<Row>
+		<Value>ENG-DIST</Value>
+		<Value>E002</Value>
+		<Value>موتور و انتقال قدرت</Value>
+		<Value>دود غیرعادی</Value>
+		<Value>S2</Value>
+		<Value>Major / جدی</Value>
+	</Row>
+	<Row>
+		<Value>ENG-DIST</Value>
+		<Value>E003</Value>
+		<Value>موتور و انتقال قدرت</Value>
+		<Value>صدای غیرعادی موتور</Value>
+		<Value>S2</Value>
+		<Value>Major / جدی</Value>
+	</Row>
+	<Row>
+		<Value>ENG-DIST</Value>
+		<Value>E004</Value>
+		<Value>موتور و انتقال قدرت</Value>
+		<Value>افت قدرت</Value>
+		<Value>S3</Value>
+		<Value>Minor / جزئی</Value>
+	</Row>
+	<Row>
+		<Value>FLUID-D</Value>
+		<Value>F001</Value>
+		<Value>مایعات و نشتی</Value>
+		<Value>نشتی روغن موتور</Value>
+		<Value>S2</Value>
+		<Value>Major / جدی</Value>
+	</Row>
+	<Row>
+		<Value>FLUID-D</Value>
+		<Value>F002</Value>
+		<Value>مایعات و نشتی</Value>
+		<Value>نشتی ترمز</Value>
+		<Value>S1</Value>
+		<Value>Critical / بحرانی</Value>
+	</Row>
+	<Row>
+		<Value>FLUID-D</Value>
+		<Value>F003</Value>
+		<Value>مایعات و نشتی</Value>
+		<Value>کمبود آب رادیاتور</Value>
+		<Value>S2</Value>
+		<Value>Major / جدی</Value>
+	</Row>
+	<Row>
+		<Value>FLUID-D</Value>
+		<Value>F004</Value>
+		<Value>مایعات و نشتی</Value>
+		<Value>کمبود روغن گیربکس</Value>
+		<Value>S3</Value>
+		<Value>Minor / جزئی</Value>
+	</Row>
+	<Row>
+		<Value>LIGHT-D</Value>
+		<Value>L001</Value>
+		<Value>روشنایی و برق</Value>
+		<Value>چراغ جلو معیوب</Value>
+		<Value>S2</Value>
+		<Value>Major / جدی</Value>
+	</Row>
+	<Row>
+		<Value>LIGHT-D</Value>
+		<Value>L002</Value>
+		<Value>روشنایی و برق</Value>
+		<Value>چراغ عقب/ترمز</Value>
+		<Value>S2</Value>
+		<Value>Major / جدی</Value>
+	</Row>
+	<Row>
+		<Value>LIGHT-D</Value>
+		<Value>L003</Value>
+		<Value>روشنایی و برق</Value>
+		<Value>چراغک داشبورد</Value>
+		<Value>S3</Value>
+		<Value>Minor / جزئی</Value>
+	</Row>
+	<Row>
+		<Value>LIGHT-D</Value>
+		<Value>L004</Value>
+		<Value>روشنایی و برق</Value>
+		<Value>باتری/دینام</Value>
+		<Value>S2</Value>
+		<Value>Major / جدی</Value>
+	</Row>
+	<Row>
+		<Value>SAFE-D</Value>
+		<Value>X001</Value>
+		<Value>ایمنی عمومی</Value>
+		<Value>کپسول آتش‌نشانی</Value>
+		<Value>S2</Value>
+		<Value>Major / جدی</Value>
+	</Row>
+	<Row>
+		<Value>SAFE-D</Value>
+		<Value>X002</Value>
+		<Value>ایمنی عمومی</Value>
+		<Value>مثلث خطر</Value>
+		<Value>S3</Value>
+		<Value>Minor / جزئی</Value>
+	</Row>
+	<Row>
+		<Value>SAFE-D</Value>
+		<Value>X003</Value>
+		<Value>ایمنی عمومی</Value>
+		<Value>جک و ابزار</Value>
+		<Value>S4</Value>
+		<Value>Observation / مشاهده</Value>
+	</Row>
+	<Row>
+		<Value>STEER-D</Value>
+		<Value>S001</Value>
+		<Value>فرمان و تعلیق</Value>
+		<Value>سنگینی فرمان</Value>
+		<Value>S2</Value>
+		<Value>Major / جدی</Value>
+	</Row>
+	<Row>
+		<Value>STEER-D</Value>
+		<Value>S002</Value>
+		<Value>فرمان و تعلیق</Value>
+		<Value>لرزش فرمان</Value>
+		<Value>S2</Value>
+		<Value>Major / جدی</Value>
+	</Row>
+	<Row>
+		<Value>STEER-D</Value>
+		<Value>S003</Value>
+		<Value>فرمان و تعلیق</Value>
+		<Value>انحراف مسیر</Value>
+		<Value>S1</Value>
+		<Value>Critical / بحرانی</Value>
+	</Row>
+	<Row>
+		<Value>TIRE-D</Value>
+		<Value>T001</Value>
+		<Value>لاستیک و چرخ</Value>
+		<Value>پنچری / باد کم</Value>
+		<Value>S1</Value>
+		<Value>Critical / بحرانی</Value>
+	</Row>
+	<Row>
+		<Value>TIRE-D</Value>
+		<Value>T002</Value>
+		<Value>لاستیک و چرخ</Value>
+		<Value>سایش غیریکنواخت</Value>
+		<Value>S3</Value>
+		<Value>Minor / جزئی</Value>
+	</Row>
+	<Row>
+		<Value>TIRE-D</Value>
+		<Value>T003</Value>
+		<Value>لاستیک و چرخ</Value>
+		<Value>پیچ شل</Value>
+		<Value>S1</Value>
+		<Value>Critical / بحرانی</Value>
+	</Row>
+</Rows>
+</Root>

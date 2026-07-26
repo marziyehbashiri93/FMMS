@@ -4,40 +4,98 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
+from apps.driver.application.services.get_driver_service import DriverAssignmentRole
 from apps.driver.domain.entities import DriverStatus
-from apps.driver.domain.value_objects import LicenseClass
+
+DRIVER_ORDERING_CHOICES = [
+    "customer_number",
+    "-customer_number",
+    "name",
+    "-name",
+    "mobile",
+    "-mobile",
+    "personnel_number",
+    "-personnel_number",
+    "gender",
+    "-gender",
+    "nilofar_code",
+    "-nilofar_code",
+    "status",
+    "-status",
+    "created_at",
+    "-created_at",
+    "updated_at",
+    "-updated_at",
+]
+DRIVER_ROLE_CHOICES = [item.value for item in DriverAssignmentRole]
+DRIVER_STATUS_CHOICES = [item.value for item in DriverStatus]
 
 
-class DriverCreateSerializer(serializers.Serializer):
-    """Validate driver registration input."""
+class DriverListQuerySerializer(serializers.Serializer):
+    """Validate query parameters accepted by the driver list endpoint."""
 
-    full_name = serializers.CharField(max_length=200)
-    license_number = serializers.CharField(max_length=20)
-    license_class = serializers.ChoiceField(
-        choices=[item.value for item in LicenseClass]
+    status = serializers.ChoiceField(
+        choices=DRIVER_STATUS_CHOICES,
+        required=False,
     )
-    phone = serializers.CharField(max_length=20)
-    email = serializers.EmailField(required=False, allow_null=True)
+    ordering = serializers.ChoiceField(
+        choices=DRIVER_ORDERING_CHOICES,
+        required=False,
+        allow_blank=True,
+    )
+    search = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True)
+    role = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        trim_whitespace=True,
+    )
+
+    def validate_role(self, value: str) -> str:
+        """Normalize and validate the current assignment role filter."""
+        normalized = value.upper()
+        if normalized and normalized not in DRIVER_ROLE_CHOICES:
+            raise serializers.ValidationError(
+                "Unsupported role filter. Allowed values are DRIVER and ASSISTANT."
+            )
+        return normalized
 
 
-class DriverAssignSerializer(serializers.Serializer):
-    """Validate driver-to-vehicle assignment input."""
+class DriverAssignedVehicleSerializer(serializers.Serializer):
+    """Serialize assigned vehicle details in driver responses."""
 
-    vehicle_id = serializers.UUIDField()
+    id = serializers.UUIDField()
+    vehicle_number = serializers.CharField()
+    license_plate = serializers.CharField()
 
 
 class DriverResponseSerializer(serializers.Serializer):
     """Serialize application driver response DTOs."""
 
     id = serializers.UUIDField()
-    full_name = serializers.CharField()
-    license_number = serializers.CharField()
-    license_class = serializers.ChoiceField(
-        choices=[item.value for item in LicenseClass]
-    )
-    status = serializers.ChoiceField(choices=[item.value for item in DriverStatus])
-    phone = serializers.CharField()
+    customer_number = serializers.CharField()
+    name = serializers.CharField()
+    status = serializers.ChoiceField(choices=DRIVER_STATUS_CHOICES)
     created_at = serializers.DateTimeField()
     updated_at = serializers.DateTimeField()
-    email = serializers.EmailField(allow_null=True)
-    assigned_vehicle_id = serializers.UUIDField(allow_null=True)
+    mobile = serializers.CharField(allow_null=True)
+    personnel_number = serializers.CharField(allow_null=True)
+    gender = serializers.CharField(allow_null=True)
+    nilofar_code = serializers.CharField(allow_null=True)
+    current_vehicle_as_driver = DriverAssignedVehicleSerializer(allow_null=True)
+    current_vehicle_as_assistant = DriverAssignedVehicleSerializer(allow_null=True)
+
+
+class DriverExitCenterSerializer(serializers.Serializer):
+    """Validate driver vehicle-center exit request."""
+
+    vehicle_id = serializers.UUIDField()
+    inspection_id = serializers.UUIDField()
+
+
+class DriverSummarySerializer(serializers.Serializer):
+    """Serialize driver dashboard summary values."""
+
+    active_count = serializers.IntegerField()
+    decommissioned_count = serializers.IntegerField()
+    with_vehicle_count = serializers.IntegerField()
+    last_sap_sync_at = serializers.DateTimeField(allow_null=True)

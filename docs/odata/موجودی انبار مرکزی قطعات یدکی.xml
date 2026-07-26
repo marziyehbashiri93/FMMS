@@ -1,0 +1,1217 @@
+<?xml version="1.0"?>
+<Root>
+<Columns>
+	<Column Name="Material"></Column>
+	<Column Name="Plant"></Column>
+	<Column Name="StorageLocation"></Column>
+	<Column Name="InventoryStockType"></Column>
+	<Column Name="MaterialCode"></Column>
+	<Column Name="InventoryStockTypeText"></Column>
+	<Column Name="MatlWrhsStkQtyInMatlBaseUnit"></Column>
+	<Column Name="MaterialBaseUnit"></Column>
+	<Column Name="StockValueInDisplayCurrency"></Column>
+	<Column Name="DisplayCurrency"></Column>
+</Columns>
+<Rows>
+	<Row>
+		<Value>000000000060001764</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60001764</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>149.500 </Value>
+		<Value>L</Value>
+		<Value>3225552.20 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060001765</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60001765</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>34.000 </Value>
+		<Value>L</Value>
+		<Value>521339.68 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060001777</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60001777</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>30.000 </Value>
+		<Value>DAS</Value>
+		<Value>0.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060001798</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60001798</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>16.000 </Value>
+		<Value>ST</Value>
+		<Value>0.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060002433</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60002433</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>24.000 </Value>
+		<Value>ST</Value>
+		<Value>827889.84 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060002413</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60002413</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>13.000 </Value>
+		<Value>HLG</Value>
+		<Value>11000000.05 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060002419</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60002419</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>7.000 </Value>
+		<Value>HLG</Value>
+		<Value>1756906.69 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000080001006</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>80001006</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>15.000 </Value>
+		<Value>ST</Value>
+		<Value>452272.65 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000080003924</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>80003924</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>24.000 </Value>
+		<Value>HLG</Value>
+		<Value>18209861.28 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000080003927</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>80003927</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>32.000 </Value>
+		<Value>HLG</Value>
+		<Value>2293490.24 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000080003957</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>80003957</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>74.000 </Value>
+		<Value>HLG</Value>
+		<Value>83582698.82 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060002403</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60002403</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>450.000 </Value>
+		<Value>L</Value>
+		<Value>836104.50 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060002415</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60002415</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>4.000 </Value>
+		<Value>HLG</Value>
+		<Value>2440000.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060002416</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60002416</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>12.000 </Value>
+		<Value>HLG</Value>
+		<Value>5287256.28 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060002417</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60002417</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>10.000 </Value>
+		<Value>HLG</Value>
+		<Value>7918415.10 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060002418</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60002418</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>9.000 </Value>
+		<Value>HLG</Value>
+		<Value>0.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060002430</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60002430</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>25.000 </Value>
+		<Value>HLG</Value>
+		<Value>0.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060002431</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60002431</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>17.000 </Value>
+		<Value>ST</Value>
+		<Value>478765.05 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060002432</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60002432</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>18.000 </Value>
+		<Value>ST</Value>
+		<Value>180322.92 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060002434</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60002434</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>27.000 </Value>
+		<Value>ST</Value>
+		<Value>3134186.19 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060002435</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60002435</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>17.000 </Value>
+		<Value>ST</Value>
+		<Value>1946500.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060002436</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60002436</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>45.000 </Value>
+		<Value>ST</Value>
+		<Value>1759352.85 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060002437</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60002437</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>16.000 </Value>
+		<Value>ST</Value>
+		<Value>273204.48 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060002439</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60002439</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>56.000 </Value>
+		<Value>ST</Value>
+		<Value>2025676.24 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000080000089</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>80000089</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>22.000 </Value>
+		<Value>JAB</Value>
+		<Value>0.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000080001299</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>80001299</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>18.000 </Value>
+		<Value>ST</Value>
+		<Value>1036585.08 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000080001304</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>80001304</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>33.000 </Value>
+		<Value>ST</Value>
+		<Value>1897999.95 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000080001893</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>80001893</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>23.000 </Value>
+		<Value>ST</Value>
+		<Value>0.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060002770</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60002770</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>120.000 </Value>
+		<Value>HLG</Value>
+		<Value>98783095.20 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000080001207</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>80001207</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>1.000 </Value>
+		<Value>ST</Value>
+		<Value>9075.29 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000080002721</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>80002721</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>30.000 </Value>
+		<Value>ST</Value>
+		<Value>429787.80 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060001646</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60001646</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>190.000 </Value>
+		<Value>KG</Value>
+		<Value>418000.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000080001342</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>80001342</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>20.000 </Value>
+		<Value>ST</Value>
+		<Value>1470914.60 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000080001344</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>80001344</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>8.000 </Value>
+		<Value>ST</Value>
+		<Value>600000.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000080002744</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>80002744</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>28.000 </Value>
+		<Value>HLG</Value>
+		<Value>268159.92 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000080003929</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>80003929</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>13.000 </Value>
+		<Value>HLG</Value>
+		<Value>217899.37 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060003248</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60003248</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>30.000 </Value>
+		<Value>ST</Value>
+		<Value>2181428.70 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060003250</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60003250</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>10.000 </Value>
+		<Value>ST</Value>
+		<Value>1600000.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000080005002</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>80005002</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>17.000 </Value>
+		<Value>ST</Value>
+		<Value>780743.36 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060003157</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60003157</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>20.000 </Value>
+		<Value>ST</Value>
+		<Value>880000.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060003197</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60003197</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>20.000 </Value>
+		<Value>ST</Value>
+		<Value>268409.20 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060003249</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60003249</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>15.000 </Value>
+		<Value>ST</Value>
+		<Value>187500.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060003414</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60003414</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>13.000 </Value>
+		<Value>ST</Value>
+		<Value>1303058.77 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000080004999</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>80004999</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>11.000 </Value>
+		<Value>ST</Value>
+		<Value>141199.96 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000080005159</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>80005159</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>10.000 </Value>
+		<Value>ST</Value>
+		<Value>184000.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060003153</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60003153</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>8.000 </Value>
+		<Value>ST</Value>
+		<Value>398666.72 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060003154</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60003154</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>31.000 </Value>
+		<Value>ST</Value>
+		<Value>390600.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060003195</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60003195</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>18.000 </Value>
+		<Value>ST</Value>
+		<Value>1223653.86 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000080005030</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>80005030</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>10.000 </Value>
+		<Value>ST</Value>
+		<Value>328090.90 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060003283</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60003283</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>190.000 </Value>
+		<Value>L</Value>
+		<Value>2402403.70 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000080005005</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>80005005</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>20.000 </Value>
+		<Value>ST</Value>
+		<Value>392857.20 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060003281</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60003281</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>260.000 </Value>
+		<Value>L</Value>
+		<Value>1611285.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000080005001</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>80005001</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>21.000 </Value>
+		<Value>ST</Value>
+		<Value>882000.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060003429</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60003429</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>14.000 </Value>
+		<Value>ST</Value>
+		<Value>336000.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000080005000</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>80005000</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>11.000 </Value>
+		<Value>ST</Value>
+		<Value>229900.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060003415</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60003415</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>14.000 </Value>
+		<Value>ST</Value>
+		<Value>196000.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060003333</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60003333</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>10.000 </Value>
+		<Value>HLG</Value>
+		<Value>2192400.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060003473</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60003473</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>1.000 </Value>
+		<Value>ST</Value>
+		<Value>25000.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060003472</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60003472</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>1.000 </Value>
+		<Value>ST</Value>
+		<Value>220000.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060003476</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60003476</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>2.000 </Value>
+		<Value>ST</Value>
+		<Value>40000.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060003475</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60003475</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>2.000 </Value>
+		<Value>ST</Value>
+		<Value>220000.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060003469</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60003469</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>2.000 </Value>
+		<Value>ST</Value>
+		<Value>1680000.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060003468</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60003468</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>2.000 </Value>
+		<Value>ST</Value>
+		<Value>2800000.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060003334</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60003334</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>20.000 </Value>
+		<Value>HLG</Value>
+		<Value>280000.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060003337</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60003337</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>20.000 </Value>
+		<Value>HLG</Value>
+		<Value>740000.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060003460</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60003460</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>185.000 </Value>
+		<Value>L</Value>
+		<Value>1449759.90 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060003525</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60003525</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>180.000 </Value>
+		<Value>L</Value>
+		<Value>1687500.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060003568</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60003568</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>8.000 </Value>
+		<Value>ST</Value>
+		<Value>236000.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060003569</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60003569</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>10.000 </Value>
+		<Value>ST</Value>
+		<Value>371000.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000080005239</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>80005239</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>2.000 </Value>
+		<Value>ST</Value>
+		<Value>200000.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060001764</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60001764</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>149.500 </Value>
+		<Value>L</Value>
+		<Value>0.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060001765</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60001765</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>34.000 </Value>
+		<Value>L</Value>
+		<Value>0.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060001777</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60001777</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>30.000 </Value>
+		<Value>DAS</Value>
+		<Value>0.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060001798</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60001798</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>16.000 </Value>
+		<Value>ST</Value>
+		<Value>0.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060002433</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60002433</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>24.000 </Value>
+		<Value>ST</Value>
+		<Value>0.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060002413</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60002413</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>13.000 </Value>
+		<Value>HLG</Value>
+		<Value>0.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060002419</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60002419</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>7.000 </Value>
+		<Value>HLG</Value>
+		<Value>0.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000080001006</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>80001006</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>15.000 </Value>
+		<Value>ST</Value>
+		<Value>0.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000080003924</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>80003924</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>24.000 </Value>
+		<Value>HLG</Value>
+		<Value>0.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000080003927</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>80003927</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>32.000 </Value>
+		<Value>HLG</Value>
+		<Value>0.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000080003957</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>80003957</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>74.000 </Value>
+		<Value>HLG</Value>
+		<Value>0.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060002403</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60002403</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>450.000 </Value>
+		<Value>L</Value>
+		<Value>0.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060002415</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60002415</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>4.000 </Value>
+		<Value>HLG</Value>
+		<Value>0.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060002416</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60002416</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>12.000 </Value>
+		<Value>HLG</Value>
+		<Value>0.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060002417</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60002417</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>10.000 </Value>
+		<Value>HLG</Value>
+		<Value>0.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060002418</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60002418</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>9.000 </Value>
+		<Value>HLG</Value>
+		<Value>0.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060002430</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60002430</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>25.000 </Value>
+		<Value>HLG</Value>
+		<Value>0.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060002431</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60002431</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>17.000 </Value>
+		<Value>ST</Value>
+		<Value>0.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060002432</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60002432</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>18.000 </Value>
+		<Value>ST</Value>
+		<Value>0.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060002434</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60002434</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>27.000 </Value>
+		<Value>ST</Value>
+		<Value>0.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060002435</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60002435</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>17.000 </Value>
+		<Value>ST</Value>
+		<Value>0.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060002436</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60002436</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>45.000 </Value>
+		<Value>ST</Value>
+		<Value>0.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060002437</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60002437</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>16.000 </Value>
+		<Value>ST</Value>
+		<Value>0.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060002439</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60002439</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>56.000 </Value>
+		<Value>ST</Value>
+		<Value>0.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000080000089</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>80000089</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>22.000 </Value>
+		<Value>JAB</Value>
+		<Value>0.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000080001299</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>80001299</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>18.000 </Value>
+		<Value>ST</Value>
+		<Value>0.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000080001304</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>80001304</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>33.000 </Value>
+		<Value>ST</Value>
+		<Value>0.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000080001893</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>80001893</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>23.000 </Value>
+		<Value>ST</Value>
+		<Value>0.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000060002770</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>60002770</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>120.000 </Value>
+		<Value>HLG</Value>
+		<Value>0.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+	<Row>
+		<Value>000000000080001207</Value>
+		<Value>1000</Value>
+		<Value>KH08</Value>
+		<Value>01</Value>
+		<Value>80001207</Value>
+		<Value>Unrestricted-Use Stock</Value>
+		<Value>1.000 </Value>
+		<Value>ST</Value>
+		<Value>0.00 </Value>
+		<Value>IRR</Value>
+	</Row>
+</Rows>
+</Root>

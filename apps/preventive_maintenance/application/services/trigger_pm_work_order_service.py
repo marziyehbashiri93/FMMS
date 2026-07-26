@@ -238,17 +238,17 @@ class TriggerPMWorkOrderService:
             message=f"Vehicle '{plan_vehicle_id}' not found.",
             details={"vehicle_id": str(plan_vehicle_id)},
         )
-        if vehicle.sap_equipment_number is None:
+        if vehicle.vehicle_number is None:
             raise FMMSConflictError(
                 message=(
-                    f"Vehicle '{plan_vehicle_id}' has no SAP equipment number; "
+                    f"Vehicle '{plan_vehicle_id}' has no SAP VehicleNumber; "
                     "cannot create PM notification."
                 ),
                 details={"vehicle_id": str(plan_vehicle_id)},
             )
 
         create_request = CreatePMNotificationRequest(
-            equipment_number=vehicle.sap_equipment_number.value,
+            equipment_number=vehicle.vehicle_number.value,
             fault_description=f"PM triggered: {plan_name}",
             defect_code=dto.defect_code,
             priority=dto.priority,

@@ -5,7 +5,7 @@ They are pure Python dataclasses — no ORM, no domain entities, no HTTP details
 Mapping between domain entities and these DTOs happens exclusively inside adapters.
 """
 
-from core.sap.dtos.equipment import SAPEquipmentDTO
+from core.sap.dtos.central_stock import SAPCentralStockDTO
 from core.sap.dtos.fault_catalog import SAPDefectCodeDTO
 from core.sap.dtos.goods_issue import (
     GILineItemRequest,
@@ -41,9 +41,10 @@ from core.sap.dtos.service_po import (
     SAPServicePODTO,
     ServiceLineItemRequest,
 )
+from core.sap.dtos.vehicle_driver import SAPVehicleDriverDTO
 
 __all__ = [
-    "SAPEquipmentDTO",
+    "SAPCentralStockDTO",
     "SAPDefectCodeDTO",
     "SAPObjectPartDTO",
     "SAPMaterialDTO",
@@ -68,4 +69,5 @@ __all__ = [
     "ServiceLineItemRequest",
     "CreateServicePORequest",
     "SAPServicePODTO",
+    "SAPVehicleDriverDTO",
 ]

@@ -27,14 +27,13 @@ class IInspectionTemplateRepository(ABC):
 
     @abstractmethod
     def get_by_sap_key(
-        self, sap_code: str, code_group: str, catalog_type: str
+        self, code: str, code_group: str
     ) -> InspectionTemplate | None:
         """Retrieve a template by its SAP natural key.
 
         Args:
-            sap_code: SAP object-part code.
-            code_group: SAP code group.
-            catalog_type: SAP catalog type.
+            code: SAP ``Code``.
+            code_group: SAP ``CodeGroup``.
 
         Returns:
             Matching template or ``None``.

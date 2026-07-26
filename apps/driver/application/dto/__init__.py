@@ -1,15 +1,15 @@
 """Driver application DTOs — pure Python, no ORM, no Django objects."""
 
 from apps.driver.application.dto.driver_dto import (
-    AssignDriverToVehicleDTO,
+    DriverAssignedVehicleDTO,
+    DriverExitCenterDTO,
     DriverResponseDTO,
-    RegisterDriverDTO,
-    SuspendDriverDTO,
+    DriverSummaryDTO,
 )
 
 __all__ = [
-    "RegisterDriverDTO",
-    "AssignDriverToVehicleDTO",
-    "SuspendDriverDTO",
+    "DriverAssignedVehicleDTO",
+    "DriverExitCenterDTO",
     "DriverResponseDTO",
+    "DriverSummaryDTO",
 ]

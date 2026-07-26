@@ -12,7 +12,7 @@ from apps.handover.infrastructure.models import VehicleHandoverModel
 from apps.repair.infrastructure.models import RepairOrderModel
 from apps.vehicle.domain.entities import VehicleStatus
 from apps.vehicle.infrastructure.models import VehicleModel
-from tests.integration.api.conftest import create_vehicle
+from tests.integration.api.conftest import create_repair_order_via_distribution
 
 pytestmark = pytest.mark.django_db
 
@@ -23,44 +23,14 @@ class TestBackfillMissingVehicleHandoversCommand:
     def test_backfill_creates_handover_for_orphaned_repair_order(
         self, technician_client: APIClient, authenticated_client: APIClient
     ) -> None:
-        vehicle = create_vehicle(
-            authenticated_client, plate="12BFLL01", vin="1HGCM82633A004501"
+        del technician_client
+        order = create_repair_order_via_distribution(
+            authenticated_client,
+            plate="12BFLL01",
+            vin="1HGCM82633A004501",
+            code="BF01",
+            description="Backfill orphan handover fault",
         )
-        inspection = authenticated_client.post(
-            "/api/v1/inspections/",
-            {
-                "vehicle_id": vehicle["id"],
-                "inspection_type": "PRE_TRIP",
-                "odometer_value": 900,
-                "odometer_unit": "KM",
-                "inspected_at": datetime.now(tz=UTC).isoformat(),
-                "items": [
-                    {
-                        "category": "LIGHTS",
-                        "description": "Front light",
-                        "result": "FAIL",
-                        "notes": "Broken",
-                        "severity": "MEDIUM",
-                    }
-                ],
-            },
-            format="json",
-        )
-        assert inspection.status_code == 201, inspection.data
-        submitted = authenticated_client.post(
-            f"/api/v1/inspections/{inspection.data['id']}/submit/", {}, format="json"
-        )
-        assert submitted.status_code == 200, submitted.data
-
-        deactivated = authenticated_client.post(
-            f"/api/v1/vehicles/{vehicle['id']}/deactivate/", {}, format="json"
-        )
-        assert deactivated.status_code == 200, deactivated.data
-
-        orders = authenticated_client.get(
-            f"/api/v1/repair-orders/?vehicle_id={vehicle['id']}"
-        )
-        order = orders.data["results"][0]
         order_id = order["id"]
 
         for step in (
@@ -72,11 +42,8 @@ class TestBackfillMissingVehicleHandoversCommand:
                 {"workshop_type": "INTERNAL", "workshop_id": "WS-001"},
                 format="json",
             ),
-            lambda: technician_client.post(
+            lambda: authenticated_client.post(
                 f"/api/v1/repair-orders/{order_id}/accept/", {}, format="json"
-            ),
-            lambda: technician_client.post(
-                f"/api/v1/repair-orders/{order_id}/start/", {}, format="json"
             ),
         ):
             response = step()
@@ -100,7 +67,7 @@ class TestBackfillMissingVehicleHandoversCommand:
         handover = VehicleHandoverModel.objects.get(repair_order_id=order_id)
         assert handover.status == VehicleStatus.WAITING_DRIVER_CONFIRMATION.value
 
-        vehicle_orm = VehicleModel.objects.get(id=vehicle["id"])
+        vehicle_orm = VehicleModel.objects.get(id=order["vehicle_id"])
         assert vehicle_orm.status == VehicleStatus.WAITING_DRIVER_CONFIRMATION.value
 
         call_command("backfill_missing_vehicle_handovers")

@@ -26,20 +26,32 @@ class FaultStatus(StrEnum):
     """Lifecycle states of a fault record.
 
     Attributes:
-        OPEN: Fault has been reported and is awaiting assignment.
-        ASSIGNED: Fault has been assigned to a technician or repair order.
+        OPEN: Fault has been reported and awaits distribution decision.
+        AWAITING_TRANSPORT: Distribution marked unusable; in transport queue.
+        ASSIGNED: Fault has been assigned to a technician.
         IN_REPAIR: Active repair work is being carried out.
         CLOSED: Fault has been resolved. Terminal state — no further transitions.
     """
 
     OPEN = "OPEN"
+    AWAITING_TRANSPORT = "AWAITING_TRANSPORT"
     ASSIGNED = "ASSIGNED"
     IN_REPAIR = "IN_REPAIR"
     CLOSED = "CLOSED"
 
 
 _ALLOWED_TRANSITIONS: dict[FaultStatus, frozenset[FaultStatus]] = {
-    FaultStatus.OPEN: frozenset({FaultStatus.ASSIGNED, FaultStatus.CLOSED}),
+    FaultStatus.OPEN: frozenset(
+        {FaultStatus.AWAITING_TRANSPORT, FaultStatus.CLOSED}
+    ),
+    FaultStatus.AWAITING_TRANSPORT: frozenset(
+        {
+            FaultStatus.ASSIGNED,
+            FaultStatus.OPEN,
+            FaultStatus.IN_REPAIR,
+            FaultStatus.CLOSED,
+        }
+    ),
     FaultStatus.ASSIGNED: frozenset({FaultStatus.IN_REPAIR, FaultStatus.OPEN}),
     FaultStatus.IN_REPAIR: frozenset({FaultStatus.CLOSED}),
     FaultStatus.CLOSED: frozenset(),
@@ -111,6 +123,7 @@ class Fault:
     sap_defect_code: SAPDefectCode | None = field(default=None)
     sap_notification_number: str | None = field(default=None)
     assigned_to_id: uuid.UUID | None = field(default=None)
+    distribution_decision_note: str | None = field(default=None)
     items: list[FaultItem] = field(default_factory=list)
 
     def transition_to(self, target: FaultStatus) -> None:
@@ -133,6 +146,15 @@ class Fault:
             )
         self.status = target
 
+    def mark_awaiting_transport(self) -> None:
+        """Move the fault into the transport queue after distribution unusable.
+
+        Raises:
+            FaultAlreadyClosedError: If the fault is already CLOSED.
+            FaultInvalidStateTransitionError: If not in OPEN status.
+        """
+        self.transition_to(FaultStatus.AWAITING_TRANSPORT)
+
     def assign(self, technician_id: uuid.UUID) -> None:
         """Assign the fault to a technician.
 
@@ -141,7 +163,7 @@ class Fault:
 
         Raises:
             FaultAlreadyClosedError: If the fault is already CLOSED.
-            FaultInvalidStateTransitionError: If not in OPEN status.
+            FaultInvalidStateTransitionError: If not awaiting transport.
         """
         self.transition_to(FaultStatus.ASSIGNED)
         self.assigned_to_id = technician_id
@@ -151,7 +173,7 @@ class Fault:
 
         Raises:
             FaultAlreadyClosedError: If already CLOSED.
-            FaultInvalidStateTransitionError: If not ASSIGNED.
+            FaultInvalidStateTransitionError: If not ASSIGNED or AWAITING_TRANSPORT.
         """
         self.transition_to(FaultStatus.IN_REPAIR)
 

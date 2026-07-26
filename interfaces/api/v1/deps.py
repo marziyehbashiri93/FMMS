@@ -9,25 +9,34 @@ from __future__ import annotations
 from apps.authentication.infrastructure.user_profile_reader import (
     DjangoUserProfileReader,
 )
-from apps.driver.application.services.assign_driver_to_vehicle_service import (
-    AssignDriverToVehicleService,
-)
+from apps.driver.application.services.exit_center_service import DriverExitCenterService
 from apps.driver.application.services.get_driver_service import (
     GetDriverService,
     ListDriversService,
 )
-from apps.driver.application.services.register_driver_service import (
-    RegisterDriverService,
+from apps.driver.application.services.get_driver_summary_service import (
+    GetDriverSummaryService,
 )
-from apps.driver.application.services.suspend_driver_service import SuspendDriverService
 from apps.driver.infrastructure.repositories import DjangoDriverRepository
+from apps.driver.infrastructure.summary_readers import DjangoDriverSummaryReader
+from apps.driver.infrastructure.vehicle_assignment_reader import (
+    DjangoDriverVehicleAssignmentReader,
+)
 from apps.fault.application.services.assign_fault_service import AssignFaultService
 from apps.fault.application.services.close_fault_service import CloseFaultService
+from apps.fault.application.services.distribution_fault_decision_service import (
+    DistributionFaultDecisionService,
+)
 from apps.fault.application.services.get_fault_service import (
     GetFaultService,
     ListFaultsService,
 )
 from apps.fault.application.services.report_fault_service import ReportFaultService
+from apps.fault.application.services.sync_fault_catalog_from_sap_service import (
+    ListFaultCatalogService,
+    SyncFaultCatalogFromSAPService,
+)
+from apps.fault.infrastructure.catalog_repositories import DjangoFaultCatalogRepository
 from apps.fault.infrastructure.repositories import DjangoFaultRepository
 from apps.handover.application.services.handover_service import (
     ConfirmVehicleHandoverService,
@@ -45,6 +54,9 @@ from apps.inspection.application.services.get_inspection_service import (
     GetInspectionService,
     ListInspectionsService,
 )
+from apps.inspection.application.services.report_inspection_fault_service import (
+    ReportInspectionFaultService,
+)
 from apps.inspection.application.services.submit_inspection_service import (
     SubmitInspectionService,
 )
@@ -56,15 +68,27 @@ from apps.inspection.infrastructure.repositories import DjangoInspectionReposito
 from apps.inspection.infrastructure.template_repositories import (
     DjangoInspectionTemplateRepository,
 )
+from apps.integration.application.services.list_sap_sync_runs_service import (
+    ListSAPSyncRunsService,
+)
 from apps.integration.application.services.retry_failed_sap_transactions_service import (
     RetryFailedSAPTransactionsService,
 )
+from apps.integration.application.services.run_sap_sync_service import RunSAPSyncService
 from apps.integration.infrastructure.repositories import DjangoSAPTransactionRepository
 from apps.material.application.services.material_request_service import (
     ApproveMaterialRequestService,
     CreateMaterialRequestService,
     ListMaterialRequestsService,
-    RejectMaterialRequestService,
+    ReceiveMaterialRequestService,
+)
+from apps.material.application.services.parts_availability_decision_service import (
+    DecidePartsAvailabilityService,
+    IssuePurchasedPartsService,
+)
+from apps.material.application.services.sync_central_stock_from_sap_service import (
+    ListCentralStockService,
+    SyncCentralStockFromSAPService,
 )
 from apps.material.infrastructure.inventory_adapter import (
     StubInventoryAvailabilityAdapter,
@@ -73,6 +97,7 @@ from apps.material.infrastructure.repositories import (
     DjangoInventoryTransactionRepository,
     DjangoMaterialRequestRepository,
 )
+from apps.material.infrastructure.stock_repositories import DjangoCentralStockRepository
 from apps.preventive_maintenance.application.services.complete_pm_work_order_service import (
     CompletePMWorkOrderService,
 )
@@ -118,11 +143,17 @@ from apps.procurement.infrastructure.repositories import (
 from apps.repair.application.services.add_repair_activity_service import (
     AddRepairActivityService,
     AddRepairPartService,
+    DeleteRepairActivityService,
+    DeleteRepairPartService,
+    UpdateRepairActivityService,
+    UpdateRepairPartService,
 )
 from apps.repair.application.services.approve_repair_order_service import (
     AcceptRepairOrderService,
     ApproveRepairOrderService,
     AssignWorkshopService,
+    ListExternalWorkshopReferralRequestsService,
+    RejectRepairOrderByTransportService,
     RejectRepairOrderService,
 )
 from apps.repair.application.services.assign_repair_order_service import (
@@ -136,9 +167,22 @@ from apps.repair.application.services.external_invoice_service import (
     ListExternalInvoicesService,
     UploadExternalInvoiceService,
 )
+from apps.repair.application.services.external_workshop_service import (
+    AssignExternalWorkshopService,
+    CancelExternalWorkshopAssignmentService,
+    CloseExternalRepairService,
+    ConfirmExternalWorkshopDeliveryService,
+    ConfirmExternalWorkshopPickupService,
+    GetExternalWorkshopAssignmentService,
+    ListExternalWorkshopAssignmentsService,
+    ReviewExternalRepairService,
+)
 from apps.repair.application.services.get_repair_order_service import (
     GetRepairOrderService,
     ListRepairOrdersService,
+)
+from apps.repair.application.services.register_internal_repair_cost_service import (
+    RegisterInternalRepairCostService,
 )
 from apps.repair.application.services.repair_order_timeline_service import (
     GetRepairOrderTimelineService,
@@ -156,34 +200,56 @@ from apps.repair.application.services.update_repair_status_service import (
     CompleteRepairOrderService,
     StartRepairService,
 )
+from apps.repair.application.services.workshop_technical_decision_service import (
+    WorkshopTechnicalDecisionService,
+)
 from apps.repair.infrastructure.event_repositories import (
     DjangoRepairOrderEventRepository,
+)
+from apps.repair.infrastructure.external_workshop_repositories import (
+    DjangoExternalWorkshopRepository,
+)
+from apps.repair.infrastructure.internal_cost_repositories import (
+    DjangoInternalRepairCostRepository,
 )
 from apps.repair.infrastructure.invoice_repositories import (
     DjangoExternalRepairInvoiceRepository,
 )
-from apps.repair.infrastructure.repositories import DjangoRepairOrderRepository
-from apps.vehicle.application.services.activate_vehicle_service import (
-    ActivateVehicleService,
+from apps.repair.infrastructure.repositories import (
+    DjangoExternalWorkshopReferralRepository,
+    DjangoRepairOrderRepository,
 )
-from apps.vehicle.application.services.create_vehicle_service import (
-    CreateVehicleService,
-)
-from apps.vehicle.application.services.deactivate_vehicle_service import (
-    DeactivateVehicleService,
+from apps.vehicle.application.services.change_vehicle_status_service import (
+    ChangeVehicleStatusService,
 )
 from apps.vehicle.application.services.get_vehicle_service import (
     GetVehicleService,
     ListVehiclesService,
 )
-from apps.vehicle.application.services.sync_sap_equipment_service import (
-    SyncSAPEquipmentService,
+from apps.vehicle.application.services.get_vehicle_summary_service import (
+    GetVehicleSummaryService,
+)
+from apps.vehicle.application.services.list_driver_assignment_history_service import (
+    ListDriverVehicleAssignmentHistoryService,
+    ListVehicleDriverAssignmentHistoryService,
+)
+from apps.vehicle.application.services.record_component_history_service import (
+    ListVehicleComponentHistoryService,
+    RecordComponentHistoryFromRepairService,
+)
+from apps.vehicle.application.services.record_odometer_service import (
+    GetVehicleCurrentOdometerService,
+    ListVehicleOdometerHistoryService,
+    RecordVehicleOdometerService,
 )
 from apps.vehicle.application.services.sync_vehicles_from_sap_service import (
     SyncVehiclesFromSAPService,
 )
-from apps.vehicle.application.services.update_vehicle_service import (
-    UpdateVehicleService,
+from apps.vehicle.infrastructure.component_history_repositories import (
+    DjangoVehicleComponentHistoryRepository,
+)
+from apps.vehicle.infrastructure.odometer_readers import (
+    DjangoFaultVehicleOdometerReader,
 )
 from apps.vehicle.infrastructure.repositories import DjangoVehicleRepository
 from infrastructure.sap.adapters.bapi.pm_notification_bapi_adapter import (
@@ -193,13 +259,26 @@ from infrastructure.sap.adapters.bapi.pm_order_bapi_adapter import PMOrderBAPIAd
 from infrastructure.sap.adapters.bapi.purchase_requisition_bapi_adapter import (
     PurchaseRequisitionBAPIAdapter,
 )
-from infrastructure.sap.adapters.odata.equipment_odata_adapter import (
-    EquipmentODataAdapter,
+from infrastructure.sap.adapters.bapi.vehicle_assignment_bapi_adapter import (
+    VehicleAssignmentBAPIAdapter,
+)
+from infrastructure.sap.adapters.bapi.vehicle_measurement_bapi_adapter import (
+    VehicleMeasurementBAPIAdapter,
+)
+from infrastructure.sap.adapters.odata.central_stock_odata_adapter import (
+    CentralStockODataAdapter,
+)
+from infrastructure.sap.adapters.odata.fault_catalog_odata_adapter import (
+    FaultCatalogODataAdapter,
 )
 from infrastructure.sap.adapters.odata.object_part_catalog_odata_adapter import (
     ObjectPartCatalogODataAdapter,
 )
+from infrastructure.sap.adapters.odata.vehicle_driver_odata_adapter import (
+    VehicleDriverODataAdapter,
+)
 from infrastructure.sap.client.mock.mock_client import MockSAPClient
+from infrastructure.sap.client.odata_client import SAPODataClient
 from infrastructure.sap.config import SAPConfig
 from infrastructure.sap.transaction.sap_transaction_manager import SAPTransactionManager
 
@@ -219,6 +298,31 @@ def _sap_client() -> MockSAPClient:
             "The API v1 composition root currently requires SAP_USE_MOCK=True."
         )
     return MockSAPClient()
+
+
+def _sap_odata_client() -> MockSAPClient | SAPODataClient:
+    """Build the SAP OData client used for read integrations."""
+    config = SAPConfig.from_env()
+    if config.use_mock:
+        return MockSAPClient()
+    return SAPODataClient(
+        base_url=config.base_url,
+        username=config.username,
+        password=config.password,
+        client_code=config.client,
+        timeout_seconds=config.timeout_seconds,
+        verify_ssl=config.verify_ssl,
+    )
+
+
+def _vehicle_driver_adapter() -> VehicleDriverODataAdapter:
+    """Return the configured SAP vehicle-driver adapter."""
+    config = SAPConfig.from_env()
+    return VehicleDriverODataAdapter(
+        _sap_odata_client(),
+        service=config.vehicle_driver_service,
+        entity_set=config.vehicle_driver_entity_set,
+    )
 
 
 def get_vehicle_repository() -> DjangoVehicleRepository:
@@ -246,9 +350,19 @@ def get_fault_repository() -> DjangoFaultRepository:
     return DjangoFaultRepository()
 
 
+def get_fault_catalog_repository() -> DjangoFaultCatalogRepository:
+    """Return the fault catalog repository."""
+    return DjangoFaultCatalogRepository()
+
+
 def get_material_request_repository() -> DjangoMaterialRequestRepository:
     """Return the material request repository."""
     return DjangoMaterialRequestRepository()
+
+
+def get_central_stock_repository() -> DjangoCentralStockRepository:
+    """Return the central warehouse stock repository."""
+    return DjangoCentralStockRepository()
 
 
 def get_inventory_transaction_repository() -> DjangoInventoryTransactionRepository:
@@ -266,9 +380,21 @@ def get_repair_order_repository() -> DjangoRepairOrderRepository:
     return DjangoRepairOrderRepository()
 
 
+def get_external_workshop_referral_repository() -> (
+    DjangoExternalWorkshopReferralRepository
+):
+    """Return external workshop referral repository."""
+    return DjangoExternalWorkshopReferralRepository()
+
+
 def get_external_invoice_repository() -> DjangoExternalRepairInvoiceRepository:
     """Return external invoice repository."""
     return DjangoExternalRepairInvoiceRepository()
+
+
+def get_external_workshop_repository() -> DjangoExternalWorkshopRepository:
+    """Return external workshop workflow repository."""
+    return DjangoExternalWorkshopRepository()
 
 
 def get_pm_plan_repository() -> DjangoPMPlanRepository:
@@ -301,87 +427,106 @@ def get_sap_transaction_manager() -> SAPTransactionManager:
     return SAPTransactionManager(repository=get_sap_transaction_repository())
 
 
-def get_create_vehicle_service() -> CreateVehicleService:
-    """Return CreateVehicleService."""
-    return CreateVehicleService(get_vehicle_repository())
-
-
-def get_update_vehicle_service() -> UpdateVehicleService:
-    """Return UpdateVehicleService."""
-    return UpdateVehicleService(get_vehicle_repository())
-
-
 def get_user_profile_reader() -> DjangoUserProfileReader:
     """Return the FMMS user profile reader."""
     return DjangoUserProfileReader()
 
 
-def get_deactivate_vehicle_service() -> DeactivateVehicleService:
-    """Return DeactivateVehicleService."""
-    return DeactivateVehicleService(get_vehicle_repository())
-
-
-def get_activate_vehicle_service() -> ActivateVehicleService:
-    """Return ActivateVehicleService."""
-    return ActivateVehicleService(
+def get_change_vehicle_status_service() -> ChangeVehicleStatusService:
+    """Return ChangeVehicleStatusService."""
+    return ChangeVehicleStatusService(
         get_vehicle_repository(),
         get_repair_order_repository(),
         get_fault_repository(),
     )
 
 
-def get_sync_sap_equipment_service() -> SyncSAPEquipmentService:
-    """Return SyncSAPEquipmentService."""
-    return SyncSAPEquipmentService(
-        get_vehicle_repository(),
-        EquipmentODataAdapter(_sap_client()),
-    )
-
-
 def get_sync_vehicles_from_sap_service() -> SyncVehiclesFromSAPService:
-    """Return SyncVehiclesFromSAPService for bulk equipment import."""
+    """Return SyncVehiclesFromSAPService for bulk vehicle-driver import."""
     return SyncVehiclesFromSAPService(
         get_vehicle_repository(),
-        EquipmentODataAdapter(_sap_client()),
+        _vehicle_driver_adapter(),
+        get_driver_repository(),
     )
+
+
+def get_record_vehicle_odometer_service() -> RecordVehicleOdometerService:
+    """Return RecordVehicleOdometerService."""
+    return RecordVehicleOdometerService(get_vehicle_repository())
+
+
+def get_list_vehicle_odometer_history_service() -> ListVehicleOdometerHistoryService:
+    """Return ListVehicleOdometerHistoryService."""
+    return ListVehicleOdometerHistoryService(get_vehicle_repository())
+
+
+def get_get_vehicle_current_odometer_service() -> GetVehicleCurrentOdometerService:
+    """Return GetVehicleCurrentOdometerService."""
+    return GetVehicleCurrentOdometerService(get_vehicle_repository())
+
+
+def get_list_vehicle_driver_assignment_history_service() -> (
+    ListVehicleDriverAssignmentHistoryService
+):
+    """Return ListVehicleDriverAssignmentHistoryService."""
+    return ListVehicleDriverAssignmentHistoryService(
+        get_vehicle_repository(),
+        get_driver_repository(),
+    )
+
+
+def get_list_driver_vehicle_assignment_history_service() -> (
+    ListDriverVehicleAssignmentHistoryService
+):
+    """Return ListDriverVehicleAssignmentHistoryService."""
+    return ListDriverVehicleAssignmentHistoryService(get_driver_repository())
 
 
 def get_get_vehicle_service() -> GetVehicleService:
     """Return GetVehicleService."""
-    return GetVehicleService(get_vehicle_repository())
+    return GetVehicleService(get_vehicle_repository(), get_driver_repository())
 
 
 def get_list_vehicles_service() -> ListVehiclesService:
     """Return ListVehiclesService."""
-    return ListVehiclesService(get_vehicle_repository())
+    return ListVehiclesService(get_vehicle_repository(), get_driver_repository())
 
 
-def get_register_driver_service() -> RegisterDriverService:
-    """Return RegisterDriverService."""
-    return RegisterDriverService(get_driver_repository())
+def get_get_vehicle_summary_service() -> GetVehicleSummaryService:
+    """Return GetVehicleSummaryService."""
+    return GetVehicleSummaryService()
 
 
 def get_get_driver_service() -> GetDriverService:
     """Return GetDriverService."""
-    return GetDriverService(get_driver_repository())
+    return GetDriverService(
+        get_driver_repository(),
+        DjangoDriverVehicleAssignmentReader(),
+    )
 
 
 def get_list_drivers_service() -> ListDriversService:
     """Return ListDriversService."""
-    return ListDriversService(get_driver_repository())
-
-
-def get_assign_driver_to_vehicle_service() -> AssignDriverToVehicleService:
-    """Return AssignDriverToVehicleService."""
-    return AssignDriverToVehicleService(
+    return ListDriversService(
         get_driver_repository(),
-        get_vehicle_repository(),
+        DjangoDriverVehicleAssignmentReader(),
     )
 
 
-def get_suspend_driver_service() -> SuspendDriverService:
-    """Return SuspendDriverService."""
-    return SuspendDriverService(get_driver_repository())
+def get_get_driver_summary_service() -> GetDriverSummaryService:
+    """Return GetDriverSummaryService."""
+    return GetDriverSummaryService(DjangoDriverSummaryReader())
+
+
+def get_driver_exit_center_service() -> DriverExitCenterService:
+    """Return DriverExitCenterService."""
+    return DriverExitCenterService(
+        get_driver_repository(),
+        get_vehicle_repository(),
+        get_inspection_repository(),
+        get_fault_repository(),
+        get_repair_order_repository(),
+    )
 
 
 def get_create_inspection_service() -> CreateInspectionService:
@@ -389,6 +534,7 @@ def get_create_inspection_service() -> CreateInspectionService:
     return CreateInspectionService(
         get_inspection_repository(),
         get_vehicle_repository(),
+        get_driver_repository(),
     )
 
 
@@ -421,6 +567,22 @@ def get_submit_inspection_service() -> SubmitInspectionService:
         get_inspection_repository(),
         get_fault_repository(),
         get_repair_order_repository(),
+        get_vehicle_repository(),
+    )
+
+
+def get_report_inspection_fault_service() -> ReportInspectionFaultService:
+    """Return ReportInspectionFaultService."""
+    client = _sap_client()
+    return ReportInspectionFaultService(
+        get_inspection_repository(),
+        get_fault_repository(),
+        get_repair_order_repository(),
+        get_vehicle_repository(),
+        get_sap_transaction_manager(),
+        PMNotificationBAPIAdapter(client),
+        VehicleMeasurementBAPIAdapter(client),
+        DjangoFaultVehicleOdometerReader(),
     )
 
 
@@ -433,19 +595,80 @@ def get_sync_inspection_templates_from_sap_service() -> (
     SyncInspectionTemplatesFromSAPService
 ):
     """Return SyncInspectionTemplatesFromSAPService."""
+    config = SAPConfig.from_env()
     return SyncInspectionTemplatesFromSAPService(
         get_inspection_template_repository(),
-        ObjectPartCatalogODataAdapter(_sap_client()),
+        ObjectPartCatalogODataAdapter(
+            _sap_odata_client(),
+            service=config.object_part_catalog_service,
+            entity_set=config.object_part_catalog_entity_set,
+        ),
     )
+
+
+def get_list_fault_catalog_service() -> ListFaultCatalogService:
+    """Return ListFaultCatalogService."""
+    return ListFaultCatalogService(get_fault_catalog_repository())
+
+
+def get_sync_fault_catalog_from_sap_service() -> SyncFaultCatalogFromSAPService:
+    """Return SyncFaultCatalogFromSAPService."""
+    config = SAPConfig.from_env()
+    return SyncFaultCatalogFromSAPService(
+        get_fault_catalog_repository(),
+        FaultCatalogODataAdapter(
+            _sap_odata_client(),
+            service=config.fault_catalog_service,
+            entity_set=config.fault_catalog_entity_set,
+        ),
+    )
+
+
+def get_list_central_stock_service() -> ListCentralStockService:
+    """Return ListCentralStockService."""
+    return ListCentralStockService(get_central_stock_repository())
+
+
+def get_sync_central_stock_from_sap_service() -> SyncCentralStockFromSAPService:
+    """Return SyncCentralStockFromSAPService."""
+    config = SAPConfig.from_env()
+    return SyncCentralStockFromSAPService(
+        get_central_stock_repository(),
+        CentralStockODataAdapter(
+            _sap_odata_client(),
+            service=config.central_stock_service,
+            entity_set=config.central_stock_entity_set,
+        ),
+    )
+
+
+def get_run_sap_sync_service() -> RunSAPSyncService:
+    """Return the global SAP read-sync orchestration service."""
+    return RunSAPSyncService(
+        get_sync_vehicles_from_sap_service(),
+        get_sync_inspection_templates_from_sap_service(),
+        get_sync_fault_catalog_from_sap_service(),
+        get_sync_central_stock_from_sap_service(),
+    )
+
+
+def get_list_sap_sync_runs_service() -> ListSAPSyncRunsService:
+    """Return ListSAPSyncRunsService."""
+    return ListSAPSyncRunsService()
 
 
 def get_report_fault_service() -> ReportFaultService:
     """Return ReportFaultService."""
+    client = _sap_client()
     return ReportFaultService(
         get_fault_repository(),
         get_vehicle_repository(),
         get_repair_order_repository(),
         get_user_profile_reader(),
+        get_sap_transaction_manager(),
+        PMNotificationBAPIAdapter(client),
+        VehicleMeasurementBAPIAdapter(client),
+        DjangoFaultVehicleOdometerReader(),
     )
 
 
@@ -470,6 +693,19 @@ def get_close_fault_service() -> CloseFaultService:
         get_fault_repository(),
         get_repair_order_repository(),
         get_record_repair_order_event_service(),
+    )
+
+
+def get_distribution_fault_decision_service() -> DistributionFaultDecisionService:
+    """Return DistributionFaultDecisionService."""
+    client = _sap_client()
+    return DistributionFaultDecisionService(
+        get_fault_repository(),
+        get_vehicle_repository(),
+        get_repair_order_repository(),
+        get_record_repair_order_event_service(),
+        get_sap_transaction_manager(),
+        VehicleAssignmentBAPIAdapter(client),
     )
 
 
@@ -528,24 +764,167 @@ def get_assign_workshop_service() -> AssignWorkshopService:
     """Return AssignWorkshopService."""
     return AssignWorkshopService(
         get_repair_order_repository(),
+        get_external_workshop_referral_repository(),
+        get_vehicle_repository(),
+        get_create_vehicle_handover_service(),
+        get_record_repair_order_event_service(),
+    )
+
+
+def get_reject_repair_order_by_transport_service() -> (
+    RejectRepairOrderByTransportService
+):
+    """Return RejectRepairOrderByTransportService."""
+    return RejectRepairOrderByTransportService(
+        get_repair_order_repository(),
+        get_fault_repository(),
+        get_vehicle_repository(),
+        get_record_repair_order_event_service(),
+    )
+
+
+def get_list_external_workshop_referral_requests_service() -> (
+    ListExternalWorkshopReferralRequestsService
+):
+    """Return ListExternalWorkshopReferralRequestsService."""
+    return ListExternalWorkshopReferralRequestsService(
+        get_external_workshop_referral_repository()
+    )
+
+
+def get_assign_external_workshop_service() -> AssignExternalWorkshopService:
+    """Return AssignExternalWorkshopService."""
+    return AssignExternalWorkshopService(
+        get_external_workshop_repository(),
+        get_repair_order_repository(),
+        get_record_repair_order_event_service(),
+    )
+
+
+def get_confirm_external_workshop_delivery_service() -> (
+    ConfirmExternalWorkshopDeliveryService
+):
+    """Return ConfirmExternalWorkshopDeliveryService."""
+    return ConfirmExternalWorkshopDeliveryService(
+        get_external_workshop_repository(),
+        get_repair_order_repository(),
+        get_vehicle_repository(),
+        get_record_repair_order_event_service(),
+    )
+
+
+def get_confirm_external_workshop_pickup_service() -> (
+    ConfirmExternalWorkshopPickupService
+):
+    """Return ConfirmExternalWorkshopPickupService."""
+    return ConfirmExternalWorkshopPickupService(
+        get_external_workshop_repository(),
+        get_repair_order_repository(),
+        get_vehicle_repository(),
+        get_record_repair_order_event_service(),
+    )
+
+
+def get_review_external_repair_service() -> ReviewExternalRepairService:
+    """Return ReviewExternalRepairService."""
+    return ReviewExternalRepairService(
+        get_external_workshop_repository(),
+        get_repair_order_repository(),
+        get_record_repair_order_event_service(),
+    )
+
+
+def get_close_external_repair_service() -> CloseExternalRepairService:
+    """Return CloseExternalRepairService."""
+    return CloseExternalRepairService(
+        get_external_workshop_repository(),
+        get_repair_order_repository(),
+        get_fault_repository(),
+        get_record_component_history_from_repair_service(),
+        get_record_repair_order_event_service(),
+    )
+
+
+def get_cancel_external_workshop_assignment_service() -> (
+    CancelExternalWorkshopAssignmentService
+):
+    """Return CancelExternalWorkshopAssignmentService."""
+    return CancelExternalWorkshopAssignmentService(
+        get_external_workshop_repository(),
+        get_repair_order_repository(),
+        get_record_repair_order_event_service(),
+    )
+
+
+def get_get_external_workshop_assignment_service() -> (
+    GetExternalWorkshopAssignmentService
+):
+    """Return GetExternalWorkshopAssignmentService."""
+    return GetExternalWorkshopAssignmentService(get_external_workshop_repository())
+
+
+def get_list_external_workshop_assignments_service() -> (
+    ListExternalWorkshopAssignmentsService
+):
+    """Return ListExternalWorkshopAssignmentsService."""
+    return ListExternalWorkshopAssignmentsService(get_external_workshop_repository())
+
+
+def get_workshop_technical_decision_service() -> WorkshopTechnicalDecisionService:
+    """Return WorkshopTechnicalDecisionService."""
+    return WorkshopTechnicalDecisionService(
+        get_repair_order_repository(),
+        get_vehicle_repository(),
+        get_fault_repository(),
+        get_sync_repair_to_sap_service(),
+        get_vehicle_handover_repository(),
         get_record_repair_order_event_service(),
     )
 
 
 def get_accept_repair_order_service() -> AcceptRepairOrderService:
-    """Return AcceptRepairOrderService."""
-    return AcceptRepairOrderService(
-        get_repair_order_repository(),
-        get_record_repair_order_event_service(),
-    )
+    """Return AcceptRepairOrderService (maps to repairable decision)."""
+    return AcceptRepairOrderService(get_workshop_technical_decision_service())
 
 
 def get_reject_repair_order_service() -> RejectRepairOrderService:
-    """Return RejectRepairOrderService."""
-    return RejectRepairOrderService(
+    """Return RejectRepairOrderService (maps to عدم نیاز به تعمیر)."""
+    return RejectRepairOrderService(get_workshop_technical_decision_service())
+
+
+def get_vehicle_component_history_repository() -> (
+    DjangoVehicleComponentHistoryRepository
+):
+    """Return vehicle component history repository."""
+    return DjangoVehicleComponentHistoryRepository()
+
+
+def get_internal_repair_cost_repository() -> DjangoInternalRepairCostRepository:
+    """Return internal repair cost repository."""
+    return DjangoInternalRepairCostRepository()
+
+
+def get_record_component_history_from_repair_service() -> (
+    RecordComponentHistoryFromRepairService
+):
+    """Return RecordComponentHistoryFromRepairService."""
+    return RecordComponentHistoryFromRepairService(
+        get_vehicle_component_history_repository()
+    )
+
+
+def get_list_vehicle_component_history_service() -> ListVehicleComponentHistoryService:
+    """Return ListVehicleComponentHistoryService."""
+    return ListVehicleComponentHistoryService(
+        get_vehicle_component_history_repository()
+    )
+
+
+def get_register_internal_repair_cost_service() -> RegisterInternalRepairCostService:
+    """Return RegisterInternalRepairCostService."""
+    return RegisterInternalRepairCostService(
+        get_internal_repair_cost_repository(),
         get_repair_order_repository(),
-        get_vehicle_repository(),
-        get_record_repair_order_event_service(),
     )
 
 
@@ -555,6 +934,8 @@ def get_approve_transport_handover_service() -> ApproveTransportHandoverService:
         get_repair_order_repository(),
         get_vehicle_repository(),
         get_fault_repository(),
+        get_record_component_history_from_repair_service(),
+        get_internal_repair_cost_repository(),
         get_record_repair_order_event_service(),
     )
 
@@ -573,20 +954,24 @@ def get_create_material_request_service() -> CreateMaterialRequestService:
     return CreateMaterialRequestService(
         get_material_request_repository(),
         get_repair_order_repository(),
+        get_central_stock_repository(),
         get_record_repair_order_event_service(),
     )
 
 
 def get_list_material_requests_service() -> ListMaterialRequestsService:
     """Return ListMaterialRequestsService."""
-    return ListMaterialRequestsService(get_material_request_repository())
-
-
-def get_approve_material_request_service() -> ApproveMaterialRequestService:
-    """Return ApproveMaterialRequestService."""
-    return ApproveMaterialRequestService(
+    return ListMaterialRequestsService(
         get_material_request_repository(),
-        StubInventoryAvailabilityAdapter(),
+        get_central_stock_repository(),
+    )
+
+
+def get_decide_parts_availability_service() -> DecidePartsAvailabilityService:
+    """Return DecidePartsAvailabilityService (explicit transport decision)."""
+    return DecidePartsAvailabilityService(
+        get_material_request_repository(),
+        get_central_stock_repository(),
         get_inventory_transaction_repository(),
         get_create_purchase_requisition_service(),
         get_add_pr_line_item_service(),
@@ -594,10 +979,32 @@ def get_approve_material_request_service() -> ApproveMaterialRequestService:
     )
 
 
-def get_reject_material_request_service() -> RejectMaterialRequestService:
-    """Return RejectMaterialRequestService."""
-    return RejectMaterialRequestService(
+def get_issue_purchased_parts_service() -> IssuePurchasedPartsService:
+    """Return IssuePurchasedPartsService."""
+    return IssuePurchasedPartsService(
         get_material_request_repository(),
+        get_inventory_transaction_repository(),
+        get_central_stock_repository(),
+        get_record_repair_order_event_service(),
+    )
+
+
+def get_approve_material_request_service() -> ApproveMaterialRequestService:
+    """Return ApproveMaterialRequestService (compat auto-availability wrapper)."""
+    return ApproveMaterialRequestService(
+        get_material_request_repository(),
+        StubInventoryAvailabilityAdapter(),
+        get_decide_parts_availability_service(),
+        get_record_repair_order_event_service(),
+    )
+
+
+def get_receive_material_request_service() -> ReceiveMaterialRequestService:
+    """Return ReceiveMaterialRequestService."""
+    return ReceiveMaterialRequestService(
+        get_material_request_repository(),
+        get_repair_order_repository(),
+        get_central_stock_repository(),
         get_record_repair_order_event_service(),
     )
 
@@ -619,6 +1026,9 @@ def get_confirm_vehicle_handover_service() -> ConfirmVehicleHandoverService:
         get_repair_order_repository(),
         get_vehicle_repository(),
         get_record_repair_order_event_service(),
+        get_external_invoice_repository(),
+        get_fault_repository(),
+        get_record_component_history_from_repair_service(),
     )
 
 
@@ -644,7 +1054,11 @@ def get_complete_repair_order_service() -> CompleteRepairOrderService:
 
 def get_cancel_repair_order_service() -> CancelRepairOrderService:
     """Return CancelRepairOrderService."""
-    return CancelRepairOrderService(get_repair_order_repository())
+    return CancelRepairOrderService(
+        get_repair_order_repository(),
+        get_external_workshop_repository(),
+        get_record_repair_order_event_service(),
+    )
 
 
 def get_add_repair_activity_service() -> AddRepairActivityService:
@@ -652,9 +1066,29 @@ def get_add_repair_activity_service() -> AddRepairActivityService:
     return AddRepairActivityService(get_repair_order_repository())
 
 
+def get_update_repair_activity_service() -> UpdateRepairActivityService:
+    """Return UpdateRepairActivityService."""
+    return UpdateRepairActivityService(get_repair_order_repository())
+
+
+def get_delete_repair_activity_service() -> DeleteRepairActivityService:
+    """Return DeleteRepairActivityService."""
+    return DeleteRepairActivityService(get_repair_order_repository())
+
+
 def get_add_repair_part_service() -> AddRepairPartService:
     """Return AddRepairPartService."""
     return AddRepairPartService(get_repair_order_repository())
+
+
+def get_update_repair_part_service() -> UpdateRepairPartService:
+    """Return UpdateRepairPartService."""
+    return UpdateRepairPartService(get_repair_order_repository())
+
+
+def get_delete_repair_part_service() -> DeleteRepairPartService:
+    """Return DeleteRepairPartService."""
+    return DeleteRepairPartService(get_repair_order_repository())
 
 
 def get_sync_repair_to_sap_service() -> SyncRepairToSAPService:
@@ -739,6 +1173,8 @@ def get_retry_failed_sap_transactions_service() -> RetryFailedSAPTransactionsSer
         PurchaseRequisitionBAPIAdapter(client),
         PMOrderBAPIAdapter(client),
         PMNotificationBAPIAdapter(client),
+        VehicleMeasurementBAPIAdapter(client),
+        VehicleAssignmentBAPIAdapter(client),
     )
 
 

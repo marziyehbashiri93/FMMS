@@ -8,32 +8,29 @@ from datetime import UTC, datetime
 from apps.material.application.dto.material_request_dto import (
     CreateMaterialRequestDTO,
     MaterialRequestDecisionDTO,
-    MaterialRequestItemResponseDTO,
-    MaterialRequestResponseDTO,
+    PartsAvailabilityDecisionDTO,
+    PartsItemDecisionDTO,
+)
+from apps.material.application.services.material_request_mapper import (
+    to_material_request_response,
+)
+from apps.material.application.services.parts_availability_decision_service import (
+    DecidePartsAvailabilityService,
 )
 from apps.material.domain.entities import (
+    MaterialItemDecision,
     MaterialRequest,
     MaterialRequestItem,
     MaterialRequestStatus,
 )
+from apps.material.domain.interfaces.central_stock_repository import (
+    ICentralStockRepository,
+)
 from apps.material.domain.interfaces.inventory_availability_port import (
     IInventoryAvailabilityPort,
 )
-from apps.material.domain.interfaces.inventory_transaction_repository import (
-    IInventoryTransactionRepository,
-)
 from apps.material.domain.interfaces.material_request_repository import (
     IMaterialRequestRepository,
-)
-from apps.procurement.application.dto.procurement_dto import (
-    AddPRLineItemDTO,
-    CreatePurchaseRequisitionDTO,
-)
-from apps.procurement.application.services.add_pr_line_item_service import (
-    AddPRLineItemService,
-)
-from apps.procurement.application.services.create_purchase_requisition_service import (
-    CreatePurchaseRequisitionService,
 )
 from apps.repair.application.services._timeline_helper import (
     record_repair_timeline_event,
@@ -46,27 +43,6 @@ from apps.repair.domain.interfaces.repair_repository import IRepairOrderReposito
 from core.exceptions.translation import load_or_not_found
 
 
-def _to_dto(material_request: MaterialRequest) -> MaterialRequestResponseDTO:
-    """Map aggregate to response DTO."""
-    return MaterialRequestResponseDTO(
-        id=material_request.id,
-        repair_order_id=material_request.repair_order_id,
-        status=material_request.status,
-        created_by_id=material_request.created_by_id,
-        created_at=material_request.created_at,
-        updated_at=material_request.updated_at,
-        items=[
-            MaterialRequestItemResponseDTO(
-                id=item.id,
-                material_number=item.material_number,
-                quantity=item.quantity,
-                unit_of_measure=item.unit_of_measure,
-            )
-            for item in material_request.items
-        ],
-    )
-
-
 class CreateMaterialRequestService:
     """Create material request linked to a repair order."""
 
@@ -74,19 +50,33 @@ class CreateMaterialRequestService:
         self,
         material_request_repository: IMaterialRequestRepository,
         repair_order_repository: IRepairOrderRepository,
+        central_stock_repository: ICentralStockRepository | None = None,
         event_recorder: RecordRepairOrderEventService | None = None,
     ) -> None:
         self._repo = material_request_repository
         self._repair_repo = repair_order_repository
+        self._stock = central_stock_repository
         self._event_recorder = event_recorder
 
-    def execute(self, dto: CreateMaterialRequestDTO) -> MaterialRequestResponseDTO:
-        """Create material request in REQUESTED status."""
-        load_or_not_found(
+    def execute(self, dto: CreateMaterialRequestDTO):
+        """Create material request in REQUESTED status and pause repair for parts."""
+        from apps.repair.domain.entities import RepairOrderStatus  # noqa: PLC0415
+        from core.exceptions.base_exception import FMMSConflictError  # noqa: PLC0415
+
+        order = load_or_not_found(
             lambda: self._repair_repo.get_by_id(dto.repair_order_id),
             message=f"Repair order '{dto.repair_order_id}' not found.",
             details={"repair_order_id": str(dto.repair_order_id)},
         )
+        if order.status != RepairOrderStatus.IN_PROGRESS:
+            raise FMMSConflictError(
+                message="Parts can only be requested while repair is in progress.",
+                error_code="MATERIAL_REQUEST_REQUIRES_IN_PROGRESS",
+                details={
+                    "repair_order_id": str(order.id),
+                    "status": order.status.value,
+                },
+            )
         now = datetime.now(tz=UTC)
         material_request = MaterialRequest(
             id=uuid.uuid4(),
@@ -101,149 +91,146 @@ class CreateMaterialRequestService:
                     material_number=item.material_number,
                     quantity=item.quantity,
                     unit_of_measure=item.unit_of_measure,
+                    from_catalog=item.from_catalog,
                 )
                 for item in dto.items
             ],
         )
         saved = self._repo.save(material_request)
+        order.wait_for_parts()
+        order.updated_at = now
+        self._repair_repo.save(order)
         record_repair_timeline_event(
             self._event_recorder,
             saved.repair_order_id,
             RepairOrderEventType.MATERIAL_REQUESTED,
-            "درخواست قطعه ثبت شد.",
+            "درخواست قطعه ثبت شد؛ تعمیر در انتظار قطعات است.",
             created_by_id=dto.requested_by,
             request_id=dto.request_id,
         )
-        return _to_dto(saved)
+        return to_material_request_response(saved, self._stock)
 
 
 class ListMaterialRequestsService:
     """List material requests."""
 
-    def __init__(self, material_request_repository: IMaterialRequestRepository) -> None:
+    def __init__(
+        self,
+        material_request_repository: IMaterialRequestRepository,
+        central_stock_repository: ICentralStockRepository | None = None,
+    ) -> None:
         self._repo = material_request_repository
+        self._stock = central_stock_repository
 
-    def execute(
-        self, status: MaterialRequestStatus | None = None
-    ) -> list[MaterialRequestResponseDTO]:
+    def execute(self, status: MaterialRequestStatus | None = None):
         """List material requests optionally by status."""
-        return [_to_dto(item) for item in self._repo.list_all(status=status)]
+        return [
+            to_material_request_response(item, self._stock)
+            for item in self._repo.list_all(status=status)
+        ]
 
 
 class ApproveMaterialRequestService:
-    """Approve material request and route inventory/procurement flow."""
+    """Compatibility wrapper: auto-detect availability then decide stock vs purchase."""
 
     def __init__(
         self,
         material_request_repository: IMaterialRequestRepository,
         inventory_availability_port: IInventoryAvailabilityPort,
-        inventory_transaction_repository: IInventoryTransactionRepository,
-        create_purchase_requisition_service: CreatePurchaseRequisitionService,
-        add_pr_line_item_service: AddPRLineItemService,
+        decide_parts_availability_service: DecidePartsAvailabilityService,
         event_recorder: RecordRepairOrderEventService | None = None,
     ) -> None:
         self._repo = material_request_repository
         self._inventory = inventory_availability_port
-        self._inventory_tx = inventory_transaction_repository
-        self._create_pr = create_purchase_requisition_service
-        self._add_pr_line_item = add_pr_line_item_service
+        self._decide = decide_parts_availability_service
         self._event_recorder = event_recorder
 
-    def execute(self, dto: MaterialRequestDecisionDTO) -> MaterialRequestResponseDTO:
-        """Approve a material request and apply stock routing logic."""
+    def execute(self, dto: MaterialRequestDecisionDTO):
+        """Approve by inferring per-item availability from the inventory port."""
+        _ = self._event_recorder
         material_request = load_or_not_found(
             lambda: self._repo.get_by_id(dto.material_request_id),
             message=f"Material request '{dto.material_request_id}' not found.",
             details={"material_request_id": str(dto.material_request_id)},
         )
-        material_request.approve()
-        material_request.updated_at = datetime.now(tz=UTC)
-        saved = self._repo.save(material_request)
-        record_repair_timeline_event(
-            self._event_recorder,
-            saved.repair_order_id,
-            RepairOrderEventType.MATERIAL_APPROVED,
-            "درخواست قطعه تایید شد.",
-            created_by_id=dto.decided_by,
-            request_id=dto.request_id,
+        item_decisions = tuple(
+            PartsItemDecisionDTO(
+                item_id=item.id,
+                decision=(
+                    MaterialItemDecision.FROM_STOCK
+                    if self._inventory.is_available(item)
+                    else MaterialItemDecision.PURCHASE
+                ),
+            )
+            for item in material_request.items
         )
-
-        available = all(self._inventory.is_available(item) for item in saved.items)
-        if available:
-            saved.transition_to(MaterialRequestStatus.STOCK_ISSUED)
-            saved.updated_at = datetime.now(tz=UTC)
-            saved = self._repo.save(saved)
-            self._inventory_tx.create_issue_for_material_request(saved.id)
-            record_repair_timeline_event(
-                self._event_recorder,
-                saved.repair_order_id,
-                RepairOrderEventType.STOCK_ISSUED,
-                "قطعات از انبار صادر شد.",
-                created_by_id=dto.decided_by,
+        return self._decide.execute(
+            PartsAvailabilityDecisionDTO(
+                material_request_id=dto.material_request_id,
+                items=item_decisions,
                 request_id=dto.request_id,
-            )
-            return _to_dto(saved)
-
-        saved.transition_to(MaterialRequestStatus.PURCHASE_REQUIRED)
-        saved.updated_at = datetime.now(tz=UTC)
-        saved = self._repo.save(saved)
-        record_repair_timeline_event(
-            self._event_recorder,
-            saved.repair_order_id,
-            RepairOrderEventType.PURCHASE_REQUIRED,
-            "نیاز به خرید قطعات ثبت شد.",
-            created_by_id=dto.decided_by,
-            request_id=dto.request_id,
-        )
-        requisition = self._create_pr.execute(
-            CreatePurchaseRequisitionDTO(
-                repair_order_id=saved.repair_order_id,
-                request_id=dto.request_id,
-                requested_by=dto.decided_by,
-                material_request_id=saved.id,
+                decided_by=dto.decided_by,
+                note="Auto availability decision from inventory check.",
+                # Compat approve path uses stub inventory; skip KH08 re-check.
+                enforce_stock_check=False,
             )
         )
-        for item in saved.items:
-            self._add_pr_line_item.execute(
-                AddPRLineItemDTO(
-                    pr_id=requisition.id,
-                    material_number=item.material_number,
-                    quantity=item.quantity,
-                    unit_of_measure=item.unit_of_measure,
-                    description="Material request auto-generated line item.",
-                    request_id=dto.request_id,
-                )
-            )
-        return _to_dto(saved)
 
 
-class RejectMaterialRequestService:
-    """Reject material request."""
+class ReceiveMaterialRequestService:
+    """Workshop confirms physical receipt of parts and resumes repair."""
 
     def __init__(
         self,
         material_request_repository: IMaterialRequestRepository,
+        repair_order_repository: IRepairOrderRepository,
+        central_stock_repository: ICentralStockRepository | None = None,
         event_recorder: RecordRepairOrderEventService | None = None,
     ) -> None:
         self._repo = material_request_repository
+        self._repair_repo = repair_order_repository
+        self._stock = central_stock_repository
         self._event_recorder = event_recorder
 
-    def execute(self, dto: MaterialRequestDecisionDTO) -> MaterialRequestResponseDTO:
-        """Reject material request."""
+    def execute(self, dto: MaterialRequestDecisionDTO):
+        """Mark material request received and resume WAITING_PARTS repair."""
+        from apps.repair.domain.entities import RepairOrderStatus  # noqa: PLC0415
+        from core.exceptions.base_exception import FMMSConflictError  # noqa: PLC0415
+
         material_request = load_or_not_found(
             lambda: self._repo.get_by_id(dto.material_request_id),
             message=f"Material request '{dto.material_request_id}' not found.",
             details={"material_request_id": str(dto.material_request_id)},
         )
-        material_request.reject()
+        if material_request.status != MaterialRequestStatus.STOCK_ISSUED:
+            raise FMMSConflictError(
+                message="Parts can only be received after stock issue/transfer to workshop.",
+                error_code="MATERIAL_RECEIVE_REQUIRES_STOCK_ISSUED",
+                details={
+                    "material_request_id": str(material_request.id),
+                    "status": material_request.status.value,
+                },
+            )
+        material_request.receive()
         material_request.updated_at = datetime.now(tz=UTC)
         saved = self._repo.save(material_request)
+
+        order = load_or_not_found(
+            lambda: self._repair_repo.get_by_id(saved.repair_order_id),
+            message=f"Repair order '{saved.repair_order_id}' not found.",
+            details={"repair_order_id": str(saved.repair_order_id)},
+        )
+        if order.status == RepairOrderStatus.WAITING_PARTS:
+            order.resume_after_parts()
+            order.updated_at = datetime.now(tz=UTC)
+            self._repair_repo.save(order)
+
         record_repair_timeline_event(
             self._event_recorder,
             saved.repair_order_id,
-            RepairOrderEventType.MATERIAL_REJECTED,
-            "درخواست قطعه رد شد.",
+            RepairOrderEventType.PARTS_RECEIVED,
+            "دریافت قطعات در تعمیرگاه ثبت شد؛ تعمیر ادامه می‌یابد.",
             created_by_id=dto.decided_by,
             request_id=dto.request_id,
         )
-        return _to_dto(saved)
+        return to_material_request_response(saved, self._stock)

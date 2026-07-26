@@ -16,13 +16,17 @@ pytestmark = pytest.mark.django_db
 class TestProcurementAPI:
     """Cover PR create, line items, SAP submit, and PO receive."""
 
-    def test_pr_submit_and_receive_po(self, authenticated_client: APIClient) -> None:
+    def test_pr_submit_and_receive_po(
+        self, authenticated_client: APIClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Create a PR, submit to SAP, and receive a PO."""
+        monkeypatch.setenv("SAP_USE_MOCK", "True")
+
         vehicle = create_vehicle(
             authenticated_client,
             plate="12PRC001",
             vin="1HGCM82633A004358",
-            sap_equipment_number="100002",
+            vehicle_number="100002",
         )
         fault = authenticated_client.post(
             "/api/v1/faults/",
@@ -36,16 +40,22 @@ class TestProcurementAPI:
         )
         assert fault.status_code == 201, fault.data
 
-        repair = authenticated_client.post(
-            "/api/v1/repair-orders/",
-            {"vehicle_id": vehicle["id"], "fault_id": fault.data["id"]},
+        unusable = authenticated_client.post(
+            f"/api/v1/faults/{fault.data['id']}/distribution-unusable/",
+            {"note": "needs repair"},
             format="json",
         )
-        assert repair.status_code == 201, repair.data
+        assert unusable.status_code == 200, unusable.data
+        orders = authenticated_client.get(
+            f"/api/v1/repair-orders/?vehicle_id={vehicle['id']}"
+        )
+        assert orders.status_code == 200, orders.data
+        assert orders.data["count"] >= 1
+        repair = orders.data["results"][0]
 
         pr = authenticated_client.post(
             "/api/v1/purchase-requisitions/",
-            {"repair_order_id": repair.data["id"]},
+            {"repair_order_id": repair["id"]},
             format="json",
         )
         assert pr.status_code == 201, pr.data

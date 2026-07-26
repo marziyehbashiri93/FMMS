@@ -8,8 +8,13 @@ from uuid import uuid4
 import pytest
 from rest_framework.test import APIClient
 
+from apps.driver.domain.entities import DriverStatus
+from apps.driver.infrastructure.models import DriverModel
 from apps.vehicle.domain.entities import VehicleStatus
-from tests.integration.api.conftest import create_vehicle
+from tests.integration.api.conftest import (
+    create_repair_order_via_distribution,
+    create_vehicle,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -17,26 +22,11 @@ pytestmark = pytest.mark.django_db
 def _create_fault_and_repair(
     client: APIClient, plate: str, vin: str
 ) -> tuple[dict, dict]:
-    """Create vehicle, fault, and repair order."""
-    vehicle = create_vehicle(client, plate=plate, vin=vin)
-    fault = client.post(
-        "/api/v1/faults/",
-        {
-            "vehicle_id": vehicle["id"],
-            "code": "WF-01",
-            "description": "Workflow fault",
-            "severity": "HIGH",
-        },
-        format="json",
+    """Create vehicle, fault, and repair order via distribution-unusable."""
+    order = create_repair_order_via_distribution(
+        client, plate=plate, vin=vin, code="WF-01", description="Workflow fault"
     )
-    assert fault.status_code == 201, fault.data
-    order = client.post(
-        "/api/v1/repair-orders/",
-        {"vehicle_id": vehicle["id"], "fault_id": fault.data["id"]},
-        format="json",
-    )
-    assert order.status_code == 201, order.data
-    return vehicle, order.data
+    return order["vehicle"], order
 
 
 def _workshop_assigned_order(client: APIClient, plate: str, vin: str) -> dict:
@@ -56,8 +46,8 @@ def _workshop_assigned_order(client: APIClient, plate: str, vin: str) -> dict:
     return assigned.data
 
 
-class TestVehicleActivateAPI:
-    """Cover POST /api/v1/vehicles/{id}/activate/."""
+class TestVehicleStatusAPI:
+    """Cover POST /api/v1/vehicles/{id}/status/."""
 
     def test_supervisor_can_activate_after_maintenance(
         self, authenticated_client: APIClient, supervisor_client: APIClient
@@ -66,13 +56,17 @@ class TestVehicleActivateAPI:
             authenticated_client, plate="12ACT001", vin="1HGCM82633A004401"
         )
         deactivated = authenticated_client.post(
-            f"/api/v1/vehicles/{vehicle['id']}/deactivate/", {}, format="json"
+            f"/api/v1/vehicles/{vehicle['id']}/status/",
+            {"status": VehicleStatus.INACTIVE.value},
+            format="json",
         )
         assert deactivated.status_code == 200
         assert deactivated.data["status"] == VehicleStatus.INACTIVE.value
 
         activated = supervisor_client.post(
-            f"/api/v1/vehicles/{vehicle['id']}/activate/", {}, format="json"
+            f"/api/v1/vehicles/{vehicle['id']}/status/",
+            {"status": VehicleStatus.ACTIVE.value},
+            format="json",
         )
         assert activated.status_code == 200, activated.data
         assert activated.data["status"] == VehicleStatus.ACTIVE.value
@@ -85,12 +79,16 @@ class TestVehicleActivateAPI:
             authenticated_client, "12ACT002", "1HGCM82633A004402"
         )
         deactivated = authenticated_client.post(
-            f"/api/v1/vehicles/{vehicle['id']}/deactivate/", {}, format="json"
+            f"/api/v1/vehicles/{vehicle['id']}/status/",
+            {"status": VehicleStatus.INACTIVE.value},
+            format="json",
         )
         assert deactivated.status_code == 200
 
         response = authenticated_client.post(
-            f"/api/v1/vehicles/{vehicle['id']}/activate/", {}, format="json"
+            f"/api/v1/vehicles/{vehicle['id']}/status/",
+            {"status": VehicleStatus.ACTIVE.value},
+            format="json",
         )
         assert response.status_code == 409
 
@@ -101,10 +99,14 @@ class TestVehicleActivateAPI:
             authenticated_client, plate="12ACT003", vin="1HGCM82633A004403"
         )
         authenticated_client.post(
-            f"/api/v1/vehicles/{vehicle['id']}/deactivate/", {}, format="json"
+            f"/api/v1/vehicles/{vehicle['id']}/status/",
+            {"status": VehicleStatus.INACTIVE.value},
+            format="json",
         )
         response = viewer_client.post(
-            f"/api/v1/vehicles/{vehicle['id']}/activate/", {}, format="json"
+            f"/api/v1/vehicles/{vehicle['id']}/status/",
+            {"status": VehicleStatus.ACTIVE.value},
+            format="json",
         )
         assert response.status_code == 403
 
@@ -153,15 +155,7 @@ class TestVehicleActivateAPI:
 
         open_fault = authenticated_client.get(f"/api/v1/faults/{fault_id}/")
         assert open_fault.status_code == 200
-        assert open_fault.data["status"] == "OPEN"
-
-        approved_final = supervisor_client.post(
-            f"/api/v1/repair-orders/{order_id}/transport-handover-approve/",
-            {},
-            format="json",
-        )
-        assert approved_final.status_code == 200, approved_final.data
-        assert approved_final.data["status"] == "COMPLETED"
+        assert open_fault.data["status"] == "CLOSED"
 
         activated = authenticated_client.get(f"/api/v1/vehicles/{vehicle['id']}/")
         assert activated.status_code == 200, activated.data
@@ -211,18 +205,12 @@ class TestInspectionHistoryAPI:
         vehicle = create_vehicle(
             authenticated_client, plate="12HIS001", vin="1HGCM82633A004421"
         )
-        driver = authenticated_client.post(
-            "/api/v1/drivers/",
-            {
-                "full_name": "History Driver",
-                "license_number": "LICHIS01",
-                "license_class": "B",
-                "phone": "+989120000001",
-                "email": "history@fmms.test",
-            },
-            format="json",
+        driver = DriverModel.objects.create(
+            customer_number="6000008888",
+            name="History Driver",
+            mobile="09120000001",
+            status=DriverStatus.ACTIVE.value,
         )
-        assert driver.status_code == 201, driver.data
 
         for idx, result in enumerate(("PASS", "FAIL")):
             created = authenticated_client.post(
@@ -233,7 +221,7 @@ class TestInspectionHistoryAPI:
                     "odometer_value": 1000 + idx,
                     "odometer_unit": "KM",
                     "inspected_at": datetime.now(tz=UTC).isoformat(),
-                    "driver_id": driver.data["id"],
+                    "driver_id": str(driver.id),
                     "items": [
                         {
                             "category": "SAFETY",
@@ -251,6 +239,13 @@ class TestInspectionHistoryAPI:
                 f"/api/v1/inspections/{created.data['id']}/submit/", {}, format="json"
             )
             assert submitted.status_code == 200, submitted.data
+            if result == "FAIL":
+                reported = authenticated_client.post(
+                    f"/api/v1/inspections/{created.data['id']}/report-fault/",
+                    {},
+                    format="json",
+                )
+                assert reported.status_code == 201, reported.data
 
         listed = authenticated_client.get(
             f"/api/v1/inspections/?vehicle_id={vehicle['id']}"
@@ -329,7 +324,7 @@ class TestRepairTimelineAPI:
         )
         assert timeline.status_code == 200, timeline.data
         events = {item["event"] for item in timeline.data}
-        assert "FAULT_CREATED" in events
+        assert "DISTRIBUTION_APPROVED" in events
         assert "TRANSPORT_APPROVED" in events
         assert "WORKSHOP_ASSIGNED" in events
         assert "REPAIR_STARTED" in events

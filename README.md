@@ -252,7 +252,7 @@ python manage.py reset_workflow_data --yes
 
 | Kept | Deleted | Vehicle status reset |
 |------|---------|----------------------|
-| Vehicles, inspection checklist templates, users | Inspections, faults, repairs (+ events/invoices), materials, handovers, procurement, SAP transactions, drivers, PM plans/work orders | `UNDER_REPAIR` and `WAITING_DRIVER_CONFIRMATION` → `ACTIVE` |
+| Vehicles, inspection checklist templates, users | Inspections, faults, repairs (+ events/invoices), materials, handovers, procurement, SAP transactions, odometer readings, drivers, PM plans/work orders | `UNDER_REPAIR` and `WAITING_DRIVER_CONFIRMATION` → `ACTIVE` |
 
 The command refuses to run when `DEBUG=False` (staging/production/tests).
 

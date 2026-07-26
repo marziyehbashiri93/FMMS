@@ -2,6 +2,11 @@
 
 from apps.repair.infrastructure.models import (
     ExternalRepairInvoiceModel,
+    ExternalRepairReviewModel,
+    ExternalWorkshopAssignmentModel,
+    ExternalWorkshopDeliveryModel,
+    ExternalWorkshopPickupModel,
+    InternalRepairCostModel,
     RepairActivityModel,
     RepairOrderEventModel,
     RepairOrderModel,
@@ -14,4 +19,9 @@ __all__ = [
     "RepairPartModel",
     "RepairOrderEventModel",
     "ExternalRepairInvoiceModel",
+    "ExternalWorkshopAssignmentModel",
+    "ExternalWorkshopDeliveryModel",
+    "ExternalWorkshopPickupModel",
+    "ExternalRepairReviewModel",
+    "InternalRepairCostModel",
 ]

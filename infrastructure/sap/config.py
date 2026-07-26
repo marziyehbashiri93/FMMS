@@ -16,6 +16,20 @@ Optional environment variables:
     SAP_TIMEOUT_SECONDS — HTTP request timeout (default: 30)
     SAP_USE_MOCK        — Use MockSAPClient instead of real SAP (default: True)
     SAP_LANG            — SAP logon language (default: EN)
+    SAP_VERIFY_SSL      — Verify SAP HTTPS certificates (default: True)
+    SAP_VEHICLE_DRIVER_SERVICE    — Vehicle-driver OData service
+        (default: ZC_VEHICLEDRIVER_CDS)
+    SAP_VEHICLE_DRIVER_ENTITY_SET — Vehicle-driver entity set (default: empty)
+    SAP_OBJECT_PART_CATALOG_SERVICE    — Object-part catalog OData service
+        (default: ZI_FLEET_CAT_B_CDS)
+    SAP_OBJECT_PART_CATALOG_ENTITY_SET — Object-part catalog entity set
+        (default: empty)
+    SAP_FAULT_CATALOG_SERVICE    — Fault catalog OData service
+        (default: ZI_B_DEFECTCATALOG9_CDS)
+    SAP_FAULT_CATALOG_ENTITY_SET — Fault catalog entity set (default: empty)
+    SAP_CENTRAL_STOCK_SERVICE    — Central warehouse stock OData service
+        (default: ZI_STOCK_KH08_CDS)
+    SAP_CENTRAL_STOCK_ENTITY_SET — Central stock entity set (default: empty)
 """
 
 from __future__ import annotations
@@ -54,6 +68,15 @@ class SAPConfig:
     timeout_seconds: int
     use_mock: bool
     lang: str
+    verify_ssl: bool
+    vehicle_driver_service: str
+    vehicle_driver_entity_set: str
+    object_part_catalog_service: str
+    object_part_catalog_entity_set: str
+    fault_catalog_service: str
+    fault_catalog_entity_set: str
+    central_stock_service: str
+    central_stock_entity_set: str
 
     @classmethod
     def from_env(cls) -> SAPConfig:
@@ -66,8 +89,7 @@ class SAPConfig:
             ImproperlyConfigured: If ``SAP_USE_MOCK`` is ``False`` but required
                 credentials are missing from the environment.
         """
-        use_mock_raw = os.environ.get("SAP_USE_MOCK", "True")
-        use_mock = use_mock_raw.strip().lower() in ("true", "1", "yes")
+        use_mock = _env_bool("SAP_USE_MOCK", default=True)
 
         base_url = os.environ.get("SAP_BASE_URL", "")
         client = os.environ.get("SAP_CLIENT", "")
@@ -76,6 +98,39 @@ class SAPConfig:
         ashost = os.environ.get("SAP_ASHOST", "")
         sysnr = os.environ.get("SAP_SYSNR", "00")
         lang = os.environ.get("SAP_LANG", "EN")
+        verify_ssl = _env_bool("SAP_VERIFY_SSL", default=True)
+        vehicle_driver_service = os.environ.get(
+            "SAP_VEHICLE_DRIVER_SERVICE",
+            "ZC_VEHICLEDRIVER_CDS",
+        )
+        vehicle_driver_entity_set = os.environ.get(
+            "SAP_VEHICLE_DRIVER_ENTITY_SET",
+            "",
+        )
+        object_part_catalog_service = os.environ.get(
+            "SAP_OBJECT_PART_CATALOG_SERVICE",
+            "ZI_FLEET_CAT_B_CDS",
+        )
+        object_part_catalog_entity_set = os.environ.get(
+            "SAP_OBJECT_PART_CATALOG_ENTITY_SET",
+            "",
+        )
+        fault_catalog_service = os.environ.get(
+            "SAP_FAULT_CATALOG_SERVICE",
+            "ZI_B_DEFECTCATALOG9_CDS",
+        )
+        fault_catalog_entity_set = os.environ.get(
+            "SAP_FAULT_CATALOG_ENTITY_SET",
+            "",
+        )
+        central_stock_service = os.environ.get(
+            "SAP_CENTRAL_STOCK_SERVICE",
+            "ZI_STOCK_KH08_CDS",
+        )
+        central_stock_entity_set = os.environ.get(
+            "SAP_CENTRAL_STOCK_ENTITY_SET",
+            "",
+        )
 
         try:
             timeout_seconds = int(os.environ.get("SAP_TIMEOUT_SECONDS", "30"))
@@ -112,4 +167,20 @@ class SAPConfig:
             timeout_seconds=timeout_seconds,
             use_mock=use_mock,
             lang=lang,
+            verify_ssl=verify_ssl,
+            vehicle_driver_service=vehicle_driver_service,
+            vehicle_driver_entity_set=vehicle_driver_entity_set,
+            object_part_catalog_service=object_part_catalog_service,
+            object_part_catalog_entity_set=object_part_catalog_entity_set,
+            fault_catalog_service=fault_catalog_service,
+            fault_catalog_entity_set=fault_catalog_entity_set,
+            central_stock_service=central_stock_service,
+            central_stock_entity_set=central_stock_entity_set,
         )
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in ("true", "1", "yes")

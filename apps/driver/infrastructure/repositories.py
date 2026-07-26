@@ -5,10 +5,12 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
+from django.db.models import Q
+
 from apps.driver.domain.entities import Driver, DriverStatus
 from apps.driver.domain.exceptions import DriverNotFoundError
 from apps.driver.domain.interfaces.driver_repository import IDriverRepository
-from apps.driver.domain.value_objects import DriverContact, LicenseClass, LicenseNumber
+from apps.driver.domain.value_objects import CustomerNumber
 from apps.driver.infrastructure.models import DriverModel
 from core.logging.structured_logger import get_structured_logger
 
@@ -19,27 +21,28 @@ def _to_domain(orm: DriverModel) -> Driver:
     """Map a DriverModel ORM instance to a Driver domain entity."""
     return Driver(
         id=uuid.UUID(str(orm.id)),
-        full_name=orm.full_name,
-        license_number=LicenseNumber(orm.license_number),
-        license_class=LicenseClass(orm.license_class),
-        contact=DriverContact(phone=orm.phone, email=orm.email or None),
+        customer_number=CustomerNumber(orm.customer_number),
+        name=orm.name,
         status=DriverStatus(orm.status),
         created_at=orm.created_at,
         updated_at=orm.updated_at,
-        assigned_vehicle_id=orm.assigned_vehicle_id,
+        mobile=orm.mobile or None,
+        personnel_number=orm.personnel_number or None,
+        gender=orm.gender or None,
+        nilofar_code=orm.nilofar_code or None,
     )
 
 
 def _to_orm_dict(driver: Driver) -> dict[str, object]:
     """Map a Driver domain entity to ORM field values."""
     return {
-        "full_name": driver.full_name,
-        "license_number": driver.license_number.value,
-        "license_class": driver.license_class.value,
-        "phone": driver.contact.phone,
-        "email": driver.contact.email or "",
+        "customer_number": driver.customer_number.value,
+        "name": driver.name,
+        "mobile": driver.mobile or "",
+        "personnel_number": driver.personnel_number or "",
+        "gender": driver.gender or "",
+        "nilofar_code": driver.nilofar_code or "",
         "status": driver.status.value,
-        "assigned_vehicle_id": driver.assigned_vehicle_id,
         "updated_at": datetime.now(tz=UTC),
     }
 
@@ -50,40 +53,80 @@ class DjangoDriverRepository(IDriverRepository):
     def get_by_id(self, driver_id: uuid.UUID) -> Driver:
         """Retrieve a driver by UUID."""
         try:
-            orm = DriverModel.objects.get(id=driver_id, is_deleted=False)
+            orm = DriverModel.objects.get(id=driver_id)
         except DriverModel.DoesNotExist:
             raise DriverNotFoundError(driver_id) from None
         return _to_domain(orm)
 
-    def get_by_license(self, license_number: LicenseNumber) -> Driver:
-        """Retrieve a driver by license number."""
+    def get_by_customer_number(self, customer_number: CustomerNumber) -> Driver:
+        """Retrieve a driver by SAP customer number."""
         try:
-            orm = DriverModel.objects.get(
-                license_number=license_number.value, is_deleted=False
-            )
+            orm = DriverModel.objects.get(customer_number=customer_number.value)
         except DriverModel.DoesNotExist:
-            raise DriverNotFoundError(license_number.value) from None
+            raise DriverNotFoundError(customer_number.value) from None
         return _to_domain(orm)
 
-    def get_by_vehicle(self, vehicle_id: uuid.UUID) -> Driver | None:
-        """Retrieve the driver currently assigned to a vehicle."""
-        orm = DriverModel.objects.filter(
-            assigned_vehicle_id=vehicle_id,
-            status=DriverStatus.ACTIVE.value,
-            is_deleted=False,
-        ).first()
-        return _to_domain(orm) if orm else None
+    def find_by_personnel_number(self, personnel_number: str) -> Driver | None:
+        """Find an ACTIVE driver by SAP personnel number."""
+        needle = personnel_number.strip()
+        if not needle:
+            return None
+        orm = (
+            DriverModel.objects.filter(
+                personnel_number=needle,
+                status=DriverStatus.ACTIVE.value,
+            )
+            .order_by("created_at")
+            .first()
+        )
+        return _to_domain(orm) if orm is not None else None
 
     def list_by_status(self, status: DriverStatus) -> list[Driver]:
         """Return all drivers matching a given status."""
-        qs = DriverModel.objects.filter(status=status.value, is_deleted=False)
+        qs = DriverModel.objects.filter(status=status.value)
         return [_to_domain(orm) for orm in qs]
 
-    def exists_by_license(self, license_number: LicenseNumber) -> bool:
-        """Check whether a driver with the given license number exists."""
-        return DriverModel.objects.filter(
-            license_number=license_number.value, is_deleted=False
-        ).exists()
+    def list_all(self) -> list[Driver]:
+        """Return all drivers regardless of status."""
+        return [_to_domain(orm) for orm in DriverModel.objects.all()]
+
+    def list_by_customer_numbers(self, customer_numbers: set[str]) -> list[Driver]:
+        """Return drivers matching the provided SAP customer numbers."""
+        if not customer_numbers:
+            return []
+        qs = DriverModel.objects.filter(customer_number__in=customer_numbers)
+        return [_to_domain(orm) for orm in qs]
+
+    def list_filtered(
+        self,
+        *,
+        status: DriverStatus | None = None,
+        ordering: str = "",
+        search: str = "",
+    ) -> list[Driver]:
+        """Return drivers filtered and ordered by database query."""
+        qs = DriverModel.objects.all()
+        if status is not None:
+            qs = qs.filter(status=status.value)
+        needle = search.strip()
+        if needle:
+            qs = qs.filter(
+                Q(name__icontains=needle) | Q(personnel_number__icontains=needle)
+            )
+        if ordering:
+            qs = qs.order_by(ordering)
+        return [_to_domain(orm) for orm in qs]
+
+    def decommission_missing_from_sap(self, seen_customer_numbers: set[str]) -> int:
+        """Mark drivers absent from SAP as DECOMMISSIONED without soft-delete."""
+        now = datetime.now(tz=UTC)
+        qs = DriverModel.objects.exclude(
+            status=DriverStatus.DECOMMISSIONED.value
+        ).exclude(customer_number__in=seen_customer_numbers)
+        return qs.update(
+            status=DriverStatus.DECOMMISSIONED.value,
+            updated_at=now,
+        )
 
     def save(self, driver: Driver) -> Driver:
         """Persist a new or updated driver."""
@@ -96,12 +139,3 @@ class DjangoDriverRepository(IDriverRepository):
             obj.save(update_fields=["created_at"])
         logger.debug("saved", extra={"driver_id": str(driver.id), "is_new": created})
         return driver
-
-    def delete(self, driver_id: uuid.UUID) -> None:
-        """Soft-delete a driver record."""
-        updated = DriverModel.objects.filter(id=driver_id, is_deleted=False).update(
-            is_deleted=True,
-            deleted_at=datetime.now(tz=UTC),
-        )
-        if updated == 0:
-            raise DriverNotFoundError(driver_id)

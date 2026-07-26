@@ -6,7 +6,7 @@ import uuid
 from abc import ABC, abstractmethod
 
 from apps.driver.domain.entities import Driver, DriverStatus
-from apps.driver.domain.value_objects import LicenseNumber
+from apps.driver.domain.value_objects import CustomerNumber
 
 
 class IDriverRepository(ABC):
@@ -27,28 +27,28 @@ class IDriverRepository(ABC):
         """
 
     @abstractmethod
-    def get_by_license(self, license_number: LicenseNumber) -> Driver:
-        """Retrieve a driver by their license number.
+    def get_by_customer_number(self, customer_number: CustomerNumber) -> Driver:
+        """Retrieve a driver by SAP customer number.
 
         Args:
-            license_number: The validated ``LicenseNumber`` value object.
+            customer_number: The validated SAP ``CustomerNumber`` value object.
 
         Returns:
             The matching ``Driver`` aggregate.
 
         Raises:
-            DriverNotFoundError: If no driver with this license number exists.
+            DriverNotFoundError: If no driver with this customer number exists.
         """
 
     @abstractmethod
-    def get_by_vehicle(self, vehicle_id: uuid.UUID) -> Driver | None:
-        """Retrieve the driver currently assigned to a vehicle.
+    def find_by_personnel_number(self, personnel_number: str) -> Driver | None:
+        """Find an ACTIVE driver by SAP personnel number (کد پرسنلی).
 
         Args:
-            vehicle_id: The UUID of the assigned vehicle.
+            personnel_number: Non-empty personnel number string.
 
         Returns:
-            The assigned ``Driver`` aggregate, or ``None`` if unassigned.
+            Matching driver, or ``None`` when not found / blank input.
         """
 
     @abstractmethod
@@ -63,15 +63,16 @@ class IDriverRepository(ABC):
         """
 
     @abstractmethod
-    def exists_by_license(self, license_number: LicenseNumber) -> bool:
-        """Check whether a driver with the given license number exists.
+    def list_all(self) -> list[Driver]:
+        """Return all drivers, regardless of lifecycle status."""
 
-        Args:
-            license_number: The license number to check.
+    @abstractmethod
+    def list_by_customer_numbers(self, customer_numbers: set[str]) -> list[Driver]:
+        """Return drivers matching the provided SAP customer numbers."""
 
-        Returns:
-            ``True`` if a driver with this license number exists.
-        """
+    @abstractmethod
+    def decommission_missing_from_sap(self, seen_customer_numbers: set[str]) -> int:
+        """Mark drivers absent from a SAP sync as DECOMMISSIONED."""
 
     @abstractmethod
     def save(self, driver: Driver) -> Driver:
@@ -82,15 +83,4 @@ class IDriverRepository(ABC):
 
         Returns:
             The saved ``Driver`` aggregate.
-        """
-
-    @abstractmethod
-    def delete(self, driver_id: uuid.UUID) -> None:
-        """Soft-delete a driver record.
-
-        Args:
-            driver_id: The UUID of the driver to delete.
-
-        Raises:
-            DriverNotFoundError: If no driver exists with this ID.
         """

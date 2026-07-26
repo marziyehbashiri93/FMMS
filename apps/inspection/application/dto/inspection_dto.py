@@ -13,7 +13,11 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from apps.inspection.domain.entities import InspectionStatus, InspectionType
-from apps.inspection.domain.value_objects import ChecklistResult, FailureSeverity, OdometerUnit
+from apps.inspection.domain.value_objects import (
+    ChecklistResult,
+    FailureSeverity,
+    OdometerUnit,
+)
 
 
 @dataclass(frozen=True)
@@ -60,6 +64,8 @@ class CreateInspectionDTO:
     created_by: uuid.UUID
     driver_id: uuid.UUID | None = field(default=None)
     items: list[CreateInspectionItemInputDTO] = field(default_factory=list)
+    actor_role: str = ""
+    actor_personnel_number: str = ""
 
 
 @dataclass(frozen=True)
@@ -103,6 +109,15 @@ class SubmitInspectionDTO:
     inspection_id: uuid.UUID
     request_id: str
     submitted_by: uuid.UUID
+
+
+@dataclass(frozen=True)
+class ReportInspectionFaultDTO:
+    """Input DTO for explicitly reporting a fault from failed checklist items."""
+
+    inspection_id: uuid.UUID
+    request_id: str
+    reported_by: uuid.UUID
 
 
 @dataclass(frozen=True)

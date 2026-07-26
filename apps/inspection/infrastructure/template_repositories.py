@@ -20,11 +20,10 @@ def _to_domain(orm: InspectionTemplateModel) -> InspectionTemplate:
     """Map ORM row to domain entity."""
     return InspectionTemplate(
         id=uuid.UUID(str(orm.id)),
-        sap_code=orm.sap_code,
         code_group=orm.code_group,
-        category=orm.category,
-        description=orm.description,
-        catalog_type=orm.catalog_type,
+        code=orm.code,
+        group_text=orm.group_text,
+        code_text=orm.code_text,
         is_active=orm.is_active,
         created_at=orm.created_at,
         updated_at=orm.updated_at,
@@ -45,32 +44,30 @@ class DjangoInspectionTemplateRepository(IInspectionTemplateRepository):
         return _to_domain(orm)
 
     def get_by_sap_key(
-        self, sap_code: str, code_group: str, catalog_type: str
+        self, code: str, code_group: str
     ) -> InspectionTemplate | None:
         """Retrieve a template by SAP natural key."""
         orm = InspectionTemplateModel.objects.filter(
-            sap_code=sap_code,
+            code=code,
             code_group=code_group,
-            catalog_type=catalog_type,
             is_deleted=False,
         ).first()
         return _to_domain(orm) if orm else None
 
     def list_active(self) -> list[InspectionTemplate]:
-        """Return all active templates ordered by category then description."""
+        """Return active templates ordered by SAP group text, then code."""
         qs = InspectionTemplateModel.objects.filter(
             is_active=True, is_deleted=False
-        ).order_by("category", "description")
+        ).order_by("group_text", "code")
         return [_to_domain(orm) for orm in qs]
 
     def save(self, template: InspectionTemplate) -> InspectionTemplate:
         """Persist a new or updated template."""
         defaults = {
-            "sap_code": template.sap_code,
             "code_group": template.code_group,
-            "category": template.category,
-            "description": template.description,
-            "catalog_type": template.catalog_type,
+            "code": template.code,
+            "group_text": template.group_text,
+            "code_text": template.code_text,
             "is_active": template.is_active,
             "updated_at": datetime.now(tz=UTC),
         }

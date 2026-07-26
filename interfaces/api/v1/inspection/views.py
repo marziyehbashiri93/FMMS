@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 
-from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.request import Request
@@ -16,12 +14,20 @@ from apps.inspection.application.dto.inspection_dto import (
     AddInspectionItemDTO,
     CreateInspectionDTO,
     CreateInspectionItemInputDTO,
+    ReportInspectionFaultDTO,
     SubmitInspectionDTO,
 )
 from apps.inspection.domain.entities import InspectionType
-from apps.inspection.domain.value_objects import ChecklistResult, FailureSeverity, OdometerUnit
-from core.permissions import IsReadOnlyOrTechnicianOrAbove
+from apps.inspection.domain.value_objects import (
+    ChecklistResult,
+    FailureSeverity,
+    OdometerUnit,
+)
+from core.permissions import IsReadOnlyOrDriverOrTechnicianOrAbove
 from interfaces.api.v1 import deps
+from interfaces.api.v1.fault.serializers import FaultResponseSerializer
+from interfaces.api.v1.filters import DateRangeFilterSerializer, date_range_to_datetimes
+from interfaces.api.v1.inspection import schema as inspection_schema
 from interfaces.api.v1.inspection.serializers import (
     InspectionCreateSerializer,
     InspectionItemCreateSerializer,
@@ -33,9 +39,9 @@ from interfaces.api.v1.utils import paginate_dto_list, request_id_from, user_id_
 class InspectionViewSet(GenericViewSet):
     """Expose inspection application services through REST endpoints."""
 
-    permission_classes = [IsReadOnlyOrTechnicianOrAbove]
+    permission_classes = [IsReadOnlyOrDriverOrTechnicianOrAbove]
 
-    @extend_schema(responses=InspectionResponseSerializer)
+    @inspection_schema.retrieve
     def retrieve(self, request: Request, pk: str | None = None) -> Response:
         """Retrieve one inspection."""
         result = deps.get_get_inspection_service().execute(
@@ -43,23 +49,18 @@ class InspectionViewSet(GenericViewSet):
         )
         return Response(InspectionResponseSerializer(result).data)
 
-    @extend_schema(responses=InspectionResponseSerializer(many=True))
+    @inspection_schema.list
     def list(self, request: Request) -> Response:
-        """List inspections for a vehicle."""
+        """List inspections; optionally filter by vehicle and date range."""
         vehicle_id_raw = request.query_params.get("vehicle_id")
-        if not vehicle_id_raw:
-            return Response(
-                {"detail": "vehicle_id query parameter is required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        from_date_raw = request.query_params.get("from_date")
-        to_date_raw = request.query_params.get("to_date")
-        from_date = datetime.fromisoformat(from_date_raw) if from_date_raw else None
-        to_date = datetime.fromisoformat(to_date_raw) if to_date_raw else None
+        vehicle_id = uuid.UUID(vehicle_id_raw) if vehicle_id_raw else None
+        filters = DateRangeFilterSerializer(data=request.query_params)
+        filters.is_valid(raise_exception=True)
+        from_datetime, to_datetime = date_range_to_datetimes(filters)
         items = deps.get_list_inspections_service().execute(
-            uuid.UUID(vehicle_id_raw),
-            from_date=from_date,
-            to_date=to_date,
+            vehicle_id,
+            from_date=from_datetime,
+            to_date=to_datetime,
             request_id=request_id_from(request),
         )
         page = paginate_dto_list(self, items)
@@ -70,9 +71,7 @@ class InspectionViewSet(GenericViewSet):
             return self.get_paginated_response(serializer.data)
         return Response(serializer.data)
 
-    @extend_schema(
-        request=InspectionCreateSerializer, responses=InspectionResponseSerializer
-    )
+    @inspection_schema.create
     def create(self, request: Request) -> Response:
         """Create a draft inspection."""
         serializer = InspectionCreateSerializer(data=request.data)
@@ -101,6 +100,10 @@ class InspectionViewSet(GenericViewSet):
                 items=items,
                 request_id=request_id_from(request),
                 created_by=user_id_from(request),
+                actor_role=str(getattr(request.user, "role", "") or ""),
+                actor_personnel_number=str(
+                    getattr(request.user, "personnel_number", "") or ""
+                ),
             )
         )
         return Response(
@@ -108,9 +111,7 @@ class InspectionViewSet(GenericViewSet):
             status=status.HTTP_201_CREATED,
         )
 
-    @extend_schema(
-        request=InspectionItemCreateSerializer, responses=InspectionResponseSerializer
-    )
+    @inspection_schema.items
     @action(detail=True, methods=["post"], url_path="items")
     def items(self, request: Request, pk: str | None = None) -> Response:
         """Add a checklist item to a draft inspection."""
@@ -131,7 +132,7 @@ class InspectionViewSet(GenericViewSet):
         )
         return Response(InspectionResponseSerializer(result).data)
 
-    @extend_schema(request=None, responses=InspectionResponseSerializer)
+    @inspection_schema.submit
     @action(detail=True, methods=["post"])
     def submit(self, request: Request, pk: str | None = None) -> Response:
         """Submit a draft inspection."""
@@ -143,3 +144,19 @@ class InspectionViewSet(GenericViewSet):
             )
         )
         return Response(InspectionResponseSerializer(result).data)
+
+    @inspection_schema.report_fault
+    @action(detail=True, methods=["post"], url_path="report-fault")
+    def report_fault(self, request: Request, pk: str | None = None) -> Response:
+        """Report failed checklist items as a fault."""
+        result = deps.get_report_inspection_fault_service().execute(
+            ReportInspectionFaultDTO(
+                inspection_id=uuid.UUID(str(pk)),
+                request_id=request_id_from(request),
+                reported_by=user_id_from(request),
+            )
+        )
+        return Response(
+            FaultResponseSerializer(result).data,
+            status=status.HTTP_201_CREATED,
+        )

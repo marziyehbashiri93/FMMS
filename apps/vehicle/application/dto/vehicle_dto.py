@@ -10,100 +10,28 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 
-from apps.vehicle.domain.entities import VehicleCategory, VehicleStatus
-
-
-@dataclass(frozen=True)
-class CreateVehicleDTO:
-    """Input DTO for creating a new fleet vehicle.
-
-    Attributes:
-        plate_number: Raw plate string; the service will validate via the
-            ``PlateNumber`` value object.
-        vin: 17-character Vehicle Identification Number.
-        make: Manufacturer name (e.g. "Toyota").
-        model: Vehicle model name (e.g. "Hilux").
-        year: Manufacturing year (four-digit integer).
-        category: Operational category of the vehicle.
-        chassis_number: Optional chassis identifier.
-        sap_equipment_number: Optional SAP PM equipment number.
-        request_id: Correlation ID propagated from the HTTP layer for tracing.
-        created_by: UUID of the authenticated user performing the action.
-    """
-
-    plate_number: str
-    vin: str
-    make: str
-    model: str
-    year: int
-    category: VehicleCategory
-    request_id: str
-    created_by: uuid.UUID
-    chassis_number: str | None = field(default=None)
-    sap_equipment_number: str | None = field(default=None)
+from apps.vehicle.domain.entities import VehicleStatus
 
 
 @dataclass(frozen=True)
-class UpdateVehicleDTO:
-    """Input DTO for updating mutable fields of an existing vehicle.
-
-    Only the fields present in this DTO may be updated via the
-    ``UpdateVehicleService``.  Status transitions are handled separately
-    by dedicated service operations.
-
-    Attributes:
-        vehicle_id: Target vehicle to update.
-        request_id: Correlation ID for tracing.
-        updated_by: UUID of the authenticated user performing the action.
-        make: Optional new manufacturer name.
-        model: Optional new model name.
-        year: Optional new manufacturing year.
-        category: Optional new operational category.
-        chassis_number: Optional new chassis number.
-        sap_equipment_number: Optional updated SAP equipment number.
-    """
+class ChangeVehicleStatusDTO:
+    """Input DTO for changing an FMMS-controlled vehicle status."""
 
     vehicle_id: uuid.UUID
-    request_id: str
-    updated_by: uuid.UUID
-    make: str | None = field(default=None)
-    model: str | None = field(default=None)
-    year: int | None = field(default=None)
-    category: VehicleCategory | None = field(default=None)
-    chassis_number: str | None = field(default=None)
-    sap_equipment_number: str | None = field(default=None)
-
-
-@dataclass(frozen=True)
-class DeactivateVehicleDTO:
-    """Input DTO for deactivating a vehicle.
-
-    Attributes:
-        vehicle_id: Target vehicle to deactivate.
-        request_id: Correlation ID for tracing.
-        requested_by: UUID of the user requesting deactivation.
-    """
-
-    vehicle_id: uuid.UUID
+    status: VehicleStatus
     request_id: str
     requested_by: uuid.UUID
 
 
 @dataclass(frozen=True)
-class ActivateVehicleDTO:
-    """Input DTO for re-activating a vehicle after maintenance.
+class VehicleAssignedDriverDTO:
+    """Driver details displayed inside vehicle detail responses."""
 
-    Attributes:
-        vehicle_id: Target vehicle to activate.
-        request_id: Correlation ID for tracing.
-        requested_by: UUID of the supervisor/admin performing activation.
-    """
-
-    vehicle_id: uuid.UUID
-    request_id: str
-    requested_by: uuid.UUID
+    id: uuid.UUID | None
+    customer_number: str
+    name: str | None
 
 
 @dataclass(frozen=True)
@@ -115,45 +43,105 @@ class VehicleResponseDTO:
 
     Attributes:
         id: Vehicle UUID.
-        plate_number: Normalised plate string.
-        vin: 17-character VIN.
-        make: Manufacturer name.
-        model: Model name.
-        year: Manufacturing year.
-        category: Operational category.
+        vehicle_number: SAP ``VehicleNumber`` and unique vehicle identifier.
+        license_plate: SAP ``LicensePlate``.
+        commissioning_date: SAP ``CommissioningDate`` in source format.
+        driver1: Main assigned driver display data.
+        driver2: Assistant assigned driver display data.
         status: Current lifecycle status.
         created_at: UTC timestamp of record creation.
         updated_at: UTC timestamp of the last modification.
-        chassis_number: Optional chassis identifier.
-        sap_equipment_number: Optional SAP equipment number.
     """
 
     id: uuid.UUID
-    plate_number: str
-    vin: str
-    make: str
-    model: str
-    year: int
-    category: VehicleCategory
+    vehicle_number: str
+    license_plate: str
     status: VehicleStatus
+    status_label: str
     created_at: datetime
     updated_at: datetime
-    chassis_number: str | None = field(default=None)
-    sap_equipment_number: str | None = field(default=None)
+    commissioning_date: str | None = field(default=None)
+    driver1: VehicleAssignedDriverDTO | None = field(default=None)
+    driver2: VehicleAssignedDriverDTO | None = field(default=None)
 
 
 @dataclass(frozen=True)
 class VehicleSAPSyncResultDTO:
-    """Summary of a bulk SAP equipment → FMMS vehicle synchronisation.
+    """Summary of a bulk SAP vehicle-driver → FMMS synchronisation.
 
     Attributes:
-        total_received: Number of equipment records returned by SAP.
+        total_received: Number of vehicle-driver rows returned by SAP.
         created: Number of new FMMS vehicles created.
         updated: Number of existing FMMS vehicles updated.
+        decommissioned: Number of local vehicles no longer present in SAP.
         failed: Number of records that could not be synced.
     """
 
     total_received: int
     created: int
     updated: int
+    decommissioned: int
     failed: int
+
+
+@dataclass(frozen=True)
+class VehicleSummaryDTO:
+    """Output DTO for vehicle dashboard summary cards."""
+
+    active_fleet_count: int
+    operational_fleet_count: int
+    under_repair_fleet_count: int
+    unusable_fleet_count: int
+    last_sap_sync_at: datetime | None
+    average_odometer_km: float
+    average_faults_last_30_days: float
+
+
+@dataclass(frozen=True)
+class RecordVehicleOdometerDTO:
+    """Input DTO for recording a vehicle daily odometer reading."""
+
+    vehicle_id: uuid.UUID
+    reading_date: date
+    odometer_km: int
+    source: str
+    request_id: str
+    recorded_by: uuid.UUID
+
+
+@dataclass(frozen=True)
+class VehicleOdometerResponseDTO:
+    """Output DTO for a daily odometer reading."""
+
+    id: uuid.UUID
+    vehicle_id: uuid.UUID
+    reading_date: date
+    odometer_km: int
+    source: str
+    recorded_by: uuid.UUID
+    recorded_at: datetime
+    updated_at: datetime
+
+
+@dataclass(frozen=True)
+class VehicleDriverAssignmentHistoryResponseDTO:
+    """Output DTO for a SAP driver-assignment snapshot."""
+
+    id: uuid.UUID
+    sync_run_id: uuid.UUID
+    request_id: str
+    synced_at: datetime
+    vehicle_id: uuid.UUID
+    vehicle_number: str
+    license_plate: str
+    driver_role: str
+    driver_customer_number: str | None
+
+
+@dataclass(frozen=True)
+class VehicleDriverAssignmentSnapshotResponseDTO:
+    """Output DTO for one vehicle driver-assignment snapshot."""
+
+    assigned_at: datetime
+    driver1: VehicleAssignedDriverDTO | None
+    driver2: VehicleAssignedDriverDTO | None

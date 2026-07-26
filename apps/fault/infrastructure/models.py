@@ -19,12 +19,15 @@ class FaultModel(BaseModel):
     description = models.CharField(max_length=500)
     reported_at = models.DateTimeField()
     severity = models.CharField(max_length=10, db_index=True)
-    status = models.CharField(max_length=20, db_index=True)
+    status = models.CharField(max_length=32, db_index=True)
     reported_by_id = models.UUIDField()
     inspection_id = models.UUIDField(null=True, blank=True, default=None)
     sap_defect_code = models.CharField(max_length=30, blank=True, default="")
     sap_notification_number = models.CharField(max_length=30, blank=True, default="")
     assigned_to_id = models.UUIDField(null=True, blank=True, default=None)
+    distribution_decision_note = models.CharField(
+        max_length=500, blank=True, default=""
+    )
 
     class Meta:
         app_label = "fault"
@@ -69,3 +72,37 @@ class FaultItemModel(BaseModel):
 
     def __str__(self) -> str:
         return f"FaultItem {self.id} [{self.component}]"
+
+
+class FaultCatalogModel(BaseModel):
+    """Local cache of SAP defect catalog rows used for manual fault reporting."""
+
+    code_group = models.CharField(max_length=40, db_index=True)
+    code = models.CharField(max_length=40, db_index=True)
+    group_text = models.CharField(max_length=100)
+    code_text = models.CharField(max_length=500)
+    defect_class = models.CharField(max_length=20, db_index=True)
+    defect_class_text = models.CharField(max_length=100)
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        app_label = "fault"
+        db_table = "fault_catalog"
+        verbose_name = "Fault Catalog"
+        verbose_name_plural = "Fault Catalogs"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["code", "code_group"],
+                condition=models.Q(is_deleted=False),
+                name="unique_active_fault_catalog_sap_key",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["is_active", "is_deleted"],
+                name="fault_cat_active_deleted_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.code_group}/{self.code}: {self.code_text}"

@@ -10,6 +10,97 @@ from django.db import models
 from infrastructure.database.base_model import BaseModel
 
 
+class SAPSyncRunModel(BaseModel):
+    """Persistence model for one SAP read synchronisation run."""
+
+    class TriggerSource(models.TextChoices):
+        API = "API", "API"
+        CELERY = "CELERY", "Celery"
+        JOB = "JOB", "Job"
+
+    class Status(models.TextChoices):
+        IN_PROGRESS = "IN_PROGRESS", "In progress"
+        SUCCESS = "SUCCESS", "Success"
+        FAILED = "FAILED", "Failed"
+        PARTIAL_SUCCESS = "PARTIAL_SUCCESS", "Partial success"
+
+    trigger_source = models.CharField(
+        max_length=20,
+        choices=TriggerSource.choices,
+        db_index=True,
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.IN_PROGRESS,
+        db_index=True,
+    )
+    request_id = models.CharField(max_length=100, blank=True, default="", db_index=True)
+    triggered_by_id = models.UUIDField(null=True, blank=True, default=None)
+    started_at = models.DateTimeField(db_index=True)
+    finished_at = models.DateTimeField(null=True, blank=True, default=None)
+    summary = models.JSONField(default=dict)
+    error_message = models.TextField(blank=True, default="")
+
+    class Meta:
+        app_label = "integration"
+        db_table = "sap_sync_run"
+        verbose_name = "SAP Sync Run"
+        verbose_name_plural = "SAP Sync Runs"
+        indexes = [
+            models.Index(
+                fields=["trigger_source", "started_at"],
+                name="sap_sync_run_source_time_idx",
+            ),
+            models.Index(
+                fields=["status", "started_at"],
+                name="sap_sync_run_status_time_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"SAPSyncRun {self.id} [{self.status}]"
+
+
+class SAPSyncRunItemModel(BaseModel):
+    """Persistence model for one item inside a SAP read sync run."""
+
+    sync_run = models.ForeignKey(
+        SAPSyncRunModel,
+        on_delete=models.CASCADE,
+        related_name="items",
+    )
+    name = models.CharField(max_length=100, db_index=True)
+    status = models.CharField(
+        max_length=20,
+        choices=SAPSyncRunModel.Status.choices,
+        db_index=True,
+    )
+    started_at = models.DateTimeField()
+    finished_at = models.DateTimeField()
+    summary = models.JSONField(default=dict)
+    error_message = models.TextField(blank=True, default="")
+
+    class Meta:
+        app_label = "integration"
+        db_table = "sap_sync_run_item"
+        verbose_name = "SAP Sync Run Item"
+        verbose_name_plural = "SAP Sync Run Items"
+        indexes = [
+            models.Index(
+                fields=["name", "finished_at"],
+                name="sap_sync_item_name_time_idx",
+            ),
+            models.Index(
+                fields=["sync_run", "name"],
+                name="sap_sync_item_run_name_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"SAPSyncRunItem {self.name} [{self.status}]"
+
+
 class SAPTransactionModel(BaseModel):
     """Persistence model for a SAP integration transaction aggregate root.
 

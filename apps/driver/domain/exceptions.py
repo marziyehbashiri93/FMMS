@@ -21,32 +21,6 @@ class DriverNotFoundError(DriverDomainError, DomainNotFoundError):
         self.driver_id = driver_id
 
 
-class DriverSuspendedError(DriverDomainError, DomainStateError):
-    """Raised when an operation is attempted on a suspended driver.
-
-    Args:
-        driver_id: The ID of the suspended driver.
-    """
-
-    def __init__(self, driver_id: object) -> None:
-        super().__init__(f"Driver '{driver_id}' is suspended and cannot be assigned.")
-        self.driver_id = driver_id
-
-
-class DriverAlreadyExistsError(DriverDomainError):
-    """Raised when a driver with the same license number already exists.
-
-    Args:
-        license_number: The conflicting license number.
-    """
-
-    def __init__(self, license_number: str) -> None:
-        super().__init__(
-            f"A driver with license number '{license_number}' already exists."
-        )
-        self.license_number = license_number
-
-
 class DriverInvalidStateTransitionError(DriverDomainError, DomainStateError):
     """Raised when a driver status transition is not permitted.
 

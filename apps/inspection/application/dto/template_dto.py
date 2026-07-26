@@ -13,22 +13,20 @@ class InspectionTemplateResponseDTO:
 
     Attributes:
         id: Template UUID.
-        sap_code: SAP object-part code.
-        code_group: SAP code group.
-        category: Checklist category shown to the driver.
-        description: Checklist item description.
-        catalog_type: SAP catalog type.
+        code_group: SAP ``CodeGroup``.
+        code: SAP ``Code``.
+        group_text: SAP ``GroupText``.
+        code_text: SAP ``CodeText``.
         is_active: Whether the template is offered to drivers.
         created_at: Local creation timestamp.
         updated_at: Last sync/update timestamp.
     """
 
     id: uuid.UUID
-    sap_code: str
     code_group: str
-    category: str
-    description: str
-    catalog_type: str
+    code: str
+    group_text: str
+    code_text: str
     is_active: bool
     created_at: datetime
     updated_at: datetime

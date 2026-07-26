@@ -1,0 +1,22 @@
+آدرس  odata کاتالوگ قطعات و زیر مجموعه خودرو:
+http://ghsapsnd-app.gbgnetwork.net:8000/sap/opu/odata/sap/ZI_FLEET_CAT_B_CDS/?$format=xml
+
+
+
+Address Odata - لیست ایرادات:
+
+http://ghsapsnd-app.gbgnetwork.net:8000/sap/opu/odata/sap/ZI_B_DEFECTCATALOG9_CDS/?$format=xml
+
+
+
+آدرس Odataجدول اطلاعات خودرو و راننده :
+
+
+http://ghsapsnd-app.gbgnetwork.net:8000/sap/opu/odata/sap/ZC_VEHICLEDRIVER_CDS/?$format=xml
+
+
+
+آدرس Odata موجودی انبار مرکزی قطعات یدکی:
+
+
+http://ghsapsnd-app.gbgnetwork.net:8000/sap/opu/odata/sap/ZI_STOCK_KH08_CDS/?$format=xml

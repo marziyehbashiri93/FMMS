@@ -34,7 +34,6 @@ from apps.repair.domain.invoice_entities import (
     ExternalRepairInvoice,
     ExternalRepairInvoiceStatus,
 )
-from apps.vehicle.domain.entities import VehicleStatus
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
 from core.exceptions.base_exception import FMMSConflictError
 from core.exceptions.translation import load_or_not_found
@@ -155,15 +154,6 @@ class ApproveExternalInvoiceService:
             fault_id=finalized_order.fault_id,
             fault_repository=self._fault_repo,
         )
-        vehicle = load_or_not_found(
-            lambda: self._vehicle_repo.get_by_id(finalized_order.vehicle_id),
-            message=f"Vehicle '{finalized_order.vehicle_id}' not found.",
-            details={"vehicle_id": str(finalized_order.vehicle_id)},
-        )
-        if vehicle.status != VehicleStatus.ACTIVE:
-            vehicle.activate()
-            vehicle.updated_at = now
-            self._vehicle_repo.save(vehicle)
         record_repair_timeline_event(
             self._event_recorder,
             saved.repair_order_id,
@@ -176,7 +166,7 @@ class ApproveExternalInvoiceService:
             self._event_recorder,
             saved.repair_order_id,
             RepairOrderEventType.EXTERNAL_INVOICE_APPROVED,
-            "تعمیر خارجی تکمیل و خودرو فعال شد.",
+            "تعمیر خارجی تکمیل شد.",
             created_by_id=dto.approved_by,
             request_id=dto.request_id,
         )
@@ -191,9 +181,12 @@ def _assert_external_invoice_upload_allowed(order: RepairOrder) -> None:
             error_code="EXTERNAL_INVOICE_REQUIRES_EXTERNAL_REPAIR",
             details={"repair_order_id": str(order.id)},
         )
-    if order.status != RepairOrderStatus.WAITING_TRANSPORT_FINAL_APPROVAL:
+    if order.status not in {
+        RepairOrderStatus.WAITING_TRANSPORT_FINAL_APPROVAL,
+        RepairOrderStatus.WAITING_EXTERNAL_ADMIN_REVIEW,
+    }:
         raise FMMSConflictError(
-            message="External invoice can only be uploaded after driver handover confirmation.",
+            message="External invoice can only be uploaded after driver pickup confirmation.",
             error_code="EXTERNAL_INVOICE_REQUIRES_DRIVER_CONFIRMATION",
             details={
                 "repair_order_id": str(order.id),
@@ -210,9 +203,12 @@ def _assert_external_invoice_approval_allowed(order: RepairOrder) -> None:
             error_code="EXTERNAL_INVOICE_APPROVAL_REQUIRES_EXTERNAL_REPAIR",
             details={"repair_order_id": str(order.id)},
         )
-    if order.status != RepairOrderStatus.WAITING_TRANSPORT_FINAL_APPROVAL:
+    if order.status not in {
+        RepairOrderStatus.WAITING_TRANSPORT_FINAL_APPROVAL,
+        RepairOrderStatus.WAITING_EXTERNAL_ADMIN_REVIEW,
+    }:
         raise FMMSConflictError(
-            message="External invoice can only be approved while waiting for transport final approval.",
+            message="External invoice can only be approved while waiting for transport administrative review.",
             error_code="EXTERNAL_INVOICE_APPROVAL_INVALID_REPAIR_STATE",
             details={
                 "repair_order_id": str(order.id),
@@ -240,6 +236,6 @@ def _close_fault_for_completed_external_repair(
 
 def _close_open_fault(fault: Fault) -> None:
     """Transition a non-closed fault to CLOSED through valid domain states."""
-    if fault.status == FaultStatus.ASSIGNED:
+    if fault.status in {FaultStatus.ASSIGNED, FaultStatus.AWAITING_TRANSPORT}:
         fault.start_repair()
     fault.close()

@@ -22,12 +22,13 @@ SAP to FMMS:
 -   Material Master
 -   Inventory
 
-Main APIs:
+Main APIs / CDS services:
 
 -   API_EQUIPMENT
 -   API_DEFECTCODE_SRV
 -   API_PRODUCT_SRV
 -   API_MATERIAL_STOCK_SRV
+-   ZI_STOCK_KH08_CDS (central spare-parts warehouse stock, SLoc KH08)
 
 ## Write Integration
 

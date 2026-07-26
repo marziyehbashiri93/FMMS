@@ -1,0 +1,154 @@
+"""OpenAPI schema configuration for vehicle API v1."""
+
+from __future__ import annotations
+
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, extend_schema
+
+from apps.vehicle.domain.entities import VehicleStatus
+from interfaces.api.v1.inspection.serializers import InspectionResponseSerializer
+from interfaces.api.v1.schema_tags import API_TAGS
+from interfaces.api.v1.vehicle.serializers import (
+    VehicleDriverAssignmentSnapshotResponseSerializer,
+    VehicleOdometerRecordSerializer,
+    VehicleOdometerResponseSerializer,
+    VehicleResponseSerializer,
+    VehicleStatusChangeSerializer,
+    VehicleSummarySerializer,
+)
+
+_VEHICLE_ORDERING_FIELDS = [
+    "vehicle_number",
+    "-vehicle_number",
+    "license_plate",
+    "-license_plate",
+    "status",
+    "-status",
+    "created_at",
+    "-created_at",
+    "updated_at",
+    "-updated_at",
+    "commissioning_date",
+    "-commissioning_date",
+]
+
+vehicle_id_parameter = OpenApiParameter(
+    name="id",
+    location=OpenApiParameter.PATH,
+    required=True,
+    type=OpenApiTypes.UUID,
+)
+
+# Standard date-range contract for all date-filter endpoints.
+date_range_parameters = [
+    OpenApiParameter(
+        name="from_date",
+        description=(
+            "Inclusive range start (YYYY-MM-DD). "
+            "Use with to_date for a full date range filter."
+        ),
+        required=False,
+        type=OpenApiTypes.DATE,
+    ),
+    OpenApiParameter(
+        name="to_date",
+        description=(
+            "Inclusive range end (YYYY-MM-DD). "
+            "Must be greater than or equal to from_date when both are provided."
+        ),
+        required=False,
+        type=OpenApiTypes.DATE,
+    ),
+]
+
+retrieve = extend_schema(
+    tags=[API_TAGS.vehicle],
+    parameters=[vehicle_id_parameter],
+    responses=VehicleResponseSerializer,
+)
+
+list = extend_schema(
+    tags=[API_TAGS.vehicle],
+    parameters=[
+        OpenApiParameter(
+            name="status",
+            description="Filter vehicles by lifecycle status. Omit to return all non-deleted vehicles.",
+            required=False,
+            type=str,
+            enum=[item.value for item in VehicleStatus],
+        ),
+        OpenApiParameter(
+            name="ordering",
+            description="Sort vehicles by a supported field. Prefix with '-' for descending order.",
+            required=False,
+            type=str,
+            enum=_VEHICLE_ORDERING_FIELDS,
+        ),
+        OpenApiParameter(
+            name="search",
+            description="Case-insensitive contains filter on license_plate or vehicle_number.",
+            required=False,
+            type=str,
+        ),
+    ],
+    responses=VehicleResponseSerializer(many=True),
+)
+
+summary = extend_schema(
+    tags=[API_TAGS.vehicle],
+    responses=VehicleSummarySerializer,
+)
+
+change_status = extend_schema(
+    tags=[API_TAGS.vehicle],
+    parameters=[vehicle_id_parameter],
+    request=VehicleStatusChangeSerializer,
+    responses=VehicleResponseSerializer,
+)
+
+odometer_current = extend_schema(
+    tags=[API_TAGS.vehicle],
+    methods=["GET"],
+    parameters=[vehicle_id_parameter],
+    responses=VehicleOdometerResponseSerializer,
+)
+
+odometer_record = extend_schema(
+    tags=[API_TAGS.vehicle],
+    methods=["POST"],
+    parameters=[vehicle_id_parameter],
+    request=VehicleOdometerRecordSerializer,
+    responses=VehicleOdometerResponseSerializer,
+)
+
+odometer_history = extend_schema(
+    tags=[API_TAGS.vehicle],
+    parameters=[vehicle_id_parameter, *date_range_parameters],
+    responses=VehicleOdometerResponseSerializer(many=True),
+)
+
+driver_assignment_history = extend_schema(
+    tags=[API_TAGS.vehicle],
+    parameters=[vehicle_id_parameter, *date_range_parameters],
+    responses=VehicleDriverAssignmentSnapshotResponseSerializer(many=True),
+)
+
+checklist_history = extend_schema(
+    tags=[API_TAGS.vehicle],
+    parameters=[vehicle_id_parameter, *date_range_parameters],
+    responses=InspectionResponseSerializer(many=True),
+)
+
+checklist_detail = extend_schema(
+    tags=[API_TAGS.vehicle],
+    parameters=[
+        vehicle_id_parameter,
+        OpenApiParameter(
+            name="inspection_id",
+            location=OpenApiParameter.PATH,
+            required=True,
+            type=OpenApiTypes.UUID,
+        ),
+    ],
+    responses=InspectionResponseSerializer,
+)

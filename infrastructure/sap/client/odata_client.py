@@ -39,12 +39,14 @@ class SAPODataClient(ISAPClient):
         password: str,
         client_code: str,
         timeout_seconds: int = 30,
+        verify_ssl: bool = True,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._username = username
         self._password = password
         self._client_code = client_code
         self._timeout = timeout_seconds
+        self._verify_ssl = verify_ssl
 
     def odata_get(
         self,
@@ -55,7 +57,7 @@ class SAPODataClient(ISAPClient):
         """Execute a GET request against an SAP OData service.
 
         Args:
-            service: The OData service path segment (e.g. ``"API_EQUIPMENT"``)
+            service: The OData service path segment (e.g. ``"ZC_VEHICLEDRIVER_CDS"``)
             entity: The entity set or key expression.
             params: Optional OData query parameters.
 
@@ -73,7 +75,7 @@ class SAPODataClient(ISAPClient):
                 "Install it with: pip install httpx"
             ) from exc
 
-        url = f"{self._base_url}/{service}/{entity}"
+        url = f"{self._base_url}/{service}/{entity}".rstrip("/")
         query_params = {"sap-client": self._client_code, "$format": "json"}
         if params:
             query_params.update(params)
@@ -89,6 +91,7 @@ class SAPODataClient(ISAPClient):
                 params=query_params,
                 auth=(self._username, self._password),
                 timeout=self._timeout,
+                verify=self._verify_ssl,
                 headers={"Accept": "application/json"},
             )
             response.raise_for_status()
@@ -104,6 +107,51 @@ class SAPODataClient(ISAPClient):
             raise SAPClientError(
                 f"SAP OData GET request error: {exc}",
             ) from exc
+
+    def odata_get_xml(
+        self,
+        service: str,
+        entity: str = "",
+        params: dict[str, Any] | None = None,
+    ) -> str:
+        """Execute a GET request and return raw XML."""
+        try:
+            import httpx
+        except ImportError as exc:
+            raise SAPClientError(
+                "httpx is required for SAPODataClient. "
+                "Install it with: pip install httpx"
+            ) from exc
+
+        url = f"{self._base_url}/{service}/{entity}".rstrip("/")
+        query_params = {"sap-client": self._client_code, "$format": "xml"}
+        if params:
+            query_params.update(params)
+
+        logger.debug(
+            "SAP OData GET XML",
+            extra={"service": service, "entity": entity, "url": url},
+        )
+
+        try:
+            response = httpx.get(
+                url,
+                params=query_params,
+                auth=(self._username, self._password),
+                timeout=self._timeout,
+                verify=self._verify_ssl,
+                headers={"Accept": "application/xml, text/xml"},
+            )
+            response.raise_for_status()
+            return response.text
+        except httpx.HTTPStatusError as exc:
+            raise SAPClientError(
+                f"SAP OData GET XML failed: {exc.response.status_code} {exc.response.text}",
+                status_code=exc.response.status_code,
+                raw_response=exc.response.text,
+            ) from exc
+        except httpx.RequestError as exc:
+            raise SAPClientError(f"SAP OData GET XML request error: {exc}") from exc
 
     def odata_post(
         self,
@@ -144,6 +192,7 @@ class SAPODataClient(ISAPClient):
                 json=payload,
                 auth=(self._username, self._password),
                 timeout=self._timeout,
+                verify=self._verify_ssl,
                 headers={
                     "Accept": "application/json",
                     "Content-Type": "application/json",

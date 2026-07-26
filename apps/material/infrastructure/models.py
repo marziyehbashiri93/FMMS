@@ -40,6 +40,12 @@ class MaterialRequestItemModel(models.Model):
     material_number = models.CharField(max_length=18)
     quantity = models.DecimalField(max_digits=12, decimal_places=3)
     unit_of_measure = models.CharField(max_length=10)
+    from_catalog = models.BooleanField(default=True)
+    decision = models.CharField(max_length=20, default="PENDING")
+    item_status = models.CharField(max_length=30, default="PENDING")
+    available_quantity_snapshot = models.DecimalField(
+        max_digits=18, decimal_places=3, null=True, blank=True
+    )
 
     class Meta:
         app_label = "material"
@@ -59,3 +65,53 @@ class InventoryTransactionModel(models.Model):
     class Meta:
         app_label = "material"
         db_table = "inventory_transaction"
+
+
+class CentralStockModel(BaseModel):
+    """Local cache of SAP central spare-parts warehouse stock (KH08)."""
+
+    material = models.CharField(max_length=40, db_index=True)
+    plant = models.CharField(max_length=10, db_index=True)
+    storage_location = models.CharField(max_length=10, db_index=True)
+    inventory_stock_type = models.CharField(max_length=10, db_index=True)
+    material_code = models.CharField(max_length=40, db_index=True)
+    material_name = models.CharField(max_length=255, blank=True, default="")
+    inventory_stock_type_text = models.CharField(max_length=100)
+    quantity = models.DecimalField(max_digits=18, decimal_places=3, default=Decimal("0"))
+    base_unit = models.CharField(max_length=10)
+    stock_value = models.DecimalField(
+        max_digits=18, decimal_places=2, default=Decimal("0")
+    )
+    display_currency = models.CharField(max_length=5, default="")
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        app_label = "material"
+        db_table = "central_stock"
+        verbose_name = "Central Stock"
+        verbose_name_plural = "Central Stock"
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "material",
+                    "plant",
+                    "storage_location",
+                    "inventory_stock_type",
+                ],
+                condition=models.Q(is_deleted=False),
+                name="unique_active_central_stock_sap_key",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["is_active", "is_deleted"],
+                name="central_stock_active_del_idx",
+            ),
+            models.Index(
+                fields=["plant", "storage_location"],
+                name="central_stock_plant_sloc_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.material_code}@{self.storage_location}: {self.quantity}"

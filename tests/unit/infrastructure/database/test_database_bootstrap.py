@@ -6,6 +6,7 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
+from django.test import override_settings
 from psycopg2 import OperationalError
 
 from infrastructure.database.bootstrap import (
@@ -150,6 +151,14 @@ class TestEnsureDatabaseExists:
 class TestEnsureDatabaseFromDjangoSettings:
     """Settings-aware bootstrap skips SQLite test engine."""
 
+    @override_settings(
+        DATABASES={
+            "default": {
+                "ENGINE": "django.db.backends.sqlite3",
+                "NAME": ":memory:",
+            }
+        }
+    )
     def test_sqlite_test_settings_are_skipped(self) -> None:
         """Test settings use SQLite — bootstrap must no-op."""
         connect = MagicMock()

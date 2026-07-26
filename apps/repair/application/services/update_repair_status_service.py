@@ -34,7 +34,14 @@ from apps.repair.application.services.repair_order_timeline_service import (
     RecordRepairOrderEventService,
 )
 from apps.repair.domain.entities import RepairOrderEventType
+from apps.repair.domain.external_workshop_entities import (
+    ExternalWorkshopAssignmentCancellationReason,
+)
+from apps.repair.domain.interfaces.external_workshop_repository import (
+    IExternalWorkshopRepository,
+)
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
+from apps.vehicle.domain.entities import VehicleStatus
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
 from core.exceptions.translation import load_or_not_found
 from core.logging.structured_logger import get_structured_logger
@@ -112,9 +119,10 @@ class StartRepairService:
             message=f"Vehicle '{saved.vehicle_id}' not found.",
             details={"vehicle_id": str(saved.vehicle_id)},
         )
-        vehicle.mark_under_repair()
-        vehicle.updated_at = datetime.now(tz=UTC)
-        self._vehicle_repo.save(vehicle)
+        if vehicle.status != VehicleStatus.UNDER_REPAIR:
+            vehicle.mark_under_repair()
+            vehicle.updated_at = datetime.now(tz=UTC)
+            self._vehicle_repo.save(vehicle)
         record_repair_timeline_event(
             self._event_recorder,
             saved.id,
@@ -191,25 +199,28 @@ class CompleteRepairOrderService:
             details={"repair_order_id": str(dto.repair_order_id)},
         )
 
+        from core.exceptions.base_exception import (  # noqa: PLC0415
+            FMMSConflictError,
+        )
+
+        material_requests = self._material_request_repo.list_by_repair_order(
+            dto.repair_order_id
+        )
         pending_material = [
             request
-            for request in self._material_request_repo.list_by_repair_order(
-                dto.repair_order_id
-            )
+            for request in material_requests
             if request.status
             not in {
                 MaterialRequestStatus.REJECTED,
-                MaterialRequestStatus.STOCK_ISSUED,
                 MaterialRequestStatus.RECEIVED,
             }
         ]
         if pending_material:
-            from core.exceptions.base_exception import (  # noqa: PLC0415
-                FMMSConflictError,
-            )
-
             raise FMMSConflictError(
-                message="Cannot complete repair order with pending material requests.",
+                message=(
+                    "Cannot complete repair until all material requests are "
+                    "physically received or rejected."
+                ),
                 error_code="PENDING_MATERIAL_REQUESTS",
                 details={
                     "repair_order_id": str(dto.repair_order_id),
@@ -217,6 +228,20 @@ class CompleteRepairOrderService:
                         str(item.id) for item in pending_material
                     ],
                 },
+            )
+
+        has_received_parts = any(
+            request.status == MaterialRequestStatus.RECEIVED
+            for request in material_requests
+        )
+        if has_received_parts and not order.parts and not dto.no_parts_consumed:
+            raise FMMSConflictError(
+                message=(
+                    "Record consumed spare parts before completing repair, "
+                    "or explicitly confirm no parts were consumed."
+                ),
+                error_code="CONSUMED_PARTS_REQUIRED",
+                details={"repair_order_id": str(dto.repair_order_id)},
             )
 
         order.complete_waiting_driver_confirmation(completed_at=dto.completed_at)
@@ -227,9 +252,14 @@ class CompleteRepairOrderService:
             message=f"Vehicle '{saved.vehicle_id}' not found.",
             details={"vehicle_id": str(saved.vehicle_id)},
         )
-        vehicle.mark_waiting_driver_confirmation()
-        vehicle.updated_at = datetime.now(tz=UTC)
-        self._vehicle_repo.save(vehicle)
+        if vehicle.status == VehicleStatus.INACTIVE:
+            vehicle.mark_under_repair()
+            vehicle.updated_at = datetime.now(tz=UTC)
+            self._vehicle_repo.save(vehicle)
+        if vehicle.status != VehicleStatus.WAITING_DRIVER_CONFIRMATION:
+            vehicle.mark_waiting_driver_confirmation()
+            vehicle.updated_at = datetime.now(tz=UTC)
+            self._vehicle_repo.save(vehicle)
         self._create_handover_service.execute(
             repair_order_id=saved.id,
             vehicle_id=saved.vehicle_id,
@@ -273,8 +303,15 @@ class CancelRepairOrderService:
         repair_order_repository: Concrete ``IRepairOrderRepository``.
     """
 
-    def __init__(self, repair_order_repository: IRepairOrderRepository) -> None:
+    def __init__(
+        self,
+        repair_order_repository: IRepairOrderRepository,
+        external_workshop_repository: IExternalWorkshopRepository | None = None,
+        event_recorder: RecordRepairOrderEventService | None = None,
+    ) -> None:
         self._repo = repair_order_repository
+        self._external_workshop_repo = external_workshop_repository
+        self._event_recorder = event_recorder
 
     def execute(self, dto: CloseRepairOrderDTO) -> RepairOrderResponseDTO:
         """Cancel the repair order.
@@ -307,9 +344,34 @@ class CancelRepairOrderService:
             details={"repair_order_id": str(dto.repair_order_id)},
         )
 
+        now = datetime.now(tz=UTC)
         order.cancel()
-        order.updated_at = datetime.now(tz=UTC)
+        order.updated_at = now
         saved = self._repo.save(order)
+        if self._external_workshop_repo is not None:
+            assignment = (
+                self._external_workshop_repo.get_active_assignment_by_repair_order(
+                    saved.id
+                )
+            )
+            if assignment is not None:
+                assignment.cancel(
+                    reason=(
+                        ExternalWorkshopAssignmentCancellationReason.REPAIR_ORDER_CANCELLED
+                    ),
+                    cancelled_by_id=dto.requested_by,
+                    cancelled_at=now,
+                    note="Repair order cancelled.",
+                )
+                self._external_workshop_repo.save_assignment(assignment)
+                record_repair_timeline_event(
+                    self._event_recorder,
+                    saved.id,
+                    RepairOrderEventType.EXTERNAL_WORKSHOP_ASSIGNMENT_CANCELLED,
+                    "External workshop assignment cancelled. Reason: Repair Order Cancelled.",
+                    created_by_id=dto.requested_by,
+                    request_id=dto.request_id,
+                )
 
         logger.info(
             "Repair order cancelled",

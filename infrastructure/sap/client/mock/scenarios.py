@@ -44,47 +44,6 @@ _SAP_DUPLICATE_RETURN: list[dict] = [
 ]
 
 # ---------------------------------------------------------------------------
-# OData — API_EQUIPMENT
-# ---------------------------------------------------------------------------
-
-ODATA_EQUIPMENT_SINGLE: dict = {
-    "d": {
-        "EquipmentId": "10000001",
-        "EquipmentDesc": "Fleet Vehicle — Toyota Land Cruiser",
-        "FunctionalLocation": "FLEET-001",
-        "Plant": "P001",
-        "SerialNumber": "SN-LC-2024-001",
-        "EquipmentCategory": "F",
-        "ObjectType": "VEHICLE",
-    }
-}
-
-ODATA_EQUIPMENT_LIST: dict = {
-    "d": {
-        "results": [
-            {
-                "EquipmentId": "10000001",
-                "EquipmentDesc": "Fleet Vehicle — Toyota Land Cruiser",
-                "FunctionalLocation": "FLEET-001",
-                "Plant": "P001",
-                "SerialNumber": "SN-LC-2024-001",
-                "EquipmentCategory": "F",
-                "ObjectType": "VEHICLE",
-            },
-            {
-                "EquipmentId": "10000002",
-                "EquipmentDesc": "Fleet Vehicle — Isuzu D-Max",
-                "FunctionalLocation": "FLEET-002",
-                "Plant": "P001",
-                "SerialNumber": "SN-DM-2024-002",
-                "EquipmentCategory": "F",
-                "ObjectType": "VEHICLE",
-            },
-        ]
-    }
-}
-
-# ---------------------------------------------------------------------------
 # OData — API_DEFECTCODE_SRV
 # ---------------------------------------------------------------------------
 
@@ -275,6 +234,26 @@ BAPI_PM_NOTIFICATION_DUPLICATE: dict = {
     "RETURN": _SAP_DUPLICATE_RETURN,
 }
 
+BAPI_VEHICLE_MEASUREMENT_UPDATE_SUCCESS: dict = {
+    "MEASUREMENT_DOCUMENT": "490000001",
+    "RETURN": _SAP_SUCCESS_RETURN,
+}
+
+BAPI_VEHICLE_MEASUREMENT_UPDATE_ERROR: dict = {
+    "MEASUREMENT_DOCUMENT": "",
+    "RETURN": _SAP_ERROR_RETURN,
+}
+
+BAPI_REPLACEMENT_ASSIGNMENT_SUCCESS: dict = {
+    "ASSIGNMENT_REQUEST_NO": "VA-REQ-0001",
+    "RETURN": _SAP_SUCCESS_RETURN,
+}
+
+BAPI_REPLACEMENT_ASSIGNMENT_ERROR: dict = {
+    "ASSIGNMENT_REQUEST_NO": "",
+    "RETURN": _SAP_ERROR_RETURN,
+}
+
 # ---------------------------------------------------------------------------
 # BAPI — PM Order
 # ---------------------------------------------------------------------------
@@ -292,7 +271,7 @@ BAPI_PM_ORDER_COMPLETE_SUCCESS: dict = {
 BAPI_PM_ORDER_GET_SUCCESS: dict = {
     "ORDER_HEADER_DATA": {
         "ORDERID": "20000001",
-        "EQUNR": "10000001",
+        "EQUNR": "20320",
         "AUART": "PM01",
         "SYSST": "REL",
         "GSTRP": _TODAY,

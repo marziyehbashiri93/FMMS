@@ -101,7 +101,7 @@ secrets/
 credentials/
 
 # SAP credentials / config (never commit)
-prototypes/sap_odata_test/config.ini
+docs/prototypes/sap_odata_test/config.ini
 
 # Node (if any frontend tooling is added)
 node_modules/
@@ -129,5 +129,5 @@ dump.rdb
 *.orig
 
 
-prototypes/*test.db
+docs/prototypes/*test.db
 test_fmms.db

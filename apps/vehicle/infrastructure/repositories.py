@@ -10,19 +10,24 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from apps.vehicle.domain.entities import Vehicle, VehicleCategory, VehicleStatus
+from django.db.models import Q
+
+from apps.vehicle.domain.entities import Vehicle, VehicleStatus
 from apps.vehicle.domain.exceptions import VehicleNotFoundError
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
-from apps.vehicle.domain.value_objects import (
-    VIN,
-    ChassisNumber,
-    PlateNumber,
-    SAPEquipmentNumber,
+from apps.vehicle.domain.value_objects import PlateNumber, SAPVehicleNumber
+from apps.vehicle.infrastructure.models import (
+    VehicleDriverAssignmentHistoryModel,
+    VehicleModel,
 )
-from apps.vehicle.infrastructure.models import VehicleModel
 from core.logging.structured_logger import get_structured_logger
 
 logger = get_structured_logger(domain="vehicle", module=__name__)
+
+# Retired API_EQUIPMENT mock vehicles (plates EQ10000001 / EQ10000002).
+_OBSOLETE_LEGACY_MOCK_VEHICLE_NUMBERS: frozenset[str] = frozenset(
+    {"10000001", "10000002"}
+)
 
 
 def _to_domain(orm: VehicleModel) -> Vehicle:
@@ -36,23 +41,14 @@ def _to_domain(orm: VehicleModel) -> Vehicle:
     """
     return Vehicle(
         id=uuid.UUID(str(orm.id)),
-        plate_number=PlateNumber(orm.plate_number),
-        vin=VIN(orm.vin),
-        make=orm.make,
-        model=orm.model,
-        year=orm.year,
-        category=VehicleCategory(orm.category),
+        vehicle_number=SAPVehicleNumber(orm.vehicle_number),
+        license_plate=PlateNumber(orm.license_plate),
         status=VehicleStatus(orm.status),
         created_at=orm.created_at,
         updated_at=orm.updated_at,
-        chassis_number=(
-            ChassisNumber(orm.chassis_number) if orm.chassis_number else None
-        ),
-        sap_equipment_number=(
-            SAPEquipmentNumber(orm.sap_equipment_number)
-            if orm.sap_equipment_number
-            else None
-        ),
+        commissioning_date=orm.commissioning_date or None,
+        driver1_customer_number=orm.driver1_customer_number or None,
+        driver2_customer_number=orm.driver2_customer_number or None,
     )
 
 
@@ -66,29 +62,22 @@ def _to_orm_dict(vehicle: Vehicle) -> dict[str, object]:
         A dict suitable for ``VehicleModel.objects.update_or_create(defaults=...)``.
     """
     return {
-        "plate_number": vehicle.plate_number.value,
-        "vin": vehicle.vin.value,
-        "make": vehicle.make,
-        "model": vehicle.model,
-        "year": vehicle.year,
-        "category": vehicle.category.value,
+        "vehicle_number": vehicle.vehicle_number.value,
+        "license_plate": vehicle.license_plate.value,
+        "commissioning_date": vehicle.commissioning_date or "",
+        "driver1_customer_number": vehicle.driver1_customer_number or "",
+        "driver2_customer_number": vehicle.driver2_customer_number or "",
         "status": vehicle.status.value,
-        "chassis_number": (
-            vehicle.chassis_number.value if vehicle.chassis_number else ""
-        ),
-        "sap_equipment_number": (
-            vehicle.sap_equipment_number.value if vehicle.sap_equipment_number else ""
-        ),
+        "is_deleted": False,
+        "deleted_at": None,
         "updated_at": datetime.now(tz=UTC),
     }
 
 
 class DjangoVehicleRepository(IVehicleRepository):
-    """Concrete repository for Vehicle aggregates backed by Django ORM.
+    """Concrete repository for Vehicle aggregates backed by Django ORM."""
 
-    Soft-delete is transparent: every read filters ``is_deleted=False``.
-    All public methods accept and return domain entities exclusively.
-    """
+    uses_transactions = True
 
     def get_by_id(self, vehicle_id: uuid.UUID) -> Vehicle:
         """Retrieve a vehicle by UUID.
@@ -100,55 +89,30 @@ class DjangoVehicleRepository(IVehicleRepository):
             The matching ``Vehicle`` domain entity.
 
         Raises:
-            VehicleNotFoundError: If no active vehicle exists with this ID.
+            VehicleNotFoundError: If no vehicle exists with this ID.
         """
         logger.debug("get_by_id", extra={"vehicle_id": str(vehicle_id)})
         try:
-            orm = VehicleModel.objects.get(id=vehicle_id, is_deleted=False)
+            orm = VehicleModel.objects.get(id=vehicle_id)
         except VehicleModel.DoesNotExist:
             raise VehicleNotFoundError(vehicle_id) from None
         return _to_domain(orm)
 
-    def get_by_plate(self, plate_number: PlateNumber) -> Vehicle:
-        """Retrieve a vehicle by plate number.
+    def get_by_vehicle_number(self, vehicle_number: SAPVehicleNumber) -> Vehicle | None:
+        """Retrieve a vehicle by SAP VehicleNumber, if linked.
 
         Args:
-            plate_number: The validated ``PlateNumber`` value object.
-
-        Returns:
-            The matching ``Vehicle`` domain entity.
-
-        Raises:
-            VehicleNotFoundError: If no active vehicle with this plate exists.
-        """
-        logger.debug("get_by_plate", extra={"plate_number": plate_number.value})
-        try:
-            orm = VehicleModel.objects.get(
-                plate_number=plate_number.value, is_deleted=False
-            )
-        except VehicleModel.DoesNotExist:
-            raise VehicleNotFoundError(plate_number.value) from None
-        return _to_domain(orm)
-
-    def get_by_sap_equipment_number(
-        self, sap_equipment_number: SAPEquipmentNumber
-    ) -> Vehicle | None:
-        """Retrieve a vehicle by SAP equipment number, if linked.
-
-        Args:
-            sap_equipment_number: Validated SAP PM equipment number.
+            vehicle_number: Validated SAP VehicleNumber.
 
         Returns:
             The matching ``Vehicle`` domain entity, or ``None``.
         """
         logger.debug(
-            "get_by_sap_equipment_number",
-            extra={"sap_equipment_number": sap_equipment_number.value},
+            "get_by_vehicle_number",
+            extra={"vehicle_number": vehicle_number.value},
         )
-        orm = VehicleModel.objects.filter(
-            sap_equipment_number=sap_equipment_number.value,
-            is_deleted=False,
-        ).first()
+        qs = VehicleModel.objects.filter(vehicle_number=vehicle_number.value)
+        orm = qs.first()
         return _to_domain(orm) if orm else None
 
     def list_active(self) -> list[Vehicle]:
@@ -157,9 +121,7 @@ class DjangoVehicleRepository(IVehicleRepository):
         Returns:
             A list of active ``Vehicle`` domain entities.
         """
-        qs = VehicleModel.objects.filter(
-            status=VehicleStatus.ACTIVE.value, is_deleted=False
-        )
+        qs = VehicleModel.objects.filter(status=VehicleStatus.ACTIVE.value)
         return [_to_domain(orm) for orm in qs]
 
     def list_by_status(self, status: VehicleStatus) -> list[Vehicle]:
@@ -171,21 +133,34 @@ class DjangoVehicleRepository(IVehicleRepository):
         Returns:
             A list of matching ``Vehicle`` domain entities.
         """
-        qs = VehicleModel.objects.filter(status=status.value, is_deleted=False)
+        qs = VehicleModel.objects.filter(status=status.value)
         return [_to_domain(orm) for orm in qs]
 
-    def exists_by_plate(self, plate_number: PlateNumber) -> bool:
-        """Check whether a non-deleted vehicle with the given plate exists.
+    def list_filtered(
+        self,
+        *,
+        status: VehicleStatus | None = None,
+        ordering: str = "",
+        search: str = "",
+    ) -> list[Vehicle]:
+        """Return vehicles filtered and ordered by database query.
 
-        Args:
-            plate_number: The plate number to check.
-
-        Returns:
-            ``True`` if a vehicle with this plate exists.
+        When ``status`` is omitted, all non-deleted vehicles are returned so
+        the UI ``همه وضعیت‌ها`` filter and plate/number search cover the full
+        fleet (not only ``ACTIVE``).
         """
-        return VehicleModel.objects.filter(
-            plate_number=plate_number.value, is_deleted=False
-        ).exists()
+        qs = VehicleModel.objects.filter(is_deleted=False)
+        if status is not None:
+            qs = qs.filter(status=status.value)
+        needle = search.strip()
+        if needle:
+            qs = qs.filter(
+                Q(license_plate__icontains=needle)
+                | Q(vehicle_number__icontains=needle)
+            )
+        if ordering:
+            qs = qs.order_by(ordering)
+        return [_to_domain(orm) for orm in qs]
 
     def save(self, vehicle: Vehicle) -> Vehicle:
         """Persist a new or updated vehicle.
@@ -199,8 +174,7 @@ class DjangoVehicleRepository(IVehicleRepository):
             The same ``Vehicle`` entity (unchanged).
 
         Raises:
-            VehicleAlreadyExistsError: If a different vehicle already holds
-                this plate number (unique constraint violation).
+            IntegrityError: If another vehicle already holds the same SAP key.
         """
         logger.debug("save", extra={"vehicle_id": str(vehicle.id)})
         defaults = _to_orm_dict(vehicle)
@@ -217,19 +191,60 @@ class DjangoVehicleRepository(IVehicleRepository):
         )
         return vehicle
 
-    def delete(self, vehicle_id: uuid.UUID) -> None:
-        """Soft-delete a vehicle record.
+    def decommission_missing_from_sap(self, seen_vehicle_numbers: set[str]) -> int:
+        """Mark vehicles absent from SAP as DECOMMISSIONED without soft-delete.
 
-        Args:
-            vehicle_id: UUID of the vehicle to delete.
-
-        Raises:
-            VehicleNotFoundError: If no active vehicle exists with this ID.
+        Also hard-deletes retired demo equipment rows (``10000001`` /
+        ``10000002`` / ``EQ…`` plates) left over from the old
+        ``API_EQUIPMENT`` mock so they never reappear in the vehicle list.
         """
-        logger.debug("delete", extra={"vehicle_id": str(vehicle_id)})
-        updated = VehicleModel.objects.filter(id=vehicle_id, is_deleted=False).update(
-            is_deleted=True,
-            deleted_at=datetime.now(tz=UTC),
+        now = datetime.now(tz=UTC)
+        qs = VehicleModel.objects.exclude(
+            status=VehicleStatus.DECOMMISSIONED.value
+        ).exclude(vehicle_number="")
+        if seen_vehicle_numbers:
+            qs = qs.exclude(vehicle_number__in=seen_vehicle_numbers)
+        updated = qs.update(
+            status=VehicleStatus.DECOMMISSIONED.value,
+            updated_at=now,
         )
-        if updated == 0:
-            raise VehicleNotFoundError(vehicle_id)
+        VehicleModel.objects.filter(
+            vehicle_number__in=_OBSOLETE_LEGACY_MOCK_VEHICLE_NUMBERS
+        ).delete()
+        return updated
+
+    def record_driver_assignment_snapshot(
+        self,
+        *,
+        vehicle: Vehicle,
+        sync_run_id: uuid.UUID,
+        synced_at: datetime,
+        request_id: str = "",
+    ) -> None:
+        """Persist both SAP driver roles for one vehicle sync occurrence."""
+        VehicleDriverAssignmentHistoryModel.objects.bulk_create(
+            [
+                VehicleDriverAssignmentHistoryModel(
+                    sync_run_id=sync_run_id,
+                    request_id=request_id,
+                    synced_at=synced_at,
+                    vehicle_id=vehicle.id,
+                    vehicle_number=vehicle.vehicle_number.value,
+                    license_plate=vehicle.license_plate.value,
+                    driver_role=VehicleDriverAssignmentHistoryModel.DriverRole.DRIVER,
+                    driver_customer_number=vehicle.driver1_customer_number or "",
+                ),
+                VehicleDriverAssignmentHistoryModel(
+                    sync_run_id=sync_run_id,
+                    request_id=request_id,
+                    synced_at=synced_at,
+                    vehicle_id=vehicle.id,
+                    vehicle_number=vehicle.vehicle_number.value,
+                    license_plate=vehicle.license_plate.value,
+                    driver_role=(
+                        VehicleDriverAssignmentHistoryModel.DriverRole.ASSISTANT
+                    ),
+                    driver_customer_number=vehicle.driver2_customer_number or "",
+                ),
+            ]
+        )

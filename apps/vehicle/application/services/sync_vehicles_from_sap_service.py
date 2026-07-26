@@ -1,147 +1,104 @@
-"""Bulk synchronisation of SAP PM equipment master data into FMMS vehicles.
+"""Bulk synchronisation of SAP vehicle-driver data into FMMS.
 
-SAP remains the master-data owner. FMMS imports equipment records and
-creates or updates local vehicle aggregates idempotently by SAP equipment
-number.
+SAP remains the master-data owner. FMMS imports ``ZC_VEHICLEDRIVER_CDS`` rows
+and creates or updates local vehicle and driver records idempotently.
 """
 
 from __future__ import annotations
 
 import uuid
+from contextlib import AbstractContextManager, nullcontext
 from datetime import UTC, datetime
 
+from django.db import IntegrityError, transaction
+
+from apps.driver.domain.entities import Driver, DriverStatus
+from apps.driver.domain.exceptions import DriverNotFoundError
+from apps.driver.domain.interfaces.driver_repository import IDriverRepository
+from apps.driver.domain.value_objects import CustomerNumber
 from apps.vehicle.application.dto.vehicle_dto import VehicleSAPSyncResultDTO
-from apps.vehicle.domain.entities import Vehicle, VehicleCategory, VehicleStatus
+from apps.vehicle.domain.entities import Vehicle, VehicleStatus
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
-from apps.vehicle.domain.value_objects import (
-    VIN,
-    ChassisNumber,
-    PlateNumber,
-    SAPEquipmentNumber,
-)
+from apps.vehicle.domain.value_objects import PlateNumber, SAPVehicleNumber
 from core.logging.structured_logger import get_structured_logger
-from core.sap.dtos.equipment import SAPEquipmentDTO
-from core.sap.ports.equipment_port import ISAPEquipmentPort
+from core.sap.dtos.vehicle_driver import SAPVehicleDriverDTO
+from core.sap.ports.vehicle_driver_port import ISAPVehicleDriverPort
 
 logger = get_structured_logger("vehicle", __name__)
 
-_DEFAULT_YEAR = 2024
-_DEFAULT_MAKE = "SAP"
 
-
-def _parse_make_model(description: str) -> tuple[str, str]:
-    """Derive make/model from an SAP equipment description.
+def _deterministic_plate(vehicle_number: str) -> str:
+    """Build a stable FMMS plate from SAP VehicleNumber.
 
     Args:
-        description: Free-text SAP equipment description.
-
-    Returns:
-        ``(make, model)`` pair.
-    """
-    text = (description or "").strip()
-    if " — " in text:
-        left, right = text.split(" — ", 1)
-        if "Toyota" in right or "Isuzu" in right or " " in right:
-            parts = right.split(None, 1)
-            if len(parts) == 2:
-                return parts[0], parts[1]
-            return _DEFAULT_MAKE, right
-        return left.strip() or _DEFAULT_MAKE, right.strip() or text
-    if not text:
-        return _DEFAULT_MAKE, "Unknown"
-    return _DEFAULT_MAKE, text
-
-
-def _map_category(sap_category: str | None) -> VehicleCategory:
-    """Map SAP equipment category codes to FMMS vehicle categories.
-
-    Args:
-        sap_category: Optional SAP equipment category code.
-
-    Returns:
-        Matching ``VehicleCategory``.
-    """
-    if sap_category in {"F", "L", "LIGHT"}:
-        return VehicleCategory.LIGHT
-    if sap_category in {"H", "HEAVY"}:
-        return VehicleCategory.HEAVY
-    if sap_category in {"M", "MOTORCYCLE"}:
-        return VehicleCategory.MOTORCYCLE
-    return VehicleCategory.SPECIAL
-
-
-def _deterministic_plate(equipment_number: str) -> str:
-    """Build a stable FMMS plate from the SAP equipment number.
-
-    Args:
-        equipment_number: SAP equipment number digits.
+        vehicle_number: SAP VehicleNumber digits.
 
     Returns:
         Plate string within the PlateNumber length limit.
     """
-    return f"EQ{equipment_number}"[-20:]
+    return f"VN{vehicle_number}"[-20:]
 
 
-def _deterministic_vin(equipment_number: str) -> str:
-    """Build a stable ISO-3779-compatible VIN from the SAP equipment number.
-
-    Args:
-        equipment_number: SAP equipment number digits.
-
-    Returns:
-        Exactly 17 alphanumeric characters without I/O/Q.
-    """
-    digits = "".join(ch for ch in equipment_number if ch.isdigit()).zfill(12)[-12:]
-    return f"FMMS0{digits}"
-
-
-def _apply_sap_fields(vehicle: Vehicle, sap_dto: SAPEquipmentDTO) -> None:
-    """Update mutable vehicle fields from an SAP equipment DTO.
+def _apply_sap_fields(vehicle: Vehicle, sap_dto: SAPVehicleDriverDTO) -> None:
+    """Update mutable vehicle fields from an SAP vehicle-driver DTO.
 
     Args:
         vehicle: Target vehicle aggregate.
-        sap_dto: Source SAP equipment record.
+        sap_dto: Source SAP vehicle-driver row.
     """
-    make, model = _parse_make_model(sap_dto.description)
-    vehicle.make = make
-    vehicle.model = model
-    vehicle.category = _map_category(sap_dto.category)
-    if sap_dto.serial_number:
-        vehicle.chassis_number = ChassisNumber(sap_dto.serial_number[:50])
-    vehicle.sap_equipment_number = SAPEquipmentNumber(sap_dto.equipment_number)
+    if sap_dto.license_plate:
+        vehicle.license_plate = PlateNumber(sap_dto.license_plate)
+    vehicle.vehicle_number = SAPVehicleNumber(sap_dto.vehicle_number)
+    vehicle.commissioning_date = sap_dto.commissioning_date
+    vehicle.driver1_customer_number = sap_dto.driver1_customer_number
+    vehicle.driver2_customer_number = sap_dto.driver2_customer_number
     vehicle.updated_at = datetime.now(tz=UTC)
 
 
+def _driver_customer_numbers_from_sap(sap_dto: SAPVehicleDriverDTO) -> set[str]:
+    """Return valid SAP driver customer numbers carried by one SAP row."""
+    seen: set[str] = set()
+    for customer_no in (
+        sap_dto.driver1_customer_number,
+        sap_dto.driver2_customer_number,
+    ):
+        if customer_no:
+            seen.add(CustomerNumber(customer_no).value)
+    return seen
+
+
 class SyncVehiclesFromSAPService:
-    """Import/create/update FMMS vehicles from SAP equipment master data.
+    """Import/create/update FMMS vehicles and drivers from SAP vehicle-driver data.
 
     Args:
         vehicle_repository: Concrete ``IVehicleRepository``.
-        sap_equipment_port: Concrete ``ISAPEquipmentPort``.
+        sap_vehicle_driver_port: Concrete ``ISAPVehicleDriverPort``.
     """
 
     def __init__(
         self,
         vehicle_repository: IVehicleRepository,
-        sap_equipment_port: ISAPEquipmentPort,
+        sap_vehicle_driver_port: ISAPVehicleDriverPort,
+        driver_repository: IDriverRepository | None = None,
     ) -> None:
         self._repo = vehicle_repository
-        self._sap = sap_equipment_port
+        self._sap = sap_vehicle_driver_port
+        self._driver_repo = driver_repository
 
     def execute(
         self,
         request_id: str = "",
         plant: str | None = None,
     ) -> VehicleSAPSyncResultDTO:
-        """Synchronise all SAP equipment records into FMMS vehicles.
+        """Synchronise SAP vehicle-driver rows into FMMS.
 
-        Matching key is ``sap_equipment_number``. Existing vehicles are
+        Matching key is SAP ``VehicleNumber``. Existing vehicles are
         updated; missing vehicles are created. Failures are counted and
         do not abort the remaining records.
 
         Args:
             request_id: Optional correlation ID for structured logging.
-            plant: Optional SAP plant filter for ``list_equipment``.
+            plant: Optional reserved filter passed to the SAP port.
 
         Returns:
             ``VehicleSAPSyncResultDTO`` with create/update/fail counts.
@@ -157,36 +114,64 @@ class SyncVehiclesFromSAPService:
             },
         )
 
-        equipment_list = self._sap.list_equipment(plant=plant)
+        sap_rows = self._sap.list_vehicle_drivers(plant=plant)
         created = 0
         updated = 0
+        decommissioned = 0
         failed = 0
+        seen_vehicle_numbers: set[str] = set()
+        seen_driver_customer_numbers: set[str] = set()
+        sync_run_id = uuid.uuid4()
+        synced_at = datetime.now(tz=UTC)
 
-        for sap_dto in equipment_list:
+        for sap_dto in sap_rows:
             try:
-                if self._sync_one(sap_dto):
-                    created += 1
-                else:
-                    updated += 1
-            except Exception as exc:  # noqa: BLE001 — per-record isolation
+                with self._atomic_if_supported():
+                    seen_vehicle_numbers.add(SAPVehicleNumber(sap_dto.vehicle_number).value)
+                    seen_driver_customer_numbers.update(
+                        _driver_customer_numbers_from_sap(sap_dto)
+                    )
+                    was_created, vehicle = self._sync_one(sap_dto)
+                    self._repo.record_driver_assignment_snapshot(
+                        vehicle=vehicle,
+                        sync_run_id=sync_run_id,
+                        synced_at=synced_at,
+                        request_id=request_id,
+                    )
+                    if was_created:
+                        created += 1
+                    else:
+                        updated += 1
+                    self._sync_drivers(sap_dto)
+            except (ValueError, IntegrityError) as exc:
                 failed += 1
                 logger.error(
-                    "Failed to sync SAP equipment record",
+                    "Failed to sync SAP vehicle-driver row",
                     extra={
                         "domain": "vehicle",
                         "service": "SyncVehiclesFromSAPService",
                         "operation": "execute",
                         "request_id": request_id,
-                        "sap_equipment_number": sap_dto.equipment_number,
+                        "vehicle_number": sap_dto.vehicle_number,
                         "exception": str(exc),
                     },
                     exc_info=True,
                 )
 
+        with self._atomic_if_supported():
+            decommissioned = self._repo.decommission_missing_from_sap(
+                seen_vehicle_numbers
+            )
+            if self._driver_repo is not None:
+                self._driver_repo.decommission_missing_from_sap(
+                    seen_driver_customer_numbers
+                )
+
         result = VehicleSAPSyncResultDTO(
-            total_received=len(equipment_list),
+            total_received=len(sap_rows),
             created=created,
             updated=updated,
+            decommissioned=decommissioned,
             failed=failed,
         )
         logger.info(
@@ -200,46 +185,101 @@ class SyncVehiclesFromSAPService:
                 "total_received": result.total_received,
                 "created_count": result.created,
                 "updated_count": result.updated,
+                "decommissioned_count": result.decommissioned,
                 "failed_count": result.failed,
             },
         )
         return result
 
-    def _sync_one(self, sap_dto: SAPEquipmentDTO) -> bool:
-        """Create or update one vehicle from an SAP equipment DTO.
+    def _sync_one(self, sap_dto: SAPVehicleDriverDTO) -> tuple[bool, Vehicle]:
+        """Create or update one vehicle from an SAP vehicle-driver DTO.
 
         Args:
-            sap_dto: SAP equipment master record.
+            sap_dto: SAP vehicle-driver row.
 
         Returns:
-            ``True`` when a new vehicle was created, ``False`` when updated.
+            Tuple of created flag and saved vehicle.
         """
-        sap_number = SAPEquipmentNumber(sap_dto.equipment_number)
-        existing = self._repo.get_by_sap_equipment_number(sap_number)
+        sap_number = SAPVehicleNumber(sap_dto.vehicle_number)
+        existing = self._repo.get_by_vehicle_number(sap_number)
         if existing is not None:
             _apply_sap_fields(existing, sap_dto)
-            self._repo.save(existing)
-            return False
+            saved = self._repo.save(existing)
+            return False, saved
 
         now = datetime.now(tz=UTC)
-        make, model = _parse_make_model(sap_dto.description)
         vehicle = Vehicle(
             id=uuid.uuid4(),
-            plate_number=PlateNumber(_deterministic_plate(sap_dto.equipment_number)),
-            vin=VIN(_deterministic_vin(sap_dto.equipment_number)),
-            make=make,
-            model=model,
-            year=_DEFAULT_YEAR,
-            category=_map_category(sap_dto.category),
+            vehicle_number=sap_number,
+            license_plate=PlateNumber(
+                sap_dto.license_plate or _deterministic_plate(sap_dto.vehicle_number)
+            ),
             status=VehicleStatus.ACTIVE,
             created_at=now,
             updated_at=now,
-            chassis_number=(
-                ChassisNumber(sap_dto.serial_number[:50])
-                if sap_dto.serial_number
-                else None
-            ),
-            sap_equipment_number=sap_number,
+            commissioning_date=sap_dto.commissioning_date,
+            driver1_customer_number=sap_dto.driver1_customer_number,
+            driver2_customer_number=sap_dto.driver2_customer_number,
         )
-        self._repo.save(vehicle)
-        return True
+        saved = self._repo.save(vehicle)
+        return True, saved
+
+    def _sync_drivers(self, sap_dto: SAPVehicleDriverDTO) -> None:
+        if self._driver_repo is None:
+            return
+        driver_specs = [
+            (
+                sap_dto.driver1_customer_number,
+                sap_dto.driver1_name,
+                sap_dto.driver1_mobile,
+                sap_dto.driver1_personnel_number,
+                sap_dto.driver1_gender,
+                sap_dto.driver1_nilofar_code,
+            ),
+            (
+                sap_dto.driver2_customer_number,
+                sap_dto.driver2_name,
+                sap_dto.driver2_mobile,
+                sap_dto.driver2_personnel_number,
+                sap_dto.driver2_gender,
+                sap_dto.driver2_nilofar_code,
+            ),
+        ]
+        for (
+            customer_no,
+            name,
+            mobile,
+            personnel_no,
+            gender,
+            nilofar_code,
+        ) in driver_specs:
+            if not customer_no:
+                continue
+            customer_number = CustomerNumber(customer_no)
+            try:
+                driver = self._driver_repo.get_by_customer_number(customer_number)
+            except DriverNotFoundError:
+                now = datetime.now(tz=UTC)
+                driver = Driver(
+                    id=uuid.uuid4(),
+                    customer_number=customer_number,
+                    name=name or customer_no,
+                    status=DriverStatus.ACTIVE,
+                    created_at=now,
+                    updated_at=now,
+                )
+            driver.name = name or driver.name
+            driver.mobile = mobile
+            driver.personnel_number = personnel_no
+            driver.gender = gender
+            driver.nilofar_code = nilofar_code
+            if driver.status == DriverStatus.DECOMMISSIONED:
+                driver.reactivate()
+            driver.updated_at = datetime.now(tz=UTC)
+            self._driver_repo.save(driver)
+
+    def _atomic_if_supported(self) -> AbstractContextManager[object]:
+        """Use database transactions only for repositories backed by Django ORM."""
+        if getattr(self._repo, "uses_transactions", False):
+            return transaction.atomic()
+        return nullcontext()

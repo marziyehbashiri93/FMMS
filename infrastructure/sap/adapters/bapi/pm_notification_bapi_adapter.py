@@ -70,7 +70,7 @@ class PMNotificationBAPIAdapter(ISAPPMNotificationPort):
         assert_bapi_success(result, context="PM Notification create")
 
         return SAPNotificationDTO(
-            notification_number=result.get("NOTIFNO", ""),
+            notification_number=_notification_number_from_result(result),
             equipment_number=request.equipment_number,
             status="OPEN",
             created_at=datetime.now(tz=UTC),
@@ -117,15 +117,17 @@ class PMNotificationBAPIAdapter(ISAPPMNotificationPort):
     @staticmethod
     def _build_create_params(request: CreatePMNotificationRequest) -> dict[str, Any]:
         """Build the BAPI import parameter dictionary from the request DTO."""
+        reported_date = request.reported_at.strftime("%Y%m%d")
         return {
-            "NOTIF_TYPE": "M2",
+            "NOTIF_TYPE": request.notification_type,
+            "EQUIPMENT": request.equipment_number,
+            "DESCRIPT": request.fault_description[:40],
             "NOTIFHEADER": {
-                "EQUNR": request.equipment_number,
-                "PRIOK": request.priority,
-                "SHORT_TEXT": request.fault_description[:40],
+                "STRMLFNDATE": reported_date,
+                "DESSTDATE": reported_date,
                 "FUNCT_LOC": request.functional_location or "",
+                "PRIOK": request.priority,
                 "REPORTEDBY": request.reported_by,
-                "REQSTART_D": request.reported_at.strftime("%Y%m%d"),
             },
             "NOTIFCAUS": [
                 {
@@ -134,3 +136,13 @@ class PMNotificationBAPIAdapter(ISAPPMNotificationPort):
                 }
             ],
         }
+
+
+def _notification_number_from_result(result: dict[str, Any]) -> str:
+    """Extract the notification number from known SAP response shapes."""
+    header = result.get("NOTIFHEADER_EXPORT")
+    if isinstance(header, dict):
+        notification_number = header.get("NOTIF_NO")
+        if notification_number:
+            return str(notification_number)
+    return str(result.get("NOTIFNO", ""))

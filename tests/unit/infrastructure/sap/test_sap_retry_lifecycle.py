@@ -26,6 +26,7 @@ from apps.integration.domain.exceptions import (
 from apps.integration.domain.interfaces.sap_transaction_repository import (
     ISAPTransactionRepository,
 )
+from core.sap.dtos.measurement_document import SAPMeasurementDocumentDTO
 from core.sap.dtos.pm_notification import SAPNotificationDTO
 from core.sap.dtos.pm_order import SAPPMOrderDTO
 from core.sap.dtos.purchase_requisition import (
@@ -33,6 +34,7 @@ from core.sap.dtos.purchase_requisition import (
     SAPPRLineItemDTO,
     SAPPurchaseRequisitionDTO,
 )
+from core.sap.dtos.vehicle_assignment import SAPVehicleAssignmentRequestDTO
 from infrastructure.sap.transaction.sap_transaction_manager import SAPTransactionManager
 
 
@@ -203,6 +205,8 @@ class TestRetryFailedSAPTransactionsServicePayloadRebuild:
         )
         order_port = MagicMock()
         notif_port = MagicMock()
+        measurement_port = MagicMock()
+        vehicle_assignment_port = MagicMock()
 
         def capture_map(adapter_map: dict) -> None:
             payload = {
@@ -228,7 +232,12 @@ class TestRetryFailedSAPTransactionsServicePayloadRebuild:
 
         manager.retry_all_pending.side_effect = capture_map
         RetryFailedSAPTransactionsService(
-            manager, pr_port, order_port, notif_port
+            manager,
+            pr_port,
+            order_port,
+            notif_port,
+            measurement_port,
+            vehicle_assignment_port,
         ).execute(request_id="corr-rebuild")
         manager.retry_all_pending.assert_called_once()
 
@@ -250,6 +259,25 @@ class TestRetryFailedSAPTransactionsServicePayloadRebuild:
             equipment_number="100001",
             status="OSNO",
             created_at=datetime.now(tz=UTC),
+        )
+        measurement_port = MagicMock()
+        measurement_port.update_vehicle_odometer.return_value = (
+            SAPMeasurementDocumentDTO(
+                measurement_document_number="49001111",
+                equipment_number="100001",
+                notification_number="10001111",
+                odometer_km=125000,
+                created_at=datetime.now(tz=UTC),
+            )
+        )
+        vehicle_assignment_port = MagicMock()
+        vehicle_assignment_port.request_replacement_assignment.return_value = (
+            SAPVehicleAssignmentRequestDTO(
+                assignment_request_number="VA-REQ-0001",
+                driver_customer_number="6000001001",
+                unavailable_vehicle_number="300001",
+                created_at=datetime.now(tz=UTC),
+            )
         )
 
         def capture_map(adapter_map: dict) -> None:
@@ -275,7 +303,36 @@ class TestRetryFailedSAPTransactionsServicePayloadRebuild:
             _, notif_doc = adapter_map[SAPObjectType.PM_WORK_ORDER](notif_payload)
             assert notif_doc == "10001111"
 
+            measurement_payload = {
+                "equipment_number": "100001",
+                "notification_number": "10001111",
+                "odometer_km": 125000,
+                "recorded_at": datetime.now(tz=UTC).isoformat(),
+                "notification_type": "EM",
+            }
+            _, measurement_doc = adapter_map[SAPObjectType.MEASUREMENT_DOCUMENT](
+                measurement_payload
+            )
+            assert measurement_doc == "49001111"
+
+            assignment_payload = {
+                "fault_id": str(uuid.uuid4()),
+                "driver_customer_number": "6000001001",
+                "unavailable_vehicle_number": "300001",
+                "requested_at": datetime.now(tz=UTC).isoformat(),
+                "reason": "خرابی تایید شد",
+            }
+            _, assignment_doc = adapter_map[SAPObjectType.VEHICLE_ASSIGNMENT](
+                assignment_payload
+            )
+            assert assignment_doc == "VA-REQ-0001"
+
         manager.retry_all_pending.side_effect = capture_map
         RetryFailedSAPTransactionsService(
-            manager, pr_port, order_port, notif_port
+            manager,
+            pr_port,
+            order_port,
+            notif_port,
+            measurement_port,
+            vehicle_assignment_port,
         ).execute(request_id="corr-rebuild-2")

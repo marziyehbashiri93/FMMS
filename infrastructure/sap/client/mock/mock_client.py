@@ -10,7 +10,7 @@ Simulates four scenarios configurable per-instance or per-call:
 Usage::
 
     client = MockSAPClient(scenario=SAPMockScenario.SUCCESS)
-    response = client.odata_get("API_EQUIPMENT", "Equipment('10000001')")
+    response = client.odata_get_xml("ZC_VEHICLEDRIVER_CDS")
 
     # Override scenario per call:
     response = client.bapi_call(
@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import logging
 from enum import StrEnum
+from pathlib import Path
 from typing import Any
 
 from infrastructure.sap.client.base import ISAPClient, SAPClientError
@@ -53,8 +54,6 @@ class SAPMockScenario(StrEnum):
 # ---------------------------------------------------------------------------
 
 _ODATA_GET_ROUTES: dict[tuple[str, str], dict] = {
-    ("API_EQUIPMENT", "Equipment("): sc.ODATA_EQUIPMENT_SINGLE,
-    ("API_EQUIPMENT", "EquipmentSet"): sc.ODATA_EQUIPMENT_LIST,
     ("API_DEFECTCODE_SRV", "DefectCode("): sc.ODATA_DEFECT_CODE_SINGLE,
     ("API_DEFECTCODE_SRV", "DefectCodeSet"): sc.ODATA_DEFECT_CODE_LIST,
     ("OBJECT_PART_CATALOG", "CatalogSet"): sc.ODATA_OBJECT_PART_LIST,
@@ -63,6 +62,20 @@ _ODATA_GET_ROUTES: dict[tuple[str, str], dict] = {
     ("API_PRODUCT_SRV", "A_ProductPlant"): sc.ODATA_MATERIAL_LIST,
     ("API_MATERIAL_STOCK_SRV", "MatlStkInAcctMod("): sc.ODATA_STOCK_SINGLE,
     ("API_MATERIAL_STOCK_SRV", "MatlStkInAcctMod"): sc.ODATA_STOCK_LIST,
+}
+
+_BASE_DIR = Path(__file__).resolve().parents[4]
+_ODATA_XML_ROUTES: dict[str, Path] = {
+    "ZC_VEHICLEDRIVER_CDS": _BASE_DIR
+    / "docs"
+    / "odata"
+    / "جدول اطلاعات خودرو و راننده.xml",
+    "ZI_FLEET_CAT_B_CDS": _BASE_DIR / "docs" / "odata" / "چک لیست روزانه.xml",
+    "ZI_B_DEFECTCATALOG9_CDS": _BASE_DIR / "docs" / "odata" / "ایرادات.xml",
+    "ZI_STOCK_KH08_CDS": _BASE_DIR
+    / "docs"
+    / "odata"
+    / "موجودی انبار مرکزی قطعات یدکی.xml",
 }
 
 # BAPI response routing — maps function_module → (success, error, duplicate)
@@ -76,6 +89,16 @@ _BAPI_ROUTES: dict[str, tuple[dict, dict, dict]] = {
         sc.BAPI_PM_NOTIFICATION_CLOSE_SUCCESS,
         sc.BAPI_PM_NOTIFICATION_ERROR,
         sc.BAPI_PM_NOTIFICATION_ERROR,
+    ),
+    "MEASUREM_DOCUM_RFC_SINGLE_001": (
+        sc.BAPI_VEHICLE_MEASUREMENT_UPDATE_SUCCESS,
+        sc.BAPI_VEHICLE_MEASUREMENT_UPDATE_ERROR,
+        sc.BAPI_VEHICLE_MEASUREMENT_UPDATE_ERROR,
+    ),
+    "ZFM_FLEET_ASSIGN_REPLACEMENT": (
+        sc.BAPI_REPLACEMENT_ASSIGNMENT_SUCCESS,
+        sc.BAPI_REPLACEMENT_ASSIGNMENT_ERROR,
+        sc.BAPI_REPLACEMENT_ASSIGNMENT_ERROR,
     ),
     "BAPI_ALM_ORDER_MAINTAIN": (
         sc.BAPI_PM_ORDER_CREATE_SUCCESS,
@@ -170,8 +193,8 @@ class MockSAPClient(ISAPClient):
     Example::
 
         client = MockSAPClient(scenario=SAPMockScenario.SUCCESS)
-        result = client.odata_get("API_EQUIPMENT", "EquipmentSet")
-        assert "d" in result
+        result = client.odata_get_xml("ZC_VEHICLEDRIVER_CDS")
+        assert "VehicleNumber" in result
     """
 
     def __init__(self, scenario: SAPMockScenario = SAPMockScenario.SUCCESS) -> None:
@@ -190,7 +213,6 @@ class MockSAPClient(ISAPClient):
         for (svc, entity_prefix), response in _ODATA_GET_ROUTES.items():
             if svc == service and entity.startswith(entity_prefix):
                 return response
-        # Fall back to equipment list as a safe default for unknown entities
         logger.warning(
             "MockSAPClient: no route for OData GET",
             extra={"service": service, "entity": entity},
@@ -315,3 +337,29 @@ class MockSAPClient(ISAPClient):
                 f"[MOCK] Transport error calling BAPI {function_module}"
             )
         return self._route_bapi(function_module, scenario)
+
+    def odata_get_xml(
+        self,
+        service: str,
+        entity: str = "",
+        params: dict[str, Any] | None = None,
+        _scenario: SAPMockScenario | None = None,
+    ) -> str:
+        """Return raw XML from local OData fixture files."""
+        scenario = self._resolve_scenario(_scenario)
+        logger.debug(
+            "MockSAPClient.odata_get_xml",
+            extra={"service": service, "entity": entity, "scenario": scenario},
+        )
+        if scenario == SAPMockScenario.TRANSPORT_ERROR:
+            raise SAPClientError(
+                f"[MOCK] Transport error calling OData GET XML {service}/{entity}"
+            )
+        path = _ODATA_XML_ROUTES.get(service)
+        if path is None:
+            logger.warning(
+                "MockSAPClient: no route for OData GET XML",
+                extra={"service": service, "entity": entity},
+            )
+            return '<?xml version="1.0"?><Root><Columns></Columns><Rows></Rows></Root>'
+        return path.read_text(encoding="utf-8-sig")

@@ -53,6 +53,7 @@ def _to_domain(orm: FaultModel, items: list[FaultItem] | None = None) -> Fault:
         ),
         sap_notification_number=orm.sap_notification_number or None,
         assigned_to_id=orm.assigned_to_id,
+        distribution_decision_note=orm.distribution_decision_note or None,
         created_at=orm.created_at,
         updated_at=orm.updated_at,
         items=items or [],
@@ -73,6 +74,7 @@ def _to_orm_dict(fault: Fault) -> dict[str, object]:
         "sap_defect_code": fault.sap_defect_code.value if fault.sap_defect_code else "",
         "sap_notification_number": fault.sap_notification_number or "",
         "assigned_to_id": fault.assigned_to_id,
+        "distribution_decision_note": fault.distribution_decision_note or "",
         "updated_at": datetime.now(tz=UTC),
     }
 
@@ -140,6 +142,14 @@ class DjangoFaultRepository(IFaultRepository):
     ) -> list[Fault]:
         """Return faults for a vehicle, optionally filtered by status."""
         qs = FaultModel.objects.filter(vehicle_id=vehicle_id, is_deleted=False)
+        if status is not None:
+            qs = qs.filter(status=status.value)
+        faults = [_to_domain(orm) for orm in qs]
+        return self._attach_items(faults)
+
+    def list_all(self, status: FaultStatus | None = None) -> list[Fault]:
+        """Return all non-deleted faults, optionally filtered by status."""
+        qs = FaultModel.objects.filter(is_deleted=False).order_by("-reported_at")
         if status is not None:
             qs = qs.filter(status=status.value)
         faults = [_to_domain(orm) for orm in qs]

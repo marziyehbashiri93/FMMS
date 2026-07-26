@@ -8,11 +8,27 @@ from apps.handover.domain.entities import VehicleHandoverStatus
 
 
 class VehicleHandoverConfirmSerializer(serializers.Serializer):
-    """Validate handover confirmation payload."""
+    """Validate handover confirmation payload.
+
+    Invoice fields are accepted for backward-compatible clients, but transport
+    now uploads and approves external workshop invoices after driver acceptance.
+    """
 
     accepted = serializers.BooleanField()
     comment = serializers.CharField(
         max_length=500, required=False, allow_null=True, allow_blank=True
+    )
+    invoice_amount = serializers.DecimalField(
+        max_digits=14, decimal_places=2, required=False, allow_null=True
+    )
+    invoice_currency = serializers.CharField(
+        max_length=8, required=False, allow_null=True, allow_blank=True
+    )
+    invoice_vendor_id = serializers.CharField(
+        max_length=64, required=False, allow_null=True, allow_blank=True
+    )
+    invoice_document = serializers.CharField(
+        max_length=1024, required=False, allow_null=True, allow_blank=True
     )
 
 

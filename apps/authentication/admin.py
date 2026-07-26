@@ -11,15 +11,24 @@ class FMMSUserAdmin(UserAdmin):
     """Admin interface for FMMSUser."""
 
     model = FMMSUser
-    list_display = ["email", "full_name", "role", "is_active", "is_staff", "created_at"]
+    list_display = [
+        "username",
+        "email",
+        "full_name",
+        "role",
+        "personnel_number",
+        "is_active",
+        "is_staff",
+        "created_at",
+    ]
     list_filter = ["role", "is_active", "is_staff"]
-    search_fields = ["email", "full_name"]
+    search_fields = ["username", "email", "full_name", "personnel_number"]
     ordering = ["full_name"]
 
     fieldsets = (
-        (None, {"fields": ("email", "password")}),
+        (None, {"fields": ("username", "email", "password")}),
         ("Personal", {"fields": ("full_name",)}),
-        ("FMMS", {"fields": ("role",)}),
+        ("FMMS", {"fields": ("role", "personnel_number")}),
         (
             "Permissions",
             {
@@ -43,7 +52,15 @@ class FMMSUserAdmin(UserAdmin):
             None,
             {
                 "classes": ("wide",),
-                "fields": ("email", "full_name", "role", "password1", "password2"),
+                "fields": (
+                    "username",
+                    "email",
+                    "full_name",
+                    "role",
+                    "personnel_number",
+                    "password1",
+                    "password2",
+                ),
             },
         ),
     )

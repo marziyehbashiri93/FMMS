@@ -13,7 +13,16 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 
-from apps.repair.domain.entities import RepairOrderStatus, WorkshopType
+from apps.repair.domain.entities import (
+    ExternalWorkshopReferralStatus,
+    RepairOrderStatus,
+    WorkshopType,
+)
+from apps.repair.domain.external_workshop_entities import (
+    ExternalRepairReviewStatus,
+    ExternalWorkshopAssignmentCancellationReason,
+    ExternalWorkshopAssignmentStatus,
+)
 from apps.repair.domain.invoice_entities import ExternalRepairInvoiceStatus
 
 
@@ -75,12 +84,15 @@ class CompleteRepairOrderDTO:
         completed_at: UTC timestamp when the repair was physically completed.
         request_id: Correlation ID for tracing.
         completed_by: UUID of the user marking the order complete.
+        no_parts_consumed: When True, allows completion without consumed-part rows
+            even if parts were requested and received.
     """
 
     repair_order_id: uuid.UUID
     completed_at: datetime
     request_id: str
     completed_by: uuid.UUID
+    no_parts_consumed: bool = False
 
 
 @dataclass(frozen=True)
@@ -104,6 +116,27 @@ class AddRepairActivityDTO:
     performed_at: datetime
     request_id: str
     notes: str | None = field(default=None)
+
+
+@dataclass(frozen=True)
+class UpdateRepairActivityDTO:
+    """Input DTO for editing a repair activity on an active order."""
+
+    repair_order_id: uuid.UUID
+    activity_id: uuid.UUID
+    description: str
+    labor_hours: Decimal
+    request_id: str
+    notes: str | None = field(default=None)
+
+
+@dataclass(frozen=True)
+class DeleteRepairActivityDTO:
+    """Input DTO for deleting a repair activity."""
+
+    repair_order_id: uuid.UUID
+    activity_id: uuid.UUID
+    request_id: str
 
 
 @dataclass(frozen=True)
@@ -135,6 +168,9 @@ class SyncRepairToSAPDTO:
     work_center: str | None = field(default=None)
 
 
+DEFAULT_REPAIR_PART_UOM = "-"
+
+
 @dataclass(frozen=True)
 class AddRepairPartDTO:
     """Input DTO for recording a spare part consumed during a repair.
@@ -142,15 +178,36 @@ class AddRepairPartDTO:
     Attributes:
         repair_order_id: UUID of the target repair order (must be mutable).
         material_number: SAP material number for the part.
-        quantity: Positive integer number of units consumed.
-        unit_of_measure: Unit of measure (e.g. "EA", "KG").
+        quantity: Positive integer quantity consumed for this part.
         request_id: Correlation ID for tracing.
+        unit_of_measure: Internal persistence default; not collected from clients.
     """
 
     repair_order_id: uuid.UUID
     material_number: str
     quantity: int
-    unit_of_measure: str
+    request_id: str
+    unit_of_measure: str = DEFAULT_REPAIR_PART_UOM
+
+
+@dataclass(frozen=True)
+class UpdateRepairPartDTO:
+    """Input DTO for editing a consumed repair part."""
+
+    repair_order_id: uuid.UUID
+    part_id: uuid.UUID
+    material_number: str
+    quantity: int
+    request_id: str
+    unit_of_measure: str = DEFAULT_REPAIR_PART_UOM
+
+
+@dataclass(frozen=True)
+class DeleteRepairPartDTO:
+    """Input DTO for deleting a consumed repair part."""
+
+    repair_order_id: uuid.UUID
+    part_id: uuid.UUID
     request_id: str
 
 
@@ -186,11 +243,34 @@ class ApproveRepairOrderDTO:
         repair_order_id: UUID of the repair order to approve.
         request_id: Correlation ID for tracing.
         approved_by: UUID of the supervisor/admin approving the order.
+        note: Optional transport approval note.
     """
 
     repair_order_id: uuid.UUID
     request_id: str
     approved_by: uuid.UUID
+    note: str = ""
+
+
+@dataclass(frozen=True)
+class WorkshopTechnicalDecisionDTO:
+    """Input DTO for central-workshop repairable / no-repair-needed decision."""
+
+    repair_order_id: uuid.UUID
+    repairable: bool
+    request_id: str
+    decided_by: uuid.UUID
+    note: str = ""
+
+
+@dataclass(frozen=True)
+class RejectRepairOrderByTransportDTO:
+    """Input DTO for initial transport rejection of a repair request."""
+
+    repair_order_id: uuid.UUID
+    reason: str
+    request_id: str
+    rejected_by: uuid.UUID
 
 
 @dataclass(frozen=True)
@@ -209,6 +289,7 @@ class AssignWorkshopDTO:
     request_id: str
     assigned_by: uuid.UUID
     workshop_id: str | None = field(default=None)
+    reason: str = ""
 
 
 @dataclass(frozen=True)
@@ -227,6 +308,8 @@ class RepairDecisionResponseDTO:
     message: str
     workshop_type: WorkshopType | None = field(default=None)
     workshop_id: str | None = field(default=None)
+    external_referral_request_id: uuid.UUID | None = field(default=None)
+    transport_rejection_reason: str | None = field(default=None)
 
 
 @dataclass(frozen=True)
@@ -250,6 +333,9 @@ class RepairOrderResponseDTO:
     sap_order_number: str | None = field(default=None)
     workshop_type: WorkshopType | None = field(default=None)
     workshop_id: str | None = field(default=None)
+    transport_rejection_reason: str | None = field(default=None)
+    transport_approval_note: str | None = field(default=None)
+    workshop_decision_note: str | None = field(default=None)
     completed_at: datetime | None = field(default=None)
 
 
@@ -318,3 +404,183 @@ class ExternalInvoiceResponseDTO:
     updated_at: datetime
     vendor_id: str | None = field(default=None)
     document: str | None = field(default=None)
+
+
+@dataclass(frozen=True)
+class ExternalWorkshopReferralResponseDTO:
+    """Output DTO for external-workshop referral permission requests."""
+
+    id: uuid.UUID
+    repair_order_id: uuid.UUID
+    vehicle_id: uuid.UUID
+    fault_id: uuid.UUID
+    status: ExternalWorkshopReferralStatus
+    requested_by_id: uuid.UUID
+    requested_at: datetime
+    created_at: datetime
+    updated_at: datetime
+    workshop_id: str | None = field(default=None)
+    reason: str = ""
+    approved_by_id: uuid.UUID | None = field(default=None)
+    approved_at: datetime | None = field(default=None)
+    rejected_by_id: uuid.UUID | None = field(default=None)
+    rejected_at: datetime | None = field(default=None)
+    rejection_reason: str | None = field(default=None)
+
+
+@dataclass(frozen=True)
+class AssignExternalWorkshopDTO:
+    """Input for assigning a repair order to an external workshop."""
+
+    repair_order_id: uuid.UUID
+    workshop_name: str
+    workshop_address: str
+    assignment_date: datetime
+    repair_reason: str
+    description: str
+    request_id: str
+    assigned_by: uuid.UUID
+    workshop_id: str | None = field(default=None)
+
+
+@dataclass(frozen=True)
+class ConfirmExternalWorkshopDeliveryDTO:
+    """Input for driver delivery confirmation."""
+
+    assignment_id: uuid.UUID
+    delivery_datetime: datetime
+    workshop_name: str
+    workshop_address: str
+    workshop_phone: str
+    vehicle_odometer: int
+    notes: str
+    request_id: str
+    delivered_by: uuid.UUID
+
+
+@dataclass(frozen=True)
+class ConfirmExternalWorkshopPickupDTO:
+    """Input for driver pickup confirmation."""
+
+    assignment_id: uuid.UUID
+    pickup_datetime: datetime
+    vehicle_odometer: int
+    notes: str
+    request_id: str
+    picked_up_by: uuid.UUID
+
+
+@dataclass(frozen=True)
+class ReviewExternalRepairDTO:
+    """Input for draft/completed transportation review save."""
+
+    assignment_id: uuid.UUID
+    invoice_attachment: str | None
+    repair_services: list[dict[str, object]]
+    replaced_parts: list[dict[str, object]]
+    repair_cost: Decimal | None
+    additional_notes: str
+    request_id: str
+    reviewed_by: uuid.UUID
+
+
+@dataclass(frozen=True)
+class CloseExternalRepairDTO:
+    """Input for closing the external repair workflow."""
+
+    assignment_id: uuid.UUID
+    request_id: str
+    closed_by: uuid.UUID
+
+
+@dataclass(frozen=True)
+class CancelExternalWorkshopAssignmentDTO:
+    """Input for cancelling an external workshop assignment."""
+
+    assignment_id: uuid.UUID
+    reason: ExternalWorkshopAssignmentCancellationReason
+    request_id: str
+    cancelled_by: uuid.UUID
+    note: str | None = field(default=None)
+
+
+@dataclass(frozen=True)
+class ExternalWorkshopDeliveryResponseDTO:
+    """Output for delivery confirmation."""
+
+    id: uuid.UUID
+    assignment_id: uuid.UUID
+    repair_order_id: uuid.UUID
+    vehicle_id: uuid.UUID
+    delivery_datetime: datetime
+    workshop_name: str
+    workshop_address: str
+    workshop_phone: str
+    vehicle_odometer: int
+    notes: str
+    delivered_by_id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass(frozen=True)
+class ExternalWorkshopPickupResponseDTO:
+    """Output for pickup confirmation."""
+
+    id: uuid.UUID
+    assignment_id: uuid.UUID
+    repair_order_id: uuid.UUID
+    vehicle_id: uuid.UUID
+    pickup_datetime: datetime
+    vehicle_odometer: int
+    notes: str
+    picked_up_by_id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass(frozen=True)
+class ExternalRepairReviewResponseDTO:
+    """Output for transportation administrative review."""
+
+    id: uuid.UUID
+    assignment_id: uuid.UUID
+    repair_order_id: uuid.UUID
+    invoice_attachment: str | None
+    repair_services: list[dict[str, object]]
+    replaced_parts: list[dict[str, object]]
+    repair_cost: Decimal | None
+    additional_notes: str
+    sap_purchase_order_number: str | None
+    sap_invoice_document_number: str | None
+    status: ExternalRepairReviewStatus
+    reviewed_by_id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass(frozen=True)
+class ExternalWorkshopAssignmentResponseDTO:
+    """Output for external workshop assignment detail and queues."""
+
+    id: uuid.UUID
+    repair_order_id: uuid.UUID
+    vehicle_id: uuid.UUID
+    fault_id: uuid.UUID
+    workshop_id: str | None
+    workshop_name: str
+    workshop_address: str
+    assignment_date: datetime
+    repair_reason: str
+    description: str
+    status: ExternalWorkshopAssignmentStatus
+    assigned_by_id: uuid.UUID
+    cancellation_reason: ExternalWorkshopAssignmentCancellationReason | None
+    cancellation_note: str | None
+    cancelled_by_id: uuid.UUID | None
+    cancelled_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+    delivery: ExternalWorkshopDeliveryResponseDTO | None = field(default=None)
+    pickup: ExternalWorkshopPickupResponseDTO | None = field(default=None)
+    review: ExternalRepairReviewResponseDTO | None = field(default=None)

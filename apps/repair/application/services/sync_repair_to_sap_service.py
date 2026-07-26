@@ -115,17 +115,17 @@ class SyncRepairToSAPService:
             details={"vehicle_id": str(order.vehicle_id)},
         )
 
-        if vehicle.sap_equipment_number is None:
+        if vehicle.vehicle_number is None:
             raise FMMSConflictError(
                 message=(
-                    f"Vehicle '{order.vehicle_id}' has no SAP equipment number; "
+                    f"Vehicle '{order.vehicle_id}' has no SAP VehicleNumber; "
                     "cannot create PM Order."
                 ),
                 details={"vehicle_id": str(order.vehicle_id)},
             )
 
         create_request = CreatePMOrderRequest(
-            equipment_number=vehicle.sap_equipment_number.value,
+            equipment_number=vehicle.vehicle_number.value,
             order_type=dto.order_type,
             description=dto.description,
             planned_start=dto.planned_start,

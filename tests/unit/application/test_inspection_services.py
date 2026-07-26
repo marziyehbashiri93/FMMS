@@ -3,7 +3,8 @@
 All repository dependencies are replaced with in-memory fakes — no DB, no network.
 
 Key workflow tested:
-- SubmitInspectionService: FAIL items → one Fault with FaultItem children.
+- SubmitInspectionService: finalizes checklist without creating faults.
+- ReportInspectionFaultService: FAIL items → one Fault with FaultItem children.
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ from apps.inspection.application.dto.inspection_dto import (
     AddInspectionItemDTO,
     CreateInspectionDTO,
     InspectionResponseDTO,
+    ReportInspectionFaultDTO,
     SubmitInspectionDTO,
 )
 from apps.inspection.application.services.add_inspection_item_service import (
@@ -31,6 +33,9 @@ from apps.inspection.application.services.create_inspection_service import (
 from apps.inspection.application.services.get_inspection_service import (
     GetInspectionService,
     ListInspectionsService,
+)
+from apps.inspection.application.services.report_inspection_fault_service import (
+    ReportInspectionFaultService,
 )
 from apps.inspection.application.services.submit_inspection_service import (
     SubmitInspectionService,
@@ -49,12 +54,26 @@ from apps.inspection.domain.value_objects import (
     OdometerReading,
     OdometerUnit,
 )
+from apps.integration.domain.entities import SAPObjectType
 from apps.repair.domain.entities import RepairOrder, RepairOrderStatus
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
-from apps.vehicle.domain.entities import Vehicle, VehicleCategory, VehicleStatus
+from apps.driver.domain.entities import Driver, DriverStatus
+from apps.driver.domain.interfaces.driver_repository import IDriverRepository
+from apps.driver.domain.value_objects import CustomerNumber
+from apps.vehicle.domain.entities import Vehicle, VehicleStatus
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
-from apps.vehicle.domain.value_objects import VIN, PlateNumber, SAPEquipmentNumber
-from core.exceptions.base_exception import FMMSNotFoundError, FMMSStateError
+from apps.vehicle.domain.value_objects import PlateNumber, SAPVehicleNumber
+from core.exceptions.base_exception import (
+    FMMSConflictError,
+    FMMSNotFoundError,
+    FMMSStateError,
+    FMMSValidationError,
+)
+from core.sap.dtos.pm_notification import (
+    CreatePMNotificationRequest,
+    SAPNotificationDTO,
+)
+from core.sap.ports.sap_transaction_manager_port import SAPAdapterCallable
 from core.workflow import VEHICLE_OPEN_FLOW_ERROR_CODE, VEHICLE_OPEN_FLOW_MESSAGE
 
 # ---------------------------------------------------------------------------
@@ -62,18 +81,27 @@ from core.workflow import VEHICLE_OPEN_FLOW_ERROR_CODE, VEHICLE_OPEN_FLOW_MESSAG
 # ---------------------------------------------------------------------------
 
 
-def _make_vehicle() -> Vehicle:
+def _make_vehicle(*, driver1_customer_number: str | None = None) -> Vehicle:
     return Vehicle(
         id=uuid.uuid4(),
-        plate_number=PlateNumber("INSP0001"),
-        vin=VIN("1HGCM82633A004352"),
-        make="Toyota",
-        model="Hilux",
-        year=2022,
-        category=VehicleCategory.LIGHT,
+        vehicle_number=SAPVehicleNumber("300001"),
+        license_plate=PlateNumber("INSP0001"),
         status=VehicleStatus.ACTIVE,
         created_at=datetime.now(tz=UTC),
         updated_at=datetime.now(tz=UTC),
+        driver1_customer_number=driver1_customer_number,
+    )
+
+
+def _make_driver(*, personnel_number: str = "P-100", customer_number: str = "C-100") -> Driver:
+    return Driver(
+        id=uuid.uuid4(),
+        customer_number=CustomerNumber(customer_number),
+        name="Driver Test",
+        status=DriverStatus.ACTIVE,
+        created_at=datetime.now(tz=UTC),
+        updated_at=datetime.now(tz=UTC),
+        personnel_number=personnel_number,
     )
 
 
@@ -137,6 +165,9 @@ class FakeInspectionRepository(IInspectionRepository):
     def list_by_vehicle(self, vehicle_id: uuid.UUID) -> list[Inspection]:
         return [i for i in self._store.values() if i.vehicle_id == vehicle_id]
 
+    def list_all(self, status=None) -> list[Inspection]:
+        return list(self._store.values())
+
     def list_by_date_range(
         self,
         start: datetime,
@@ -162,15 +193,12 @@ class FakeVehicleRepository(IVehicleRepository):
     def get_by_plate(self, plate_number: PlateNumber) -> Vehicle | None:
         return None
 
-    def get_by_sap_equipment_number(
-        self, sap_equipment_number: SAPEquipmentNumber
-    ) -> Vehicle | None:
+    def get_by_vehicle_number(self, vehicle_number: SAPVehicleNumber) -> Vehicle | None:
         return next(
             (
                 v
                 for v in self._store.values()
-                if v.sap_equipment_number is not None
-                and v.sap_equipment_number == sap_equipment_number
+                if v.vehicle_number is not None and v.vehicle_number == vehicle_number
             ),
             None,
         )
@@ -188,8 +216,70 @@ class FakeVehicleRepository(IVehicleRepository):
         self._store[vehicle.id] = vehicle
         return vehicle
 
+    def decommission_missing_from_sap(self, seen_vehicle_numbers: set[str]) -> int:
+        count = 0
+        for vehicle in self._store.values():
+            if vehicle.vehicle_number.value not in seen_vehicle_numbers:
+                vehicle.decommission()
+                count += 1
+        return count
+
+    def record_driver_assignment_snapshot(self, **kwargs: object) -> None:
+        return None
+
     def delete(self, vehicle_id: uuid.UUID) -> None:
         self._store.pop(vehicle_id, None)
+
+
+class FakeDriverRepository(IDriverRepository):
+    """In-memory driver repository for inspection actor scoping tests."""
+
+    def __init__(self, initial: list[Driver] | None = None) -> None:
+        self._store: dict[uuid.UUID, Driver] = {d.id: d for d in (initial or [])}
+
+    def get_by_id(self, driver_id: uuid.UUID) -> Driver:
+        driver = self._store.get(driver_id)
+        if driver is None:
+            raise KeyError(driver_id)
+        return driver
+
+    def get_by_customer_number(self, customer_number: CustomerNumber) -> Driver:
+        for driver in self._store.values():
+            if driver.customer_number == customer_number:
+                return driver
+        raise KeyError(customer_number.value)
+
+    def find_by_personnel_number(self, personnel_number: str) -> Driver | None:
+        needle = personnel_number.strip()
+        if not needle:
+            return None
+        for driver in self._store.values():
+            if (
+                (driver.personnel_number or "") == needle
+                and driver.status == DriverStatus.ACTIVE
+            ):
+                return driver
+        return None
+
+    def list_by_status(self, status: DriverStatus) -> list[Driver]:
+        return [d for d in self._store.values() if d.status == status]
+
+    def list_all(self) -> list[Driver]:
+        return list(self._store.values())
+
+    def list_by_customer_numbers(self, customer_numbers: set[str]) -> list[Driver]:
+        return [
+            d
+            for d in self._store.values()
+            if d.customer_number.value in customer_numbers
+        ]
+
+    def decommission_missing_from_sap(self, seen_customer_numbers: set[str]) -> int:
+        return 0
+
+    def save(self, driver: Driver) -> Driver:
+        self._store[driver.id] = driver
+        return driver
 
 
 class FakeFaultRepository(IFaultRepository):
@@ -201,6 +291,11 @@ class FakeFaultRepository(IFaultRepository):
 
     def list_by_vehicle(self, vehicle_id: uuid.UUID) -> list[Fault]:
         return [f for f in self.saved if f.vehicle_id == vehicle_id]
+
+    def list_all(self, status: FaultStatus | None = None) -> list[Fault]:
+        if status is None:
+            return list(self.saved)
+        return [f for f in self.saved if f.status == status]
 
     def list_open_by_severity(self, severity) -> list[Fault]:
         return []
@@ -237,6 +332,11 @@ class FakeRepairOrderRepository(IRepairOrderRepository):
     def list_by_fault(self, fault_id: uuid.UUID) -> list[RepairOrder]:
         return [o for o in self.saved if o.fault_id == fault_id]
 
+    def list_all(self, status: RepairOrderStatus | None = None, workshop_type=None) -> list[RepairOrder]:
+        if status is None:
+            return list(self.saved)
+        return [o for o in self.saved if o.status == status]
+
     def list_active_by_vehicle(self, vehicle_id: uuid.UUID) -> list[RepairOrder]:
         return [
             o
@@ -257,16 +357,64 @@ class FakeRepairOrderRepository(IRepairOrderRepository):
         self.saved = [o for o in self.saved if o.id != order_id]
 
 
+class FakeSAPTransactionManager:
+    def __init__(self) -> None:
+        self.calls: list[tuple[SAPObjectType, uuid.UUID, str, dict[str, object]]] = []
+
+    def execute(
+        self,
+        object_type: SAPObjectType,
+        object_id: uuid.UUID,
+        idempotency_key: str,
+        request_payload: dict[str, object],
+        adapter_call: SAPAdapterCallable,
+    ) -> tuple[dict[str, object], str]:
+        self.calls.append((object_type, object_id, idempotency_key, request_payload))
+        return adapter_call(request_payload)
+
+
+class FakeSAPPMNotificationPort:
+    def __init__(self, notification_number: str = "10008888") -> None:
+        self.calls: list[CreatePMNotificationRequest] = []
+        self._notification_number = notification_number
+
+    def create_notification(
+        self,
+        request: CreatePMNotificationRequest,
+    ) -> SAPNotificationDTO:
+        self.calls.append(request)
+        return SAPNotificationDTO(
+            notification_number=self._notification_number,
+            equipment_number=request.equipment_number,
+            status="OPEN",
+            created_at=datetime.now(tz=UTC),
+        )
+
+    def close_notification(self, notification_number: str) -> SAPNotificationDTO:
+        return SAPNotificationDTO(
+            notification_number=notification_number,
+            equipment_number="",
+            status="CLOSED",
+            created_at=datetime.now(tz=UTC),
+        )
+
+
 # ---------------------------------------------------------------------------
 # CreateInspectionService
 # ---------------------------------------------------------------------------
 
 
 class TestCreateInspectionService:
-    def _service(self, vehicle: Vehicle) -> CreateInspectionService:
+    def _service(
+        self,
+        vehicle: Vehicle,
+        *,
+        drivers: list[Driver] | None = None,
+    ) -> CreateInspectionService:
         return CreateInspectionService(
             inspection_repository=FakeInspectionRepository(),
             vehicle_repository=FakeVehicleRepository(initial=[vehicle]),
+            driver_repository=FakeDriverRepository(initial=drivers or []),
         )
 
     def test_creates_draft_inspection(self) -> None:
@@ -291,6 +439,7 @@ class TestCreateInspectionService:
         service = CreateInspectionService(
             inspection_repository=FakeInspectionRepository(),
             vehicle_repository=FakeVehicleRepository(),
+            driver_repository=FakeDriverRepository(),
         )
 
         with pytest.raises(FMMSNotFoundError):
@@ -305,6 +454,86 @@ class TestCreateInspectionService:
                     created_by=uuid.uuid4(),
                 )
             )
+
+    def test_rejects_non_operational_vehicle(self) -> None:
+        vehicle = _make_vehicle()
+        vehicle.status = VehicleStatus.OUT_OF_SERVICE
+        service = self._service(vehicle)
+
+        with pytest.raises(FMMSConflictError) as exc:
+            service.execute(
+                CreateInspectionDTO(
+                    vehicle_id=vehicle.id,
+                    inspection_type=InspectionType.PRE_TRIP,
+                    odometer_value=50000,
+                    odometer_unit=OdometerUnit.KM,
+                    inspected_at=datetime.now(tz=UTC),
+                    request_id="req-oos",
+                    created_by=uuid.uuid4(),
+                )
+            )
+        assert exc.value.error_code == "VEHICLE_NOT_OPERATIONAL"
+
+    def test_driver_may_only_inspect_assigned_vehicle(self) -> None:
+        driver = _make_driver(personnel_number="PN-9", customer_number="6000000249")
+        vehicle = _make_vehicle(driver1_customer_number="6000000249")
+        service = self._service(vehicle, drivers=[driver])
+
+        result = service.execute(
+            CreateInspectionDTO(
+                vehicle_id=vehicle.id,
+                inspection_type=InspectionType.PRE_TRIP,
+                odometer_value=50000,
+                odometer_unit=OdometerUnit.KM,
+                inspected_at=datetime.now(tz=UTC),
+                request_id="req-driver-ok",
+                created_by=uuid.uuid4(),
+                actor_role="DRIVER",
+                actor_personnel_number="PN-9",
+            )
+        )
+        assert result.driver_id == driver.id
+
+    def test_driver_rejected_for_unassigned_vehicle(self) -> None:
+        driver = _make_driver(personnel_number="PN-9", customer_number="6000000249")
+        vehicle = _make_vehicle(driver1_customer_number="OTHER")
+        service = self._service(vehicle, drivers=[driver])
+
+        with pytest.raises(FMMSConflictError) as exc:
+            service.execute(
+                CreateInspectionDTO(
+                    vehicle_id=vehicle.id,
+                    inspection_type=InspectionType.PRE_TRIP,
+                    odometer_value=50000,
+                    odometer_unit=OdometerUnit.KM,
+                    inspected_at=datetime.now(tz=UTC),
+                    request_id="req-driver-deny",
+                    created_by=uuid.uuid4(),
+                    actor_role="DRIVER",
+                    actor_personnel_number="PN-9",
+                )
+            )
+        assert exc.value.error_code == "VEHICLE_NOT_ASSIGNED_TO_DRIVER"
+
+    def test_driver_requires_personnel_number(self) -> None:
+        vehicle = _make_vehicle()
+        service = self._service(vehicle)
+
+        with pytest.raises(FMMSValidationError) as exc:
+            service.execute(
+                CreateInspectionDTO(
+                    vehicle_id=vehicle.id,
+                    inspection_type=InspectionType.PRE_TRIP,
+                    odometer_value=50000,
+                    odometer_unit=OdometerUnit.KM,
+                    inspected_at=datetime.now(tz=UTC),
+                    request_id="req-no-pn",
+                    created_by=uuid.uuid4(),
+                    actor_role="DRIVER",
+                    actor_personnel_number="",
+                )
+            )
+        assert exc.value.error_code == "PERSONNEL_NUMBER_REQUIRED"
 
 
 # ---------------------------------------------------------------------------
@@ -389,6 +618,7 @@ class TestSubmitInspectionService:
             inspection_repository=FakeInspectionRepository(initial=inspections or []),
             fault_repository=fault_repo,
             repair_order_repository=repair_repo,
+            vehicle_repository=vehicle_repo,
         )
         return service, fault_repo, repair_repo, vehicle_repo
 
@@ -409,7 +639,7 @@ class TestSubmitInspectionService:
 
         assert result.status == InspectionStatus.SUBMITTED
 
-    def test_creates_one_fault_with_item_per_fail(self) -> None:
+    def test_submit_does_not_create_fault_for_failed_items(self) -> None:
         vehicle = _make_vehicle()
         inspection = _make_inspection(vehicle_id=vehicle.id)
         inspection.items.append(_make_fail_item("Brakes", "Brake fluid low"))
@@ -421,10 +651,10 @@ class TestSubmitInspectionService:
 
         service.execute(self._dto(inspection.id))
 
-        assert len(fault_repo.saved) == 1
-        assert len(fault_repo.saved[0].items) == 2
+        assert inspection.status == InspectionStatus.SUBMITTED
+        assert len(fault_repo.saved) == 0
 
-    def test_creates_one_repair_order_for_failed_inspection(self) -> None:
+    def test_submit_does_not_create_repair_order_for_failed_inspection(self) -> None:
         vehicle = _make_vehicle()
         inspection = _make_inspection(vehicle_id=vehicle.id)
         inspection.items.append(_make_fail_item("Brakes", "Brake fluid low"))
@@ -435,9 +665,9 @@ class TestSubmitInspectionService:
 
         service.execute(self._dto(inspection.id))
 
-        assert len(repair_repo.saved) == 1
-        assert repair_repo.saved[0].status == RepairOrderStatus.CREATED
-        assert repair_repo.saved[0].fault_id == fault_repo.saved[0].id
+        assert inspection.status == InspectionStatus.SUBMITTED
+        assert len(fault_repo.saved) == 0
+        assert len(repair_repo.saved) == 0
 
     def test_keeps_vehicle_active_on_fail(self) -> None:
         vehicle = _make_vehicle()
@@ -465,42 +695,33 @@ class TestSubmitInspectionService:
         assert len(repair_repo.saved) == 0
         assert vehicle_repo.get_by_id(vehicle.id).status == VehicleStatus.ACTIVE
 
-    def test_auto_created_faults_are_open_and_linked_to_inspection(self) -> None:
+    def test_submit_rejects_non_operational_vehicle(self) -> None:
         vehicle = _make_vehicle()
+        vehicle.status = VehicleStatus.UNDER_REPAIR
         inspection = _make_inspection(vehicle_id=vehicle.id)
-        inspection.items.append(_make_fail_item("Engine", "Oil level critical"))
-        service, fault_repo, _, _ = self._service(
+        inspection.items.append(_make_pass_item())
+        service, _, _, _ = self._service(
             inspections=[inspection], vehicles=[vehicle]
         )
 
-        service.execute(self._dto(inspection.id))
+        with pytest.raises(FMMSConflictError) as exc:
+            service.execute(self._dto(inspection.id))
+        assert exc.value.error_code == "VEHICLE_NOT_OPERATIONAL"
 
-        fault = fault_repo.saved[0]
-        assert fault.status == FaultStatus.OPEN
-        assert fault.inspection_id == inspection.id
-        assert fault.vehicle_id == inspection.vehicle_id
-        assert len(fault.items) == 1
-        assert fault.items[0].component == "Oil level critical"
-
-    def test_submit_propagates_item_severity_to_fault(self) -> None:
+    def test_submit_allows_failed_items_without_open_flow_check(self) -> None:
         vehicle = _make_vehicle()
         inspection = _make_inspection(vehicle_id=vehicle.id)
-        inspection.items.append(
-            _make_fail_item("Brakes", "Pad worn", FailureSeverity.LOW)
-        )
-        inspection.items.append(
-            _make_fail_item("Engine", "Oil leak", FailureSeverity.CRITICAL)
-        )
-        service, fault_repo, _, _ = self._service(
-            inspections=[inspection], vehicles=[vehicle]
+        inspection.items.append(_make_fail_item("Brakes", "Brake fluid low"))
+        open_fault = _make_open_fault(vehicle.id)
+        service, _, _, _ = self._service(
+            inspections=[inspection],
+            vehicles=[vehicle],
+            faults=[open_fault],
         )
 
-        service.execute(self._dto(inspection.id))
+        result = service.execute(self._dto(inspection.id))
 
-        fault = fault_repo.saved[0]
-        assert fault.severity == FaultSeverity.CRITICAL
-        severities = {item.severity for item in fault.items}
-        assert severities == {FaultSeverity.LOW, FaultSeverity.CRITICAL}
+        assert result.status == InspectionStatus.SUBMITTED
 
     def test_raises_not_found_for_missing_inspection(self) -> None:
         service, _, _, _ = self._service()
@@ -516,14 +737,111 @@ class TestSubmitInspectionService:
         with pytest.raises(InspectionItemRequiredError):
             service.execute(self._dto(inspection.id))
 
+
+# ---------------------------------------------------------------------------
+# ReportInspectionFaultService
+# ---------------------------------------------------------------------------
+
+
+class TestReportInspectionFaultService:
+    def _service(
+        self,
+        inspections: list[Inspection] | None = None,
+        faults: list[Fault] | None = None,
+        repair_orders: list[RepairOrder] | None = None,
+    ) -> tuple[
+        ReportInspectionFaultService,
+        FakeFaultRepository,
+        FakeRepairOrderRepository,
+    ]:
+        fault_repo = FakeFaultRepository()
+        for fault in faults or []:
+            fault_repo.saved.append(fault)
+        repair_repo = FakeRepairOrderRepository()
+        for order in repair_orders or []:
+            repair_repo.saved.append(order)
+        service = ReportInspectionFaultService(
+            inspection_repository=FakeInspectionRepository(initial=inspections or []),
+            fault_repository=fault_repo,
+            repair_order_repository=repair_repo,
+        )
+        return service, fault_repo, repair_repo
+
+    def _dto(self, inspection_id: uuid.UUID) -> ReportInspectionFaultDTO:
+        return ReportInspectionFaultDTO(
+            inspection_id=inspection_id,
+            request_id="req-report-fault",
+            reported_by=uuid.uuid4(),
+        )
+
+    def test_creates_one_fault_with_item_per_fail(self) -> None:
+        vehicle = _make_vehicle()
+        inspection = _make_inspection(
+            vehicle_id=vehicle.id,
+            status=InspectionStatus.SUBMITTED,
+        )
+        inspection.items.append(_make_fail_item("Brakes", "Brake fluid low"))
+        inspection.items.append(_make_fail_item("Lights", "Left headlight broken"))
+        service, fault_repo, _ = self._service(inspections=[inspection])
+
+        service.execute(self._dto(inspection.id))
+
+        assert len(fault_repo.saved) == 1
+        assert len(fault_repo.saved[0].items) == 2
+
+    def test_reports_checklist_fault_to_sap_pm_notification(self) -> None:
+        vehicle = _make_vehicle()
+        inspection = _make_inspection(
+            vehicle_id=vehicle.id,
+            status=InspectionStatus.SUBMITTED,
+        )
+        inspection.items.append(_make_fail_item("Brakes", "Brake fluid low"))
+        fault_repo = FakeFaultRepository()
+        repair_repo = FakeRepairOrderRepository()
+        sap_tx = FakeSAPTransactionManager()
+        sap_port = FakeSAPPMNotificationPort(notification_number="10007777")
+        service = ReportInspectionFaultService(
+            inspection_repository=FakeInspectionRepository(initial=[inspection]),
+            fault_repository=fault_repo,
+            repair_order_repository=repair_repo,
+            vehicle_repository=FakeVehicleRepository(initial=[vehicle]),
+            sap_transaction_manager=sap_tx,
+            sap_pm_notification_port=sap_port,
+        )
+
+        result = service.execute(self._dto(inspection.id))
+
+        assert result.sap_notification_number == "10007777"
+        assert len(sap_tx.calls) == 1
+        assert sap_tx.calls[0][0] == SAPObjectType.FAULT
+        request = sap_port.calls[0]
+        assert request.notification_type == "EM"
+        assert request.equipment_number == vehicle.vehicle_number.value
+
+    def test_creates_one_repair_order_for_failed_inspection(self) -> None:
+        vehicle = _make_vehicle()
+        inspection = _make_inspection(
+            vehicle_id=vehicle.id,
+            status=InspectionStatus.SUBMITTED,
+        )
+        inspection.items.append(_make_fail_item("Brakes", "Brake fluid low"))
+        service, fault_repo, repair_repo = self._service(inspections=[inspection])
+
+        service.execute(self._dto(inspection.id))
+
+        assert len(fault_repo.saved) == 1
+        assert len(repair_repo.saved) == 0
+
     def test_raises_when_vehicle_has_open_fault(self) -> None:
         vehicle = _make_vehicle()
-        inspection = _make_inspection(vehicle_id=vehicle.id)
+        inspection = _make_inspection(
+            vehicle_id=vehicle.id,
+            status=InspectionStatus.SUBMITTED,
+        )
         inspection.items.append(_make_fail_item("Brakes", "Brake fluid low"))
         open_fault = _make_open_fault(vehicle.id)
-        service, _, _, _ = self._service(
+        service, _, _ = self._service(
             inspections=[inspection],
-            vehicles=[vehicle],
             faults=[open_fault],
         )
 
@@ -532,16 +850,17 @@ class TestSubmitInspectionService:
 
         assert exc_info.value.error_code == VEHICLE_OPEN_FLOW_ERROR_CODE
         assert exc_info.value.message == VEHICLE_OPEN_FLOW_MESSAGE
-        assert inspection.status == InspectionStatus.DRAFT
 
     def test_raises_when_vehicle_has_open_repair_order(self) -> None:
         vehicle = _make_vehicle()
-        inspection = _make_inspection(vehicle_id=vehicle.id)
+        inspection = _make_inspection(
+            vehicle_id=vehicle.id,
+            status=InspectionStatus.SUBMITTED,
+        )
         inspection.items.append(_make_fail_item("Brakes", "Brake fluid low"))
         open_order = _make_open_repair_order(vehicle.id)
-        service, fault_repo, _, _ = self._service(
+        service, fault_repo, _ = self._service(
             inspections=[inspection],
-            vehicles=[vehicle],
             repair_orders=[open_order],
         )
 
@@ -549,7 +868,45 @@ class TestSubmitInspectionService:
             service.execute(self._dto(inspection.id))
 
         assert len(fault_repo.saved) == 0
-        assert inspection.status == InspectionStatus.DRAFT
+
+    def test_reported_faults_are_open_and_linked_to_inspection(self) -> None:
+        vehicle = _make_vehicle()
+        inspection = _make_inspection(
+            vehicle_id=vehicle.id,
+            status=InspectionStatus.SUBMITTED,
+        )
+        inspection.items.append(_make_fail_item("Engine", "Oil level critical"))
+        service, fault_repo, _ = self._service(inspections=[inspection])
+
+        service.execute(self._dto(inspection.id))
+
+        fault = fault_repo.saved[0]
+        assert fault.status == FaultStatus.OPEN
+        assert fault.inspection_id == inspection.id
+        assert fault.vehicle_id == inspection.vehicle_id
+        assert len(fault.items) == 1
+        assert fault.items[0].component == "Oil level critical"
+
+    def test_report_propagates_item_severity_to_fault(self) -> None:
+        vehicle = _make_vehicle()
+        inspection = _make_inspection(
+            vehicle_id=vehicle.id,
+            status=InspectionStatus.SUBMITTED,
+        )
+        inspection.items.append(
+            _make_fail_item("Brakes", "Pad worn", FailureSeverity.LOW)
+        )
+        inspection.items.append(
+            _make_fail_item("Engine", "Oil leak", FailureSeverity.CRITICAL)
+        )
+        service, fault_repo, _ = self._service(inspections=[inspection])
+
+        service.execute(self._dto(inspection.id))
+
+        fault = fault_repo.saved[0]
+        assert fault.severity == FaultSeverity.CRITICAL
+        severities = {item.severity for item in fault.items}
+        assert severities == {FaultSeverity.LOW, FaultSeverity.CRITICAL}
 
 
 # ---------------------------------------------------------------------------
@@ -623,6 +980,15 @@ class TestListInspectionsService:
         repo = FakeInspectionRepository()
         results = ListInspectionsService(repo).execute(vehicle_id=uuid.uuid4())
         assert results == []
+
+    def test_lists_all_inspections_without_vehicle_filter(self) -> None:
+        i1 = _make_inspection()
+        i2 = _make_inspection()
+        repo = FakeInspectionRepository(initial=[i1, i2])
+
+        results = ListInspectionsService(repo).execute()
+
+        assert len(results) == 2
 
 
 # ---------------------------------------------------------------------------

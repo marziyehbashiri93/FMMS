@@ -1,27 +1,33 @@
-"""Vehicle application services — orchestration without business rules."""
+"""Vehicle application services - orchestration without business rules."""
 
-from apps.vehicle.application.services.create_vehicle_service import (
-    CreateVehicleService,
-)
-from apps.vehicle.application.services.deactivate_vehicle_service import (
-    DeactivateVehicleService,
+from apps.vehicle.application.services.change_vehicle_status_service import (
+    ChangeVehicleStatusService,
 )
 from apps.vehicle.application.services.get_vehicle_service import (
     GetVehicleService,
     ListVehiclesService,
 )
-from apps.vehicle.application.services.sync_sap_equipment_service import (
-    SyncSAPEquipmentService,
+from apps.vehicle.application.services.list_driver_assignment_history_service import (
+    ListDriverVehicleAssignmentHistoryService,
+    ListVehicleDriverAssignmentHistoryService,
 )
-from apps.vehicle.application.services.update_vehicle_service import (
-    UpdateVehicleService,
+from apps.vehicle.application.services.record_odometer_service import (
+    GetVehicleCurrentOdometerService,
+    ListVehicleOdometerHistoryService,
+    RecordVehicleOdometerService,
+)
+from apps.vehicle.application.services.sync_vehicles_from_sap_service import (
+    SyncVehiclesFromSAPService,
 )
 
 __all__ = [
-    "CreateVehicleService",
-    "UpdateVehicleService",
-    "DeactivateVehicleService",
+    "ChangeVehicleStatusService",
     "GetVehicleService",
+    "GetVehicleCurrentOdometerService",
+    "ListDriverVehicleAssignmentHistoryService",
+    "ListVehicleDriverAssignmentHistoryService",
     "ListVehiclesService",
-    "SyncSAPEquipmentService",
+    "ListVehicleOdometerHistoryService",
+    "RecordVehicleOdometerService",
+    "SyncVehiclesFromSAPService",
 ]

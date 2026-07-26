@@ -16,31 +16,58 @@ class MaterialRequestStatus(StrEnum):
 
     REQUESTED = "REQUESTED"
     APPROVED = "APPROVED"
-    REJECTED = "REJECTED"
+    REJECTED = "REJECTED"  # Legacy; transport reject is removed from the flow.
     WAITING_STOCK = "WAITING_STOCK"
     STOCK_ISSUED = "STOCK_ISSUED"
     PURCHASE_REQUIRED = "PURCHASE_REQUIRED"
+    PARTIALLY_ISSUED = "PARTIALLY_ISSUED"
     RECEIVED = "RECEIVED"
 
 
+class MaterialItemDecision(StrEnum):
+    """Transport decision for one requested material line."""
+
+    PENDING = "PENDING"
+    FROM_STOCK = "FROM_STOCK"
+    PURCHASE = "PURCHASE"
+
+
+class MaterialItemStatus(StrEnum):
+    """Fulfillment status for one requested material line."""
+
+    PENDING = "PENDING"
+    READY = "READY"
+    PURCHASE_REQUIRED = "PURCHASE_REQUIRED"
+
+
 _ALLOWED_TRANSITIONS: dict[MaterialRequestStatus, frozenset[MaterialRequestStatus]] = {
-    MaterialRequestStatus.REQUESTED: frozenset(
-        {MaterialRequestStatus.APPROVED, MaterialRequestStatus.REJECTED}
-    ),
+    MaterialRequestStatus.REQUESTED: frozenset({MaterialRequestStatus.APPROVED}),
     MaterialRequestStatus.APPROVED: frozenset(
         {
             MaterialRequestStatus.WAITING_STOCK,
             MaterialRequestStatus.STOCK_ISSUED,
             MaterialRequestStatus.PURCHASE_REQUIRED,
+            MaterialRequestStatus.PARTIALLY_ISSUED,
         }
     ),
     MaterialRequestStatus.REJECTED: frozenset(),
     MaterialRequestStatus.WAITING_STOCK: frozenset(
-        {MaterialRequestStatus.STOCK_ISSUED, MaterialRequestStatus.PURCHASE_REQUIRED}
+        {
+            MaterialRequestStatus.STOCK_ISSUED,
+            MaterialRequestStatus.PURCHASE_REQUIRED,
+            MaterialRequestStatus.PARTIALLY_ISSUED,
+        }
     ),
     MaterialRequestStatus.STOCK_ISSUED: frozenset({MaterialRequestStatus.RECEIVED}),
     MaterialRequestStatus.PURCHASE_REQUIRED: frozenset(
-        {MaterialRequestStatus.RECEIVED}
+        {
+            MaterialRequestStatus.WAITING_STOCK,
+            MaterialRequestStatus.STOCK_ISSUED,
+            MaterialRequestStatus.PARTIALLY_ISSUED,
+        }
+    ),
+    MaterialRequestStatus.PARTIALLY_ISSUED: frozenset(
+        {MaterialRequestStatus.STOCK_ISSUED}
     ),
     MaterialRequestStatus.RECEIVED: frozenset(),
 }
@@ -48,12 +75,16 @@ _ALLOWED_TRANSITIONS: dict[MaterialRequestStatus, frozenset[MaterialRequestStatu
 
 @dataclass
 class MaterialRequestItem:
-    """One requested material."""
+    """One requested material line with optional per-item fulfillment state."""
 
     id: uuid.UUID
     material_number: str
     quantity: Decimal
     unit_of_measure: str
+    from_catalog: bool = True
+    decision: MaterialItemDecision = MaterialItemDecision.PENDING
+    item_status: MaterialItemStatus = MaterialItemStatus.PENDING
+    available_quantity_snapshot: Decimal | None = None
 
 
 @dataclass
@@ -75,9 +106,9 @@ class MaterialRequest:
         self.status = target
 
     def approve(self) -> None:
-        """Approve request."""
+        """Approve request (internal step before stock/purchase branching)."""
         self.transition_to(MaterialRequestStatus.APPROVED)
 
-    def reject(self) -> None:
-        """Reject request."""
-        self.transition_to(MaterialRequestStatus.REJECTED)
+    def receive(self) -> None:
+        """Confirm physical receipt of parts at the workshop."""
+        self.transition_to(MaterialRequestStatus.RECEIVED)

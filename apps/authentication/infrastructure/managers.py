@@ -19,12 +19,13 @@ class FMMSUserManager(BaseUserManager["FMMSUser"]):
     """
     Custom manager for the FMMSUser model.
 
-    Replaces Django's default UserManager to enforce email-based
-    authentication and FMMS role assignment.
+    Replaces Django's default UserManager to enforce username-based login,
+    contact email storage, and FMMS role assignment.
     """
 
     def create_user(
         self,
+        username: str,
         email: str,
         full_name: str,
         password: str | None = None,
@@ -34,7 +35,8 @@ class FMMSUserManager(BaseUserManager["FMMSUser"]):
         Create and save a standard FMMS user.
 
         Args:
-            email: The user's email address (used as login identifier).
+            username: The user's login identifier.
+            email: The user's email address.
             full_name: The user's full display name.
             password: Plain-text password (hashed before storage).
             **extra_fields: Additional model fields (e.g. role, is_active).
@@ -45,21 +47,30 @@ class FMMSUserManager(BaseUserManager["FMMSUser"]):
         Raises:
             ValueError: If email is not provided.
         """
+        if not username:
+            raise ValueError("Username is required for all FMMS users.")
         if not email:
             raise ValueError("Email address is required for all FMMS users.")
 
+        username = self.model.normalize_username(username)
         email = self.normalize_email(email)
         extra_fields.setdefault("is_active", True)
         extra_fields.setdefault("is_staff", False)
         extra_fields.setdefault("is_superuser", False)
 
-        user: FMMSUser = self.model(email=email, full_name=full_name, **extra_fields)
+        user: FMMSUser = self.model(
+            username=username,
+            email=email,
+            full_name=full_name,
+            **extra_fields,
+        )
         user.set_password(password)
         user.save(using=self._db)
         return user
 
     def create_superuser(
         self,
+        username: str,
         email: str,
         full_name: str,
         password: str | None = None,
@@ -69,6 +80,7 @@ class FMMSUserManager(BaseUserManager["FMMSUser"]):
         Create and save a superuser with ADMIN role.
 
         Args:
+            username: The user's login identifier.
             email: The user's email address.
             full_name: The user's full display name.
             password: Plain-text password.
@@ -82,11 +94,13 @@ class FMMSUserManager(BaseUserManager["FMMSUser"]):
         """
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
-        extra_fields.setdefault("role", "ADMIN")
+        from apps.authentication.infrastructure.models import FMMSUserRole
+
+        extra_fields.setdefault("role", FMMSUserRole.ADMIN)
 
         if extra_fields.get("is_staff") is not True:
             raise ValueError("Superuser must have is_staff=True.")
         if extra_fields.get("is_superuser") is not True:
             raise ValueError("Superuser must have is_superuser=True.")
 
-        return self.create_user(email, full_name, password, **extra_fields)
+        return self.create_user(username, email, full_name, password, **extra_fields)

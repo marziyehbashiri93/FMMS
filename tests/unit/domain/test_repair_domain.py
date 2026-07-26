@@ -138,15 +138,40 @@ class TestRepairOrderLifecycle:
         with pytest.raises(RepairOrderInvalidStateTransitionError):
             order.assign_workshop(WorkshopType.EXTERNAL)
 
+    def test_cannot_reassign_workshop_after_assignment(self) -> None:
+        from apps.repair.domain.entities import WorkshopType
+
+        order = _make_order()
+        order.approve()
+        order.assign_workshop(WorkshopType.INTERNAL)
+        with pytest.raises(RepairOrderInvalidStateTransitionError):
+            order.assign_workshop(WorkshopType.EXTERNAL, workshop_id="EXT-001")
+
     def test_assign_technician_after_workshop_assigned(self) -> None:
         from apps.repair.domain.entities import WorkshopType
 
         order = _make_order()
         order.approve()
-        order.assign_workshop(WorkshopType.EXTERNAL)
+        order.assign_workshop(WorkshopType.INTERNAL)
         assignment = _make_assignment()
         order.assign_technician(assignment)
         assert order.status == RepairOrderStatus.ASSIGNED
+
+    def test_assign_external_workshop_waits_for_referral_approval(self) -> None:
+        from apps.repair.domain.entities import WorkshopType
+
+        order = _make_order()
+        order.approve()
+        order.assign_workshop(WorkshopType.EXTERNAL, workshop_id="EXT-001")
+        assert order.status == RepairOrderStatus.WAITING_EXTERNAL_REFERRAL_APPROVAL
+        assert order.workshop_type == WorkshopType.EXTERNAL
+        assert order.workshop_id == "EXT-001"
+
+    def test_transport_reject_from_created(self) -> None:
+        order = _make_order()
+        order.reject_by_transport("Not required")
+        assert order.status == RepairOrderStatus.REJECTED_BY_TRANSPORT
+        assert order.transport_rejection_reason == "Not required"
 
     def test_start_work_from_workshop_assigned(self) -> None:
         from apps.repair.domain.entities import WorkshopType

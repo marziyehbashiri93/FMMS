@@ -3,21 +3,30 @@
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
+from decimal import Decimal
 
 from apps.handover.domain.entities import VehicleHandoverStatus
 
 
 @dataclass(frozen=True)
 class ConfirmVehicleHandoverDTO:
-    """Confirm handover input DTO."""
+    """Confirm handover input DTO.
+
+    For EXTERNAL repairs, accepting handover moves the order to transport final
+    approval; transport uploads and approves the workshop invoice separately.
+    """
 
     handover_id: uuid.UUID
     accepted: bool
     comment: str | None
     request_id: str
     confirmed_by: uuid.UUID
+    invoice_amount: Decimal | None = field(default=None)
+    invoice_currency: str | None = field(default=None)
+    invoice_vendor_id: str | None = field(default=None)
+    invoice_document: str | None = field(default=None)
 
 
 @dataclass(frozen=True)

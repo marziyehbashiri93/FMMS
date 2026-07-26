@@ -18,6 +18,23 @@ from apps.fault.domain.value_objects import FaultSeverity
 
 
 @dataclass(frozen=True)
+class ReportFaultItemDTO:
+    """One failed component reported inside a manual fault incident.
+
+    Attributes:
+        code: Catalog / classification code for this item.
+        description: Human-readable failure detail.
+        severity: Severity assigned to this item.
+        component: Short label shown on the item (e.g. catalog text).
+    """
+
+    code: str
+    description: str
+    severity: FaultSeverity
+    component: str = ""
+
+
+@dataclass(frozen=True)
 class ReportFaultDTO:
     """Input DTO for reporting a new fault.
 
@@ -29,6 +46,7 @@ class ReportFaultDTO:
         request_id: Correlation ID for tracing.
         reported_by: UUID of the user reporting the fault.
         inspection_id: Optional UUID of the originating inspection.
+        items: Optional child items when several defects are reported together.
     """
 
     vehicle_id: uuid.UUID
@@ -38,6 +56,7 @@ class ReportFaultDTO:
     request_id: str
     reported_by: uuid.UUID
     inspection_id: uuid.UUID | None = field(default=None)
+    items: list[ReportFaultItemDTO] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -70,6 +89,16 @@ class CloseFaultDTO:
     fault_id: uuid.UUID
     request_id: str
     closed_by: uuid.UUID
+
+
+@dataclass(frozen=True)
+class DistributionFaultDecisionDTO:
+    """Input DTO for distribution unit decision about a reported fault."""
+
+    fault_id: uuid.UUID
+    request_id: str
+    decided_by: uuid.UUID
+    note: str = ""
 
 
 @dataclass(frozen=True)
@@ -120,5 +149,6 @@ class FaultResponseDTO:
     inspection_id: uuid.UUID | None = field(default=None)
     assigned_to_id: uuid.UUID | None = field(default=None)
     sap_notification_number: str | None = field(default=None)
+    distribution_decision_note: str | None = field(default=None)
     items: list[FaultItemResponseDTO] = field(default_factory=list)
     created_by: UserProfileSummaryDTO | None = field(default=None)

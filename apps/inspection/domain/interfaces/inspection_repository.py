@@ -43,6 +43,20 @@ class IInspectionRepository(ABC):
         """
 
     @abstractmethod
+    def list_all(
+        self,
+        status: InspectionStatus | None = None,
+    ) -> list[Inspection]:
+        """Return all non-deleted inspections, optionally filtered by status.
+
+        Args:
+            status: Optional status filter.
+
+        Returns:
+            A list of ``Inspection`` aggregates ordered by inspected_at desc.
+        """
+
+    @abstractmethod
     def list_by_date_range(
         self,
         start: datetime,
