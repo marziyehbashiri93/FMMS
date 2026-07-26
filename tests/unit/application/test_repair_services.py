@@ -1114,9 +1114,9 @@ class TestExternalWorkshopWorkflowServices:
         ReviewExternalRepairService(external_repo, repair_repo).execute(
             ReviewExternalRepairDTO(
                 assignment_id=assignment.id,
-                invoice_attachment="invoice.pdf",
+                invoice_attachment=None,
                 repair_services=[{"description": "Replaced alternator", "labor_hours": "2"}],
-                replaced_parts=[{"material_number": "ALT-1", "quantity": "1"}],
+                replaced_parts=[],
                 repair_cost=Decimal("1000"),
                 additional_notes="",
                 request_id="req",

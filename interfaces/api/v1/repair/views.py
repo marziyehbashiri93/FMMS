@@ -98,6 +98,8 @@ def _json_safe_parts(items: list[dict]) -> list[dict]:
         next_item = dict(item)
         if "quantity" in next_item and next_item["quantity"] is not None:
             next_item["quantity"] = str(next_item["quantity"])
+        if "cost" in next_item and next_item["cost"] is not None:
+            next_item["cost"] = str(next_item["cost"])
         result.append(next_item)
     return result
 
@@ -109,6 +111,8 @@ def _json_safe_services(items: list[dict]) -> list[dict]:
         next_item = dict(item)
         if "labor_hours" in next_item and next_item["labor_hours"] is not None:
             next_item["labor_hours"] = str(next_item["labor_hours"])
+        if "cost" in next_item and next_item["cost"] is not None:
+            next_item["cost"] = str(next_item["cost"])
         result.append(next_item)
     return result
 

@@ -466,7 +466,6 @@ export const api = {
   reviewExternalRepair(
     id: string,
     payload: {
-      invoice_attachment?: string | null;
       repair_services?: Array<Record<string, unknown>>;
       replaced_parts?: Array<Record<string, unknown>>;
       repair_cost?: string | number | null;

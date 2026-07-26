@@ -127,6 +127,9 @@ class ExternalReplacedPartSerializer(serializers.Serializer):
     quantity = serializers.DecimalField(
         max_digits=12, decimal_places=3, required=False, min_value=0
     )
+    cost = serializers.DecimalField(
+        max_digits=15, decimal_places=2, required=False, allow_null=True, min_value=0
+    )
     unit_of_measure = serializers.CharField(
         max_length=10, required=False, allow_blank=True, trim_whitespace=True
     )
@@ -138,6 +141,9 @@ class ExternalRepairServiceLineSerializer(serializers.Serializer):
     description = serializers.CharField(max_length=500, trim_whitespace=True)
     labor_hours = serializers.DecimalField(
         max_digits=8, decimal_places=2, required=False, allow_null=True, min_value=0
+    )
+    cost = serializers.DecimalField(
+        max_digits=15, decimal_places=2, required=False, allow_null=True, min_value=0
     )
     notes = serializers.CharField(
         required=False, allow_blank=True, default="", trim_whitespace=True

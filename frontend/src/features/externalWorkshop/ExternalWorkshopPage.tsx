@@ -5,6 +5,7 @@ import {
   Card,
   CardContent,
   Divider,
+  MenuItem,
   Stack,
   Tab,
   Tabs,
@@ -25,6 +26,7 @@ import { Button } from '../../components/Button';
 import { FeaturePage } from '../../components/FeaturePage';
 import { PageHeader } from '../../components/PageHeader';
 import { RtlDataTable, type RtlDataTableColumn } from '../../components/RtlDataTable';
+import { RtlSelectField } from '../../components/RtlSelectField';
 import { RtlTextField } from '../../components/RtlTextField';
 import { EmptyState, ErrorState } from '../../components/States';
 import { PlainStatusBadge } from '../../components/StatusBadge';
@@ -33,6 +35,8 @@ import type { ExternalWorkshopAssignment, RepairOrder, Vehicle } from '../../typ
 import { formatDateTime } from '../../utils/format';
 
 type TabKey = 'driver' | 'transport';
+type DriverExternalFilter = '' | 'WAITING_DELIVERY' | 'IN_REPAIR' | 'COMPLETED';
+type TransportInvoiceFilter = '' | 'WAITING_PICKUP' | 'WAITING_INVOICE' | 'DRAFT' | 'COMPLETED';
 
 function normalizeList<T>(payload: { results?: T[] } | T[]): T[] {
   if (Array.isArray(payload)) return payload;
@@ -48,11 +52,46 @@ function statusLabel(item: ExternalWorkshopAssignment): string {
   return 'آماده بستن';
 }
 
-function actionFor(item: ExternalWorkshopAssignment): 'delivery' | 'pickup' | 'review' | 'done' {
-  if (!item.delivery) return 'delivery';
-  if (!item.pickup) return 'pickup';
-  if (item.status !== 'COMPLETED') return 'review';
-  return 'done';
+function invoiceStateFor(item: ExternalWorkshopAssignment): Exclude<TransportInvoiceFilter, ''> {
+  if (item.status === 'COMPLETED' || item.review?.status === 'COMPLETED') return 'COMPLETED';
+  if (!item.pickup) return 'WAITING_PICKUP';
+  if (!item.review) return 'WAITING_INVOICE';
+  return 'DRAFT';
+}
+
+function driverStateFor(item: ExternalWorkshopAssignment): Exclude<DriverExternalFilter, ''> {
+  if (item.status === 'COMPLETED') return 'COMPLETED';
+  if (!item.delivery) return 'WAITING_DELIVERY';
+  return 'IN_REPAIR';
+}
+
+function driverStateLabel(item: ExternalWorkshopAssignment): string {
+  const state = driverStateFor(item);
+  if (state === 'WAITING_DELIVERY') return 'در انتظار تحویل به تعمیرگاه';
+  if (state === 'IN_REPAIR') return item.pickup ? 'خودرو دریافت شده' : 'در تعمیرگاه بیرونی';
+  return 'تکمیل‌شده';
+}
+
+function driverStateTone(item: ExternalWorkshopAssignment): 'neutral' | 'warning' | 'success' {
+  const state = driverStateFor(item);
+  if (state === 'COMPLETED') return 'success';
+  if (state === 'WAITING_DELIVERY') return 'warning';
+  return item.pickup ? 'success' : 'neutral';
+}
+
+function invoiceStateLabel(item: ExternalWorkshopAssignment): string {
+  const state = invoiceStateFor(item);
+  if (state === 'WAITING_PICKUP') return 'در انتظار دریافت خودرو';
+  if (state === 'WAITING_INVOICE') return 'در انتظار ثبت فاکتور';
+  if (state === 'DRAFT') return 'پیش‌نویس فاکتور';
+  return 'تکمیل‌شده';
+}
+
+function invoiceStateTone(item: ExternalWorkshopAssignment): 'neutral' | 'warning' | 'success' {
+  const state = invoiceStateFor(item);
+  if (state === 'COMPLETED') return 'success';
+  if (state === 'WAITING_PICKUP') return 'neutral';
+  return 'warning';
 }
 
 const emptyDelivery = {
@@ -69,16 +108,15 @@ const emptyPickup = {
 };
 
 const emptyReview = {
-  invoice_attachment: '',
   repair_cost: '',
   additional_notes: '',
 };
 
-type ServiceLine = { description: string; labor_hours: string; notes: string };
-type PartLine = { name: string; quantity: string };
+type ServiceLine = { description: string; labor_hours: string; cost: string; notes: string };
+type PartLine = { name: string; quantity: string; cost: string };
 
-const blankService = (): ServiceLine => ({ description: '', labor_hours: '', notes: '' });
-const blankPart = (): PartLine => ({ name: '', quantity: '1' });
+const blankService = (): ServiceLine => ({ description: '', labor_hours: '', cost: '', notes: '' });
+const blankPart = (): PartLine => ({ name: '', quantity: '1', cost: '' });
 
 export function ExternalWorkshopPage({ mode }: { mode?: TabKey }) {
   const [tab, setTab] = useState<TabKey>(mode ?? 'driver');
@@ -99,13 +137,18 @@ export function ExternalWorkshopPage({ mode }: { mode?: TabKey }) {
   const [actionError, setActionError] = useState('');
   const [success, setSuccess] = useState('');
   const [actionLoading, setActionLoading] = useState('');
+  const [driverFilter, setDriverFilter] = useState<DriverExternalFilter>('');
+  const [invoiceFilter, setInvoiceFilter] = useState<TransportInvoiceFilter>('');
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
       const list = normalizeList(
-        await api.listExternalWorkshopAssignments({ status: 'ACTIVE', page: 1, pageSize: 100 }),
+        await api.listExternalWorkshopAssignments({
+          page: 1,
+          pageSize: 100,
+        }),
       );
       setItems(list);
       const [vehicleResults, orderResults] = await Promise.all([
@@ -127,7 +170,7 @@ export function ExternalWorkshopPage({ mode }: { mode?: TabKey }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeTab]);
 
   useEffect(() => {
     void load();
@@ -135,10 +178,16 @@ export function ExternalWorkshopPage({ mode }: { mode?: TabKey }) {
 
   const visible = useMemo(() => {
     if (activeTab === 'driver') {
-      return items.filter((item) => ['delivery', 'pickup'].includes(actionFor(item)));
+      return items.filter((item) => {
+        if (item.status === 'CANCELLED') return false;
+        return driverFilter === '' || driverStateFor(item) === driverFilter;
+      });
     }
-    return items.filter((item) => actionFor(item) === 'review');
-  }, [items, activeTab]);
+    return items.filter((item) => {
+      if (item.status === 'CANCELLED' || !item.delivery) return false;
+      return invoiceFilter === '' || invoiceStateFor(item) === invoiceFilter;
+    });
+  }, [items, activeTab, driverFilter, invoiceFilter]);
 
   const openDetail = async (item: ExternalWorkshopAssignment) => {
     setActionError('');
@@ -157,7 +206,6 @@ export function ExternalWorkshopPage({ mode }: { mode?: TabKey }) {
       notes: fresh.pickup?.notes ?? '',
     });
     setReview({
-      invoice_attachment: fresh.review?.invoice_attachment ?? '',
       repair_cost: fresh.review?.repair_cost ? String(fresh.review.repair_cost) : '',
       additional_notes: fresh.review?.additional_notes ?? '',
     });
@@ -166,6 +214,7 @@ export function ExternalWorkshopPage({ mode }: { mode?: TabKey }) {
         ? fresh.review.repair_services.map((item) => ({
             description: String(item.description ?? ''),
             labor_hours: String(item.labor_hours ?? ''),
+            cost: String(item.cost ?? ''),
             notes: String(item.notes ?? ''),
           }))
         : [],
@@ -175,6 +224,7 @@ export function ExternalWorkshopPage({ mode }: { mode?: TabKey }) {
         ? fresh.review.replaced_parts.map((item) => ({
             name: String(item.material_number ?? item.name ?? ''),
             quantity: String(item.quantity ?? '1'),
+            cost: String(item.cost ?? ''),
           }))
         : [],
     );
@@ -184,6 +234,8 @@ export function ExternalWorkshopPage({ mode }: { mode?: TabKey }) {
 
   const selectedVehicle = selected ? vehicles.get(selected.vehicle_id) : null;
   const selectedOrder = selected ? orders.get(selected.repair_order_id) : null;
+  const selectedReviewCompleted = selected?.status === 'COMPLETED';
+  const canEditSelectedReview = Boolean(selected?.pickup && selected.status !== 'COMPLETED');
 
   const submitDelivery = async () => {
     if (!selected) return;
@@ -228,30 +280,33 @@ export function ExternalWorkshopPage({ mode }: { mode?: TabKey }) {
     }
   };
 
+  const buildReviewPayload = () => ({
+    repair_services: serviceLines
+      .map((line) => ({
+        description: line.description.trim(),
+        labor_hours: line.labor_hours || null,
+        cost: line.cost || null,
+        notes: line.notes.trim(),
+      }))
+      .filter((line) => line.description),
+    replaced_parts: partLines
+      .map((line) => ({
+        name: line.name.trim(),
+        quantity: line.quantity || '1',
+        cost: line.cost || null,
+        unit_of_measure: '-',
+      }))
+      .filter((line) => line.name),
+    repair_cost: review.repair_cost || null,
+    additional_notes: review.additional_notes,
+  });
+
   const saveReview = async () => {
     if (!selected) return;
     setActionLoading('review');
     setActionError('');
     try {
-      const updated = await api.reviewExternalRepair(selected.id, {
-        invoice_attachment: review.invoice_attachment || null,
-        repair_services: serviceLines
-          .map((line) => ({
-            description: line.description.trim(),
-            labor_hours: line.labor_hours || null,
-            notes: line.notes.trim(),
-          }))
-          .filter((line) => line.description),
-        replaced_parts: partLines
-          .map((line) => ({
-            name: line.name.trim(),
-            quantity: line.quantity || '1',
-            unit_of_measure: '-',
-          }))
-          .filter((line) => line.name),
-        repair_cost: review.repair_cost || null,
-        additional_notes: review.additional_notes,
-      });
+      const updated = await api.reviewExternalRepair(selected.id, buildReviewPayload());
       setSelected(updated);
       setSuccess('پیش‌نویس اطلاعات ترابری ذخیره شد.');
       await load();
@@ -264,11 +319,20 @@ export function ExternalWorkshopPage({ mode }: { mode?: TabKey }) {
 
   const closeWorkflow = async () => {
     if (!selected) return;
+    const reviewPayload = buildReviewPayload();
+    const missing: string[] = [];
+    if (!reviewPayload.repair_services.length) missing.push('حداقل یک خدمت انجام‌شده');
+    if (!reviewPayload.repair_cost) missing.push('هزینه تعمیر');
+    if (missing.length) {
+      setActionError(`برای بستن درخواست، این موارد را کامل کنید: ${missing.join('، ')}.`);
+      return;
+    }
     setActionLoading('close');
     setActionError('');
     try {
-      const updated = await api.closeExternalRepair(selected.id);
-      setSelected(updated);
+      await api.reviewExternalRepair(selected.id, reviewPayload);
+      await api.closeExternalRepair(selected.id);
+      setSelected(null);
       setSuccess('درخواست تعمیر خارجی بسته شد.');
       await load();
     } catch (err) {
@@ -294,14 +358,19 @@ export function ExternalWorkshopPage({ mode }: { mode?: TabKey }) {
     },
     {
       key: 'status',
-      label: 'مرحله',
+      label: activeTab === 'transport' ? 'وضعیت فاکتور' : 'مرحله',
       render: (row) => (
         <PlainStatusBadge
-          label={statusLabel(row)}
-          tone={actionFor(row) === 'done' ? 'success' : 'warning'}
+          label={activeTab === 'transport' ? invoiceStateLabel(row) : driverStateLabel(row)}
+          tone={activeTab === 'transport' ? invoiceStateTone(row) : driverStateTone(row)}
         />
       ),
     },
+    ...(activeTab === 'transport' ? [{
+      key: 'cost',
+      label: 'هزینه تعمیر',
+      render: (row: ExternalWorkshopAssignment) => row.review?.repair_cost || '—',
+    }] : []),
     {
       key: 'date',
       label: 'تاریخ ارجاع',
@@ -313,7 +382,7 @@ export function ExternalWorkshopPage({ mode }: { mode?: TabKey }) {
       align: 'center',
       render: (row) => (
         <Button size="small" variant="outlined" onClick={() => void openDetail(row)}>
-          بررسی
+          {row.status === 'COMPLETED' ? 'مشاهده' : 'بررسی'}
         </Button>
       ),
     },
@@ -343,6 +412,65 @@ export function ExternalWorkshopPage({ mode }: { mode?: TabKey }) {
           <Tab value="driver" icon={<DirectionsCar />} iconPosition="start" label="کارتابل راننده" />
           <Tab value="transport" icon={<FactCheck />} iconPosition="start" label="ثبت فاکتور" />
         </Tabs>
+      )}
+      {activeTab === 'driver' && (
+        <Card variant="outlined" sx={{ mb: 2 }}>
+          <CardContent>
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', md: 'minmax(260px, 340px) 1fr' },
+                gap: 1.25,
+                alignItems: 'center',
+              }}
+            >
+              <RtlSelectField
+                label="فیلتر وضعیت تعمیر"
+                value={driverFilter}
+                onChange={(event) => setDriverFilter(event.target.value as DriverExternalFilter)}
+                size="small"
+              >
+                <MenuItem value="">همه</MenuItem>
+                <MenuItem value="WAITING_DELIVERY">در انتظار تحویل به تعمیرگاه</MenuItem>
+                <MenuItem value="IN_REPAIR">در تعمیرگاه بیرونی / دریافت خودرو</MenuItem>
+                <MenuItem value="COMPLETED">تکمیل‌شده</MenuItem>
+              </RtlSelectField>
+              <Typography variant="body2" color="text.secondary">
+                تعمیرات جاری و سوابق بسته‌شده تعمیرگاه بیرونی در همین لیست نمایش داده می‌شوند.
+              </Typography>
+            </Box>
+          </CardContent>
+        </Card>
+      )}
+      {activeTab === 'transport' && (
+        <Card variant="outlined" sx={{ mb: 2 }}>
+          <CardContent>
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', md: 'minmax(260px, 340px) 1fr' },
+                gap: 1.25,
+                alignItems: 'center',
+              }}
+            >
+              <RtlSelectField
+                label="فیلتر وضعیت فاکتور"
+                value={invoiceFilter}
+                onChange={(event) => setInvoiceFilter(event.target.value as TransportInvoiceFilter)}
+                size="small"
+              >
+                <MenuItem value="">همه</MenuItem>
+                <MenuItem value="WAITING_PICKUP">در انتظار دریافت خودرو</MenuItem>
+                <MenuItem value="WAITING_INVOICE">در انتظار ثبت فاکتور</MenuItem>
+                <MenuItem value="DRAFT">پیش‌نویس فاکتور</MenuItem>
+                <MenuItem value="COMPLETED">تکمیل‌شده</MenuItem>
+              </RtlSelectField>
+              <Typography variant="body2" color="text.secondary">
+                فاکتورهای جاری و سوابق تکمیل‌شده تعمیرگاه بیرونی در همین لیست نمایش داده می‌شوند.
+              </Typography>
+            </Box>
+          </CardContent>
+        </Card>
       )}
       {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
       {error ? (
@@ -412,79 +540,107 @@ export function ExternalWorkshopPage({ mode }: { mode?: TabKey }) {
             content: (
               <Stack spacing={1.75}>
                 {!selected.pickup && <Alert severity="info">ثبت فاکتور بعد از دریافت خودرو توسط راننده فعال می‌شود.</Alert>}
+                {selectedReviewCompleted && <Alert severity="success">این فاکتور قبلا تکمیل شده و فقط به صورت گزارش نمایش داده می‌شود.</Alert>}
                 <FormPanel title="اطلاعات فاکتور" icon={<ReceiptLong fontSize="small" />}>
-                  <ResponsiveFields>
-                    <RtlTextField label="پیوست فاکتور" value={review.invoice_attachment} disabled={!selected.pickup} onChange={(e) => setReview({ ...review, invoice_attachment: e.target.value })} fullWidth />
-                    <RtlTextField label="هزینه تعمیر" value={review.repair_cost} disabled={!selected.pickup} onChange={(e) => setReview({ ...review, repair_cost: e.target.value })} fullWidth />
-                  </ResponsiveFields>
-                  <RtlTextField label="یادداشت تکمیلی" value={review.additional_notes} disabled={!selected.pickup} onChange={(e) => setReview({ ...review, additional_notes: e.target.value })} fullWidth multiline minRows={2} />
+                  {selectedReviewCompleted ? (
+                    <ResponsiveFields>
+                      <InfoTile label="هزینه تعمیر" value={review.repair_cost || '—'} />
+                      <InfoTile label="یادداشت تکمیلی" value={review.additional_notes || '—'} />
+                    </ResponsiveFields>
+                  ) : (
+                    <>
+                      <ResponsiveFields>
+                        <RtlTextField label="هزینه تعمیر" value={review.repair_cost} disabled={!canEditSelectedReview} onChange={(e) => setReview({ ...review, repair_cost: e.target.value })} fullWidth />
+                      </ResponsiveFields>
+                      <RtlTextField label="یادداشت تکمیلی" value={review.additional_notes} disabled={!canEditSelectedReview} onChange={(e) => setReview({ ...review, additional_notes: e.target.value })} fullWidth multiline minRows={2} />
+                    </>
+                  )}
                 </FormPanel>
                 <RecordSection title="خدمات انجام‌شده">
-                  <RecordRow>
-                    <RtlTextField label="شرح خدمت" value={draftService.description} disabled={!selected.pickup} onChange={(e) => setDraftService({ ...draftService, description: e.target.value })} fullWidth />
-                    <RtlTextField label="ساعت کار" value={draftService.labor_hours} disabled={!selected.pickup} onChange={(e) => setDraftService({ ...draftService, labor_hours: e.target.value })} sx={{ minWidth: 110 }} />
-                    <RtlTextField label="یادداشت" value={draftService.notes} disabled={!selected.pickup} onChange={(e) => setDraftService({ ...draftService, notes: e.target.value })} fullWidth />
-                    <Button variant="contained" startIcon={<Add />} disabled={!selected.pickup || !draftService.description.trim()} onClick={() => {
-                      setServiceLines([{
-                        description: draftService.description.trim(),
-                        labor_hours: draftService.labor_hours.trim(),
-                        notes: draftService.notes.trim(),
-                      }, ...serviceLines]);
-                      setDraftService(blankService());
-                    }} sx={{ minHeight: 40 }}>
-                      افزودن
-                    </Button>
-                  </RecordRow>
+                  {!selectedReviewCompleted && (
+                    <RecordRow>
+                      <RtlTextField label="شرح خدمت" value={draftService.description} disabled={!canEditSelectedReview} onChange={(e) => setDraftService({ ...draftService, description: e.target.value })} fullWidth />
+                      <RtlTextField label="ساعت کار" value={draftService.labor_hours} disabled={!canEditSelectedReview} onChange={(e) => setDraftService({ ...draftService, labor_hours: e.target.value })} sx={{ minWidth: 110 }} />
+                      <RtlTextField label="هزینه خدمت" value={draftService.cost} disabled={!canEditSelectedReview} onChange={(e) => setDraftService({ ...draftService, cost: e.target.value })} sx={{ minWidth: 130 }} />
+                      <RtlTextField label="یادداشت" value={draftService.notes} disabled={!canEditSelectedReview} onChange={(e) => setDraftService({ ...draftService, notes: e.target.value })} fullWidth />
+                      <Button variant="contained" startIcon={<Add />} disabled={!canEditSelectedReview || !draftService.description.trim()} onClick={() => {
+                        setServiceLines([{
+                          description: draftService.description.trim(),
+                          labor_hours: draftService.labor_hours.trim(),
+                          cost: draftService.cost.trim(),
+                          notes: draftService.notes.trim(),
+                        }, ...serviceLines]);
+                        setDraftService(blankService());
+                      }} sx={{ minHeight: 40 }}>
+                        افزودن
+                      </Button>
+                    </RecordRow>
+                  )}
                   {serviceLines.map((line, index) => (
                     <RecordRow key={index}>
                       <ReadonlyValue label="شرح خدمت" value={line.description} />
                       <ReadonlyValue label="ساعت کار" value={line.labor_hours || '—'} />
+                      <ReadonlyValue label="هزینه خدمت" value={line.cost || '—'} />
                       <ReadonlyValue label="یادداشت" value={line.notes || '—'} />
-                      <Button variant="outlined" color="error" startIcon={<DeleteOutline />} disabled={!selected.pickup} onClick={() => setServiceLines(serviceLines.filter((_, i) => i !== index))} sx={{ minHeight: 40 }}>
-                        حذف
-                      </Button>
+                      {!selectedReviewCompleted && (
+                        <Button variant="outlined" color="error" startIcon={<DeleteOutline />} disabled={!canEditSelectedReview} onClick={() => setServiceLines(serviceLines.filter((_, i) => i !== index))} sx={{ minHeight: 40 }}>
+                          حذف
+                        </Button>
+                      )}
                     </RecordRow>
                   ))}
                 </RecordSection>
                 <RecordSection title="قطعات تعویضی">
-                  <RecordRow variant="part">
-                    <RtlTextField label="نام یا کد قطعه" value={draftPart.name} disabled={!selected.pickup} onChange={(e) => setDraftPart({ ...draftPart, name: e.target.value })} fullWidth />
-                    <RtlTextField label="تعداد" value={draftPart.quantity} disabled={!selected.pickup} onChange={(e) => setDraftPart({ ...draftPart, quantity: e.target.value })} sx={{ minWidth: 100 }} />
-                    <Button variant="contained" startIcon={<Add />} disabled={!selected.pickup || !draftPart.name.trim()} onClick={() => {
-                      setPartLines([{
-                        name: draftPart.name.trim(),
-                        quantity: draftPart.quantity.trim() || '1',
-                      }, ...partLines]);
-                      setDraftPart(blankPart());
-                    }} sx={{ minHeight: 40 }}>
-                      افزودن
-                    </Button>
-                  </RecordRow>
+                  {!selectedReviewCompleted && (
+                    <RecordRow variant="part">
+                      <RtlTextField label="نام یا کد قطعه" value={draftPart.name} disabled={!canEditSelectedReview} onChange={(e) => setDraftPart({ ...draftPart, name: e.target.value })} fullWidth />
+                      <RtlTextField label="تعداد" value={draftPart.quantity} disabled={!canEditSelectedReview} onChange={(e) => setDraftPart({ ...draftPart, quantity: e.target.value })} sx={{ minWidth: 100 }} />
+                      <RtlTextField label="هزینه قطعه" value={draftPart.cost} disabled={!canEditSelectedReview} onChange={(e) => setDraftPart({ ...draftPart, cost: e.target.value })} sx={{ minWidth: 130 }} />
+                      <Button variant="contained" startIcon={<Add />} disabled={!canEditSelectedReview || !draftPart.name.trim()} onClick={() => {
+                        setPartLines([{
+                          name: draftPart.name.trim(),
+                          quantity: draftPart.quantity.trim() || '1',
+                          cost: draftPart.cost.trim(),
+                        }, ...partLines]);
+                        setDraftPart(blankPart());
+                      }} sx={{ minHeight: 40 }}>
+                        افزودن
+                      </Button>
+                    </RecordRow>
+                  )}
                   {partLines.map((line, index) => (
                     <RecordRow key={index} variant="part">
                       <ReadonlyValue label="نام یا کد قطعه" value={line.name} />
                       <ReadonlyValue label="تعداد" value={line.quantity || '1'} />
-                      <Button variant="outlined" color="error" startIcon={<DeleteOutline />} disabled={!selected.pickup} onClick={() => setPartLines(partLines.filter((_, i) => i !== index))} sx={{ minHeight: 40 }}>
-                        حذف
-                      </Button>
+                      <ReadonlyValue label="هزینه قطعه" value={line.cost || '—'} />
+                      {!selectedReviewCompleted && (
+                        <Button variant="outlined" color="error" startIcon={<DeleteOutline />} disabled={!canEditSelectedReview} onClick={() => setPartLines(partLines.filter((_, i) => i !== index))} sx={{ minHeight: 40 }}>
+                          حذف
+                        </Button>
+                      )}
                     </RecordRow>
                   ))}
+                  {selectedReviewCompleted && partLines.length === 0 && (
+                    <EmptyRecordMessage text="هیچ قطعه‌ای ثبت نشده" />
+                  )}
                 </RecordSection>
-                <Box
-                  sx={{
-                    display: 'grid',
-                    gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' },
-                    gap: 1.5,
-                    pt: 0.5,
-                  }}
-                >
-                  <Button variant="outlined" startIcon={<Save />} disabled={!selected.pickup} loading={actionLoading === 'review'} onClick={() => void saveReview()} sx={{ flex: 1, minHeight: 44 }}>
-                    ذخیره پیش‌نویس
-                  </Button>
-                  <Button variant="contained" color="success" startIcon={<CheckCircleOutline />} disabled={!selected.pickup} loading={actionLoading === 'close'} onClick={() => void closeWorkflow()} sx={{ flex: 1, minHeight: 44 }}>
-                    بستن درخواست تعمیر
-                  </Button>
-                </Box>
+                {!selectedReviewCompleted && (
+                  <Box
+                    sx={{
+                      display: 'grid',
+                      gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' },
+                      gap: 1.5,
+                      pt: 0.5,
+                    }}
+                  >
+                    <Button variant="outlined" startIcon={<Save />} disabled={!canEditSelectedReview} loading={actionLoading === 'review'} onClick={() => void saveReview()} sx={{ flex: 1, minHeight: 44 }}>
+                      ذخیره پیش‌نویس
+                    </Button>
+                    <Button variant="contained" color="success" startIcon={<CheckCircleOutline />} disabled={!canEditSelectedReview} loading={actionLoading === 'close'} onClick={() => void closeWorkflow()} sx={{ flex: 1, minHeight: 44 }}>
+                      بستن درخواست تعمیر
+                    </Button>
+                  </Box>
+                )}
                 {actionError && <Alert severity="error">{actionError}</Alert>}
               </Stack>
             ),
@@ -686,8 +842,8 @@ function RecordRow({
 }) {
   const columns =
     variant === 'part'
-      ? 'minmax(220px, 1fr) minmax(96px, 120px) auto'
-      : 'minmax(220px, 1fr) minmax(96px, 130px) minmax(160px, 1fr) auto';
+      ? 'minmax(200px, 1fr) minmax(88px, 110px) minmax(120px, 150px) auto'
+      : 'minmax(200px, 1fr) minmax(88px, 120px) minmax(120px, 150px) minmax(150px, 1fr) auto';
   return (
     <Box
       sx={{
@@ -747,6 +903,24 @@ function ReadonlyValue({ label, value }: { label: string; value: string }) {
       </Typography>
       <Typography fontWeight={800} sx={{ overflowWrap: 'anywhere' }}>
         {value}
+      </Typography>
+    </Box>
+  );
+}
+
+function EmptyRecordMessage({ text }: { text: string }) {
+  return (
+    <Box
+      sx={{
+        p: 1.5,
+        borderRadius: 1,
+        bgcolor: 'rgba(15, 23, 42, 0.035)',
+        border: '1px dashed',
+        borderColor: 'rgba(15, 23, 42, 0.16)',
+      }}
+    >
+      <Typography variant="body2" color="text.secondary" fontWeight={700}>
+        {text}
       </Typography>
     </Box>
   );

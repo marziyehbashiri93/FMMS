@@ -610,18 +610,12 @@ def _assert_review_complete(
     missing: list[str] = []
     if review is None:
         missing = [
-            "invoice_attachment",
             "repair_services",
-            "replaced_parts",
             "repair_cost",
         ]
     else:
-        if not review.invoice_attachment:
-            missing.append("invoice_attachment")
         if not review.repair_services:
             missing.append("repair_services")
-        if not review.replaced_parts:
-            missing.append("replaced_parts")
         if review.repair_cost is None or Decimal(str(review.repair_cost)) <= 0:
             missing.append("repair_cost")
     if missing:
