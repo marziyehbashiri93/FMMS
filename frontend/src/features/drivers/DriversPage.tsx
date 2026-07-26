@@ -6,7 +6,6 @@ import {
   Divider,
   InputAdornment,
   MenuItem,
-  Pagination,
   Stack,
   Typography,
   useMediaQuery,
@@ -30,6 +29,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { EmptyState, ErrorState } from '../../components/States';
 import { PlainStatusBadge } from '../../components/StatusBadge';
 import { RtlDataTable, type RtlDataTableColumn } from '../../components/RtlDataTable';
+import { RtlPagination } from '../../components/RtlPagination';
 import { RtlSelectField } from '../../components/RtlSelectField';
 import { RtlTextField } from '../../components/RtlTextField';
 import type { Driver, DriverStatus, DriverSummary } from '../../types/fmms';
@@ -422,16 +422,15 @@ export function DriversPage() {
         </Stack>
       )}
 
-      {!error && total > PAGE_SIZE && (
-        <Stack alignItems="center" pt={0.5}>
-          <Pagination
-            color="primary"
-            page={page}
-            count={pageCount}
-            onChange={(_event, next) => setPage(next)}
-            siblingCount={isMobile ? 0 : 1}
-          />
-        </Stack>
+      {!error && (
+        <RtlPagination
+          page={page}
+          count={pageCount}
+          onChange={setPage}
+          totalItems={total}
+          pageSize={PAGE_SIZE}
+          disabled={loading}
+        />
       )}
 
       <DriverDetailModal open={Boolean(selectedId)} driverId={selectedId} onClose={closeDriver} />

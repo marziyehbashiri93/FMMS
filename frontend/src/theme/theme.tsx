@@ -313,6 +313,35 @@ export const theme = createTheme({
                 },
             },
         },
+        MuiPagination: {
+            defaultProps: {
+                color: 'primary',
+                shape: 'rounded',
+                variant: 'outlined',
+            },
+        },
+        MuiPaginationItem: {
+            styleOverrides: {
+                root: ({theme: t}) => ({
+                    borderRadius: t.radius('sm'),
+                    fontWeight: 800,
+                }),
+                outlined: {
+                    borderColor: '#D5E0DA',
+                },
+                outlinedPrimary: {
+                    '&.Mui-selected': {
+                        backgroundColor: '#0F6B4C',
+                        borderColor: '#0F6B4C',
+                        color: '#FFFFFF',
+                        '&:hover': {
+                            backgroundColor: '#0A4D37',
+                            borderColor: '#0A4D37',
+                        },
+                    },
+                },
+            },
+        },
         MuiDialog: {
             defaultProps: {
                 disableScrollLock: true,

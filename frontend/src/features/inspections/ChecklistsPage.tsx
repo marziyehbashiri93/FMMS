@@ -10,7 +10,6 @@ import {
   IconButton,
   Link,
   MenuItem,
-  Pagination,
   Stack,
   Typography,
   useMediaQuery,
@@ -29,6 +28,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { EmptyState, ErrorState, LoadingState } from '../../components/States';
 import { PlainStatusBadge } from '../../components/StatusBadge';
 import { RtlDataTable, type RtlDataTableColumn } from '../../components/RtlDataTable';
+import { RtlPagination } from '../../components/RtlPagination';
 import { RtlSelectField } from '../../components/RtlSelectField';
 import type { Inspection, Vehicle } from '../../types/fmms';
 import { isValidIsoDateRange } from '../../utils/dateRange';
@@ -433,16 +433,15 @@ export function ChecklistsPage() {
         </Stack>
       )}
 
-      {!error && total > PAGE_SIZE && (
-        <Stack alignItems="center" pt={0.5}>
-          <Pagination
-            color="primary"
-            page={page}
-            count={pageCount}
-            onChange={(_event, next) => setPage(next)}
-            siblingCount={isMobile ? 0 : 1}
-          />
-        </Stack>
+      {!error && (
+        <RtlPagination
+          page={page}
+          count={pageCount}
+          onChange={setPage}
+          totalItems={total}
+          pageSize={PAGE_SIZE}
+          disabled={loading}
+        />
       )}
 
       <Dialog

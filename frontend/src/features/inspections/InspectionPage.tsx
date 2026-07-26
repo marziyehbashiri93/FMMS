@@ -768,6 +768,8 @@ export function InspectionPage() {
 
   const handleExitCenter = async () => {
     if (!completedInspection || exitedCenter) return;
+    // After اعلام خرابی, exit stays hidden until distribution unlocks it.
+    if (faultReported && !exitUnlocked) return;
     setActionLoading('exit');
     setActionError('');
     setActionInfo('');
@@ -1149,7 +1151,7 @@ export function InspectionPage() {
                       ? faultReported
                         ? exitUnlocked
                           ? 'واحد توزیع خودرو را قابل‌استفاده اعلام کرد. می‌توانید اقدام به خروج کنید.'
-                          : 'خرابی اعلام شد. تصمیم خروج با راننده است؛ در صورت باز بودن جریان خرابی/تعمیر، سیستم خروج را رد می‌کند.'
+                          : 'خرابی اعلام شد. تا تعیین تکلیف در واحد توزیع، دکمه خروج نمایش داده نمی‌شود.'
                         : 'موارد خراب در چک‌لیست ثبت شد. اعلام خرابی اختیاری است و تصمیم خروج با راننده است.'
                       : 'تمام موارد چک‌لیست بدون خرابی ثبت شد.'}
                 </Typography>
@@ -1185,7 +1187,7 @@ export function InspectionPage() {
                       بررسی تصمیم توزیع
                     </Button>
                   )}
-                  {!exitedCenter && (
+                  {!exitedCenter && (!faultReported || exitUnlocked) && (
                     <Button
                       variant="contained"
                       size="large"
@@ -1220,7 +1222,8 @@ export function InspectionPage() {
                 ) : null}
                 {hadFailures && faultReported && !exitUnlocked && !exitedCenter ? (
                   <Typography variant="caption" color="text.secondary" display="block" mt={1.25}>
-                    در صورت نیاز می‌توانید وضعیت تصمیم توزیع را بررسی کنید.
+                    پس از مشخص شدن وضعیت خرابی در توزیع، با «بررسی تصمیم توزیع» امکان خروج فعال
+                    می‌شود.
                   </Typography>
                 ) : null}
               </Box>

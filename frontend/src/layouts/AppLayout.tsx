@@ -328,7 +328,14 @@ function NavLeafButton({
         )}
       </Box>
       {collapsed && (
-        <Typography fontSize="0.66rem" fontWeight={selected ? 900 : 750} noWrap maxWidth={50}>
+        <Typography
+          fontSize="0.66rem"
+          fontWeight={selected ? 900 : 750}
+          noWrap
+          maxWidth={56}
+          textAlign="center"
+          sx={{ color: selected ? sidebarActive : sidebarText, lineHeight: 1.2 }}
+        >
           {item.label}
         </Typography>
       )}
@@ -381,7 +388,14 @@ function NavGroupItem({
               <Box sx={{ color: childActive ? sidebarActive : sidebarMuted, display: 'flex' }}>
                 <GroupIcon fontSize="medium" />
               </Box>
-              <Typography fontSize="0.66rem" fontWeight={childActive ? 900 : 750} noWrap maxWidth={50}>
+              <Typography
+                fontSize="0.66rem"
+                fontWeight={childActive ? 900 : 750}
+                noWrap
+                maxWidth={56}
+                textAlign="center"
+                sx={{ color: childActive ? sidebarActive : sidebarText, lineHeight: 1.2 }}
+              >
                 {group.label}
               </Typography>
             </ListItemButton>
@@ -586,11 +600,11 @@ export function AppLayout() {
               top: 22,
               width: 28,
               height: 28,
-              bgcolor: '#FFFFFF',
+              bgcolor: sidebarBg,
               border: '1px solid',
-              borderColor: 'divider',
-              color: 'primary.main',
-              boxShadow: '0 4px 12px rgba(15, 107, 76, 0.18)',
+              borderColor: 'rgba(143, 212, 176, 0.45)',
+              color: sidebarActive,
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.22)',
               zIndex: (t) => t.zIndex.drawer + 1,
               '&:hover': {
                 bgcolor: 'primary.main',

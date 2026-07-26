@@ -12,7 +12,6 @@ import {
   InputAdornment,
   Link,
   MenuItem,
-  Pagination,
   Stack,
   Typography,
   useMediaQuery,
@@ -41,6 +40,7 @@ import { EmptyState, ErrorState, LoadingState } from '../../components/States';
 import { PlainStatusBadge, VehicleStatusBadge } from '../../components/StatusBadge';
 import { PageHeader } from '../../components/PageHeader';
 import { RtlDataTable, type RtlDataTableColumn } from '../../components/RtlDataTable';
+import { RtlPagination } from '../../components/RtlPagination';
 import { RtlTextField } from '../../components/RtlTextField';
 import { FilterPanel } from '../../components/FilterPanel';
 import { RtlSelectField } from '../../components/RtlSelectField';
@@ -1315,16 +1315,15 @@ export function VehiclePage() {
         />
       )}
 
-      {!error && total > PAGE_SIZE && (
-        <Stack alignItems="center" pt={0.5}>
-          <Pagination
-            color="primary"
-            page={page}
-            count={pageCount}
-            onChange={(_event, next) => setPage(next)}
-            siblingCount={isMobile ? 0 : 1}
-          />
-        </Stack>
+      {!error && (
+        <RtlPagination
+          page={page}
+          count={pageCount}
+          onChange={setPage}
+          totalItems={total}
+          pageSize={PAGE_SIZE}
+          disabled={loading}
+        />
       )}
 
       <VehicleDetailModal
