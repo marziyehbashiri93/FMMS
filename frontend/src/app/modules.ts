@@ -44,7 +44,7 @@ export const modules: AppModule[] = [
   { key: 'drivers', label: 'لیست راننده‌ها', path: '/drivers', icon: PeopleAlt, enabled: true },
   { key: 'inspections', label: 'بازرسی روزانه', path: '/inspections', icon: ReportProblem, enabled: true },
   { key: 'manualFault', label: 'ثبت خرابی موردی', path: '/faults/new', icon: ReportProblem, enabled: true },
-  { key: 'faults', label: 'لیست خرابی‌ها', path: '/faults', icon: CarRepair, enabled: true },
+  { key: 'faults', label: 'کارتابل توزیع', path: '/faults', icon: CarRepair, enabled: true },
   { key: 'handover', label: 'تحویل و تایید', path: '/handover', icon: Handshake, enabled: true },
   { key: 'driverExternalWorkshop', label: 'تحویل تعمیرگاه بیرونی', path: '/driver/external-workshop', icon: LocalShipping, enabled: true },
   { key: 'transportExternalWorkshop', label: 'ثبت فاکتور تعمیرگاه بیرونی', path: '/transport/external-workshop', icon: LocalShipping, enabled: true },

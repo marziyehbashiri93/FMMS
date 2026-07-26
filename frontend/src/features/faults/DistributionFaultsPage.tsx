@@ -222,7 +222,7 @@ export function DistributionFaultsPage() {
     } catch (err) {
       setFaults([]);
       setVehicles([]);
-      setError(err instanceof Error ? err.message : 'دریافت لیست خرابی‌ها انجام نشد');
+      setError(err instanceof Error ? err.message : 'کارتابل توزیع بارگذاری نشد');
     } finally {
       setLoading(false);
     }
