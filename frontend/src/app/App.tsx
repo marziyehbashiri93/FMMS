@@ -17,6 +17,7 @@ import { HandoverPage } from '../features/handover/HandoverPage';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { SapTransactionsPage } from '../features/sap/SapTransactionsPage';
 import { ComponentShowcasePage } from '../features/showcase/ComponentShowcasePage';
+import { MaterialsPage } from '../features/materials/MaterialsPage';
 import { modules } from './modules';
 import { RequireModule } from './RequireModule';
 
@@ -58,6 +59,7 @@ const dedicatedPaths = new Set([
   '/transport/parts',
   '/workshop',
   '/handover',
+  '/materials',
   '/sap',
   '/components',
 ]);
@@ -83,6 +85,7 @@ export function App() {
         />
         <Route path="/workshop" element={guarded('workshop', <CentralWorkshopPage />)} />
         <Route path="/handover" element={guarded('handover', <HandoverPage />)} />
+        <Route path="/materials" element={guarded('materials', <MaterialsPage />)} />
         <Route path="/sap" element={guarded('sap', <SapTransactionsPage />)} />
         <Route path="/components" element={guarded('components', <ComponentShowcasePage />)} />
         {modules

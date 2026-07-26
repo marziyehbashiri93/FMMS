@@ -49,7 +49,7 @@ export const modules: AppModule[] = [
   { key: 'repairs', label: 'کارتابل ترابری', path: '/repairs', icon: Build, enabled: true },
   { key: 'transportParts', label: 'درخواست قطعات', path: '/transport/parts', icon: Inventory2, enabled: true },
   { key: 'workshop', label: 'تعمیرگاه مرکزی', path: '/workshop', icon: Build, enabled: true },
-  { key: 'materials', label: 'قطعات و انبار', path: '/materials', icon: Inventory2, enabled: false },
+  { key: 'materials', label: 'قطعات و انبار', path: '/materials', icon: Inventory2, enabled: true },
   { key: 'sap', label: 'یکپارچه‌سازی SAP', path: '/sap', icon: Sync, enabled: true },
   { key: 'settings', label: 'تنظیمات', path: '/settings', icon: Settings, enabled: false },
 ];
