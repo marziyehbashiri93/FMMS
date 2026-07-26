@@ -44,6 +44,8 @@ export function PageHeader({
   accentColor,
   accentSide = 'start',
   backgroundImage,
+  backgroundSize = '420px auto',
+  backgroundPosition = 'left 24px center',
 }: {
   title: string;
   description?: string;
@@ -52,15 +54,17 @@ export function PageHeader({
   accentColor?: string;
   accentSide?: 'start' | 'right';
   backgroundImage?: string;
+  backgroundSize?: string;
+  backgroundPosition?: string;
 }) {
   return (
     <Card
       sx={{
         bgcolor: 'background.paper',
         backgroundImage: backgroundImage ? `url("${backgroundImage}")` : undefined,
-        backgroundPosition: 'center',
+        backgroundPosition,
         backgroundRepeat: 'no-repeat',
-        backgroundSize: 'cover',
+        backgroundSize,
         border: '1px solid',
         borderColor: 'divider',
         boxShadow: '0 8px 22px rgba(15, 107, 76, 0.07)',
