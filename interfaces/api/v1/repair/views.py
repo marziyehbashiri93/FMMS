@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 
 from django.db import transaction
+from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.decorators import action
@@ -368,11 +369,17 @@ class RepairOrderViewSet(
         """Add a repair activity."""
         serializer = RepairActivityCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        performed_by_id = serializer.validated_data.get("performed_by_id")
+        performed_at = serializer.validated_data.get("performed_at")
         result = deps.get_add_repair_activity_service().execute(
             AddRepairActivityDTO(
                 repair_order_id=uuid.UUID(str(pk)),
+                description=serializer.validated_data["description"],
+                labor_hours=serializer.validated_data["labor_hours"],
+                performed_by_id=performed_by_id or user_id_from(request),
+                performed_at=performed_at or timezone.now(),
                 request_id=request_id_from(request),
-                **serializer.validated_data,
+                notes=serializer.validated_data.get("notes") or None,
             )
         )
         return Response(RepairOrderResponseSerializer(result).data)

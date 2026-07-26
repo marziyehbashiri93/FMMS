@@ -10,9 +10,8 @@ from apps.handover.domain.entities import VehicleHandoverStatus
 class VehicleHandoverConfirmSerializer(serializers.Serializer):
     """Validate handover confirmation payload.
 
-    External repairs require invoice fields when ``accepted`` is true. Validation
-    of that business rule happens in the application service after loading the
-    repair order workshop type.
+    Invoice fields are accepted for backward-compatible clients, but transport
+    now uploads and approves external workshop invoices after driver acceptance.
     """
 
     accepted = serializers.BooleanField()

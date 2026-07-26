@@ -121,8 +121,8 @@ class RepairActivityCreateSerializer(serializers.Serializer):
 
     description = serializers.CharField(max_length=500)
     labor_hours = serializers.DecimalField(max_digits=8, decimal_places=2)
-    performed_by_id = serializers.UUIDField()
-    performed_at = serializers.DateTimeField()
+    performed_by_id = serializers.UUIDField(required=False)
+    performed_at = serializers.DateTimeField(required=False)
     notes = serializers.CharField(required=False, allow_null=True, allow_blank=True)
 
 

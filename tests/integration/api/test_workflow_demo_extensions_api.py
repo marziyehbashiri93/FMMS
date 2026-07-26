@@ -155,15 +155,7 @@ class TestVehicleStatusAPI:
 
         open_fault = authenticated_client.get(f"/api/v1/faults/{fault_id}/")
         assert open_fault.status_code == 200
-        assert open_fault.data["status"] == "AWAITING_TRANSPORT"
-
-        approved_final = supervisor_client.post(
-            f"/api/v1/repair-orders/{order_id}/transport-handover-approve/",
-            {},
-            format="json",
-        )
-        assert approved_final.status_code == 200, approved_final.data
-        assert approved_final.data["status"] == "COMPLETED"
+        assert open_fault.data["status"] == "CLOSED"
 
         activated = authenticated_client.get(f"/api/v1/vehicles/{vehicle['id']}/")
         assert activated.status_code == 200, activated.data

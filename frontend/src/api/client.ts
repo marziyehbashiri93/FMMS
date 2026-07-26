@@ -488,6 +488,16 @@ export const api = {
     });
   },
 
+  addRepairActivity(
+    id: string,
+    payload: { description: string; labor_hours: string | number; notes?: string },
+  ) {
+    return request(`/repair-orders/${id}/activities/`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
   completeRepairOrder(
     id: string,
     payload: { completed_at: string; no_parts_consumed?: boolean },

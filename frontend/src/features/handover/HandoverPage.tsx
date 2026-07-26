@@ -228,10 +228,14 @@ export function HandoverPage() {
         accepted,
         comment: comment.trim() || undefined,
       });
+      const acceptedMessage =
+        detail?.order?.workshop_type === 'EXTERNAL'
+          ? 'تحویل خودرو تایید شد و برای بارگذاری فاکتور و تایید نهایی ترابری ارسال شد.'
+          : 'تحویل خودرو تایید شد و تعمیر تکمیل شد.';
       closeDetail();
       setSuccess(
         accepted
-          ? 'تحویل خودرو تایید شد و برای تایید نهایی ترابری ارسال شد.'
+          ? acceptedMessage
           : 'تحویل رد شد و درخواست تعمیر جدید در صف ترابری ثبت شد.',
       );
       await load();

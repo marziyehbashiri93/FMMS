@@ -250,16 +250,19 @@ export interface VehicleHandover {
 }
 
 export interface RepairPart {
-  part_id: string;
+  id: string;
   material_number: string;
   quantity: number;
+  unit_of_measure?: string;
+  posted_at?: string | null;
 }
 
 export interface RepairActivity {
-  activity_id: string;
+  id: string;
   description: string;
   labor_hours: string | number;
   performed_at: string;
+  notes?: string | null;
 }
 
 export type SAPTransactionStatus =

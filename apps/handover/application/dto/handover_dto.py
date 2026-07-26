@@ -14,8 +14,8 @@ from apps.handover.domain.entities import VehicleHandoverStatus
 class ConfirmVehicleHandoverDTO:
     """Confirm handover input DTO.
 
-    For EXTERNAL repairs, accepting handover requires invoice fields so the
-    driver uploads the workshop invoice at confirmation time.
+    For EXTERNAL repairs, accepting handover moves the order to transport final
+    approval; transport uploads and approves the workshop invoice separately.
     """
 
     handover_id: uuid.UUID

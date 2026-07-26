@@ -71,8 +71,6 @@ class TestRepairAPI:
             {
                 "description": "Inspected engine bay",
                 "labor_hours": "1.50",
-                "performed_by_id": technician_id,
-                "performed_at": datetime.now(tz=UTC).isoformat(),
             },
             format="json",
         )

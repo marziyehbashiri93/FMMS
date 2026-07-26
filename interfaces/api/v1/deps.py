@@ -927,6 +927,8 @@ def get_confirm_vehicle_handover_service() -> ConfirmVehicleHandoverService:
         get_vehicle_repository(),
         get_record_repair_order_event_service(),
         get_external_invoice_repository(),
+        get_fault_repository(),
+        get_record_component_history_from_repair_service(),
     )
 
 
