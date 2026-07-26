@@ -6,7 +6,6 @@ import {
   CardContent,
   Divider,
   Link,
-  MenuItem,
   Stack,
   Tab,
   Tabs,
@@ -28,9 +27,9 @@ import { Button } from '../../components/Button';
 import { FeaturePage } from '../../components/FeaturePage';
 import { PageHeader } from '../../components/PageHeader';
 import { RtlDataTable, type RtlDataTableColumn } from '../../components/RtlDataTable';
-import { RtlSelectField } from '../../components/RtlSelectField';
 import { RtlTextField } from '../../components/RtlTextField';
-import { EmptyState, ErrorState } from '../../components/States';
+import { ErrorState } from '../../components/States';
+import { StatusFilterTabs, type StatusTabOption } from '../../components/StatusFilterTabs';
 import { PlainStatusBadge } from '../../components/StatusBadge';
 import { TabbedDetailModal } from '../../components/TabbedDetailModal';
 import type { ExternalWorkshopAssignment, RepairOrder, Vehicle } from '../../types/fmms';
@@ -39,6 +38,21 @@ import { formatDateTime } from '../../utils/format';
 type TabKey = 'driver' | 'transport';
 type DriverExternalFilter = '' | 'WAITING_DELIVERY' | 'IN_REPAIR' | 'COMPLETED';
 type TransportInvoiceFilter = '' | 'WAITING_PICKUP' | 'WAITING_INVOICE' | 'DRAFT' | 'COMPLETED';
+const DRIVER_STATUS_TABS: ReadonlyArray<StatusTabOption<Exclude<DriverExternalFilter, ''>>> = [
+  { value: '', label: 'همه' },
+  { value: 'WAITING_DELIVERY', label: 'در انتظار تحویل' },
+  { value: 'IN_REPAIR', label: 'در تعمیرگاه / دریافت خودرو' },
+  { value: 'COMPLETED', label: 'تکمیل‌شده' },
+];
+const TRANSPORT_INVOICE_TABS: ReadonlyArray<
+  StatusTabOption<Exclude<TransportInvoiceFilter, ''>>
+> = [
+  { value: '', label: 'همه' },
+  { value: 'WAITING_PICKUP', label: 'در انتظار دریافت خودرو' },
+  { value: 'WAITING_INVOICE', label: 'در انتظار ثبت فاکتور' },
+  { value: 'DRAFT', label: 'پیش‌نویس فاکتور' },
+  { value: 'COMPLETED', label: 'تکمیل‌شده' },
+];
 const API_ORIGIN = (() => {
   try {
     return new URL(import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api/v1').origin;
@@ -443,12 +457,14 @@ export function ExternalWorkshopPage({ mode }: { mode?: TabKey }) {
             : 'ثبت تحویل خودرو به تعمیرگاه و دریافت خودرو پس از تعمیر'
         }
         breadcrumbs={[
-          { label: 'اصلی', to: '/dashboard' },
+          {
+            label: activeTab === 'transport' ? 'ترابری' : 'راننده',
+          },
           {
             label:
               activeTab === 'transport'
                 ? 'ثبت فاکتور تعمیرگاه بیرونی'
-                : 'تعمیرگاه بیرونی',
+                : 'تحویل تعمیرگاه بیرونی',
           },
         ]}
       />
@@ -459,71 +475,38 @@ export function ExternalWorkshopPage({ mode }: { mode?: TabKey }) {
         </Tabs>
       )}
       {activeTab === 'driver' && (
-        <Card variant="outlined" sx={{ mb: 2 }}>
-          <CardContent>
-            <Box
-              sx={{
-                display: 'grid',
-                gridTemplateColumns: { xs: '1fr', md: 'minmax(260px, 340px) 1fr' },
-                gap: 1.25,
-                alignItems: 'center',
-              }}
-            >
-              <RtlSelectField
-                label="فیلتر وضعیت تعمیر"
-                value={driverFilter}
-                onChange={(event) => setDriverFilter(event.target.value as DriverExternalFilter)}
-                size="small"
-              >
-                <MenuItem value="">همه</MenuItem>
-                <MenuItem value="WAITING_DELIVERY">در انتظار تحویل به تعمیرگاه</MenuItem>
-                <MenuItem value="IN_REPAIR">در تعمیرگاه بیرونی / دریافت خودرو</MenuItem>
-                <MenuItem value="COMPLETED">تکمیل‌شده</MenuItem>
-              </RtlSelectField>
-              <Typography variant="body2" color="text.secondary">
-                تعمیرات جاری و سوابق بسته‌شده تعمیرگاه بیرونی در همین لیست نمایش داده می‌شوند.
-              </Typography>
-            </Box>
-          </CardContent>
-        </Card>
+        <StatusFilterTabs
+          value={driverFilter}
+          options={DRIVER_STATUS_TABS}
+          onChange={(next) => setDriverFilter(next as DriverExternalFilter)}
+          ariaLabel="وضعیت تحویل تعمیرگاه بیرونی"
+        />
       )}
       {activeTab === 'transport' && (
-        <Card variant="outlined" sx={{ mb: 2 }}>
-          <CardContent>
-            <Box
-              sx={{
-                display: 'grid',
-                gridTemplateColumns: { xs: '1fr', md: 'minmax(260px, 340px) 1fr' },
-                gap: 1.25,
-                alignItems: 'center',
-              }}
-            >
-              <RtlSelectField
-                label="فیلتر وضعیت فاکتور"
-                value={invoiceFilter}
-                onChange={(event) => setInvoiceFilter(event.target.value as TransportInvoiceFilter)}
-                size="small"
-              >
-                <MenuItem value="">همه</MenuItem>
-                <MenuItem value="WAITING_PICKUP">در انتظار دریافت خودرو</MenuItem>
-                <MenuItem value="WAITING_INVOICE">در انتظار ثبت فاکتور</MenuItem>
-                <MenuItem value="DRAFT">پیش‌نویس فاکتور</MenuItem>
-                <MenuItem value="COMPLETED">تکمیل‌شده</MenuItem>
-              </RtlSelectField>
-              <Typography variant="body2" color="text.secondary">
-                فاکتورهای جاری و سوابق تکمیل‌شده تعمیرگاه بیرونی در همین لیست نمایش داده می‌شوند.
-              </Typography>
-            </Box>
-          </CardContent>
-        </Card>
+        <StatusFilterTabs
+          value={invoiceFilter}
+          options={TRANSPORT_INVOICE_TABS}
+          onChange={(next) => setInvoiceFilter(next as TransportInvoiceFilter)}
+          ariaLabel="وضعیت فاکتور تعمیرگاه بیرونی"
+        />
       )}
       {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
       {error ? (
         <ErrorState message={error} onRetry={() => void load()} />
-      ) : visible.length || loading ? (
-        <RtlDataTable columns={columns} rows={visible} getRowKey={(row) => row.id} loading={loading} />
       ) : (
-        <EmptyState title="موردی برای نمایش وجود ندارد" />
+        <RtlDataTable
+          columns={columns}
+          rows={visible}
+          getRowKey={(row) => row.id}
+          loading={loading}
+          emptyMessage={
+            activeTab === 'transport'
+              ? 'فاکتوری برای ثبت تعمیرگاه بیرونی نیست'
+              : 'درخواستی برای تحویل تعمیرگاه بیرونی نیست'
+          }
+          emptyIcon={activeTab === 'transport' ? ReceiptLong : DirectionsCar}
+          minWidth={900}
+        />
       )}
 
       <TabbedDetailModal
