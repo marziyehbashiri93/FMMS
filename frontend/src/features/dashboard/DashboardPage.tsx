@@ -3,6 +3,7 @@ import { Box, Card, CardActionArea, CardContent, Stack, Typography } from '@mui/
 import {
   Build,
   CarRepair,
+  ChevronLeft,
   DirectionsCar,
   ErrorOutline,
   PeopleAlt,
@@ -30,8 +31,17 @@ type QuickLink = {
   subtitle: string;
   to: string;
   icon: typeof DirectionsCar;
-  tone: 'primary' | 'warning' | 'success' | 'error';
+  tone: 'primary' | 'warning' | 'success' | 'error' | 'info';
+  imageSrc?: string;
 };
+
+const API_ORIGIN = (() => {
+  try {
+    return new URL(import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api/v1').origin;
+  } catch {
+    return '';
+  }
+})();
 
 /**
  * Operations dashboard built from vehicle/driver summary APIs and queue counts.
@@ -93,13 +103,14 @@ export function DashboardPage() {
     void load();
   }, []);
 
-  const quickLinks: QuickLink[] = [
+  const workQueueLinks: QuickLink[] = [
     {
       title: 'کارتابل توزیع',
       subtitle: `${toFaNumber(queues.openFaults)} خرابی در انتظار تصمیم توزیع`,
       to: '/faults',
       icon: CarRepair,
       tone: 'warning',
+      imageSrc: '/dashboard-card-distribution.png',
     },
     {
       title: 'کارتابل ترابری',
@@ -107,6 +118,7 @@ export function DashboardPage() {
       to: '/repairs',
       icon: Build,
       tone: 'error',
+      imageSrc: '/dashboard-card-transport.png',
     },
     {
       title: 'تعمیرگاه مرکزی',
@@ -114,7 +126,11 @@ export function DashboardPage() {
       to: '/workshop',
       icon: Build,
       tone: 'warning',
+      imageSrc: '/dashboard-card-workshop.png',
     },
+  ];
+
+  const masterDataLinks: QuickLink[] = [
     {
       title: 'خودروها',
       subtitle: `${toFaNumber(vehicleSummary?.active_fleet_count)} خودرو فعال`,
@@ -129,23 +145,17 @@ export function DashboardPage() {
       icon: PeopleAlt,
       tone: 'success',
     },
-    {
-      title: 'وضعیت SAP',
-      subtitle: sapSummary
-        ? `${toFaNumber(sapSummary.failed + sapSummary.exhausted)} ناموفق · ${toFaNumber(sapSummary.success)} موفق`
-        : 'مشاهده وضعیت همگام‌سازی و تراکنش‌ها',
-      to: '/sap',
-      icon: Sync,
-      tone: 'primary',
-    },
   ];
 
   return (
     <FeaturePage>
       <PageHeader
         title="نمای کلی عملیات ناوگان"
-        description="خلاصه وضعیت ناوگان، راننده‌ها و صف‌های عملیاتی بر اساس آخرین داده‌ها."
+        description="خلاصه وضعیت ناوگان، راننده‌ها و صف‌های عملیاتی در یک نگاه."
         breadcrumbs={[{ label: 'داشبورد' }]}
+        accentColor="primary.main"
+        accentSide="right"
+        backgroundImage={`${API_ORIGIN}/media/dashboard.png`}
       />
 
       {error && <ErrorState message={error} onRetry={() => void load()} />}
@@ -153,6 +163,7 @@ export function DashboardPage() {
 
       {!loading && !error && (
         <>
+          <SectionTitle title="وضعیت ناوگان" />
           <KpiGrid mdColumns={4}>
             <KpiCard
               label="خودروهای فعال"
@@ -180,6 +191,7 @@ export function DashboardPage() {
             />
           </KpiGrid>
 
+          <SectionTitle title="راننده‌ها و عملکرد" />
           <KpiGrid mdColumns={4}>
             <KpiCard
               label="راننده‌های فعال"
@@ -207,69 +219,47 @@ export function DashboardPage() {
             />
           </KpiGrid>
 
-          <Box
+          <SectionTitle title="صفحه‌های کاری" />
+          <QuickLinkGrid columns={3} links={workQueueLinks} variant="work" />
+
+          <SectionTitle title="دسترسی سریع" />
+          <QuickLinkGrid columns={2} links={masterDataLinks} variant="quick" />
+
+          <Card
+            variant="outlined"
             sx={{
-              display: 'grid',
-              gridTemplateColumns: {
-                xs: '1fr',
-                md: 'repeat(2, minmax(0, 1fr))',
-                lg: 'repeat(4, minmax(0, 1fr))',
-              },
-              gap: 1.5,
+              borderRadius: (t) => t.radius('md'),
+              boxShadow: '0 14px 32px rgba(15, 35, 29, 0.06)',
             }}
           >
-            {quickLinks.map((link) => {
-              const Icon = link.icon;
-              return (
-                <Card key={link.to} variant="outlined">
-                  <CardActionArea
-                    component={RouterLink}
-                    to={link.to}
-                    sx={{ height: '100%', alignItems: 'stretch' }}
-                  >
-                    <CardContent
-                      sx={{
-                        p: 1.75,
-                        '&:last-child': { pb: 1.75 },
-                        display: 'flex',
-                        gap: 1.5,
-                        alignItems: 'center',
-                        direction: 'rtl',
-                      }}
-                    >
-                      <Box
-                        sx={{
-                          width: 44,
-                          height: 44,
-                          borderRadius: (t) => t.radius('lg'),
-                          bgcolor: `${link.tone}.light`,
-                          color: `${link.tone}.dark`,
-                          display: 'grid',
-                          placeItems: 'center',
-                          flexShrink: 0,
-                        }}
-                      >
-                        <Icon fontSize="medium" />
-                      </Box>
-                      <Box minWidth={0} textAlign="right">
-                        <Typography fontWeight={800}>{link.title}</Typography>
-                        <Typography variant="body2" color="text.secondary" noWrap>
-                          {link.subtitle}
-                        </Typography>
-                      </Box>
-                    </CardContent>
-                  </CardActionArea>
-                </Card>
-              );
-            })}
-          </Box>
-
-          <Card variant="outlined">
             <CardActionArea component={RouterLink} to="/sap">
-              <CardContent sx={{ p: 1.75, '&:last-child': { pb: 1.75 } }}>
-                <Stack direction="row" spacing={1.25} alignItems="center">
-                  <Sync color="action" />
-                  <Box>
+              <CardContent
+                sx={{
+                  p: { xs: 1.75, md: 2 },
+                  '&:last-child': { pb: { xs: 1.75, md: 2 } },
+                }}
+              >
+                <Stack
+                  direction={{ xs: 'column', md: 'row' }}
+                  spacing={1.5}
+                  alignItems={{ xs: 'flex-start', md: 'center' }}
+                  justifyContent="space-between"
+                >
+                  <Box
+                    sx={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: (t) => t.radius('lg'),
+                      bgcolor: 'primary.light',
+                      color: 'primary.dark',
+                      display: 'grid',
+                      placeItems: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Sync fontSize="medium" />
+                  </Box>
+                  <Box minWidth={0} flex={1}>
                     <Typography fontWeight={800}>همگام‌سازی و تراکنش‌های SAP</Typography>
                     <Typography variant="body2" color="text.secondary">
                       خودرو: {formatDateTime(vehicleSummary?.last_sap_sync_at)} · راننده:{' '}
@@ -279,6 +269,7 @@ export function DashboardPage() {
                         : ''}
                     </Typography>
                   </Box>
+                  <ChevronLeft sx={{ color: 'text.secondary', display: { xs: 'none', md: 'block' } }} />
                 </Stack>
               </CardContent>
             </CardActionArea>
@@ -286,5 +277,146 @@ export function DashboardPage() {
         </>
       )}
     </FeaturePage>
+  );
+}
+
+function SectionTitle({ title }: { title: string }) {
+  return (
+    <Typography variant="subtitle1" fontWeight={900} sx={{ mt: { xs: 0.5, md: 1 } }}>
+      {title}
+    </Typography>
+  );
+}
+
+function QuickLinkGrid({
+  links,
+  columns,
+  variant,
+}: {
+  links: QuickLink[];
+  columns: 2 | 3;
+  variant: 'work' | 'quick';
+}) {
+  return (
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: {
+          xs: '1fr',
+          md: 'repeat(2, minmax(0, 1fr))',
+          lg: `repeat(${columns}, minmax(0, 1fr))`,
+        },
+        gap: 1.5,
+      }}
+    >
+      {links.map((link) => (
+        <QuickLinkCard key={link.to} link={link} variant={variant} />
+      ))}
+    </Box>
+  );
+}
+
+function QuickLinkCard({ link, variant }: { link: QuickLink; variant: 'work' | 'quick' }) {
+  const Icon = link.icon;
+  return (
+    <Card
+      variant="outlined"
+      sx={{
+        borderRadius: (t) => t.radius('md'),
+        boxShadow: '0 14px 32px rgba(15, 35, 29, 0.06)',
+        overflow: 'hidden',
+      }}
+    >
+      <CardActionArea
+        component={RouterLink}
+        to={link.to}
+        sx={{ height: '100%', alignItems: 'stretch' }}
+      >
+        <CardContent
+          sx={{
+            p: 1.75,
+            '&:last-child': { pb: 1.75 },
+            display: 'flex',
+            gap: 1.5,
+            alignItems: 'center',
+            direction: 'rtl',
+            minHeight: variant === 'work' ? 92 : 78,
+            position: 'relative',
+          }}
+        >
+          {variant === 'work' && (
+            <Box
+              sx={{
+                position: 'absolute',
+                left: 12,
+                top: '50%',
+                width: 132,
+                height: 72,
+                borderRadius: (t) => t.radius('md'),
+                display: { xs: 'none', sm: 'block' },
+                transform: 'translateY(-50%)',
+                overflow: 'hidden',
+                backgroundColor: '#fff',
+                border: '1px solid',
+                borderColor: 'divider',
+                boxShadow: '0 10px 24px rgba(15, 35, 29, 0.08)',
+                '&::after': {
+                  content: '""',
+                  position: 'absolute',
+                  inset: 0,
+                  background:
+                    'linear-gradient(90deg, rgba(255,255,255,0) 50%, rgba(255,255,255,0.86) 100%)',
+                },
+              }}
+            >
+              {link.imageSrc && (
+                <Box
+                  component="img"
+                  src={link.imageSrc}
+                  alt=""
+                  aria-hidden="true"
+                  sx={{
+                    width: '100%',
+                    height: '100%',
+                    display: 'block',
+                    objectFit: 'cover',
+                    objectPosition: 'center',
+                  }}
+                />
+              )}
+            </Box>
+          )}
+          <Box
+            sx={{
+              width: 44,
+              height: 44,
+              borderRadius: (t) => t.radius('lg'),
+              bgcolor: `${link.tone}.light`,
+              color: `${link.tone}.dark`,
+              display: 'grid',
+              placeItems: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <Icon fontSize="medium" />
+          </Box>
+          <Box minWidth={0} textAlign="right">
+            <Typography fontWeight={800}>{link.title}</Typography>
+            <Typography variant="body2" color="text.secondary" noWrap>
+              {link.subtitle}
+            </Typography>
+          </Box>
+          <Box sx={{ flex: 1 }} />
+          <ChevronLeft
+            sx={{
+              color: 'text.secondary',
+              flexShrink: 0,
+              position: 'relative',
+              zIndex: 1,
+            }}
+          />
+        </CardContent>
+      </CardActionArea>
+    </Card>
   );
 }

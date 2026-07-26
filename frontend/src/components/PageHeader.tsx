@@ -41,16 +41,26 @@ export function PageHeader({
   description,
   breadcrumbs,
   actions,
+  accentColor,
+  accentSide = 'start',
+  backgroundImage,
 }: {
   title: string;
   description?: string;
   breadcrumbs: Crumb[];
   actions?: ReactNode;
+  accentColor?: string;
+  accentSide?: 'start' | 'right';
+  backgroundImage?: string;
 }) {
   return (
     <Card
       sx={{
         bgcolor: 'background.paper',
+        backgroundImage: backgroundImage ? `url("${backgroundImage}")` : undefined,
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        backgroundSize: 'cover',
         border: '1px solid',
         borderColor: 'divider',
         boxShadow: '0 8px 22px rgba(15, 107, 76, 0.07)',
@@ -59,16 +69,28 @@ export function PageHeader({
         '&::before': {
           content: '""',
           position: 'absolute',
-          insetInlineStart: 0,
+          ...(accentSide === 'right' ? { right: 0 } : { insetInlineStart: 0 }),
           top: 0,
           bottom: 0,
           width: 4,
-          background: (theme) =>
-            brandAccentBarGradient(theme.palette.primary, theme.palette.secondary),
+          ...(accentColor
+            ? { bgcolor: accentColor }
+            : {
+                background: (theme) =>
+                  brandAccentBarGradient(theme.palette.primary, theme.palette.secondary),
+              }),
+          zIndex: 1,
         },
       }}
     >
-      <CardContent sx={{ p: { xs: 1.75, md: 2.25 }, '&:last-child': { pb: { xs: 1.75, md: 2.25 } } }}>
+      <CardContent
+        sx={{
+          p: { xs: 1.75, md: 2.25 },
+          '&:last-child': { pb: { xs: 1.75, md: 2.25 } },
+          position: 'relative',
+          zIndex: 2,
+        }}
+      >
         <Stack spacing={1.25}>
           <Breadcrumbs
             separator={<BreadcrumbSeparator />}

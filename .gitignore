@@ -121,7 +121,7 @@ dump.rdb
 
 # Static / media (generated, not source)
 /static/
-/media/
+/mediafiles/media/
 
 # Temporary files
 *.tmp
