@@ -63,6 +63,21 @@ class TestInspectionAPI:
         assert listed.status_code == 200
         assert listed.data["count"] >= 1
 
+        inspected_at = submitted.data["inspected_at"][:10]
+        ranged = authenticated_client.get(
+            f"/api/v1/inspections/?vehicle_id={vehicle['id']}"
+            f"&from_date={inspected_at}&to_date={inspected_at}"
+        )
+        assert ranged.status_code == 200, ranged.data
+        assert ranged.data["count"] >= 1
+
+        invalid = authenticated_client.get(
+            f"/api/v1/inspections/?vehicle_id={vehicle['id']}"
+            "&from_date=2026-07-20&to_date=2026-07-10"
+        )
+        assert invalid.status_code == 400
+        assert "to_date" in invalid.data.get("details", invalid.data)
+
     def test_failed_checklist_requires_explicit_fault_report(
         self, authenticated_client: APIClient
     ) -> None:

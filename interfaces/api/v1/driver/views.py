@@ -26,9 +26,9 @@ from interfaces.api.v1.driver.serializers import (
     DriverResponseSerializer,
     DriverSummarySerializer,
 )
+from interfaces.api.v1.filters import DateRangeFilterSerializer
 from interfaces.api.v1.utils import paginate_dto_list, request_id_from, user_id_from
 from interfaces.api.v1.vehicle.serializers import (
-    DateRangeFilterSerializer,
     VehicleDriverAssignmentHistoryResponseSerializer,
     VehicleResponseSerializer,
 )

@@ -110,23 +110,6 @@ class VehicleListQuerySerializer(serializers.Serializer):
     search = serializers.CharField(required=False, allow_blank=True, max_length=100)
 
 
-class DateRangeFilterSerializer(serializers.Serializer):
-    """Validate optional from/to date query parameters."""
-
-    from_date = serializers.DateField(required=False)
-    to_date = serializers.DateField(required=False)
-
-    def validate(self, attrs: dict[str, object]) -> dict[str, object]:
-        """Ensure the date range is chronologically valid."""
-        from_date = attrs.get("from_date")
-        to_date = attrs.get("to_date")
-        if from_date and to_date and from_date > to_date:
-            raise serializers.ValidationError(
-                {"to_date": "to_date must be greater than or equal to from_date."}
-            )
-        return attrs
-
-
 class VehicleStatusChangeSerializer(serializers.Serializer):
     """Validate a vehicle status change requested from FMMS."""
 

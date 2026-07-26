@@ -39,16 +39,23 @@ vehicle_id_parameter = OpenApiParameter(
     type=OpenApiTypes.UUID,
 )
 
+# Standard date-range contract for all date-filter endpoints.
 date_range_parameters = [
     OpenApiParameter(
         name="from_date",
-        description="Filter history from this date, inclusive.",
+        description=(
+            "Inclusive range start (YYYY-MM-DD). "
+            "Use with to_date for a full date range filter."
+        ),
         required=False,
         type=OpenApiTypes.DATE,
     ),
     OpenApiParameter(
         name="to_date",
-        description="Filter history until this date, inclusive.",
+        description=(
+            "Inclusive range end (YYYY-MM-DD). "
+            "Must be greater than or equal to from_date when both are provided."
+        ),
         required=False,
         type=OpenApiTypes.DATE,
     ),

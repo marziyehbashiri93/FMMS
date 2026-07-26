@@ -647,3 +647,24 @@ class TestDriverAPI:
 
         assert response.status_code == 200, response.data
         assert [item["vehicle_number"] for item in response.data] == ["203200002"]
+
+        ranged = authenticated_client.get(
+            f"/api/v1/drivers/{driver.id}/vehicle-assignment-history/"
+            "?from_date=2026-07-14&to_date=2026-07-14"
+        )
+        assert ranged.status_code == 200, ranged.data
+        assert [item["vehicle_number"] for item in ranged.data] == ["203200001"]
+
+        until = authenticated_client.get(
+            f"/api/v1/drivers/{driver.id}/vehicle-assignment-history/"
+            "?to_date=2026-07-14"
+        )
+        assert until.status_code == 200, until.data
+        assert [item["vehicle_number"] for item in until.data] == ["203200001"]
+
+        invalid = authenticated_client.get(
+            f"/api/v1/drivers/{driver.id}/vehicle-assignment-history/"
+            "?from_date=2026-07-16&to_date=2026-07-14"
+        )
+        assert invalid.status_code == 400
+        assert "to_date" in invalid.data.get("details", invalid.data)

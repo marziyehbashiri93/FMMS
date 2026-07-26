@@ -22,14 +22,16 @@ import { api } from '../../api/client';
 import { Button } from '../../components/Button';
 import { ClearFiltersButton } from '../../components/ClearFiltersButton';
 import { DetailLine } from '../../components/DetailLine';
+import { FeaturePage } from '../../components/FeaturePage';
 import { FilterPanel } from '../../components/FilterPanel';
-import { JalaliDateField } from '../../components/JalaliDateField';
+import { JalaliDateRangeFilter } from '../../components/JalaliDateRangeFilter';
 import { PageHeader } from '../../components/PageHeader';
 import { EmptyState, ErrorState, LoadingState } from '../../components/States';
 import { PlainStatusBadge } from '../../components/StatusBadge';
 import { RtlDataTable, type RtlDataTableColumn } from '../../components/RtlDataTable';
 import { RtlSelectField } from '../../components/RtlSelectField';
 import type { Inspection, Vehicle } from '../../types/fmms';
+import { isValidIsoDateRange } from '../../utils/dateRange';
 import { formatDateTime, toFaNumber } from '../../utils/format';
 import {
   checklistOverallLabel,
@@ -130,6 +132,7 @@ export function ChecklistsPage() {
   };
 
   const loadChecklists = async () => {
+    if (!isValidIsoDateRange(fromDate, toDate)) return;
     setLoading(true);
     setError('');
     try {
@@ -316,7 +319,7 @@ export function ChecklistsPage() {
   ];
 
   return (
-    <Stack spacing={{ xs: 1.5, md: 2.25 }} style={{ direction: 'rtl', textAlign: 'right' }}>
+    <FeaturePage>
       <PageHeader
         title="لیست بازرسی روزانه"
         breadcrumbs={[
@@ -350,23 +353,15 @@ export function ChecklistsPage() {
             </MenuItem>
           ))}
         </RtlSelectField>
-        <JalaliDateField
-          label="از تاریخ"
-          value={fromDate}
-          onChange={(next) => {
+        <JalaliDateRangeFilter
+          fromDate={fromDate}
+          toDate={toDate}
+          showClear={false}
+          onChange={({ fromDate: nextFrom, toDate: nextTo }) => {
             setPage(1);
-            setFromDate(next);
+            setFromDate(nextFrom);
+            setToDate(nextTo);
           }}
-          sx={{ width: { xs: '100%', sm: 180 }, flexShrink: 0 }}
-        />
-        <JalaliDateField
-          label="تا تاریخ"
-          value={toDate}
-          onChange={(next) => {
-            setPage(1);
-            setToDate(next);
-          }}
-          sx={{ width: { xs: '100%', sm: 180 }, flexShrink: 0 }}
         />
         <ClearFiltersButton onClick={resetFilters} disabled={!hasActiveFilters} />
       </FilterPanel>
@@ -562,6 +557,6 @@ export function ChecklistsPage() {
           ) : null}
         </DialogContent>
       </Dialog>
-    </Stack>
+    </FeaturePage>
   );
 }

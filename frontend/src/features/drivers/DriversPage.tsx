@@ -23,6 +23,7 @@ import { api } from '../../api/client';
 import { Button } from '../../components/Button';
 import { ClearFiltersButton } from '../../components/ClearFiltersButton';
 import { DriverStatusBadge } from '../../components/DriverStatusBadge';
+import { FeaturePage, KpiGrid } from '../../components/FeaturePage';
 import { FilterPanel } from '../../components/FilterPanel';
 import { KpiCard } from '../../components/KpiCard';
 import { PageHeader } from '../../components/PageHeader';
@@ -249,7 +250,7 @@ export function DriversPage() {
     page !== 1;
 
   return (
-    <Stack spacing={{ xs: 1.5, md: 2.25 }} style={{ direction: 'rtl', textAlign: 'right' }}>
+    <FeaturePage>
       <PageHeader
         title="راننده‌ها"
         breadcrumbs={[
@@ -258,16 +259,7 @@ export function DriversPage() {
         ]}
       />
 
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: {
-            xs: 'repeat(2, minmax(0, 1fr))',
-            md: 'repeat(3, minmax(0, 1fr))',
-          },
-          gap: 1.5,
-        }}
-      >
+      <KpiGrid>
         <KpiCard
           label="راننده‌های فعال"
           value={summaryLoading ? '...' : toFaNumber(summary?.active_count)}
@@ -285,7 +277,7 @@ export function DriversPage() {
           icon={Sync}
           tone="info"
         />
-      </Box>
+      </KpiGrid>
       {summaryError && <ErrorState message={summaryError} onRetry={loadSummary} />}
 
       <FilterPanel>
@@ -443,6 +435,6 @@ export function DriversPage() {
       )}
 
       <DriverDetailModal open={Boolean(selectedId)} driverId={selectedId} onClose={closeDriver} />
-    </Stack>
+    </FeaturePage>
   );
 }

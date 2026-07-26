@@ -17,6 +17,7 @@ import { api } from '../../api/client';
 import { Button } from '../../components/Button';
 import { ClearFiltersButton } from '../../components/ClearFiltersButton';
 import { DetailLine } from '../../components/DetailLine';
+import { FeaturePage, KpiGrid } from '../../components/FeaturePage';
 import { FilterPanel } from '../../components/FilterPanel';
 import { KpiCard } from '../../components/KpiCard';
 import { PageHeader } from '../../components/PageHeader';
@@ -428,7 +429,7 @@ export function SapTransactionsPage() {
     : [];
 
   return (
-    <Stack spacing={{ xs: 1.5, md: 2.25 }} style={{ direction: 'rtl', textAlign: 'right' }}>
+    <FeaturePage>
       <PageHeader
         title="لاگ یکپارچه‌سازی SAP"
         breadcrumbs={[{ label: 'مدیریت' }, { label: 'یکپارچه‌سازی SAP' }]}
@@ -440,16 +441,7 @@ export function SapTransactionsPage() {
       </Alert>
 
       {summary && (
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: {
-              xs: 'repeat(2, minmax(0, 1fr))',
-              md: 'repeat(5, minmax(0, 1fr))',
-            },
-            gap: 1.5,
-          }}
-        >
+        <KpiGrid mdColumns={5}>
           <KpiCard label="کل تراکنش‌ها" value={toFaNumber(summary.total)} icon={Sync} />
           <KpiCard
             label="موفق"
@@ -475,7 +467,7 @@ export function SapTransactionsPage() {
             icon={Sync}
             tone="error"
           />
-        </Box>
+        </KpiGrid>
       )}
 
       <Tabs
@@ -564,6 +556,6 @@ export function SapTransactionsPage() {
         tabs={syncDetailTabs}
         maxWidth="lg"
       />
-    </Stack>
+    </FeaturePage>
   );
 }

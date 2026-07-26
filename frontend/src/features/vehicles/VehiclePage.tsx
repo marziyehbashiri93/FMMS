@@ -34,7 +34,8 @@ import { api } from '../../api/client';
 import { Button } from '../../components/Button';
 import { ClearFiltersButton } from '../../components/ClearFiltersButton';
 import { DetailLine } from '../../components/DetailLine';
-import { JalaliDateField } from '../../components/JalaliDateField';
+import { FeaturePage, KpiGrid } from '../../components/FeaturePage';
+import { JalaliDateRangeFilter } from '../../components/JalaliDateRangeFilter';
 import { KpiCard } from '../../components/KpiCard';
 import { EmptyState, ErrorState, LoadingState } from '../../components/States';
 import { PlainStatusBadge, VehicleStatusBadge } from '../../components/StatusBadge';
@@ -55,6 +56,7 @@ import type {
   VehicleStatus,
   VehicleSummary,
 } from '../../types/fmms';
+import { isValidIsoDateRange } from '../../utils/dateRange';
 import { formatDate, formatDateTime, toFaNumber } from '../../utils/format';
 import {
   checklistOverallLabel,
@@ -353,8 +355,12 @@ function VehicleDetailModal({
   const [tab, setTab] = useState(0);
   const [detail, setDetail] = useState<Vehicle | null>(null);
   const [odometer, setOdometer] = useState<OdometerReading[]>([]);
+  const [odometerFromDate, setOdometerFromDate] = useState('');
+  const [odometerToDate, setOdometerToDate] = useState('');
+  const [odometerLoading, setOdometerLoading] = useState(false);
   const [driverHistory, setDriverHistory] = useState<VehicleDriverAssignmentHistory[]>([]);
   const [driverHistoryFromDate, setDriverHistoryFromDate] = useState('');
+  const [driverHistoryToDate, setDriverHistoryToDate] = useState('');
   const [driverHistoryLoading, setDriverHistoryLoading] = useState(false);
   const [driverHistoryOrderBy, setDriverHistoryOrderBy] = useState<DriverHistorySortKey>('assigned_at');
   const [driverHistoryOrder, setDriverHistoryOrder] = useState<'asc' | 'desc'>('desc');
@@ -362,6 +368,7 @@ function VehicleDetailModal({
   const [odometerOrder, setOdometerOrder] = useState<'asc' | 'desc'>('desc');
   const [checklists, setChecklists] = useState<Inspection[]>([]);
   const [checklistFromDate, setChecklistFromDate] = useState('');
+  const [checklistToDate, setChecklistToDate] = useState('');
   const [checklistLoading, setChecklistLoading] = useState(false);
   const [checklistOrderBy, setChecklistOrderBy] = useState<ChecklistSortKey>('inspected_at');
   const [checklistOrder, setChecklistOrder] = useState<'asc' | 'desc'>('desc');
@@ -374,12 +381,36 @@ function VehicleDetailModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const loadDriverHistory = async (fromDate = driverHistoryFromDate) => {
-    if (!vehicle) return;
+  const loadOdometerHistory = async (
+    fromDate = odometerFromDate,
+    toDate = odometerToDate,
+  ) => {
+    if (!vehicle || !isValidIsoDateRange(fromDate, toDate)) return;
+    setOdometerLoading(true);
+    try {
+      setOdometer(
+        await api.getOdometerHistory(vehicle.id, {
+          fromDate: fromDate || undefined,
+          toDate: toDate || undefined,
+        }),
+      );
+    } catch {
+      setOdometer([]);
+    } finally {
+      setOdometerLoading(false);
+    }
+  };
+
+  const loadDriverHistory = async (
+    fromDate = driverHistoryFromDate,
+    toDate = driverHistoryToDate,
+  ) => {
+    if (!vehicle || !isValidIsoDateRange(fromDate, toDate)) return;
     setDriverHistoryLoading(true);
     try {
       const drivers = await api.getDriverAssignmentHistory(vehicle.id, {
         fromDate: fromDate || undefined,
+        toDate: toDate || undefined,
       });
       setDriverHistory(drivers);
     } catch {
@@ -389,12 +420,16 @@ function VehicleDetailModal({
     }
   };
 
-  const loadChecklists = async (fromDate = checklistFromDate) => {
-    if (!vehicle) return;
+  const loadChecklists = async (
+    fromDate = checklistFromDate,
+    toDate = checklistToDate,
+  ) => {
+    if (!vehicle || !isValidIsoDateRange(fromDate, toDate)) return;
     setChecklistLoading(true);
     try {
       const payload = await api.listVehicleChecklists(vehicle.id, {
         fromDate: fromDate || undefined,
+        toDate: toDate || undefined,
       });
       setChecklists(normalizeInspections(payload));
     } catch {
@@ -429,16 +464,25 @@ function VehicleDetailModal({
     setChecklistDetailError('');
   };
 
-  const loadDetail = async (fromDate = '') => {
+  const loadDetail = async (
+    fromDate = driverHistoryFromDate,
+    toDate = driverHistoryToDate,
+    odoFromDate = odometerFromDate,
+    odoToDate = odometerToDate,
+  ) => {
     if (!vehicle) return;
     setLoading(true);
     setError('');
     try {
       const [vehicleResult, odoResult, driversResult, faultsResult, repairsResult] = await Promise.allSettled([
         api.getVehicle(vehicle.id),
-        api.getOdometerHistory(vehicle.id),
+        api.getOdometerHistory(vehicle.id, {
+          fromDate: odoFromDate || undefined,
+          toDate: odoToDate || undefined,
+        }),
         api.getDriverAssignmentHistory(vehicle.id, {
           fromDate: fromDate || undefined,
+          toDate: toDate || undefined,
         }),
         api.listFaults(vehicle.id),
         api.listRepairOrders({ vehicleId: vehicle.id }),
@@ -466,10 +510,14 @@ function VehicleDetailModal({
   useEffect(() => {
     setDetail(null);
     setOdometer([]);
+    setOdometerFromDate('');
+    setOdometerToDate('');
     setDriverHistory([]);
     setDriverHistoryFromDate('');
+    setDriverHistoryToDate('');
     setChecklists([]);
     setChecklistFromDate('');
+    setChecklistToDate('');
     setSelectedChecklistId(null);
     setSelectedChecklist(null);
     setChecklistDetailError('');
@@ -477,8 +525,8 @@ function VehicleDetailModal({
     setRepairs([]);
     setTab(0);
     if (open) {
-      void loadDetail('');
-      void loadChecklists('');
+      void loadDetail('', '', '', '');
+      void loadChecklists('', '');
     }
   }, [open, vehicle?.id]);
 
@@ -721,58 +769,78 @@ function VehicleDetailModal({
         },
         {
           label: 'تاریخچه کیلومتر',
-          content: (
-            <RtlDataTable
-              columns={odometerColumns}
-              rows={sortedOdometer}
-              getRowKey={(row) => row.id}
-              orderBy={odometerOrderBy}
-              order={odometerOrder}
-              onSort={(key) => {
-                if (odometerOrderBy === key) {
-                  setOdometerOrder((current) => (current === 'asc' ? 'desc' : 'asc'));
-                  return;
+          content: odometerLoading ? (
+            <LoadingState label="در حال دریافت تاریخچه کیلومتر" />
+          ) : sortedOdometer.length === 0 && !odometerFromDate && !odometerToDate ? (
+            <EmptyState title="رکورد کیلومتری ثبت نشده است" />
+          ) : (
+            <Stack spacing={1.5}>
+              <JalaliDateRangeFilter
+                fromDate={odometerFromDate}
+                toDate={odometerToDate}
+                disabled={odometerLoading}
+                onChange={({ fromDate, toDate }) => {
+                  setOdometerFromDate(fromDate);
+                  setOdometerToDate(toDate);
+                  void loadOdometerHistory(fromDate, toDate);
+                }}
+                onClear={() => {
+                  setOdometerFromDate('');
+                  setOdometerToDate('');
+                  void loadOdometerHistory('', '');
+                }}
+              />
+              <RtlDataTable
+                columns={odometerColumns}
+                rows={sortedOdometer}
+                getRowKey={(row) => row.id}
+                orderBy={odometerOrderBy}
+                order={odometerOrder}
+                onSort={(key) => {
+                  if (odometerOrderBy === key) {
+                    setOdometerOrder((current) => (current === 'asc' ? 'desc' : 'asc'));
+                    return;
+                  }
+                  setOdometerOrderBy(key);
+                  setOdometerOrder('asc');
+                }}
+                emptyMessage="رکورد کیلومتری ثبت نشده است"
+                emptySubtitle={
+                  odometerFromDate || odometerToDate
+                    ? 'با تغییر بازه تاریخ دوباره تلاش کنید'
+                    : undefined
                 }
-                setOdometerOrderBy(key);
-                setOdometerOrder('asc');
-              }}
-              emptyMessage="رکورد کیلومتری ثبت نشده است"
-              standaloneEmpty
-              minWidth={480}
-            />
+                standaloneEmpty
+                minWidth={480}
+              />
+            </Stack>
           ),
         },
         {
           label: 'تاریخچه راننده',
           content: driverHistoryLoading ? (
             <LoadingState label="در حال دریافت تاریخچه راننده" />
-          ) : sortedDriverHistory.length === 0 && !driverHistoryFromDate ? (
+          ) : sortedDriverHistory.length === 0 &&
+            !driverHistoryFromDate &&
+            !driverHistoryToDate ? (
             <EmptyState title="تاریخچه راننده ثبت نشده است" />
           ) : (
             <Stack spacing={1.5}>
-              <Stack
-                direction={{ xs: 'column', sm: 'row' }}
-                useFlexGap
-                alignItems={{ xs: 'stretch', sm: 'center' }}
-                sx={{ gap: 2, '& > *': { margin: 0 } }}
-              >
-                <JalaliDateField
-                  label="تاریخ"
-                  value={driverHistoryFromDate}
-                  onChange={(next) => {
-                    setDriverHistoryFromDate(next);
-                    void loadDriverHistory(next);
-                  }}
-                  sx={{ width: { xs: '100%', sm: 220 }, flexShrink: 0 }}
-                />
-                <ClearFiltersButton
-                  disabled={!driverHistoryFromDate || driverHistoryLoading}
-                  onClick={() => {
-                    setDriverHistoryFromDate('');
-                    void loadDriverHistory('');
-                  }}
-                />
-              </Stack>
+              <JalaliDateRangeFilter
+                fromDate={driverHistoryFromDate}
+                toDate={driverHistoryToDate}
+                disabled={driverHistoryLoading}
+                onChange={({ fromDate, toDate }) => {
+                  setDriverHistoryFromDate(fromDate);
+                  setDriverHistoryToDate(toDate);
+                  void loadDriverHistory(fromDate, toDate);
+                }}
+                onClear={() => {
+                  setDriverHistoryFromDate('');
+                  setDriverHistoryToDate('');
+                  void loadDriverHistory('', '');
+                }}
+              />
               <RtlDataTable
                 columns={driverHistoryColumns}
                 rows={sortedDriverHistory}
@@ -789,7 +857,9 @@ function VehicleDetailModal({
                 }}
                 emptyMessage="تاریخچه راننده ثبت نشده است"
                 emptySubtitle={
-                  driverHistoryFromDate ? 'با تغییر تاریخ فیلتر دوباره تلاش کنید' : undefined
+                  driverHistoryFromDate || driverHistoryToDate
+                    ? 'با تغییر بازه تاریخ دوباره تلاش کنید'
+                    : undefined
                 }
                 standaloneEmpty
                 minWidth={480}
@@ -801,33 +871,25 @@ function VehicleDetailModal({
           label: 'تاریخچه چک‌لیست',
           content: checklistLoading ? (
             <LoadingState label="در حال دریافت تاریخچه چک‌لیست" />
-          ) : sortedChecklists.length === 0 && !checklistFromDate ? (
+          ) : sortedChecklists.length === 0 && !checklistFromDate && !checklistToDate ? (
             <EmptyState title="چک‌لیستی ثبت نشده است" />
           ) : (
             <Stack spacing={1.5}>
-              <Stack
-                direction={{ xs: 'column', sm: 'row' }}
-                useFlexGap
-                alignItems={{ xs: 'stretch', sm: 'center' }}
-                sx={{ gap: 2, '& > *': { margin: 0 } }}
-              >
-                <JalaliDateField
-                  label="تاریخ"
-                  value={checklistFromDate}
-                  onChange={(next) => {
-                    setChecklistFromDate(next);
-                    void loadChecklists(next);
-                  }}
-                  sx={{ width: { xs: '100%', sm: 220 }, flexShrink: 0 }}
-                />
-                <ClearFiltersButton
-                  disabled={!checklistFromDate || checklistLoading}
-                  onClick={() => {
-                    setChecklistFromDate('');
-                    void loadChecklists('');
-                  }}
-                />
-              </Stack>
+              <JalaliDateRangeFilter
+                fromDate={checklistFromDate}
+                toDate={checklistToDate}
+                disabled={checklistLoading}
+                onChange={({ fromDate, toDate }) => {
+                  setChecklistFromDate(fromDate);
+                  setChecklistToDate(toDate);
+                  void loadChecklists(fromDate, toDate);
+                }}
+                onClear={() => {
+                  setChecklistFromDate('');
+                  setChecklistToDate('');
+                  void loadChecklists('', '');
+                }}
+              />
               <RtlDataTable
                 columns={checklistColumns}
                 rows={sortedChecklists}
@@ -845,7 +907,9 @@ function VehicleDetailModal({
                 }}
                 emptyMessage="چک‌لیستی ثبت نشده است"
                 emptySubtitle={
-                  checklistFromDate ? 'با تغییر تاریخ فیلتر دوباره تلاش کنید' : undefined
+                  checklistFromDate || checklistToDate
+                    ? 'با تغییر بازه تاریخ دوباره تلاش کنید'
+                    : undefined
                 }
                 standaloneEmpty
                 minWidth={720}
@@ -916,7 +980,14 @@ function VehicleDetailModal({
         loading={loading}
         loadingLabel="در حال دریافت جزئیات خودرو"
         error={error}
-        onRetry={() => void loadDetail(driverHistoryFromDate)}
+        onRetry={() =>
+          void loadDetail(
+            driverHistoryFromDate,
+            driverHistoryToDate,
+            odometerFromDate,
+            odometerToDate,
+          )
+        }
         activeTab={tab}
         onTabChange={setTab}
         tabs={tabs}
@@ -1123,7 +1194,7 @@ export function VehiclePage() {
     search !== '' || status !== '' || orderBy !== 'vehicle_number' || order !== 'asc' || page !== 1;
 
   return (
-    <Stack spacing={{ xs: 1.5, md: 2.25 }} style={{ direction: 'rtl', textAlign: 'right' }}>
+    <FeaturePage>
       <PageHeader
         title="خودروها"
         breadcrumbs={[
@@ -1132,17 +1203,7 @@ export function VehiclePage() {
         ]}
       />
 
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: {
-            xs: 'repeat(2, minmax(0, 1fr))',
-            md: 'repeat(3, minmax(0, 1fr))',
-            xl: 'repeat(6, minmax(0, 1fr))',
-          },
-          gap: 1.5,
-        }}
-      >
+      <KpiGrid mdColumns={3} xlColumns={6}>
         <KpiCard label="کل ناوگان فعال" value={summaryLoading ? '...' : toFaNumber(summary?.active_fleet_count)} icon={DirectionsCar} tone="primary" />
         <KpiCard label="عملیاتی" value={summaryLoading ? '...' : toFaNumber(summary?.operational_fleet_count)} icon={TaskAlt} tone="success" />
         <KpiCard label="در تعمیر" value={summaryLoading ? '...' : toFaNumber(summary?.under_repair_fleet_count)} icon={CarRepair} tone="warning" />
@@ -1154,7 +1215,7 @@ export function VehiclePage() {
           icon={Sync}
           tone="secondary"
         />
-      </Box>
+      </KpiGrid>
       {summaryError && <ErrorState message={summaryError} onRetry={reloadSummary} />}
 
       <FilterPanel>
@@ -1242,6 +1303,6 @@ export function VehiclePage() {
         open={Boolean(selected)}
         onClose={() => setSelected(null)}
       />
-    </Stack>
+    </FeaturePage>
   );
 }

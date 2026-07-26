@@ -29,6 +29,7 @@ import { api } from '../../api/client';
 import { Button } from '../../components/Button';
 import { ClearFiltersButton } from '../../components/ClearFiltersButton';
 import { DetailLine } from '../../components/DetailLine';
+import { FeaturePage, KpiGrid } from '../../components/FeaturePage';
 import { FilterPanel } from '../../components/FilterPanel';
 import { KpiCard } from '../../components/KpiCard';
 import { PageHeader } from '../../components/PageHeader';
@@ -841,22 +842,13 @@ export function TransportRepairsPage() {
     : [];
 
   return (
-    <Stack spacing={{ xs: 1.5, md: 2.25 }} style={{ direction: 'rtl', textAlign: 'right' }}>
+    <FeaturePage>
       <PageHeader
         title="کارتابل ترابری"
         breadcrumbs={[{ label: 'ترابری' }, { label: 'درخواست‌های تعمیر' }]}
       />
 
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: {
-            xs: 'repeat(2, minmax(0, 1fr))',
-            md: 'repeat(3, minmax(0, 1fr))',
-          },
-          gap: 1.5,
-        }}
-      >
+      <KpiGrid>
         <KpiCard
           label="موارد صف"
           value={loading ? '...' : toFaNumber(kpi.total)}
@@ -874,7 +866,7 @@ export function TransportRepairsPage() {
           icon={CheckCircleOutline}
           tone="success"
         />
-      </Box>
+      </KpiGrid>
 
       <FilterPanel>
         <RtlSelectField<StatusFilter>
@@ -1090,6 +1082,6 @@ export function TransportRepairsPage() {
           ) : null}
         </DialogContent>
       </Dialog>
-    </Stack>
+    </FeaturePage>
   );
 }

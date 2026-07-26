@@ -21,6 +21,7 @@ import { api } from '../../api/client';
 import { Button } from '../../components/Button';
 import { ClearFiltersButton } from '../../components/ClearFiltersButton';
 import { DetailLine } from '../../components/DetailLine';
+import { FeaturePage, KpiGrid } from '../../components/FeaturePage';
 import { FilterPanel } from '../../components/FilterPanel';
 import { KpiCard } from '../../components/KpiCard';
 import {
@@ -773,22 +774,13 @@ export function CentralWorkshopPage() {
     : [];
 
   return (
-    <Stack spacing={{ xs: 1.5, md: 2.25 }} style={{ direction: 'rtl', textAlign: 'right' }}>
+    <FeaturePage>
       <PageHeader
         title="کارتابل تعمیرگاه مرکزی"
         breadcrumbs={[{ label: 'تعمیرات' }, { label: 'تعمیرگاه مرکزی' }]}
       />
 
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: {
-            xs: 'repeat(2, minmax(0, 1fr))',
-            md: 'repeat(3, minmax(0, 1fr))',
-          },
-          gap: 1.5,
-        }}
-      >
+      <KpiGrid>
         <KpiCard label="صف تصمیم فنی" value={toFaNumber(queueCount)} icon={Build} tone="warning" />
         <KpiCard label="در حال تعمیر" value={toFaNumber(inProgressCount)} icon={Build} tone="success" />
         <KpiCard
@@ -797,7 +789,7 @@ export function CentralWorkshopPage() {
           icon={Inventory2}
           tone="error"
         />
-      </Box>
+      </KpiGrid>
 
       <FilterPanel>
         <RtlSelectField
@@ -846,6 +838,6 @@ export function CentralWorkshopPage() {
       />
 
       {isMobile && null}
-    </Stack>
+    </FeaturePage>
   );
 }

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime, time
 
 from rest_framework import status
 from rest_framework.decorators import action
@@ -27,6 +26,7 @@ from apps.inspection.domain.value_objects import (
 from core.permissions import IsReadOnlyOrDriverOrTechnicianOrAbove
 from interfaces.api.v1 import deps
 from interfaces.api.v1.fault.serializers import FaultResponseSerializer
+from interfaces.api.v1.filters import DateRangeFilterSerializer, date_range_to_datetimes
 from interfaces.api.v1.inspection import schema as inspection_schema
 from interfaces.api.v1.inspection.serializers import (
     InspectionCreateSerializer,
@@ -34,20 +34,6 @@ from interfaces.api.v1.inspection.serializers import (
     InspectionResponseSerializer,
 )
 from interfaces.api.v1.utils import paginate_dto_list, request_id_from, user_id_from
-from interfaces.api.v1.vehicle.serializers import DateRangeFilterSerializer
-
-
-def _date_range_to_datetimes(
-    filters: DateRangeFilterSerializer,
-) -> tuple[datetime | None, datetime | None]:
-    """Convert validated date filters to inclusive UTC datetime bounds."""
-    from_date = filters.validated_data.get("from_date")
-    to_date = filters.validated_data.get("to_date")
-    from_datetime = (
-        datetime.combine(from_date, time.min, tzinfo=UTC) if from_date else None
-    )
-    to_datetime = datetime.combine(to_date, time.max, tzinfo=UTC) if to_date else None
-    return from_datetime, to_datetime
 
 
 class InspectionViewSet(GenericViewSet):
@@ -70,7 +56,7 @@ class InspectionViewSet(GenericViewSet):
         vehicle_id = uuid.UUID(vehicle_id_raw) if vehicle_id_raw else None
         filters = DateRangeFilterSerializer(data=request.query_params)
         filters.is_valid(raise_exception=True)
-        from_datetime, to_datetime = _date_range_to_datetimes(filters)
+        from_datetime, to_datetime = date_range_to_datetimes(filters)
         items = deps.get_list_inspections_service().execute(
             vehicle_id,
             from_date=from_datetime,

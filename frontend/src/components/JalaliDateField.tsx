@@ -21,6 +21,8 @@ export type JalaliDateFieldProps = {
   sx?: SxProps<Theme>;
   minDate?: string;
   maxDate?: string;
+  error?: boolean;
+  helperText?: string;
 };
 
 const jalaliLocaleText = {
@@ -183,6 +185,8 @@ export function JalaliDateField({
   sx,
   minDate,
   maxDate,
+  error = false,
+  helperText,
 }: JalaliDateFieldProps) {
   const [open, setOpen] = useState(false);
 
@@ -224,6 +228,8 @@ export function JalaliDateField({
             textField: {
               size,
               fullWidth: true,
+              error,
+              helperText,
               onClick: () => {
                 if (!disabled) setOpen(true);
               },

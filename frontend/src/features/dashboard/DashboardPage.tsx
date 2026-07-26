@@ -12,6 +12,7 @@ import {
 } from '@mui/icons-material';
 import { Link as RouterLink } from 'react-router-dom';
 import { api } from '../../api/client';
+import { FeaturePage, KpiGrid } from '../../components/FeaturePage';
 import { KpiCard } from '../../components/KpiCard';
 import { PageHeader } from '../../components/PageHeader';
 import { ErrorState, LoadingState } from '../../components/States';
@@ -140,7 +141,7 @@ export function DashboardPage() {
   ];
 
   return (
-    <Stack spacing={{ xs: 1.5, md: 2.25 }} style={{ direction: 'rtl', textAlign: 'right' }}>
+    <FeaturePage>
       <PageHeader
         title="داشبورد"
         description="وضعیت خودروها، راننده‌ها و صف‌های توزیع و ترابری بر اساس آخرین داده‌های سامانه."
@@ -152,16 +153,7 @@ export function DashboardPage() {
 
       {!loading && !error && (
         <>
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: {
-                xs: 'repeat(2, minmax(0, 1fr))',
-                md: 'repeat(4, minmax(0, 1fr))',
-              },
-              gap: 1.5,
-            }}
-          >
+          <KpiGrid mdColumns={4}>
             <KpiCard
               label="کل ناوگان فعال"
               value={toFaNumber(vehicleSummary?.active_fleet_count)}
@@ -186,18 +178,9 @@ export function DashboardPage() {
               icon={ErrorOutline}
               tone="error"
             />
-          </Box>
+          </KpiGrid>
 
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: {
-                xs: 'repeat(2, minmax(0, 1fr))',
-                md: 'repeat(4, minmax(0, 1fr))',
-              },
-              gap: 1.5,
-            }}
-          >
+          <KpiGrid mdColumns={4}>
             <KpiCard
               label="راننده فعال"
               value={toFaNumber(driverSummary?.active_count)}
@@ -222,7 +205,7 @@ export function DashboardPage() {
               icon={CarRepair}
               tone="warning"
             />
-          </Box>
+          </KpiGrid>
 
           <Box
             sx={{
@@ -302,6 +285,6 @@ export function DashboardPage() {
           </Card>
         </>
       )}
-    </Stack>
+    </FeaturePage>
   );
 }

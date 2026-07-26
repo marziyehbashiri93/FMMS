@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime, time
 
 from rest_framework import status
 from rest_framework.decorators import action
@@ -22,11 +21,11 @@ from core.permissions import (
     IsSupervisorOrAbove,
 )
 from interfaces.api.v1 import deps
+from interfaces.api.v1.filters import DateRangeFilterSerializer, date_range_to_datetimes
 from interfaces.api.v1.inspection.serializers import InspectionResponseSerializer
 from interfaces.api.v1.utils import paginate_dto_list, request_id_from, user_id_from
 from interfaces.api.v1.vehicle import schema as vehicle_schema
 from interfaces.api.v1.vehicle.serializers import (
-    DateRangeFilterSerializer,
     VehicleComponentHistoryResponseSerializer,
     VehicleDriverAssignmentSnapshotResponseSerializer,
     VehicleListQuerySerializer,
@@ -36,19 +35,6 @@ from interfaces.api.v1.vehicle.serializers import (
     VehicleStatusChangeSerializer,
     VehicleSummarySerializer,
 )
-
-
-def _date_range_to_datetimes(
-    filters: DateRangeFilterSerializer,
-) -> tuple[datetime | None, datetime | None]:
-    """Convert validated date filters to inclusive UTC datetime bounds."""
-    from_date = filters.validated_data.get("from_date")
-    to_date = filters.validated_data.get("to_date")
-    from_datetime = (
-        datetime.combine(from_date, time.min, tzinfo=UTC) if from_date else None
-    )
-    to_datetime = datetime.combine(to_date, time.max, tzinfo=UTC) if to_date else None
-    return from_datetime, to_datetime
 
 
 class VehicleViewSet(GenericViewSet):
@@ -183,7 +169,7 @@ class VehicleViewSet(GenericViewSet):
         )
         filters = DateRangeFilterSerializer(data=request.query_params)
         filters.is_valid(raise_exception=True)
-        from_datetime, to_datetime = _date_range_to_datetimes(filters)
+        from_datetime, to_datetime = date_range_to_datetimes(filters)
         result = deps.get_list_inspections_service().execute(
             vehicle_id,
             from_date=from_datetime,

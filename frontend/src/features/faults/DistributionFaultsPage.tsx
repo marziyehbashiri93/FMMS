@@ -31,6 +31,7 @@ import { api } from '../../api/client';
 import { Button } from '../../components/Button';
 import { ClearFiltersButton } from '../../components/ClearFiltersButton';
 import { DetailLine } from '../../components/DetailLine';
+import { FeaturePage, KpiGrid } from '../../components/FeaturePage';
 import { FilterPanel } from '../../components/FilterPanel';
 import { KpiCard } from '../../components/KpiCard';
 import { PageHeader } from '../../components/PageHeader';
@@ -745,22 +746,13 @@ export function DistributionFaultsPage() {
     : [];
 
   return (
-    <Stack spacing={{ xs: 1.5, md: 2.25 }} style={{ direction: 'rtl', textAlign: 'right' }}>
+    <FeaturePage>
       <PageHeader
         title="لیست خرابی‌ها"
         breadcrumbs={[{ label: 'توزیع خودرو' }, { label: 'لیست خرابی‌ها' }]}
       />
 
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: {
-            xs: 'repeat(2, minmax(0, 1fr))',
-            md: 'repeat(4, minmax(0, 1fr))',
-          },
-          gap: 1.5,
-        }}
-      >
+      <KpiGrid mdColumns={4}>
         <KpiCard
           label="کل خرابی‌ها"
           value={loading ? '...' : toFaNumber(kpi.total)}
@@ -784,7 +776,7 @@ export function DistributionFaultsPage() {
           icon={CheckCircleOutline}
           tone="success"
         />
-      </Box>
+      </KpiGrid>
 
       <FilterPanel>
         <RtlTextField
@@ -1029,6 +1021,6 @@ export function DistributionFaultsPage() {
           ) : null}
         </DialogContent>
       </Dialog>
-    </Stack>
+    </FeaturePage>
   );
 }

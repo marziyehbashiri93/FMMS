@@ -33,7 +33,7 @@ export function RequireModule({ moduleKey, children }: RequireModuleProps) {
 
   if (user === undefined) {
     return (
-      <Box display="grid" placeItems="center" minHeight={240}>
+      <Box sx={{ display: 'grid', placeItems: 'center', minHeight: 240 }}>
         <CircularProgress size={28} />
       </Box>
     );

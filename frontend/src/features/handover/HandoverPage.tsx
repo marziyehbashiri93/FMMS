@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
-  Box,
   Card,
   CardContent,
   Divider,
@@ -22,6 +21,7 @@ import { api } from '../../api/client';
 import { Button } from '../../components/Button';
 import { ClearFiltersButton } from '../../components/ClearFiltersButton';
 import { DetailLine } from '../../components/DetailLine';
+import { FeaturePage, KpiGrid } from '../../components/FeaturePage';
 import { FilterPanel } from '../../components/FilterPanel';
 import { KpiCard } from '../../components/KpiCard';
 import { PageHeader } from '../../components/PageHeader';
@@ -466,22 +466,13 @@ export function HandoverPage() {
     : [];
 
   return (
-    <Stack spacing={{ xs: 1.5, md: 2.25 }} style={{ direction: 'rtl', textAlign: 'right' }}>
+    <FeaturePage>
       <PageHeader
         title="تحویل و تایید"
         breadcrumbs={[{ label: 'راننده' }, { label: 'تحویل و تایید' }]}
       />
 
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: {
-            xs: 'repeat(2, minmax(0, 1fr))',
-            md: 'repeat(4, minmax(0, 1fr))',
-          },
-          gap: 1.5,
-        }}
-      >
+      <KpiGrid mdColumns={4}>
         <KpiCard
           label="کل موارد"
           value={loading ? '...' : toFaNumber(kpi.total)}
@@ -505,7 +496,7 @@ export function HandoverPage() {
           icon={DoNotDisturbAlt}
           tone="error"
         />
-      </Box>
+      </KpiGrid>
 
       <FilterPanel>
         <RtlSelectField<StatusFilter>
@@ -587,6 +578,6 @@ export function HandoverPage() {
         onRetry={selected ? () => void openDetail(selected) : undefined}
         maxWidth="lg"
       />
-    </Stack>
+    </FeaturePage>
   );
 }

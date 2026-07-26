@@ -9,10 +9,9 @@ import {
 import { Link as RouterLink } from 'react-router-dom';
 import { Person } from '@mui/icons-material';
 import { api } from '../../api/client';
-import { ClearFiltersButton } from '../../components/ClearFiltersButton';
 import { DetailLine } from '../../components/DetailLine';
 import { DriverStatusBadge } from '../../components/DriverStatusBadge';
-import { JalaliDateField } from '../../components/JalaliDateField';
+import { JalaliDateRangeFilter } from '../../components/JalaliDateRangeFilter';
 import { EmptyState, ErrorState, LoadingState } from '../../components/States';
 import { RtlDataTable, type RtlDataTableColumn } from '../../components/RtlDataTable';
 import { TabbedDetailModal } from '../../components/TabbedDetailModal';
@@ -21,6 +20,7 @@ import type {
   DriverAssignedVehicle,
   DriverVehicleAssignmentHistoryItem,
 } from '../../types/fmms';
+import { isValidIsoDateRange } from '../../utils/dateRange';
 import { formatDateTime } from '../../utils/format';
 
 const ROLE_LABELS: Record<string, string> = {
@@ -69,7 +69,8 @@ export function DriverDetailModal({
   const [history, setHistory] = useState<DriverVehicleAssignmentHistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState('');
-  const [historyDate, setHistoryDate] = useState('');
+  const [historyFromDate, setHistoryFromDate] = useState('');
+  const [historyToDate, setHistoryToDate] = useState('');
   const [tab, setTab] = useState(0);
   const [orderBy, setOrderBy] = useState<HistorySortKey>('synced_at');
   const [order, setOrder] = useState<'asc' | 'desc'>('desc');
@@ -87,13 +88,19 @@ export function DriverDetailModal({
     }
   };
 
-  const loadHistory = async (id: string, date = historyDate) => {
+  const loadHistory = async (
+    id: string,
+    fromDate = historyFromDate,
+    toDate = historyToDate,
+  ) => {
+    if (!isValidIsoDateRange(fromDate, toDate)) return;
     setHistoryLoading(true);
     setHistoryError('');
     try {
       setHistory(
         await api.getDriverVehicleAssignmentHistory(id, {
-          fromDate: date || undefined,
+          fromDate: fromDate || undefined,
+          toDate: toDate || undefined,
         }),
       );
     } catch (err) {
@@ -107,9 +114,10 @@ export function DriverDetailModal({
   useEffect(() => {
     if (!open || !driverId) return;
     setTab(0);
-    setHistoryDate('');
+    setHistoryFromDate('');
+    setHistoryToDate('');
     void loadDriver(driverId);
-    void loadHistory(driverId, '');
+    void loadHistory(driverId, '', '');
   }, [open, driverId]);
 
   const sortedHistory = [...history].sort((a, b) => {
@@ -228,33 +236,25 @@ export function DriverDetailModal({
               message={historyError}
               onRetry={() => driverId && void loadHistory(driverId)}
             />
-          ) : sortedHistory.length === 0 && !historyDate ? (
+          ) : sortedHistory.length === 0 && !historyFromDate && !historyToDate ? (
             <EmptyState title="تاریخچه‌ای یافت نشد" />
           ) : (
             <Stack spacing={1.5}>
-              <Stack
-                direction={{ xs: 'column', sm: 'row' }}
-                useFlexGap
-                alignItems={{ xs: 'stretch', sm: 'center' }}
-                sx={{ gap: 2, '& > *': { margin: 0 } }}
-              >
-                <JalaliDateField
-                  label="تاریخ"
-                  value={historyDate}
-                  onChange={(next) => {
-                    setHistoryDate(next);
-                    if (driverId) void loadHistory(driverId, next);
-                  }}
-                  sx={{ width: { xs: '100%', sm: 220 }, flexShrink: 0 }}
-                />
-                <ClearFiltersButton
-                  disabled={!historyDate || historyLoading}
-                  onClick={() => {
-                    setHistoryDate('');
-                    if (driverId) void loadHistory(driverId, '');
-                  }}
-                />
-              </Stack>
+              <JalaliDateRangeFilter
+                fromDate={historyFromDate}
+                toDate={historyToDate}
+                disabled={historyLoading}
+                onChange={({ fromDate, toDate }) => {
+                  setHistoryFromDate(fromDate);
+                  setHistoryToDate(toDate);
+                  if (driverId) void loadHistory(driverId, fromDate, toDate);
+                }}
+                onClear={() => {
+                  setHistoryFromDate('');
+                  setHistoryToDate('');
+                  if (driverId) void loadHistory(driverId, '', '');
+                }}
+              />
               <RtlDataTable
                 columns={historyColumns}
                 rows={sortedHistory}
@@ -271,7 +271,9 @@ export function DriverDetailModal({
                 }}
                 emptyMessage="تاریخچه‌ای یافت نشد"
                 emptySubtitle={
-                  historyDate ? 'با تغییر تاریخ فیلتر دوباره تلاش کنید' : undefined
+                  historyFromDate || historyToDate
+                    ? 'با تغییر بازه تاریخ دوباره تلاش کنید'
+                    : undefined
                 }
                 standaloneEmpty
                 minWidth={560}

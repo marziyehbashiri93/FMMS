@@ -393,6 +393,22 @@ class TestVehicleAPI:
         assert history.status_code == 200
         assert [item["reading_date"] for item in history.data] == ["2026-07-16"]
 
+        ranged = authenticated_client.get(
+            f"{history_url}?from_date=2026-07-15&to_date=2026-07-15"
+        )
+        assert ranged.status_code == 200
+        assert [item["reading_date"] for item in ranged.data] == ["2026-07-15"]
+
+        until = authenticated_client.get(f"{history_url}?to_date=2026-07-15")
+        assert until.status_code == 200
+        assert [item["reading_date"] for item in until.data] == ["2026-07-15"]
+
+        invalid = authenticated_client.get(
+            f"{history_url}?from_date=2026-07-16&to_date=2026-07-15"
+        )
+        assert invalid.status_code == 400
+        assert "to_date" in invalid.data.get("details", invalid.data)
+
     def test_get_odometer_without_reading_returns_not_found(
         self, authenticated_client: APIClient
     ) -> None:
@@ -481,6 +497,21 @@ class TestVehicleAPI:
         assert "sync_run_id" not in response.data[0]
         assert "vehicle_number" not in response.data[0]
 
+        ranged = authenticated_client.get(
+            f"/api/v1/vehicles/{vehicle_id}/driver-assignment-history/"
+            "?from_date=2026-07-14&to_date=2026-07-14"
+        )
+        assert ranged.status_code == 200, ranged.data
+        assert len(ranged.data) == 1
+        assert ranged.data[0]["assigned_at"].startswith("2026-07-14T08:00:00")
+
+        invalid = authenticated_client.get(
+            f"/api/v1/vehicles/{vehicle_id}/driver-assignment-history/"
+            "?from_date=2026-07-16&to_date=2026-07-14"
+        )
+        assert invalid.status_code == 400
+        assert "to_date" in invalid.data.get("details", invalid.data)
+
     def test_vehicle_checklist_history_and_detail(
         self, authenticated_client: APIClient
     ) -> None:
@@ -537,6 +568,28 @@ class TestVehicleAPI:
         assert history.data["count"] == 1
         assert history.data["results"][0]["id"] == newer.data["id"]
         assert history.data["results"][0]["overall_result"] == "FAIL"
+
+        ranged = authenticated_client.get(
+            f"/api/v1/vehicles/{vehicle['id']}/checklists/"
+            "?from_date=2026-07-14&to_date=2026-07-14"
+        )
+        assert ranged.status_code == 200, ranged.data
+        assert ranged.data["count"] == 1
+        assert ranged.data["results"][0]["id"] == older.data["id"]
+
+        until = authenticated_client.get(
+            f"/api/v1/vehicles/{vehicle['id']}/checklists/?to_date=2026-07-14"
+        )
+        assert until.status_code == 200, until.data
+        assert until.data["count"] == 1
+        assert until.data["results"][0]["id"] == older.data["id"]
+
+        invalid = authenticated_client.get(
+            f"/api/v1/vehicles/{vehicle['id']}/checklists/"
+            "?from_date=2026-07-16&to_date=2026-07-14"
+        )
+        assert invalid.status_code == 400
+        assert "to_date" in invalid.data.get("details", invalid.data)
 
         detail = authenticated_client.get(
             f"/api/v1/vehicles/{vehicle['id']}/checklists/{newer.data['id']}/"
