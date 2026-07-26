@@ -14,6 +14,7 @@ import { TransportRepairsPage } from '../features/repairs/TransportRepairsPage';
 import { CentralWorkshopPage } from '../features/workshop/CentralWorkshopPage';
 import { TransportPartsPage } from '../features/transport/TransportPartsPage';
 import { HandoverPage } from '../features/handover/HandoverPage';
+import { ExternalWorkshopPage } from '../features/externalWorkshop/ExternalWorkshopPage';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { SapTransactionsPage } from '../features/sap/SapTransactionsPage';
 import { ComponentShowcasePage } from '../features/showcase/ComponentShowcasePage';
@@ -59,6 +60,8 @@ const dedicatedPaths = new Set([
   '/transport/parts',
   '/workshop',
   '/handover',
+  '/driver/external-workshop',
+  '/transport/external-workshop',
   '/materials',
   '/sap',
   '/components',
@@ -85,6 +88,14 @@ export function App() {
         />
         <Route path="/workshop" element={guarded('workshop', <CentralWorkshopPage />)} />
         <Route path="/handover" element={guarded('handover', <HandoverPage />)} />
+        <Route
+          path="/driver/external-workshop"
+          element={guarded('driverExternalWorkshop', <ExternalWorkshopPage mode="driver" />)}
+        />
+        <Route
+          path="/transport/external-workshop"
+          element={guarded('transportExternalWorkshop', <ExternalWorkshopPage mode="transport" />)}
+        />
         <Route path="/materials" element={guarded('materials', <MaterialsPage />)} />
         <Route path="/sap" element={guarded('sap', <SapTransactionsPage />)} />
         <Route path="/components" element={guarded('components', <ComponentShowcasePage />)} />

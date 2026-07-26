@@ -24,6 +24,7 @@ class VehicleStatus(StrEnum):
         ACTIVE: Vehicle is operational and available for assignment.
         INACTIVE: Vehicle has been decommissioned or removed from service.
         UNDER_REPAIR: Vehicle is currently being repaired and unavailable.
+        UNDER_EXTERNAL_REPAIR: Vehicle is at an external workshop and unavailable.
         EXITED_CENTER: Vehicle has left the fleet center after daily checklist.
         SUSPENDED: Vehicle is temporarily suspended (e.g. pending inspection).
         OUT_OF_SERVICE: Vehicle failed inspection and is not operational.
@@ -32,6 +33,7 @@ class VehicleStatus(StrEnum):
     ACTIVE = "ACTIVE"
     INACTIVE = "INACTIVE"
     UNDER_REPAIR = "UNDER_REPAIR"
+    UNDER_EXTERNAL_REPAIR = "UNDER_EXTERNAL_REPAIR"
     WAITING_DRIVER_CONFIRMATION = "WAITING_DRIVER_CONFIRMATION"
     EXITED_CENTER = "EXITED_CENTER"
     SUSPENDED = "SUSPENDED"
@@ -43,6 +45,7 @@ VEHICLE_STATUS_LABELS: dict[VehicleStatus, str] = {
     VehicleStatus.ACTIVE: "عملیاتی",
     VehicleStatus.INACTIVE: "غیرفعال",
     VehicleStatus.UNDER_REPAIR: "در تعمیر",
+    VehicleStatus.UNDER_EXTERNAL_REPAIR: "در تعمیرگاه بیرونی",
     VehicleStatus.WAITING_DRIVER_CONFIRMATION: "منتظر تایید راننده",
     VehicleStatus.EXITED_CENTER: "خروج از مرکز",
     VehicleStatus.SUSPENDED: "تعلیق‌شده",
@@ -57,6 +60,7 @@ _ALLOWED_TRANSITIONS: dict[VehicleStatus, frozenset[VehicleStatus]] = {
         {
             VehicleStatus.INACTIVE,
             VehicleStatus.UNDER_REPAIR,
+            VehicleStatus.UNDER_EXTERNAL_REPAIR,
             VehicleStatus.WAITING_DRIVER_CONFIRMATION,
             VehicleStatus.EXITED_CENTER,
             VehicleStatus.SUSPENDED,
@@ -68,6 +72,7 @@ _ALLOWED_TRANSITIONS: dict[VehicleStatus, frozenset[VehicleStatus]] = {
         {
             VehicleStatus.ACTIVE,
             VehicleStatus.INACTIVE,
+            VehicleStatus.UNDER_EXTERNAL_REPAIR,
             VehicleStatus.WAITING_DRIVER_CONFIRMATION,
             VehicleStatus.SUSPENDED,
             VehicleStatus.OUT_OF_SERVICE,
@@ -78,6 +83,7 @@ _ALLOWED_TRANSITIONS: dict[VehicleStatus, frozenset[VehicleStatus]] = {
         {
             VehicleStatus.ACTIVE,
             VehicleStatus.UNDER_REPAIR,
+            VehicleStatus.UNDER_EXTERNAL_REPAIR,
             VehicleStatus.OUT_OF_SERVICE,
             VehicleStatus.SUSPENDED,
             VehicleStatus.INACTIVE,
@@ -89,6 +95,7 @@ _ALLOWED_TRANSITIONS: dict[VehicleStatus, frozenset[VehicleStatus]] = {
             VehicleStatus.ACTIVE,
             VehicleStatus.INACTIVE,
             VehicleStatus.UNDER_REPAIR,
+            VehicleStatus.UNDER_EXTERNAL_REPAIR,
             VehicleStatus.WAITING_DRIVER_CONFIRMATION,
             VehicleStatus.OUT_OF_SERVICE,
             VehicleStatus.DECOMMISSIONED,
@@ -99,6 +106,7 @@ _ALLOWED_TRANSITIONS: dict[VehicleStatus, frozenset[VehicleStatus]] = {
             VehicleStatus.ACTIVE,
             VehicleStatus.INACTIVE,
             VehicleStatus.UNDER_REPAIR,
+            VehicleStatus.UNDER_EXTERNAL_REPAIR,
             VehicleStatus.WAITING_DRIVER_CONFIRMATION,
             VehicleStatus.SUSPENDED,
             VehicleStatus.OUT_OF_SERVICE,
@@ -109,6 +117,7 @@ _ALLOWED_TRANSITIONS: dict[VehicleStatus, frozenset[VehicleStatus]] = {
         {
             VehicleStatus.ACTIVE,
             VehicleStatus.UNDER_REPAIR,
+            VehicleStatus.UNDER_EXTERNAL_REPAIR,
             VehicleStatus.WAITING_DRIVER_CONFIRMATION,
             VehicleStatus.INACTIVE,
             VehicleStatus.SUSPENDED,
@@ -119,6 +128,18 @@ _ALLOWED_TRANSITIONS: dict[VehicleStatus, frozenset[VehicleStatus]] = {
         {
             VehicleStatus.ACTIVE,
             VehicleStatus.UNDER_REPAIR,
+            VehicleStatus.UNDER_EXTERNAL_REPAIR,
+            VehicleStatus.DECOMMISSIONED,
+        }
+    ),
+    VehicleStatus.UNDER_EXTERNAL_REPAIR: frozenset(
+        {
+            VehicleStatus.ACTIVE,
+            VehicleStatus.UNDER_REPAIR,
+            VehicleStatus.WAITING_DRIVER_CONFIRMATION,
+            VehicleStatus.OUT_OF_SERVICE,
+            VehicleStatus.SUSPENDED,
+            VehicleStatus.INACTIVE,
             VehicleStatus.DECOMMISSIONED,
         }
     ),
@@ -232,6 +253,10 @@ class Vehicle:
     def mark_waiting_driver_confirmation(self) -> None:
         """Transition vehicle to WAITING_DRIVER_CONFIRMATION after repair."""
         self.transition_to(VehicleStatus.WAITING_DRIVER_CONFIRMATION)
+
+    def mark_under_external_repair(self) -> None:
+        """Transition vehicle to UNDER_EXTERNAL_REPAIR after external delivery."""
+        self.transition_to(VehicleStatus.UNDER_EXTERNAL_REPAIR)
 
     def activate(self) -> None:
         """Return the vehicle to ACTIVE when maintenance clearance allows it.

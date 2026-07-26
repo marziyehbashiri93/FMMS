@@ -4,6 +4,7 @@ import type {
   Driver,
   DriverSummary,
   DriverVehicleAssignmentHistoryItem,
+  ExternalWorkshopAssignment,
   Fault,
   FaultCatalog,
   FailureSeverity,
@@ -400,6 +401,88 @@ export const api = {
     }>(`/repair-orders/${id}/assign-workshop/`, {
       method: 'POST',
       body: JSON.stringify(payload),
+    });
+  },
+
+  assignExternalWorkshop(
+    id: string,
+    payload: {
+      workshop_id?: string;
+      workshop_name?: string;
+      workshop_address?: string;
+      assignment_date: string;
+      repair_reason?: string;
+      description?: string;
+    },
+  ) {
+    return request<ExternalWorkshopAssignment>(`/repair-orders/${id}/assign-external-workshop/`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  listExternalWorkshopAssignments(options?: { status?: string; page?: number; pageSize?: number }) {
+    const params = new URLSearchParams();
+    if (options?.status) params.set('status', options.status);
+    if (options?.page) params.set('page', String(options.page));
+    if (options?.pageSize) params.set('page_size', String(options.pageSize));
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return request<ExternalWorkshopAssignment[] | Paginated<ExternalWorkshopAssignment>>(
+      `/external-workshop-assignments/${query}`,
+    );
+  },
+
+  getExternalWorkshopAssignment(id: string) {
+    return request<ExternalWorkshopAssignment>(`/external-workshop-assignments/${id}/`);
+  },
+
+  confirmExternalWorkshopDelivery(
+    id: string,
+    payload: {
+      delivery_datetime: string;
+      workshop_name: string;
+      workshop_address: string;
+      workshop_phone: string;
+      vehicle_odometer: number;
+      notes?: string;
+    },
+  ) {
+    return request<ExternalWorkshopAssignment>(`/external-workshop-assignments/${id}/confirm-delivery/`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  confirmExternalWorkshopPickup(
+    id: string,
+    payload: { pickup_datetime: string; vehicle_odometer: number; notes?: string },
+  ) {
+    return request<ExternalWorkshopAssignment>(`/external-workshop-assignments/${id}/confirm-pickup/`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  reviewExternalRepair(
+    id: string,
+    payload: {
+      invoice_attachment?: string | null;
+      repair_services?: Array<Record<string, unknown>>;
+      replaced_parts?: Array<Record<string, unknown>>;
+      repair_cost?: string | number | null;
+      additional_notes?: string;
+    },
+  ) {
+    return request<ExternalWorkshopAssignment>(`/external-workshop-assignments/${id}/review/`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  closeExternalRepair(id: string) {
+    return request<ExternalWorkshopAssignment>(`/external-workshop-assignments/${id}/close/`, {
+      method: 'POST',
+      body: JSON.stringify({}),
     });
   },
 

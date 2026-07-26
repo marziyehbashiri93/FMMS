@@ -89,7 +89,10 @@ class GetVehicleSummaryService:
             active_fleet_count=active_fleet_count,
             operational_fleet_count=operational_fleet_count,
             under_repair_fleet_count=active_fleet.filter(
-                status=VehicleStatus.UNDER_REPAIR.value
+                status__in=[
+                    VehicleStatus.UNDER_REPAIR.value,
+                    VehicleStatus.UNDER_EXTERNAL_REPAIR.value,
+                ]
             ).count(),
             unusable_fleet_count=active_fleet.filter(
                 status__in=[status.value for status in _UNUSABLE_STATUSES]

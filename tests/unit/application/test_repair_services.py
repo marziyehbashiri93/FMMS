@@ -29,13 +29,17 @@ from apps.material.domain.interfaces.material_request_repository import (
 from apps.repair.application.dto.repair_dto import (
     AddRepairActivityDTO,
     AddRepairPartDTO,
+    AssignExternalWorkshopDTO,
     AssignRepairOrderDTO,
+    CloseExternalRepairDTO,
     CloseRepairOrderDTO,
     CompleteRepairOrderDTO,
+    ConfirmExternalWorkshopDeliveryDTO,
+    ConfirmExternalWorkshopPickupDTO,
     CreateRepairOrderDTO,
     DeleteRepairActivityDTO,
     DeleteRepairPartDTO,
-    RepairOrderResponseDTO,
+    ReviewExternalRepairDTO,
     SyncRepairToSAPDTO,
     UpdateRepairActivityDTO,
     UpdateRepairPartDTO,
@@ -54,6 +58,13 @@ from apps.repair.application.services.assign_repair_order_service import (
 from apps.repair.application.services.create_repair_order_service import (
     CreateRepairOrderService,
 )
+from apps.repair.application.services.external_workshop_service import (
+    AssignExternalWorkshopService,
+    CloseExternalRepairService,
+    ConfirmExternalWorkshopDeliveryService,
+    ConfirmExternalWorkshopPickupService,
+    ReviewExternalRepairService,
+)
 from apps.repair.application.services.get_repair_order_service import (
     GetRepairOrderService,
     ListRepairOrdersService,
@@ -71,12 +82,26 @@ from apps.repair.domain.exceptions import (
     RepairOrderInvalidStateError,
     RepairOrderInvalidStateTransitionError,
 )
+from apps.repair.domain.external_workshop_entities import (
+    ExternalRepairReview,
+    ExternalWorkshopAssignment,
+    ExternalWorkshopAssignmentStatus,
+    ExternalWorkshopDelivery,
+    ExternalWorkshopPickup,
+)
+from apps.repair.domain.interfaces.external_workshop_repository import (
+    IExternalWorkshopRepository,
+)
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
 from apps.repair.domain.value_objects import TechnicianAssignment
 from apps.vehicle.domain.entities import Vehicle, VehicleStatus
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
 from apps.vehicle.domain.value_objects import PlateNumber, SAPVehicleNumber
-from core.exceptions.base_exception import FMMSConflictError, FMMSNotFoundError
+from core.exceptions.base_exception import (
+    FMMSConflictError,
+    FMMSNotFoundError,
+    FMMSValidationError,
+)
 from core.sap.dtos.pm_order import CreatePMOrderRequest, SAPPMOrderDTO
 from core.sap.ports.pm_order_port import ISAPPMOrderPort
 from infrastructure.sap.transaction.sap_transaction_manager import SAPTransactionManager
@@ -354,6 +379,75 @@ class FakeFaultRepository(IFaultRepository):
 
     def delete(self, fault_id: uuid.UUID) -> None:
         self._store.pop(fault_id, None)
+
+
+class FakeExternalWorkshopRepository(IExternalWorkshopRepository):
+    def __init__(self) -> None:
+        self.assignments: dict[uuid.UUID, ExternalWorkshopAssignment] = {}
+        self.deliveries: dict[uuid.UUID, ExternalWorkshopDelivery] = {}
+        self.pickups: dict[uuid.UUID, ExternalWorkshopPickup] = {}
+        self.reviews: dict[uuid.UUID, ExternalRepairReview] = {}
+
+    def get_assignment_by_id(
+        self, assignment_id: uuid.UUID
+    ) -> ExternalWorkshopAssignment:
+        return self.assignments[assignment_id]
+
+    def get_active_assignment_by_repair_order(
+        self, repair_order_id: uuid.UUID
+    ) -> ExternalWorkshopAssignment | None:
+        return next(
+            (
+                item
+                for item in self.assignments.values()
+                if item.repair_order_id == repair_order_id
+                and item.status == ExternalWorkshopAssignmentStatus.ACTIVE
+            ),
+            None,
+        )
+
+    def list_assignments(
+        self, status: ExternalWorkshopAssignmentStatus | None = None
+    ) -> list[ExternalWorkshopAssignment]:
+        items = list(self.assignments.values())
+        if status is not None:
+            items = [item for item in items if item.status == status]
+        return items
+
+    def save_assignment(
+        self, assignment: ExternalWorkshopAssignment
+    ) -> ExternalWorkshopAssignment:
+        self.assignments[assignment.id] = assignment
+        return assignment
+
+    def get_delivery_by_assignment(
+        self, assignment_id: uuid.UUID
+    ) -> ExternalWorkshopDelivery | None:
+        return self.deliveries.get(assignment_id)
+
+    def save_delivery(
+        self, delivery: ExternalWorkshopDelivery
+    ) -> ExternalWorkshopDelivery:
+        self.deliveries[delivery.assignment_id] = delivery
+        return delivery
+
+    def get_pickup_by_assignment(
+        self, assignment_id: uuid.UUID
+    ) -> ExternalWorkshopPickup | None:
+        return self.pickups.get(assignment_id)
+
+    def save_pickup(self, pickup: ExternalWorkshopPickup) -> ExternalWorkshopPickup:
+        self.pickups[pickup.assignment_id] = pickup
+        return pickup
+
+    def get_review_by_assignment(
+        self, assignment_id: uuid.UUID
+    ) -> ExternalRepairReview | None:
+        return self.reviews.get(assignment_id)
+
+    def save_review(self, review: ExternalRepairReview) -> ExternalRepairReview:
+        self.reviews[review.assignment_id] = review
+        return review
 
 
 class FakeSAPPMOrderPort(ISAPPMOrderPort):
@@ -871,3 +965,174 @@ class TestListRepairOrdersService:
 
         assert len(results) == 1
         assert results[0].status == RepairOrderStatus.ASSIGNED
+
+
+class TestExternalWorkshopWorkflowServices:
+    pytestmark = pytest.mark.django_db
+
+    def test_delivery_starts_external_repair_and_pickup_activates_vehicle(self) -> None:
+        vehicle = _make_vehicle()
+        fault = _make_fault(vehicle.id)
+        order = _make_order(vehicle_id=vehicle.id, fault_id=fault.id)
+        order.approve()
+        repair_repo = FakeRepairRepository([order])
+        vehicle_repo = FakeVehicleRepository([vehicle])
+        external_repo = FakeExternalWorkshopRepository()
+
+        assignment = AssignExternalWorkshopService(
+            external_repo, repair_repo
+        ).execute(
+            AssignExternalWorkshopDTO(
+                repair_order_id=order.id,
+                workshop_name="External A",
+                workshop_address="Address A",
+                assignment_date=datetime.now(tz=UTC),
+                repair_reason="Alternator replacement",
+                description="",
+                request_id="req",
+                assigned_by=uuid.uuid4(),
+            )
+        )
+
+        ConfirmExternalWorkshopDeliveryService(
+            external_repo, repair_repo, vehicle_repo
+        ).execute(
+            ConfirmExternalWorkshopDeliveryDTO(
+                assignment_id=assignment.id,
+                delivery_datetime=datetime.now(tz=UTC),
+                workshop_name="External A",
+                workshop_address="Address A",
+                workshop_phone="021",
+                vehicle_odometer=1200,
+                notes="",
+                request_id="req",
+                delivered_by=uuid.uuid4(),
+            )
+        )
+
+        assert repair_repo.get_by_id(order.id).status == (
+            RepairOrderStatus.EXTERNAL_REPAIR_IN_PROGRESS
+        )
+        assert vehicle_repo.get_by_id(vehicle.id).status == (
+            VehicleStatus.UNDER_EXTERNAL_REPAIR
+        )
+
+        ConfirmExternalWorkshopPickupService(
+            external_repo, repair_repo, vehicle_repo
+        ).execute(
+            ConfirmExternalWorkshopPickupDTO(
+                assignment_id=assignment.id,
+                pickup_datetime=datetime.now(tz=UTC),
+                vehicle_odometer=1300,
+                notes="",
+                request_id="req",
+                picked_up_by=uuid.uuid4(),
+            )
+        )
+
+        assert repair_repo.get_by_id(order.id).status == (
+            RepairOrderStatus.WAITING_EXTERNAL_ADMIN_REVIEW
+        )
+        assert vehicle_repo.get_by_id(vehicle.id).status == VehicleStatus.ACTIVE
+
+    def test_close_requires_completed_mandatory_review_fields(self) -> None:
+        vehicle = _make_vehicle()
+        fault = _make_fault(vehicle.id)
+        order = _make_order(vehicle_id=vehicle.id, fault_id=fault.id)
+        order.approve()
+        repair_repo = FakeRepairRepository([order])
+        vehicle_repo = FakeVehicleRepository([vehicle])
+        fault_repo = FakeFaultRepository([fault])
+        external_repo = FakeExternalWorkshopRepository()
+        actor = uuid.uuid4()
+
+        assignment = AssignExternalWorkshopService(
+            external_repo, repair_repo
+        ).execute(
+            AssignExternalWorkshopDTO(
+                repair_order_id=order.id,
+                workshop_name="External A",
+                workshop_address="Address A",
+                assignment_date=datetime.now(tz=UTC),
+                repair_reason="Alternator replacement",
+                description="",
+                request_id="req",
+                assigned_by=actor,
+            )
+        )
+        ConfirmExternalWorkshopDeliveryService(
+            external_repo, repair_repo, vehicle_repo
+        ).execute(
+            ConfirmExternalWorkshopDeliveryDTO(
+                assignment_id=assignment.id,
+                delivery_datetime=datetime.now(tz=UTC),
+                workshop_name="External A",
+                workshop_address="Address A",
+                workshop_phone="021",
+                vehicle_odometer=1200,
+                notes="",
+                request_id="req",
+                delivered_by=actor,
+            )
+        )
+        ConfirmExternalWorkshopPickupService(
+            external_repo, repair_repo, vehicle_repo
+        ).execute(
+            ConfirmExternalWorkshopPickupDTO(
+                assignment_id=assignment.id,
+                pickup_datetime=datetime.now(tz=UTC),
+                vehicle_odometer=1300,
+                notes="",
+                request_id="req",
+                picked_up_by=actor,
+            )
+        )
+
+        ReviewExternalRepairService(external_repo, repair_repo).execute(
+            ReviewExternalRepairDTO(
+                assignment_id=assignment.id,
+                invoice_attachment=None,
+                repair_services=[],
+                replaced_parts=[],
+                repair_cost=None,
+                additional_notes="draft",
+                request_id="req",
+                reviewed_by=actor,
+            )
+        )
+        with pytest.raises(FMMSValidationError):
+            CloseExternalRepairService(
+                external_repo, repair_repo, fault_repo
+            ).execute(
+                CloseExternalRepairDTO(
+                    assignment_id=assignment.id,
+                    request_id="req",
+                    closed_by=actor,
+                )
+            )
+
+        ReviewExternalRepairService(external_repo, repair_repo).execute(
+            ReviewExternalRepairDTO(
+                assignment_id=assignment.id,
+                invoice_attachment="invoice.pdf",
+                repair_services=[{"description": "Replaced alternator", "labor_hours": "2"}],
+                replaced_parts=[{"material_number": "ALT-1", "quantity": "1"}],
+                repair_cost=Decimal("1000"),
+                additional_notes="",
+                request_id="req",
+                reviewed_by=actor,
+            )
+        )
+        result = CloseExternalRepairService(
+            external_repo, repair_repo, fault_repo
+        ).execute(
+            CloseExternalRepairDTO(
+                assignment_id=assignment.id,
+                request_id="req",
+                closed_by=actor,
+            )
+        )
+
+        assert result.status == ExternalWorkshopAssignmentStatus.COMPLETED
+        assert repair_repo.get_by_id(order.id).status == RepairOrderStatus.COMPLETED
+        assert vehicle_repo.get_by_id(vehicle.id).status == VehicleStatus.ACTIVE

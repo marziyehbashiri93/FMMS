@@ -18,6 +18,11 @@ from apps.repair.domain.entities import (
     RepairOrderStatus,
     WorkshopType,
 )
+from apps.repair.domain.external_workshop_entities import (
+    ExternalRepairReviewStatus,
+    ExternalWorkshopAssignmentCancellationReason,
+    ExternalWorkshopAssignmentStatus,
+)
 from apps.repair.domain.invoice_entities import ExternalRepairInvoiceStatus
 
 
@@ -421,3 +426,161 @@ class ExternalWorkshopReferralResponseDTO:
     rejected_by_id: uuid.UUID | None = field(default=None)
     rejected_at: datetime | None = field(default=None)
     rejection_reason: str | None = field(default=None)
+
+
+@dataclass(frozen=True)
+class AssignExternalWorkshopDTO:
+    """Input for assigning a repair order to an external workshop."""
+
+    repair_order_id: uuid.UUID
+    workshop_name: str
+    workshop_address: str
+    assignment_date: datetime
+    repair_reason: str
+    description: str
+    request_id: str
+    assigned_by: uuid.UUID
+    workshop_id: str | None = field(default=None)
+
+
+@dataclass(frozen=True)
+class ConfirmExternalWorkshopDeliveryDTO:
+    """Input for driver delivery confirmation."""
+
+    assignment_id: uuid.UUID
+    delivery_datetime: datetime
+    workshop_name: str
+    workshop_address: str
+    workshop_phone: str
+    vehicle_odometer: int
+    notes: str
+    request_id: str
+    delivered_by: uuid.UUID
+
+
+@dataclass(frozen=True)
+class ConfirmExternalWorkshopPickupDTO:
+    """Input for driver pickup confirmation."""
+
+    assignment_id: uuid.UUID
+    pickup_datetime: datetime
+    vehicle_odometer: int
+    notes: str
+    request_id: str
+    picked_up_by: uuid.UUID
+
+
+@dataclass(frozen=True)
+class ReviewExternalRepairDTO:
+    """Input for draft/completed transportation review save."""
+
+    assignment_id: uuid.UUID
+    invoice_attachment: str | None
+    repair_services: list[dict[str, object]]
+    replaced_parts: list[dict[str, object]]
+    repair_cost: Decimal | None
+    additional_notes: str
+    request_id: str
+    reviewed_by: uuid.UUID
+
+
+@dataclass(frozen=True)
+class CloseExternalRepairDTO:
+    """Input for closing the external repair workflow."""
+
+    assignment_id: uuid.UUID
+    request_id: str
+    closed_by: uuid.UUID
+
+
+@dataclass(frozen=True)
+class CancelExternalWorkshopAssignmentDTO:
+    """Input for cancelling an external workshop assignment."""
+
+    assignment_id: uuid.UUID
+    reason: ExternalWorkshopAssignmentCancellationReason
+    request_id: str
+    cancelled_by: uuid.UUID
+    note: str | None = field(default=None)
+
+
+@dataclass(frozen=True)
+class ExternalWorkshopDeliveryResponseDTO:
+    """Output for delivery confirmation."""
+
+    id: uuid.UUID
+    assignment_id: uuid.UUID
+    repair_order_id: uuid.UUID
+    vehicle_id: uuid.UUID
+    delivery_datetime: datetime
+    workshop_name: str
+    workshop_address: str
+    workshop_phone: str
+    vehicle_odometer: int
+    notes: str
+    delivered_by_id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass(frozen=True)
+class ExternalWorkshopPickupResponseDTO:
+    """Output for pickup confirmation."""
+
+    id: uuid.UUID
+    assignment_id: uuid.UUID
+    repair_order_id: uuid.UUID
+    vehicle_id: uuid.UUID
+    pickup_datetime: datetime
+    vehicle_odometer: int
+    notes: str
+    picked_up_by_id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass(frozen=True)
+class ExternalRepairReviewResponseDTO:
+    """Output for transportation administrative review."""
+
+    id: uuid.UUID
+    assignment_id: uuid.UUID
+    repair_order_id: uuid.UUID
+    invoice_attachment: str | None
+    repair_services: list[dict[str, object]]
+    replaced_parts: list[dict[str, object]]
+    repair_cost: Decimal | None
+    additional_notes: str
+    sap_purchase_order_number: str | None
+    sap_invoice_document_number: str | None
+    status: ExternalRepairReviewStatus
+    reviewed_by_id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass(frozen=True)
+class ExternalWorkshopAssignmentResponseDTO:
+    """Output for external workshop assignment detail and queues."""
+
+    id: uuid.UUID
+    repair_order_id: uuid.UUID
+    vehicle_id: uuid.UUID
+    fault_id: uuid.UUID
+    workshop_id: str | None
+    workshop_name: str
+    workshop_address: str
+    assignment_date: datetime
+    repair_reason: str
+    description: str
+    status: ExternalWorkshopAssignmentStatus
+    assigned_by_id: uuid.UUID
+    cancellation_reason: ExternalWorkshopAssignmentCancellationReason | None
+    cancellation_note: str | None
+    cancelled_by_id: uuid.UUID | None
+    cancelled_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+    delivery: ExternalWorkshopDeliveryResponseDTO | None = field(default=None)
+    pickup: ExternalWorkshopPickupResponseDTO | None = field(default=None)
+    review: ExternalRepairReviewResponseDTO | None = field(default=None)

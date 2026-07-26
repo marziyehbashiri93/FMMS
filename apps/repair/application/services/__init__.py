@@ -20,6 +20,16 @@ from apps.repair.application.services.assign_repair_order_service import (
 from apps.repair.application.services.create_repair_order_service import (
     CreateRepairOrderService,
 )
+from apps.repair.application.services.external_workshop_service import (
+    AssignExternalWorkshopService,
+    CancelExternalWorkshopAssignmentService,
+    CloseExternalRepairService,
+    ConfirmExternalWorkshopDeliveryService,
+    ConfirmExternalWorkshopPickupService,
+    GetExternalWorkshopAssignmentService,
+    ListExternalWorkshopAssignmentsService,
+    ReviewExternalRepairService,
+)
 from apps.repair.application.services.get_repair_order_service import (
     GetRepairOrderService,
     ListRepairOrdersService,
@@ -52,4 +62,12 @@ __all__ = [
     "SyncRepairToSAPService",
     "GetRepairOrderService",
     "ListRepairOrdersService",
+    "AssignExternalWorkshopService",
+    "CancelExternalWorkshopAssignmentService",
+    "CloseExternalRepairService",
+    "ConfirmExternalWorkshopDeliveryService",
+    "ConfirmExternalWorkshopPickupService",
+    "GetExternalWorkshopAssignmentService",
+    "ListExternalWorkshopAssignmentsService",
+    "ReviewExternalRepairService",
 ]

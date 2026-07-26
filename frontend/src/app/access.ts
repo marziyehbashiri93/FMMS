@@ -2,7 +2,12 @@ import type { AuthUser } from '../types/fmms';
 import { isNavGroup, navSections, type NavEntry, type NavGroup } from './modules';
 
 /** Module keys a DRIVER role may access in the shell navigation. */
-const DRIVER_MODULE_KEYS = new Set(['dashboard', 'inspections', 'handover']);
+const DRIVER_MODULE_KEYS = new Set([
+  'dashboard',
+  'inspections',
+  'handover',
+  'driverExternalWorkshop',
+]);
 
 /** Central workshop supervisor / technician inbox. */
 const WORKSHOP_MODULE_KEYS = new Set(['dashboard', 'workshop']);
@@ -20,6 +25,7 @@ const TRANSPORT_MODULE_KEYS = new Set([
   'dashboard',
   'repairs',
   'transportParts',
+  'transportExternalWorkshop',
   'vehicles',
   'drivers',
 ]);
@@ -49,6 +55,8 @@ export const PATH_MODULE_KEYS: Record<string, string> = {
   '/faults/new': 'manualFault',
   '/repairs': 'repairs',
   '/transport/parts': 'transportParts',
+  '/transport/external-workshop': 'transportExternalWorkshop',
+  '/driver/external-workshop': 'driverExternalWorkshop',
   '/workshop': 'workshop',
   '/handover': 'handover',
   '/sap': 'sap',

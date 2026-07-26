@@ -17,14 +17,20 @@ from apps.repair.application.dto.repair_dto import (
     AddRepairActivityDTO,
     AddRepairPartDTO,
     ApproveRepairOrderDTO,
+    AssignExternalWorkshopDTO,
     AssignRepairOrderDTO,
     AssignWorkshopDTO,
+    CancelExternalWorkshopAssignmentDTO,
+    CloseExternalRepairDTO,
     CloseRepairOrderDTO,
     CompleteRepairOrderDTO,
+    ConfirmExternalWorkshopDeliveryDTO,
+    ConfirmExternalWorkshopPickupDTO,
     CreateRepairOrderDTO,
     DeleteRepairActivityDTO,
     DeleteRepairPartDTO,
     RejectRepairOrderByTransportDTO,
+    ReviewExternalRepairDTO,
     SyncRepairToSAPDTO,
     TransportHandoverApproveDTO,
     TransportHandoverRejectDTO,
@@ -40,8 +46,13 @@ from apps.repair.domain.entities import (
     RepairOrderStatus,
     WorkshopType,
 )
+from apps.repair.domain.external_workshop_entities import (
+    ExternalWorkshopAssignmentCancellationReason,
+    ExternalWorkshopAssignmentStatus,
+)
 from core.permissions import (
     IsDistributionSupervisorOrAbove,
+    IsDriverOrTechnicianOrAbove,
     IsReadOnlyOrTechnicianOrAbove,
     IsTransportSupervisorOrAbove,
     IsWorkshopSupervisorOrAbove,
@@ -52,6 +63,12 @@ from interfaces.api.v1.repair.external_invoice_views import (
     RepairOrderExternalInvoiceMixin,
 )
 from interfaces.api.v1.repair.serializers import (
+    ExternalRepairReviewSerializer,
+    ExternalWorkshopAssignmentResponseSerializer,
+    ExternalWorkshopAssignSerializer,
+    ExternalWorkshopCancelSerializer,
+    ExternalWorkshopDeliverySerializer,
+    ExternalWorkshopPickupSerializer,
     ExternalWorkshopReferralResponseSerializer,
     InternalRepairCostRegisterSerializer,
     InternalRepairCostResponseSerializer,
@@ -72,6 +89,28 @@ from interfaces.api.v1.repair.serializers import (
 )
 from interfaces.api.v1.schema_tags import API_TAGS
 from interfaces.api.v1.utils import paginate_dto_list, request_id_from, user_id_from
+
+
+def _json_safe_parts(items: list[dict]) -> list[dict]:
+    """Convert serializer values to JSON-safe primitive dicts."""
+    result: list[dict] = []
+    for item in items:
+        next_item = dict(item)
+        if "quantity" in next_item and next_item["quantity"] is not None:
+            next_item["quantity"] = str(next_item["quantity"])
+        result.append(next_item)
+    return result
+
+
+def _json_safe_services(items: list[dict]) -> list[dict]:
+    """Convert external service rows to JSON-safe primitive dicts."""
+    result: list[dict] = []
+    for item in items:
+        next_item = dict(item)
+        if "labor_hours" in next_item and next_item["labor_hours"] is not None:
+            next_item["labor_hours"] = str(next_item["labor_hours"])
+        result.append(next_item)
+    return result
 
 
 class RepairOrderViewSet(
@@ -213,6 +252,33 @@ class RepairOrderViewSet(
             )
         )
         return Response(RepairDecisionResponseSerializer(result).data)
+
+    @extend_schema(
+        tags=[API_TAGS.repair],
+        request=ExternalWorkshopAssignSerializer,
+        responses=ExternalWorkshopAssignmentResponseSerializer,
+    )
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="assign-external-workshop",
+        permission_classes=[IsTransportSupervisorOrAbove],
+    )
+    def assign_external_workshop(
+        self, request: Request, pk: str | None = None
+    ) -> Response:
+        """Transportation assigns an external workshop."""
+        serializer = ExternalWorkshopAssignSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        result = deps.get_assign_external_workshop_service().execute(
+            AssignExternalWorkshopDTO(
+                repair_order_id=uuid.UUID(str(pk)),
+                request_id=request_id_from(request),
+                assigned_by=user_id_from(request),
+                **serializer.validated_data,
+            )
+        )
+        return Response(ExternalWorkshopAssignmentResponseSerializer(result).data)
 
     @extend_schema(
         tags=[API_TAGS.repair],
@@ -608,3 +674,176 @@ class ExternalWorkshopReferralViewSet(GenericViewSet):
         if page is not None:
             return self.get_paginated_response(serializer.data)
         return Response(serializer.data)
+
+
+class ExternalWorkshopAssignmentViewSet(GenericViewSet):
+    """Expose external workshop assignment workflow endpoints."""
+
+    permission_classes = [IsReadOnlyOrTechnicianOrAbove]
+
+    @extend_schema(
+        tags=[API_TAGS.repair],
+        responses=ExternalWorkshopAssignmentResponseSerializer(many=True),
+    )
+    def list(self, request: Request) -> Response:
+        """List external workshop assignments."""
+        status_raw = request.query_params.get("status")
+        assignment_status = (
+            ExternalWorkshopAssignmentStatus(status_raw) if status_raw else None
+        )
+        items = deps.get_list_external_workshop_assignments_service().execute(
+            assignment_status
+        )
+        page = paginate_dto_list(self, items)
+        serializer = ExternalWorkshopAssignmentResponseSerializer(
+            page if page is not None else items, many=True
+        )
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response(serializer.data)
+
+    @extend_schema(
+        tags=[API_TAGS.repair],
+        responses=ExternalWorkshopAssignmentResponseSerializer,
+    )
+    def retrieve(self, request: Request, pk: str | None = None) -> Response:
+        """Driver/transport can read full assignment detail."""
+        result = deps.get_get_external_workshop_assignment_service().execute(
+            uuid.UUID(str(pk))
+        )
+        return Response(ExternalWorkshopAssignmentResponseSerializer(result).data)
+
+    @extend_schema(
+        tags=[API_TAGS.repair],
+        request=ExternalWorkshopDeliverySerializer,
+        responses=ExternalWorkshopAssignmentResponseSerializer,
+    )
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="confirm-delivery",
+        permission_classes=[IsDriverOrTechnicianOrAbove],
+    )
+    def confirm_delivery(self, request: Request, pk: str | None = None) -> Response:
+        """Driver confirms delivery to external workshop."""
+        serializer = ExternalWorkshopDeliverySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        result = deps.get_confirm_external_workshop_delivery_service().execute(
+            ConfirmExternalWorkshopDeliveryDTO(
+                assignment_id=uuid.UUID(str(pk)),
+                request_id=request_id_from(request),
+                delivered_by=user_id_from(request),
+                **serializer.validated_data,
+            )
+        )
+        return Response(ExternalWorkshopAssignmentResponseSerializer(result).data)
+
+    @extend_schema(
+        tags=[API_TAGS.repair],
+        request=ExternalWorkshopPickupSerializer,
+        responses=ExternalWorkshopAssignmentResponseSerializer,
+    )
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="confirm-pickup",
+        permission_classes=[IsDriverOrTechnicianOrAbove],
+    )
+    def confirm_pickup(self, request: Request, pk: str | None = None) -> Response:
+        """Driver confirms pickup from external workshop."""
+        serializer = ExternalWorkshopPickupSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        result = deps.get_confirm_external_workshop_pickup_service().execute(
+            ConfirmExternalWorkshopPickupDTO(
+                assignment_id=uuid.UUID(str(pk)),
+                request_id=request_id_from(request),
+                picked_up_by=user_id_from(request),
+                **serializer.validated_data,
+            )
+        )
+        return Response(ExternalWorkshopAssignmentResponseSerializer(result).data)
+
+    @extend_schema(
+        tags=[API_TAGS.repair],
+        request=ExternalRepairReviewSerializer,
+        responses=ExternalWorkshopAssignmentResponseSerializer,
+    )
+    @action(
+        detail=True,
+        methods=["post", "patch"],
+        url_path="review",
+        permission_classes=[IsTransportSupervisorOrAbove],
+    )
+    def review(self, request: Request, pk: str | None = None) -> Response:
+        """Transportation saves external repair review draft."""
+        serializer = ExternalRepairReviewSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        result = deps.get_review_external_repair_service().execute(
+            ReviewExternalRepairDTO(
+                assignment_id=uuid.UUID(str(pk)),
+                request_id=request_id_from(request),
+                reviewed_by=user_id_from(request),
+                invoice_attachment=serializer.validated_data.get(
+                    "invoice_attachment"
+                ),
+                repair_services=_json_safe_services(
+                    serializer.validated_data.get("repair_services", [])
+                ),
+                replaced_parts=_json_safe_parts(
+                    serializer.validated_data.get("replaced_parts", [])
+                ),
+                repair_cost=serializer.validated_data.get("repair_cost"),
+                additional_notes=serializer.validated_data.get("additional_notes", ""),
+            )
+        )
+        return Response(ExternalWorkshopAssignmentResponseSerializer(result).data)
+
+    @extend_schema(
+        tags=[API_TAGS.repair],
+        request=None,
+        responses=ExternalWorkshopAssignmentResponseSerializer,
+    )
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="close",
+        permission_classes=[IsTransportSupervisorOrAbove],
+    )
+    def close(self, request: Request, pk: str | None = None) -> Response:
+        """Transportation closes completed external repair workflow."""
+        result = deps.get_close_external_repair_service().execute(
+            CloseExternalRepairDTO(
+                assignment_id=uuid.UUID(str(pk)),
+                request_id=request_id_from(request),
+                closed_by=user_id_from(request),
+            )
+        )
+        return Response(ExternalWorkshopAssignmentResponseSerializer(result).data)
+
+    @extend_schema(
+        tags=[API_TAGS.repair],
+        request=ExternalWorkshopCancelSerializer,
+        responses=ExternalWorkshopAssignmentResponseSerializer,
+    )
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="cancel",
+        permission_classes=[IsTransportSupervisorOrAbove],
+    )
+    def cancel(self, request: Request, pk: str | None = None) -> Response:
+        """Cancel external workshop assignment before delivery."""
+        serializer = ExternalWorkshopCancelSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        result = deps.get_cancel_external_workshop_assignment_service().execute(
+            CancelExternalWorkshopAssignmentDTO(
+                assignment_id=uuid.UUID(str(pk)),
+                reason=ExternalWorkshopAssignmentCancellationReason(
+                    serializer.validated_data["reason"]
+                ),
+                note=serializer.validated_data.get("note") or None,
+                request_id=request_id_from(request),
+                cancelled_by=user_id_from(request),
+            )
+        )
+        return Response(ExternalWorkshopAssignmentResponseSerializer(result).data)

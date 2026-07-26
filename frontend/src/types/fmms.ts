@@ -43,6 +43,7 @@ export type VehicleStatus =
   | 'ACTIVE'
   | 'INACTIVE'
   | 'UNDER_REPAIR'
+  | 'UNDER_EXTERNAL_REPAIR'
   | 'WAITING_DRIVER_CONFIRMATION'
   | 'EXITED_CENTER'
   | 'SUSPENDED'
@@ -247,6 +248,76 @@ export interface VehicleHandover {
   comment?: string | null;
   driver_id?: string | null;
   confirmed_at?: string | null;
+}
+
+export interface ExternalWorkshopDelivery {
+  id: string;
+  assignment_id: string;
+  repair_order_id: string;
+  vehicle_id: string;
+  delivery_datetime: string;
+  workshop_name: string;
+  workshop_address: string;
+  workshop_phone: string;
+  vehicle_odometer: number;
+  notes: string;
+  delivered_by_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ExternalWorkshopPickup {
+  id: string;
+  assignment_id: string;
+  repair_order_id: string;
+  vehicle_id: string;
+  pickup_datetime: string;
+  vehicle_odometer: number;
+  notes: string;
+  picked_up_by_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ExternalRepairReview {
+  id: string;
+  assignment_id: string;
+  repair_order_id: string;
+  invoice_attachment?: string | null;
+  repair_services: Array<Record<string, unknown>>;
+  replaced_parts: Array<Record<string, unknown>>;
+  repair_cost?: string | null;
+  additional_notes: string;
+  sap_purchase_order_number?: string | null;
+  sap_invoice_document_number?: string | null;
+  status: 'DRAFT' | 'COMPLETED' | string;
+  reviewed_by_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ExternalWorkshopAssignment {
+  id: string;
+  repair_order_id: string;
+  vehicle_id: string;
+  fault_id: string;
+  workshop_id?: string | null;
+  workshop_name: string;
+  workshop_address: string;
+  assignment_date: string;
+  repair_reason: string;
+  description: string;
+  status: 'ACTIVE' | 'CANCELLED' | 'COMPLETED' | string;
+  assigned_by_id: string;
+  cancellation_reason?: string | null;
+  cancellation_note?: string | null;
+  cancelled_by_id?: string | null;
+  cancelled_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  delivery?: ExternalWorkshopDelivery | null;
+  pickup?: ExternalWorkshopPickup | null;
+  review?: ExternalRepairReview | null;
 }
 
 export interface RepairPart {

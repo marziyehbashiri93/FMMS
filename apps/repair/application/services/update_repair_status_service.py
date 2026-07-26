@@ -34,6 +34,12 @@ from apps.repair.application.services.repair_order_timeline_service import (
     RecordRepairOrderEventService,
 )
 from apps.repair.domain.entities import RepairOrderEventType
+from apps.repair.domain.external_workshop_entities import (
+    ExternalWorkshopAssignmentCancellationReason,
+)
+from apps.repair.domain.interfaces.external_workshop_repository import (
+    IExternalWorkshopRepository,
+)
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
 from apps.vehicle.domain.entities import VehicleStatus
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
@@ -297,8 +303,15 @@ class CancelRepairOrderService:
         repair_order_repository: Concrete ``IRepairOrderRepository``.
     """
 
-    def __init__(self, repair_order_repository: IRepairOrderRepository) -> None:
+    def __init__(
+        self,
+        repair_order_repository: IRepairOrderRepository,
+        external_workshop_repository: IExternalWorkshopRepository | None = None,
+        event_recorder: RecordRepairOrderEventService | None = None,
+    ) -> None:
         self._repo = repair_order_repository
+        self._external_workshop_repo = external_workshop_repository
+        self._event_recorder = event_recorder
 
     def execute(self, dto: CloseRepairOrderDTO) -> RepairOrderResponseDTO:
         """Cancel the repair order.
@@ -331,9 +344,34 @@ class CancelRepairOrderService:
             details={"repair_order_id": str(dto.repair_order_id)},
         )
 
+        now = datetime.now(tz=UTC)
         order.cancel()
-        order.updated_at = datetime.now(tz=UTC)
+        order.updated_at = now
         saved = self._repo.save(order)
+        if self._external_workshop_repo is not None:
+            assignment = (
+                self._external_workshop_repo.get_active_assignment_by_repair_order(
+                    saved.id
+                )
+            )
+            if assignment is not None:
+                assignment.cancel(
+                    reason=(
+                        ExternalWorkshopAssignmentCancellationReason.REPAIR_ORDER_CANCELLED
+                    ),
+                    cancelled_by_id=dto.requested_by,
+                    cancelled_at=now,
+                    note="Repair order cancelled.",
+                )
+                self._external_workshop_repo.save_assignment(assignment)
+                record_repair_timeline_event(
+                    self._event_recorder,
+                    saved.id,
+                    RepairOrderEventType.EXTERNAL_WORKSHOP_ASSIGNMENT_CANCELLED,
+                    "External workshop assignment cancelled. Reason: Repair Order Cancelled.",
+                    created_by_id=dto.requested_by,
+                    request_id=dto.request_id,
+                )
 
         logger.info(
             "Repair order cancelled",

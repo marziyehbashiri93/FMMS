@@ -41,6 +41,10 @@ class RepairOrderStatus(StrEnum):
     APPROVED = "APPROVED"
     WORKSHOP_ASSIGNED = "WORKSHOP_ASSIGNED"
     WAITING_EXTERNAL_REFERRAL_APPROVAL = "WAITING_EXTERNAL_REFERRAL_APPROVAL"
+    WAITING_EXTERNAL_DELIVERY = "WAITING_EXTERNAL_DELIVERY"
+    EXTERNAL_REPAIR_IN_PROGRESS = "EXTERNAL_REPAIR_IN_PROGRESS"
+    WAITING_EXTERNAL_PICKUP = "WAITING_EXTERNAL_PICKUP"
+    WAITING_EXTERNAL_ADMIN_REVIEW = "WAITING_EXTERNAL_ADMIN_REVIEW"
     WAITING_WORKSHOP_CONFIRMATION = "WAITING_WORKSHOP_CONFIRMATION"
     WAITING_PARTS = "WAITING_PARTS"
     ASSIGNED = "ASSIGNED"
@@ -79,11 +83,41 @@ _ALLOWED_TRANSITIONS: dict[RepairOrderStatus, frozenset[RepairOrderStatus]] = {
         {
             RepairOrderStatus.WORKSHOP_ASSIGNED,
             RepairOrderStatus.WAITING_EXTERNAL_REFERRAL_APPROVAL,
+            RepairOrderStatus.WAITING_EXTERNAL_DELIVERY,
             RepairOrderStatus.CANCELLED,
         }
     ),
     RepairOrderStatus.WAITING_EXTERNAL_REFERRAL_APPROVAL: frozenset(
-        {RepairOrderStatus.WAITING_DRIVER_CONFIRMATION, RepairOrderStatus.CANCELLED}
+        {
+            RepairOrderStatus.WAITING_DRIVER_CONFIRMATION,
+            RepairOrderStatus.WAITING_EXTERNAL_DELIVERY,
+            RepairOrderStatus.CANCELLED,
+        }
+    ),
+    RepairOrderStatus.WAITING_EXTERNAL_DELIVERY: frozenset(
+        {
+            RepairOrderStatus.EXTERNAL_REPAIR_IN_PROGRESS,
+            RepairOrderStatus.WAITING_EXTERNAL_DELIVERY,
+            RepairOrderStatus.CANCELLED,
+        }
+    ),
+    RepairOrderStatus.EXTERNAL_REPAIR_IN_PROGRESS: frozenset(
+        {
+            RepairOrderStatus.WAITING_EXTERNAL_PICKUP,
+            RepairOrderStatus.CANCELLED,
+        }
+    ),
+    RepairOrderStatus.WAITING_EXTERNAL_PICKUP: frozenset(
+        {
+            RepairOrderStatus.WAITING_EXTERNAL_ADMIN_REVIEW,
+            RepairOrderStatus.CANCELLED,
+        }
+    ),
+    RepairOrderStatus.WAITING_EXTERNAL_ADMIN_REVIEW: frozenset(
+        {
+            RepairOrderStatus.COMPLETED,
+            RepairOrderStatus.CANCELLED,
+        }
     ),
     RepairOrderStatus.WORKSHOP_ASSIGNED: frozenset(
         {
@@ -144,6 +178,10 @@ _MUTABLE_STATUSES: frozenset[RepairOrderStatus] = frozenset(
         RepairOrderStatus.APPROVED,
         RepairOrderStatus.WORKSHOP_ASSIGNED,
         RepairOrderStatus.WAITING_EXTERNAL_REFERRAL_APPROVAL,
+        RepairOrderStatus.WAITING_EXTERNAL_DELIVERY,
+        RepairOrderStatus.EXTERNAL_REPAIR_IN_PROGRESS,
+        RepairOrderStatus.WAITING_EXTERNAL_PICKUP,
+        RepairOrderStatus.WAITING_EXTERNAL_ADMIN_REVIEW,
         RepairOrderStatus.WAITING_WORKSHOP_CONFIRMATION,
         RepairOrderStatus.WAITING_PARTS,
         RepairOrderStatus.ASSIGNED,
@@ -347,6 +385,59 @@ class RepairOrder:
             self.transition_to(RepairOrderStatus.WAITING_EXTERNAL_REFERRAL_APPROVAL)
             return
         self.transition_to(RepairOrderStatus.WORKSHOP_ASSIGNED)
+
+    def assign_external_workshop(self, workshop_id: str | None = None) -> None:
+        """Assign an external workshop and wait for driver delivery."""
+        if self.status not in {
+            RepairOrderStatus.APPROVED,
+            RepairOrderStatus.WAITING_EXTERNAL_DELIVERY,
+        }:
+            raise RepairOrderInvalidStateTransitionError(
+                current_status=self.status.value,
+                target_status=RepairOrderStatus.WAITING_EXTERNAL_DELIVERY.value,
+            )
+        self.workshop_type = WorkshopType.EXTERNAL
+        self.workshop_id = workshop_id
+        self.transition_to(RepairOrderStatus.WAITING_EXTERNAL_DELIVERY)
+
+    def confirm_external_delivery(self) -> None:
+        """Move external repair to in-progress immediately after delivery."""
+        if self.workshop_type != WorkshopType.EXTERNAL:
+            raise RepairOrderInvalidStateTransitionError(
+                current_status=self.status.value,
+                target_status=RepairOrderStatus.EXTERNAL_REPAIR_IN_PROGRESS.value,
+            )
+        self.transition_to(RepairOrderStatus.EXTERNAL_REPAIR_IN_PROGRESS)
+
+    def wait_for_external_pickup(self) -> None:
+        """Mark external repair ready for driver pickup."""
+        if self.workshop_type != WorkshopType.EXTERNAL:
+            raise RepairOrderInvalidStateTransitionError(
+                current_status=self.status.value,
+                target_status=RepairOrderStatus.WAITING_EXTERNAL_PICKUP.value,
+            )
+        self.transition_to(RepairOrderStatus.WAITING_EXTERNAL_PICKUP)
+
+    def confirm_external_pickup(self) -> None:
+        """Move external repair to transport administrative review."""
+        if self.workshop_type != WorkshopType.EXTERNAL:
+            raise RepairOrderInvalidStateTransitionError(
+                current_status=self.status.value,
+                target_status=RepairOrderStatus.WAITING_EXTERNAL_ADMIN_REVIEW.value,
+            )
+        if self.status == RepairOrderStatus.EXTERNAL_REPAIR_IN_PROGRESS:
+            self.wait_for_external_pickup()
+        self.transition_to(RepairOrderStatus.WAITING_EXTERNAL_ADMIN_REVIEW)
+
+    def close_external_repair(self, completed_at: datetime) -> None:
+        """Close an externally repaired order after administrative review."""
+        if self.workshop_type != WorkshopType.EXTERNAL:
+            raise RepairOrderInvalidStateTransitionError(
+                current_status=self.status.value,
+                target_status=RepairOrderStatus.COMPLETED.value,
+            )
+        self.transition_to(RepairOrderStatus.COMPLETED)
+        self.completed_at = completed_at
 
     def accept_internal_workshop(self) -> None:
         """Accept an internally assigned workshop before work starts."""
@@ -585,6 +676,13 @@ class RepairOrderEventType(StrEnum):
     EXTERNAL_REFERRAL_REQUESTED = "EXTERNAL_REFERRAL_REQUESTED"
     EXTERNAL_REFERRAL_APPROVED = "EXTERNAL_REFERRAL_APPROVED"
     EXTERNAL_REFERRAL_REJECTED = "EXTERNAL_REFERRAL_REJECTED"
+    EXTERNAL_WORKSHOP_ASSIGNED = "EXTERNAL_WORKSHOP_ASSIGNED"
+    EXTERNAL_WORKSHOP_ASSIGNMENT_CANCELLED = "EXTERNAL_WORKSHOP_ASSIGNMENT_CANCELLED"
+    EXTERNAL_VEHICLE_DELIVERED = "EXTERNAL_VEHICLE_DELIVERED"
+    EXTERNAL_REPAIR_IN_PROGRESS = "EXTERNAL_REPAIR_IN_PROGRESS"
+    EXTERNAL_VEHICLE_PICKED_UP = "EXTERNAL_VEHICLE_PICKED_UP"
+    EXTERNAL_ADMIN_REVIEW_SAVED = "EXTERNAL_ADMIN_REVIEW_SAVED"
+    EXTERNAL_REPAIR_CLOSED = "EXTERNAL_REPAIR_CLOSED"
     TECHNICIAN_ACCEPTED = "TECHNICIAN_ACCEPTED"
     TECHNICIAN_REJECTED = "TECHNICIAN_REJECTED"
     REPAIR_REJECTED = "REPAIR_REJECTED"

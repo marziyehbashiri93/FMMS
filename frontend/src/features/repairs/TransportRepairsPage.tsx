@@ -76,6 +76,10 @@ const REPAIR_STATUS_LABELS: Record<string, string> = {
   APPROVED: 'ارجاع به تعمیرگاه',
   WORKSHOP_ASSIGNED: 'ارجاع‌شده به تعمیرگاه مرکزی',
   WAITING_EXTERNAL_REFERRAL_APPROVAL: 'منتظر مجوز تعمیرگاه بیرونی',
+  WAITING_EXTERNAL_DELIVERY: 'منتظر تحویل به تعمیرگاه بیرونی',
+  EXTERNAL_REPAIR_IN_PROGRESS: 'در حال تعمیر بیرونی',
+  WAITING_EXTERNAL_PICKUP: 'منتظر دریافت از تعمیرگاه بیرونی',
+  WAITING_EXTERNAL_ADMIN_REVIEW: 'منتظر تکمیل اطلاعات ترابری',
   REJECTED_BY_TRANSPORT: 'رد شده توسط ترابری',
   CANCELLED: 'لغو شده',
   IN_PROGRESS: 'در حال تعمیر',
@@ -394,24 +398,26 @@ export function TransportRepairsPage() {
   const assignWorkshop = async () => {
     const order = detail?.order ?? selected;
     if (!order) return;
-    if (workshopType === 'EXTERNAL' && !workshopId.trim()) {
-      setActionError('برای تعمیرگاه بیرونی، شناسه تعمیرگاه الزامی است.');
-      return;
-    }
     setActionLoading('workshop');
     setActionError('');
     setSuccess('');
     try {
-      await api.assignRepairWorkshop(order.id, {
-        workshop_type: workshopType,
-        workshop_id: workshopType === 'EXTERNAL' ? workshopId.trim() : undefined,
-        reason:
-          workshopType === 'EXTERNAL' ? 'درخواست ارجاع به تعمیرگاه بیرونی' : '',
-      });
+      if (workshopType === 'EXTERNAL') {
+        await api.assignExternalWorkshop(order.id, {
+          workshop_id: workshopId.trim() || undefined,
+          assignment_date: new Date().toISOString(),
+          repair_reason: 'ارجاع به تعمیرگاه بیرونی',
+          description: '',
+        });
+      } else {
+        await api.assignRepairWorkshop(order.id, {
+          workshop_type: workshopType,
+        });
+      }
       closeDetail();
       setSuccess(
         workshopType === 'EXTERNAL'
-          ? 'درخواست مجوز تعمیرگاه بیرونی ثبت شد.'
+          ? 'ارجاع به تعمیرگاه بیرونی ثبت شد و در کارتابل راننده قرار گرفت.'
           : 'سفارش به تعمیرگاه مرکزی ارجاع شد.',
       );
       await Promise.all([load(), refreshKpis()]);
@@ -710,13 +716,18 @@ export function TransportRepairsPage() {
                     <MenuItem value="EXTERNAL">تعمیرگاه بیرونی</MenuItem>
                   </RtlSelectField>
                   {workshopType === 'EXTERNAL' && (
-                    <RtlTextField
-                      fullWidth
-                      label="شناسه تعمیرگاه بیرونی"
-                      placeholder="مثلاً EXT-001"
-                      value={workshopId}
-                      onChange={(event) => setWorkshopId(event.target.value)}
-                    />
+                    <Stack spacing={1}>
+                      <RtlTextField
+                        fullWidth
+                        label="شناسه تعمیرگاه بیرونی (اختیاری)"
+                        placeholder="مثلاً EXT-001"
+                        value={workshopId}
+                        onChange={(event) => setWorkshopId(event.target.value)}
+                      />
+                      <Alert severity="info">
+                        نام، آدرس و تلفن تعمیرگاه هنگام تحویل خودرو توسط راننده ثبت می‌شود.
+                      </Alert>
+                    </Stack>
                   )}
                   <Stack direction="row" justifyContent="flex-end">
                     <Button
@@ -725,8 +736,7 @@ export function TransportRepairsPage() {
                       startIcon={<Build />}
                       loading={actionLoading === 'workshop'}
                       disabled={
-                        actionLoading !== '' ||
-                        (workshopType === 'EXTERNAL' && !workshopId.trim())
+                        actionLoading !== ''
                       }
                       onClick={() => void assignWorkshop()}
                       sx={{

@@ -215,3 +215,106 @@ class ExternalWorkshopReferralRequestModel(BaseModel):
                 name="ext_ref_status_idx",
             ),
         ]
+
+
+class ExternalWorkshopAssignmentModel(BaseModel):
+    """External workshop assignment created by Transportation."""
+
+    repair_order_id = models.UUIDField(db_index=True)
+    vehicle_id = models.UUIDField(db_index=True)
+    fault_id = models.UUIDField(db_index=True)
+    workshop_id = models.CharField(max_length=64, blank=True, default="")
+    workshop_name = models.CharField(max_length=255, blank=True, default="")
+    workshop_address = models.CharField(max_length=500, blank=True, default="")
+    assignment_date = models.DateTimeField()
+    repair_reason = models.CharField(max_length=500, blank=True, default="")
+    description = models.TextField(blank=True, default="")
+    status = models.CharField(max_length=20, db_index=True)
+    assigned_by_id = models.UUIDField()
+    cancellation_reason = models.CharField(max_length=40, blank=True, default="")
+    cancellation_note = models.CharField(max_length=500, blank=True, default="")
+    cancelled_by_id = models.UUIDField(null=True, blank=True, default=None)
+    cancelled_at = models.DateTimeField(null=True, blank=True, default=None)
+
+    class Meta:
+        app_label = "repair"
+        db_table = "external_workshop_assignment"
+        indexes = [
+            models.Index(
+                fields=["repair_order_id", "status", "is_deleted"],
+                name="ext_assign_order_status_idx",
+            ),
+            models.Index(
+                fields=["vehicle_id", "status", "is_deleted"],
+                name="ext_assign_vehicle_status_idx",
+            ),
+        ]
+
+
+class ExternalWorkshopDeliveryModel(BaseModel):
+    """Driver confirmation of delivery to an external workshop."""
+
+    assignment = models.OneToOneField(
+        ExternalWorkshopAssignmentModel,
+        on_delete=models.CASCADE,
+        related_name="delivery",
+    )
+    repair_order_id = models.UUIDField(db_index=True)
+    vehicle_id = models.UUIDField(db_index=True)
+    delivery_datetime = models.DateTimeField()
+    workshop_name = models.CharField(max_length=255)
+    workshop_address = models.CharField(max_length=500)
+    workshop_phone = models.CharField(max_length=40)
+    vehicle_odometer = models.PositiveIntegerField()
+    notes = models.TextField(blank=True, default="")
+    delivered_by_id = models.UUIDField()
+
+    class Meta:
+        app_label = "repair"
+        db_table = "external_workshop_delivery"
+
+
+class ExternalWorkshopPickupModel(BaseModel):
+    """Driver confirmation of pickup from an external workshop."""
+
+    assignment = models.OneToOneField(
+        ExternalWorkshopAssignmentModel,
+        on_delete=models.CASCADE,
+        related_name="pickup",
+    )
+    repair_order_id = models.UUIDField(db_index=True)
+    vehicle_id = models.UUIDField(db_index=True)
+    pickup_datetime = models.DateTimeField()
+    vehicle_odometer = models.PositiveIntegerField()
+    notes = models.TextField(blank=True, default="")
+    picked_up_by_id = models.UUIDField()
+
+    class Meta:
+        app_label = "repair"
+        db_table = "external_workshop_pickup"
+
+
+class ExternalRepairReviewModel(BaseModel):
+    """Transportation administrative review after external repair pickup."""
+
+    assignment = models.OneToOneField(
+        ExternalWorkshopAssignmentModel,
+        on_delete=models.CASCADE,
+        related_name="repair_review",
+    )
+    repair_order_id = models.UUIDField(db_index=True)
+    invoice_attachment = models.CharField(max_length=500, blank=True, default="")
+    repair_services = models.JSONField(default=list, blank=True)
+    replaced_parts = models.JSONField(default=list, blank=True)
+    repair_cost = models.DecimalField(
+        max_digits=15, decimal_places=2, null=True, blank=True, default=None
+    )
+    additional_notes = models.TextField(blank=True, default="")
+    sap_purchase_order_number = models.CharField(max_length=64, blank=True, default="")
+    sap_invoice_document_number = models.CharField(max_length=64, blank=True, default="")
+    status = models.CharField(max_length=20, db_index=True)
+    reviewed_by_id = models.UUIDField()
+
+    class Meta:
+        app_label = "repair"
+        db_table = "external_repair_review"

@@ -7,6 +7,7 @@ const statusStyles: Record<VehicleStatus, { bg: string; softBg: string; border: 
   ACTIVE: { bg: '#248a57', softBg: 'rgba(36, 138, 87, 0.12)', border: 'rgba(36, 138, 87, 0.35)', label: 'عملیاتی' },
   INACTIVE: { bg: '#647067', softBg: 'rgba(100, 112, 103, 0.12)', border: 'rgba(100, 112, 103, 0.35)', label: 'غیرفعال' },
   UNDER_REPAIR: { bg: '#d28a20', softBg: 'rgba(210, 138, 32, 0.14)', border: 'rgba(210, 138, 32, 0.42)', label: 'در تعمیر' },
+  UNDER_EXTERNAL_REPAIR: { bg: '#9a5b14', softBg: 'rgba(154, 91, 20, 0.14)', border: 'rgba(154, 91, 20, 0.38)', label: 'در تعمیرگاه بیرونی' },
   WAITING_DRIVER_CONFIRMATION: { bg: '#2d6f95', softBg: 'rgba(45, 111, 149, 0.12)', border: 'rgba(45, 111, 149, 0.36)', label: 'منتظر تایید راننده' },
   EXITED_CENTER: { bg: '#0F6B4C', softBg: 'rgba(15, 107, 76, 0.12)', border: 'rgba(15, 107, 76, 0.36)', label: 'خارج شده از مرکز' },
   SUSPENDED: { bg: '#647067', softBg: 'rgba(100, 112, 103, 0.12)', border: 'rgba(100, 112, 103, 0.35)', label: 'تعلیق‌شده' },

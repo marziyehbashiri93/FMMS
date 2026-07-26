@@ -167,6 +167,16 @@ from apps.repair.application.services.external_invoice_service import (
     ListExternalInvoicesService,
     UploadExternalInvoiceService,
 )
+from apps.repair.application.services.external_workshop_service import (
+    AssignExternalWorkshopService,
+    CancelExternalWorkshopAssignmentService,
+    CloseExternalRepairService,
+    ConfirmExternalWorkshopDeliveryService,
+    ConfirmExternalWorkshopPickupService,
+    GetExternalWorkshopAssignmentService,
+    ListExternalWorkshopAssignmentsService,
+    ReviewExternalRepairService,
+)
 from apps.repair.application.services.get_repair_order_service import (
     GetRepairOrderService,
     ListRepairOrdersService,
@@ -195,6 +205,9 @@ from apps.repair.application.services.workshop_technical_decision_service import
 )
 from apps.repair.infrastructure.event_repositories import (
     DjangoRepairOrderEventRepository,
+)
+from apps.repair.infrastructure.external_workshop_repositories import (
+    DjangoExternalWorkshopRepository,
 )
 from apps.repair.infrastructure.internal_cost_repositories import (
     DjangoInternalRepairCostRepository,
@@ -377,6 +390,11 @@ def get_external_workshop_referral_repository() -> (
 def get_external_invoice_repository() -> DjangoExternalRepairInvoiceRepository:
     """Return external invoice repository."""
     return DjangoExternalRepairInvoiceRepository()
+
+
+def get_external_workshop_repository() -> DjangoExternalWorkshopRepository:
+    """Return external workshop workflow repository."""
+    return DjangoExternalWorkshopRepository()
 
 
 def get_pm_plan_repository() -> DjangoPMPlanRepository:
@@ -774,6 +792,84 @@ def get_list_external_workshop_referral_requests_service() -> (
     )
 
 
+def get_assign_external_workshop_service() -> AssignExternalWorkshopService:
+    """Return AssignExternalWorkshopService."""
+    return AssignExternalWorkshopService(
+        get_external_workshop_repository(),
+        get_repair_order_repository(),
+        get_record_repair_order_event_service(),
+    )
+
+
+def get_confirm_external_workshop_delivery_service() -> (
+    ConfirmExternalWorkshopDeliveryService
+):
+    """Return ConfirmExternalWorkshopDeliveryService."""
+    return ConfirmExternalWorkshopDeliveryService(
+        get_external_workshop_repository(),
+        get_repair_order_repository(),
+        get_vehicle_repository(),
+        get_record_repair_order_event_service(),
+    )
+
+
+def get_confirm_external_workshop_pickup_service() -> (
+    ConfirmExternalWorkshopPickupService
+):
+    """Return ConfirmExternalWorkshopPickupService."""
+    return ConfirmExternalWorkshopPickupService(
+        get_external_workshop_repository(),
+        get_repair_order_repository(),
+        get_vehicle_repository(),
+        get_record_repair_order_event_service(),
+    )
+
+
+def get_review_external_repair_service() -> ReviewExternalRepairService:
+    """Return ReviewExternalRepairService."""
+    return ReviewExternalRepairService(
+        get_external_workshop_repository(),
+        get_repair_order_repository(),
+        get_record_repair_order_event_service(),
+    )
+
+
+def get_close_external_repair_service() -> CloseExternalRepairService:
+    """Return CloseExternalRepairService."""
+    return CloseExternalRepairService(
+        get_external_workshop_repository(),
+        get_repair_order_repository(),
+        get_fault_repository(),
+        get_record_component_history_from_repair_service(),
+        get_record_repair_order_event_service(),
+    )
+
+
+def get_cancel_external_workshop_assignment_service() -> (
+    CancelExternalWorkshopAssignmentService
+):
+    """Return CancelExternalWorkshopAssignmentService."""
+    return CancelExternalWorkshopAssignmentService(
+        get_external_workshop_repository(),
+        get_repair_order_repository(),
+        get_record_repair_order_event_service(),
+    )
+
+
+def get_get_external_workshop_assignment_service() -> (
+    GetExternalWorkshopAssignmentService
+):
+    """Return GetExternalWorkshopAssignmentService."""
+    return GetExternalWorkshopAssignmentService(get_external_workshop_repository())
+
+
+def get_list_external_workshop_assignments_service() -> (
+    ListExternalWorkshopAssignmentsService
+):
+    """Return ListExternalWorkshopAssignmentsService."""
+    return ListExternalWorkshopAssignmentsService(get_external_workshop_repository())
+
+
 def get_workshop_technical_decision_service() -> WorkshopTechnicalDecisionService:
     """Return WorkshopTechnicalDecisionService."""
     return WorkshopTechnicalDecisionService(
@@ -958,7 +1054,11 @@ def get_complete_repair_order_service() -> CompleteRepairOrderService:
 
 def get_cancel_repair_order_service() -> CancelRepairOrderService:
     """Return CancelRepairOrderService."""
-    return CancelRepairOrderService(get_repair_order_repository())
+    return CancelRepairOrderService(
+        get_repair_order_repository(),
+        get_external_workshop_repository(),
+        get_record_repair_order_event_service(),
+    )
 
 
 def get_add_repair_activity_service() -> AddRepairActivityService:
