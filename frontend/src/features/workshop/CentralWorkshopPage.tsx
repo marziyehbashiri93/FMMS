@@ -124,7 +124,7 @@ export function CentralWorkshopPage() {
   const [vehicles, setVehicles] = useState<Map<string, Vehicle>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [status, setStatus] = useState<StatusFilter>('WORKSHOP_ASSIGNED');
+  const [status, setStatus] = useState<StatusFilter>('');
   const [selected, setSelected] = useState<RepairOrder | null>(null);
   const [detail, setDetail] = useState<DetailState | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -812,7 +812,7 @@ export function CentralWorkshopPage() {
           <MenuItem value="NO_REPAIR_NEEDED">عدم نیاز به تعمیر</MenuItem>
           <MenuItem value="">همه</MenuItem>
         </RtlSelectField>
-        <ClearFiltersButton onClick={() => setStatus('WORKSHOP_ASSIGNED')} disabled={status === 'WORKSHOP_ASSIGNED'} />
+        <ClearFiltersButton onClick={() => setStatus('')} disabled={status === ''} />
       </FilterPanel>
 
       {error && <ErrorState message={error} onRetry={() => void load()} />}

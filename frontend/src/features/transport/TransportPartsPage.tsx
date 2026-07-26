@@ -23,7 +23,7 @@ import { DetailLine } from '../../components/DetailLine';
 import { FilterPanel } from '../../components/FilterPanel';
 import { KpiCard } from '../../components/KpiCard';
 import { PageHeader } from '../../components/PageHeader';
-import { EmptyState, ErrorState } from '../../components/States';
+import { ErrorState } from '../../components/States';
 import { PlainStatusBadge } from '../../components/StatusBadge';
 import { RtlDataTable, type RtlDataTableColumn } from '../../components/RtlDataTable';
 import { RtlSelectField } from '../../components/RtlSelectField';
@@ -217,7 +217,7 @@ export function TransportPartsPage() {
   const [items, setItems] = useState<MaterialRequestRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [status, setStatus] = useState<StatusFilter>('REQUESTED');
+  const [status, setStatus] = useState<StatusFilter>('');
   const [selected, setSelected] = useState<MaterialRequestRow | null>(null);
   const [note, setNote] = useState('');
   const [itemDecisions, setItemDecisions] = useState<Record<string, ItemDecision>>({});
@@ -473,25 +473,19 @@ export function TransportPartsPage() {
           <MenuItem value="STOCK_ISSUED">ارسال‌شده</MenuItem>
           <MenuItem value="RECEIVED">دریافت‌شده</MenuItem>
         </RtlSelectField>
-        <ClearFiltersButton onClick={() => setStatus('REQUESTED')} />
+        <ClearFiltersButton onClick={() => setStatus('')} disabled={status === ''} />
       </FilterPanel>
 
       {success ? <Alert severity="success">{success}</Alert> : null}
       {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
-      {!error && !loading && items.length === 0 ? (
-        <EmptyState
-          title="درخواستی نیست"
-          subtitle="فعلاً درخواست قطعه‌ای در این وضعیت وجود ندارد."
-          icon={LocalShipping}
-        />
-      ) : null}
-      {!error && (loading || items.length > 0) ? (
+      {!error ? (
         <RtlDataTable
           columns={columns}
           rows={items}
           getRowKey={(row) => row.id}
           loading={loading}
           emptyMessage="درخواست قطعه‌ای یافت نشد"
+          emptySubtitle="فعلاً درخواست قطعه‌ای در این وضعیت وجود ندارد."
           emptyIcon={LocalShipping}
           minWidth={isMobile ? 640 : 900}
         />

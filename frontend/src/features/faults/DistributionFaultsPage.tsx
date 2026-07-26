@@ -3,8 +3,13 @@ import {
   Alert,
   Box,
   Card,
+  CardActionArea,
   CardContent,
+  Dialog,
+  DialogContent,
+  DialogTitle,
   Divider,
+  IconButton,
   InputAdornment,
   MenuItem,
   Stack,
@@ -14,6 +19,7 @@ import {
 import { useTheme } from '@mui/material/styles';
 import {
   CheckCircleOutline,
+  Close,
   DirectionsCar,
   DoNotDisturbAlt,
   FactCheck,
@@ -28,7 +34,7 @@ import { DetailLine } from '../../components/DetailLine';
 import { FilterPanel } from '../../components/FilterPanel';
 import { KpiCard } from '../../components/KpiCard';
 import { PageHeader } from '../../components/PageHeader';
-import { EmptyState, ErrorState } from '../../components/States';
+import { EmptyState, ErrorState, LoadingState } from '../../components/States';
 import { PlainStatusBadge, VehicleStatusBadge } from '../../components/StatusBadge';
 import { RtlDataTable, type RtlDataTableColumn } from '../../components/RtlDataTable';
 import { RtlSelectField } from '../../components/RtlSelectField';
@@ -36,6 +42,32 @@ import { RtlTextField } from '../../components/RtlTextField';
 import { TabbedDetailModal } from '../../components/TabbedDetailModal';
 import type { Fault, Inspection, Vehicle } from '../../types/fmms';
 import { formatDateTime, toFaNumber } from '../../utils/format';
+import {
+  checklistOverallLabel,
+  checklistOverallTone,
+  sortChecklistItems,
+} from '../inspections/checklistDisplay';
+
+const CHECKLIST_RESULT_LABELS: Record<string, string> = {
+  PASS: 'قبول',
+  FAIL: 'مردود',
+  NOT_APPLICABLE: 'نامرتبط',
+  NA: 'نامرتبط',
+};
+
+const INSPECTION_TYPE_LABELS: Record<string, string> = {
+  PRE_TRIP: 'پیش از حرکت',
+  POST_TRIP: 'پس از حرکت',
+  PERIODIC: 'دوره‌ای',
+  UNSCHEDULED: 'خارج از برنامه',
+};
+
+const INSPECTION_STATUS_LABELS: Record<string, string> = {
+  DRAFT: 'پیش‌نویس',
+  SUBMITTED: 'ثبت‌شده',
+  REVIEWED: 'بررسی‌شده',
+  APPROVED: 'تاییدشده',
+};
 
 const PAGE_SIZE = 50;
 
@@ -144,6 +176,10 @@ export function DistributionFaultsPage() {
   const [success, setSuccess] = useState('');
   const [decisionNote, setDecisionNote] = useState('');
   const [decisionLoading, setDecisionLoading] = useState<'usable' | 'unusable' | ''>('');
+  const [selectedChecklistId, setSelectedChecklistId] = useState<string | null>(null);
+  const [selectedChecklist, setSelectedChecklist] = useState<Inspection | null>(null);
+  const [checklistDetailLoading, setChecklistDetailLoading] = useState(false);
+  const [checklistDetailError, setChecklistDetailError] = useState('');
 
   const vehicleMap = useMemo(() => {
     const map = new Map<string, Vehicle>();
@@ -258,12 +294,35 @@ export function DistributionFaultsPage() {
     }
   };
 
+  const closeChecklistDetail = () => {
+    setSelectedChecklistId(null);
+    setSelectedChecklist(null);
+    setChecklistDetailError('');
+  };
+
+  const openChecklistDetail = async (inspectionId: string) => {
+    setSelectedChecklistId(inspectionId);
+    setSelectedChecklist(null);
+    setChecklistDetailError('');
+    setChecklistDetailLoading(true);
+    try {
+      setSelectedChecklist(await api.getInspection(inspectionId));
+    } catch (err) {
+      setChecklistDetailError(
+        err instanceof Error ? err.message : 'دریافت جزئیات چک‌لیست انجام نشد',
+      );
+    } finally {
+      setChecklistDetailLoading(false);
+    }
+  };
+
   const closeDetail = () => {
     setSelected(null);
     setDetail(null);
     setDetailError('');
     setActionError('');
     setDecisionNote('');
+    closeChecklistDetail();
   };
 
   const decide = async (decision: 'usable' | 'unusable') => {
@@ -368,6 +427,51 @@ export function DistributionFaultsPage() {
           بررسی
         </Button>
       ),
+    },
+  ];
+
+  const checklistItemColumns: Array<
+    RtlDataTableColumn<
+      Inspection['items'][number],
+      'category' | 'description' | 'result' | 'severity' | 'notes'
+    >
+  > = [
+    { key: 'category', label: 'دسته', render: (row) => row.category || '—' },
+    { key: 'description', label: 'شرح', render: (row) => row.description || '—' },
+    {
+      key: 'result',
+      label: 'نتیجه',
+      render: (row) => (
+        <PlainStatusBadge
+          tone={row.result === 'FAIL' ? 'error' : row.result === 'PASS' ? 'success' : 'neutral'}
+          label={CHECKLIST_RESULT_LABELS[row.result] ?? row.result}
+        />
+      ),
+    },
+    {
+      key: 'severity',
+      label: 'شدت',
+      render: (row) =>
+        row.severity ? (
+          <Typography
+            fontWeight={row.result === 'FAIL' ? 800 : 500}
+            color={row.result === 'FAIL' ? 'error.main' : 'inherit'}
+          >
+            {SEVERITY_LABELS[row.severity] ?? row.severity}
+          </Typography>
+        ) : (
+          '—'
+        ),
+    },
+    {
+      key: 'notes',
+      label: 'یادداشت',
+      render: (row) =>
+        row.notes ? (
+          <Typography fontWeight={row.result === 'FAIL' ? 700 : 400}>{row.notes}</Typography>
+        ) : (
+          '—'
+        ),
     },
   ];
 
@@ -566,30 +670,46 @@ export function DistributionFaultsPage() {
             <Stack spacing={1}>
               {detail.checklists.map((inspection) => (
                 <Card key={inspection.id} variant="outlined">
-                  <CardContent>
-                    <Stack direction="row" justifyContent="space-between" gap={1}>
-                      <Typography fontWeight={800}>
-                        {formatDateTime(inspection.inspected_at)}
+                  <CardActionArea
+                    onClick={() => void openChecklistDetail(inspection.id)}
+                    sx={{ alignItems: 'stretch' }}
+                  >
+                    <CardContent>
+                      <Stack direction="row" justifyContent="space-between" gap={1} alignItems="center">
+                        <Typography fontWeight={800}>
+                          {formatDateTime(inspection.inspected_at)}
+                        </Typography>
+                        <PlainStatusBadge
+                          tone={checklistOverallTone(
+                            inspection.has_failures,
+                            inspection.overall_result,
+                          )}
+                          label={checklistOverallLabel(
+                            inspection.has_failures,
+                            inspection.overall_result,
+                            CHECKLIST_RESULT_LABELS,
+                          )}
+                        />
+                      </Stack>
+                      <Typography variant="body2" color="text.secondary">
+                        کیلومتر: {toFaNumber(inspection.odometer_value)}
                       </Typography>
-                      <PlainStatusBadge
-                        label={
-                          inspection.overall_result === 'PASS'
-                            ? 'قبول'
-                            : inspection.overall_result === 'FAIL'
-                              ? 'مردود'
-                              : inspection.overall_result
-                        }
-                        tone={inspection.overall_result === 'FAIL' ? 'error' : 'success'}
-                      />
-                    </Stack>
-                    <Typography variant="body2" color="text.secondary">
-                      کیلومتر: {toFaNumber(inspection.odometer_value)}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      موارد ناموفق:{' '}
-                      {toFaNumber(inspection.items.filter((item) => item.result === 'FAIL').length)}
-                    </Typography>
-                  </CardContent>
+                      <Typography variant="body2" color="text.secondary">
+                        موارد ناموفق:{' '}
+                        {toFaNumber(
+                          inspection.items.filter((item) => item.result === 'FAIL').length,
+                        )}
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        color="primary.main"
+                        fontWeight={800}
+                        mt={1}
+                      >
+                        مشاهده جزئیات
+                      </Typography>
+                    </CardContent>
+                  </CardActionArea>
                 </Card>
               ))}
             </Stack>
@@ -798,6 +918,117 @@ export function DistributionFaultsPage() {
         onRetry={selected ? () => void openDetail(selected) : undefined}
         maxWidth="lg"
       />
+
+      <Dialog
+        open={Boolean(selectedChecklistId)}
+        onClose={closeChecklistDetail}
+        fullWidth
+        maxWidth="md"
+        disableScrollLock
+        dir="rtl"
+        PaperProps={{
+          sx: {
+            borderRadius: (t) => t.radius('md'),
+            height: { sm: 640, md: 680 },
+            maxHeight: { sm: 640, md: 680 },
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            boxShadow: '0 24px 64px rgba(23, 35, 29, 0.18)',
+          },
+        }}
+      >
+        <DialogTitle sx={{ pr: 6, position: 'relative', flexShrink: 0 }}>
+          <Stack direction="row" alignItems="center" gap={1}>
+            <FactCheck fontSize="small" color="primary" />
+            جزئیات چک‌لیست
+          </Stack>
+          <IconButton
+            size="small"
+            onClick={closeChecklistDetail}
+            aria-label="بستن"
+            sx={{ position: 'absolute', top: 12, left: 12 }}
+          >
+            <Close fontSize="small" />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+          {checklistDetailLoading ? (
+            <LoadingState label="در حال دریافت جزئیات چک‌لیست" />
+          ) : checklistDetailError ? (
+            <ErrorState
+              message={checklistDetailError}
+              onRetry={() => {
+                if (selectedChecklistId) void openChecklistDetail(selectedChecklistId);
+              }}
+            />
+          ) : selectedChecklist ? (
+            <Stack spacing={2}>
+              <Box>
+                <DetailLine
+                  label="تاریخ بازرسی"
+                  value={formatDateTime(selectedChecklist.inspected_at)}
+                />
+                <DetailLine
+                  label="نوع"
+                  value={
+                    INSPECTION_TYPE_LABELS[selectedChecklist.inspection_type] ??
+                    selectedChecklist.inspection_type
+                  }
+                />
+                <DetailLine
+                  label="کیلومتر"
+                  value={
+                    selectedChecklist.odometer_value != null
+                      ? `${toFaNumber(selectedChecklist.odometer_value)} ${
+                          selectedChecklist.odometer_unit === 'MILES' ? 'mi' : 'km'
+                        }`
+                      : '—'
+                  }
+                />
+                <DetailLine
+                  label="وضعیت"
+                  value={
+                    <PlainStatusBadge
+                      label={
+                        INSPECTION_STATUS_LABELS[selectedChecklist.status] ??
+                        selectedChecklist.status
+                      }
+                    />
+                  }
+                />
+                <DetailLine
+                  label="نتیجه کلی"
+                  value={
+                    <PlainStatusBadge
+                      tone={checklistOverallTone(
+                        selectedChecklist.has_failures,
+                        selectedChecklist.overall_result,
+                      )}
+                      label={checklistOverallLabel(
+                        selectedChecklist.has_failures,
+                        selectedChecklist.overall_result,
+                        CHECKLIST_RESULT_LABELS,
+                      )}
+                    />
+                  }
+                />
+                {selectedChecklist.driver?.name && (
+                  <DetailLine label="راننده" value={selectedChecklist.driver.name} />
+                )}
+              </Box>
+              <RtlDataTable
+                columns={checklistItemColumns}
+                rows={sortChecklistItems(selectedChecklist.items)}
+                getRowKey={(row) => row.id}
+                emptyMessage="آیتمی برای این چک‌لیست ثبت نشده است"
+                standaloneEmpty
+                minWidth={640}
+              />
+            </Stack>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </Stack>
   );
 }

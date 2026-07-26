@@ -1,4 +1,4 @@
-"""Management command: reset workflow/demo data while keeping master records.
+"""Management command: reset workflow/demo data while keeping selected masters.
 
 Intended for local development when schema/workflow changes leave the DB in an
 inconsistent state. Only available when ``settings.DEBUG`` is True.
@@ -16,7 +16,11 @@ from apps.driver.infrastructure.models import DriverModel
 from apps.fault.infrastructure.models import FaultItemModel, FaultModel
 from apps.handover.infrastructure.models import VehicleHandoverModel
 from apps.inspection.infrastructure.models import InspectionModel
-from apps.integration.infrastructure.models import SAPTransactionModel
+from apps.integration.infrastructure.models import (
+    SAPSyncRunItemModel,
+    SAPSyncRunModel,
+    SAPTransactionModel,
+)
 from apps.material.infrastructure.models import (
     InventoryTransactionModel,
     MaterialRequestModel,
@@ -34,8 +38,9 @@ from apps.repair.infrastructure.models import (
     RepairOrderEventModel,
     RepairOrderModel,
 )
-from apps.vehicle.domain.entities import VehicleStatus
 from apps.vehicle.infrastructure.models import (
+    VehicleComponentHistoryModel,
+    VehicleDriverAssignmentHistoryModel,
     VehicleModel,
     VehicleOdometerReadingModel,
 )
@@ -57,32 +62,24 @@ _DELETE_TARGETS: tuple[tuple[str, type], ...] = (
     ("pm_work_order", PMWorkOrderModel),
     ("pm_plan", PMPlanModel),
     ("sap_transaction", SAPTransactionModel),
+    ("sap_sync_run_item", SAPSyncRunItemModel),
+    ("sap_sync_run", SAPSyncRunModel),
     ("vehicle_odometer_reading", VehicleOdometerReadingModel),
+    ("vehicle_component_history", VehicleComponentHistoryModel),
+    ("vehicle_driver_assignment_history", VehicleDriverAssignmentHistoryModel),
+    ("vehicle", VehicleModel),
     ("driver", DriverModel),
-)
-
-_WORKFLOW_VEHICLE_STATUSES: frozenset[str] = frozenset(
-    {
-        VehicleStatus.UNDER_REPAIR.value,
-        VehicleStatus.WAITING_DRIVER_CONFIRMATION.value,
-    }
-)
-
-# Retired API_EQUIPMENT mock vehicles (EQ10000001 / EQ10000002).
-_OBSOLETE_LEGACY_MOCK_VEHICLE_NUMBERS: frozenset[str] = frozenset(
-    {"10000001", "10000002"}
 )
 
 
 class Command(BaseCommand):
-    """Wipe operational workflow data; keep vehicles, templates, and users."""
+    """Wipe operational workflow data and vehicles; keep templates and users."""
 
     help = (
         "DEBUG only: delete all workflow data (inspections, faults, repairs, "
         "materials, handovers, procurement, SAP txs, odometer readings, "
-        "drivers, PM) while keeping vehicles, inspection checklist templates, "
-        "and users. Resets UNDER_REPAIR / WAITING_DRIVER_CONFIRMATION "
-        "vehicles to ACTIVE."
+        "vehicle histories, vehicles, drivers, PM) while keeping inspection "
+        "checklist templates and users."
     )
 
     def add_arguments(self, parser: Any) -> None:
@@ -114,25 +111,11 @@ class Command(BaseCommand):
         skip_confirm = bool(options.get("yes"))
 
         counts = self._collect_counts()
-        vehicles_to_reset = VehicleModel.objects.filter(
-            status__in=_WORKFLOW_VEHICLE_STATUSES,
-            is_deleted=False,
-        ).count()
-        obsolete_vehicles = VehicleModel.objects.filter(
-            vehicle_number__in=_OBSOLETE_LEGACY_MOCK_VEHICLE_NUMBERS,
-        ).count()
 
         self.stdout.write(self.style.WARNING("Tables that will be cleared:"))
         for label, count in counts:
             self.stdout.write(f"  - {label}: {count} row(s)")
-        self.stdout.write(
-            f"  - vehicles status reset → ACTIVE: {vehicles_to_reset} row(s)"
-        )
-        self.stdout.write(
-            f"  - obsolete mock vehicles removed: {obsolete_vehicles} row(s)"
-        )
         self.stdout.write(self.style.SUCCESS("Preserved:"))
-        self.stdout.write("  - vehicle (except retired mock equipment 10000001/02)")
         self.stdout.write("  - inspection_template")
         self.stdout.write("  - users (AUTH_USER_MODEL)")
 
@@ -147,20 +130,12 @@ class Command(BaseCommand):
 
         with transaction.atomic():
             deleted_summary = self._delete_all()
-            obsolete_deleted, _ = VehicleModel.objects.filter(
-                vehicle_number__in=_OBSOLETE_LEGACY_MOCK_VEHICLE_NUMBERS,
-            ).delete()
-            reset_n = VehicleModel.objects.filter(
-                is_deleted=False,
-                status__in=_WORKFLOW_VEHICLE_STATUSES,
-            ).update(status=VehicleStatus.ACTIVE.value)
 
         for label, deleted in deleted_summary:
             self.stdout.write(f"Deleted {label}: {deleted}")
         self.stdout.write(
             self.style.SUCCESS(
-                f"Removed {obsolete_deleted} obsolete mock vehicle(s). "
-                f"Reset {reset_n} vehicle(s) to ACTIVE. Workflow data cleared."
+                "Workflow data and vehicles cleared."
             )
         )
 

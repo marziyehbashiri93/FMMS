@@ -1008,9 +1008,9 @@ export function InspectionPage() {
         px: 1.5,
         py: 1.35,
         borderRadius: (t) => t.radius('md'),
-        bgcolor: 'secondary.light',
+        bgcolor: 'action.disabledBackground',
         border: '1px solid',
-        borderColor: 'rgba(196, 92, 74, 0.18)',
+        borderColor: 'divider',
       }}
     >
       <Box>
@@ -1023,7 +1023,7 @@ export function InspectionPage() {
           underline="hover"
           fontWeight={800}
           display="block"
-          color="secondary.dark"
+          color="primary.dark"
         >
           {selectedVehicle.license_plate}
         </Link>
@@ -1559,17 +1559,17 @@ export function InspectionPage() {
                             px: 1.25,
                             py: 0.75,
                             borderRadius: (t) => t.radius('sm'),
-                            bgcolor: 'secondary.light',
+                            bgcolor: 'action.disabledBackground',
                             border: '1px solid',
-                            borderColor: 'rgba(196, 92, 74, 0.18)',
+                            borderColor: 'divider',
                           }}
                         >
-                          <Typography variant="body2" color="secondary.dark" fontWeight={900}>
+                          <Typography variant="body2" color="text.primary" fontWeight={900}>
                             {currentItem.category}
                           </Typography>
                           <Typography
                             variant="caption"
-                            color="secondary.dark"
+                            color="text.secondary"
                             fontWeight={900}
                             sx={{
                               direction: 'ltr',
@@ -1578,7 +1578,7 @@ export function InspectionPage() {
                               borderRadius: (t) => t.radius('sm'),
                               bgcolor: 'background.paper',
                               border: '1px solid',
-                              borderColor: 'rgba(196, 92, 74, 0.18)',
+                              borderColor: 'divider',
                             }}
                           >
                             {currentItem.code}
