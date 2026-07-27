@@ -1,5 +1,6 @@
 import { Box, Card, CardContent, Typography } from '@mui/material';
 import type { SvgIconComponent } from '@mui/icons-material';
+import { IconWell, type IconWellTone } from './IconWell';
 
 export function KpiCard({
   label,
@@ -12,17 +13,37 @@ export function KpiCard({
   value: string | number;
   helper?: string;
   icon: SvgIconComponent;
-  tone?: 'primary' | 'secondary' | 'success' | 'warning' | 'error' | 'info';
+  tone?: IconWellTone;
 }) {
   return (
-    <Card>
+    <Card
+      sx={{
+        overflow: 'visible',
+        transition: 'transform .18s ease, box-shadow .2s ease',
+        '&:hover': {
+          transform: 'translateY(-2px)',
+        },
+      }}
+    >
       <CardContent sx={{ p: { xs: 1.5, md: 1.75 }, '&:last-child': { pb: { xs: 1.5, md: 1.75 } } }}>
-        <Box display="flex" alignItems="center" justifyContent="space-between" gap={1.5} style={{ direction: 'rtl' }}>
+        <Box
+          display="flex"
+          alignItems="center"
+          justifyContent="space-between"
+          gap={1.5}
+          style={{ direction: 'rtl' }}
+        >
           <Box minWidth={0} style={{ textAlign: 'right', direction: 'rtl' }}>
-            <Typography variant="caption" color="text.primary" display="block" mb={0.75} fontWeight={900}>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              display="block"
+              mb={0.75}
+              fontWeight={800}
+            >
               {label}
             </Typography>
-            <Typography variant="h2" color="text.primary" noWrap>
+            <Typography variant="h2" color="text.primary" noWrap fontWeight={900}>
               {value}
             </Typography>
             {helper && (
@@ -31,20 +52,9 @@ export function KpiCard({
               </Typography>
             )}
           </Box>
-          <Box
-            sx={{
-              width: 44,
-              height: 44,
-              borderRadius: (t) => t.radius('lg'),
-              bgcolor: `${tone}.light`,
-              color: `${tone}.dark`,
-              display: 'grid',
-              placeItems: 'center',
-              flexShrink: 0,
-            }}
-          >
-            <Icon fontSize="medium" />
-          </Box>
+          <IconWell tone={tone} size={46}>
+            <Icon />
+          </IconWell>
         </Box>
       </CardContent>
     </Card>

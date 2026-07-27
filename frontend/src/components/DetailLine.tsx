@@ -9,9 +9,12 @@ export function DetailLine({ label, value }: { label: string; value: ReactNode }
         gridTemplateColumns: 'minmax(110px, 36%) 1fr',
         gap: 1.5,
         alignItems: 'center',
-        py: 1.25,
+        py: 1.35,
+        px: 0.25,
         borderBottom: '1px solid',
         borderColor: 'divider',
+        transition: 'background-color .15s ease',
+        '&:hover': { bgcolor: 'action.hover' },
         '&:last-child': { borderBottom: 'none' },
       }}
     >

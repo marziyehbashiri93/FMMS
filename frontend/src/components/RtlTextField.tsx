@@ -42,10 +42,23 @@ export function RtlTextField({
         direction: 'rtl',
         '& .MuiOutlinedInput-root': {
           direction: 'rtl',
-           paddingRight: '14px',
+          paddingRight: '14px',
+          bgcolor: 'background.paper',
+          transition: 'box-shadow .18s ease, background-color .15s ease',
+          '&:hover': {
+            bgcolor: 'action.hover',
+          },
+          '&.Mui-focused': {
+            bgcolor: 'background.paper',
+            boxShadow: (t) =>
+              t.palette.mode === 'dark'
+                ? '0 0 0 3px rgba(46, 173, 116, 0.22)'
+                : '0 0 0 3px rgba(15, 107, 76, 0.14)',
+          },
         },
         '& .MuiOutlinedInput-notchedOutline': {
           textAlign: 'right',
+          borderColor: 'divider',
         },
         '& .MuiOutlinedInput-notchedOutline legend': {
           textAlign: 'right',

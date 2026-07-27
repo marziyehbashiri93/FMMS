@@ -1,4 +1,4 @@
-import { Chip } from '@mui/material';
+import { Box, Chip } from '@mui/material';
 import type { VehicleStatus } from '../types/fmms';
 
 type BadgeAppearance = 'soft' | 'solid';
@@ -15,6 +15,23 @@ const statusStyles: Record<VehicleStatus, { bg: string; softBg: string; border: 
   DECOMMISSIONED: { bg: '#9f2f27', softBg: 'rgba(159, 47, 39, 0.12)', border: 'rgba(159, 47, 39, 0.36)', label: 'از رده خارج' },
 };
 
+function StatusDot({ color }: { color: string }) {
+  return (
+    <Box
+      component="span"
+      sx={{
+        width: 7,
+        height: 7,
+        borderRadius: '50%',
+        bgcolor: color,
+        boxShadow: `0 0 0 3px ${color}33`,
+        flexShrink: 0,
+        display: 'inline-block',
+      }}
+    />
+  );
+}
+
 export function VehicleStatusBadge({
   status,
   label,
@@ -25,17 +42,23 @@ export function VehicleStatusBadge({
   appearance?: BadgeAppearance;
 }) {
   const config = statusStyles[status] ?? statusStyles.INACTIVE;
+  const isSolid = appearance === 'solid';
   return (
     <Chip
       size="small"
+      icon={<StatusDot color={isSolid ? '#ffffff' : config.bg} />}
       label={label || config.label}
       sx={{
         minWidth: 76,
-        bgcolor: appearance === 'solid' ? config.bg : config.softBg,
-        color: appearance === 'solid' ? '#ffffff' : config.bg,
+        height: 28,
+        fontWeight: 800,
+        bgcolor: isSolid ? config.bg : config.softBg,
+        color: isSolid ? '#ffffff' : config.bg,
         border: '1px solid',
-        borderColor: appearance === 'solid' ? config.bg : config.border,
-        '& .MuiChip-label': { px: 1 },
+        borderColor: isSolid ? config.bg : config.border,
+        boxShadow: isSolid ? `0 4px 10px ${config.bg}44` : 'none',
+        '& .MuiChip-icon': { ml: 0.75, mr: -0.25 },
+        '& .MuiChip-label': { px: 1, fontWeight: 800 },
       }}
     />
   );
@@ -77,15 +100,24 @@ export function PlainStatusBadge({
     },
   }[tone];
 
+  const isSolid = appearance === 'solid';
+  const dotColor = isSolid ? '#ffffff' : palette.softFg;
+
   return (
     <Chip
       size="small"
+      icon={<StatusDot color={dotColor} />}
       label={label}
       sx={{
-        bgcolor: appearance === 'solid' ? palette.solid : palette.softBg,
-        color: appearance === 'solid' ? '#ffffff' : palette.softFg,
+        height: 28,
+        fontWeight: 800,
+        bgcolor: isSolid ? palette.solid : palette.softBg,
+        color: isSolid ? '#ffffff' : palette.softFg,
         border: '1px solid',
-        borderColor: appearance === 'solid' ? palette.solid : palette.border,
+        borderColor: isSolid ? palette.solid : palette.border,
+        boxShadow: isSolid ? `0 4px 10px ${palette.solid}40` : 'none',
+        '& .MuiChip-icon': { ml: 0.75, mr: -0.25 },
+        '& .MuiChip-label': { px: 1, fontWeight: 800 },
       }}
     />
   );

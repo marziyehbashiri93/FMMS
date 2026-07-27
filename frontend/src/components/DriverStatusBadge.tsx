@@ -1,4 +1,4 @@
-import { Chip } from '@mui/material';
+import { Box, Chip } from '@mui/material';
 import type { DriverStatus } from '../types/fmms';
 
 const styles: Record<DriverStatus, { bg: string; softBg: string; border: string; label: string }> = {
@@ -32,14 +32,30 @@ export function DriverStatusBadge({
   return (
     <Chip
       size="small"
+      icon={
+        <Box
+          component="span"
+          sx={{
+            width: 7,
+            height: 7,
+            borderRadius: '50%',
+            bgcolor: config.bg,
+            boxShadow: `0 0 0 3px ${config.bg}33`,
+            display: 'inline-block',
+          }}
+        />
+      }
       label={label || config.label}
       sx={{
         minWidth: 76,
+        height: 28,
+        fontWeight: 800,
         bgcolor: config.softBg,
         color: config.bg,
         border: '1px solid',
         borderColor: config.border,
-        '& .MuiChip-label': { px: 1 },
+        '& .MuiChip-icon': { ml: 0.75, mr: -0.25 },
+        '& .MuiChip-label': { px: 1, fontWeight: 800 },
       }}
     />
   );

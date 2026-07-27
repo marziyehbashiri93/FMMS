@@ -160,11 +160,17 @@ export function EmptyState({
           py: { xs: 4, sm: 5 },
           borderRadius: (t) => t.radius('lg'),
           border: '1px dashed',
-          borderColor: 'rgba(15, 107, 76, 0.22)',
-          bgcolor: 'rgba(255,255,255,0.72)',
+          borderColor: 'divider',
+          bgcolor: (theme) =>
+            theme.palette.mode === 'dark' ? 'rgba(21, 28, 24, 0.72)' : 'rgba(255,255,255,0.72)',
           backgroundImage: (theme) =>
-            `linear-gradient(165deg, ${theme.palette.common.white} 0%, ${theme.palette.primary.light}55 48%, ${theme.palette.secondary.light}66 100%)`,
-          boxShadow: '0 10px 28px rgba(15, 107, 76, 0.06)',
+            theme.palette.mode === 'dark'
+              ? `linear-gradient(165deg, ${theme.palette.background.paper} 0%, ${theme.palette.primary.light}88 48%, ${theme.palette.secondary.light}88 100%)`
+              : `linear-gradient(165deg, ${theme.palette.common.white} 0%, ${theme.palette.primary.light}55 48%, ${theme.palette.secondary.light}66 100%)`,
+          boxShadow: (theme) =>
+            theme.palette.mode === 'dark'
+              ? '0 10px 28px rgba(0,0,0,0.35)'
+              : '0 10px 28px rgba(15, 107, 76, 0.06)',
         }}
       >
         {visual}

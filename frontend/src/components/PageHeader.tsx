@@ -60,16 +60,21 @@ export function PageHeader({
   return (
     <Card
       sx={{
-        bgcolor: 'background.paper',
+        bgcolor: (t) =>
+          t.palette.mode === 'dark' ? 'rgba(21, 28, 24, 0.94)' : 'rgba(255,255,255,0.94)',
         backgroundImage: backgroundImage ? `url("${backgroundImage}")` : undefined,
         backgroundPosition,
         backgroundRepeat: 'no-repeat',
         backgroundSize,
         border: '1px solid',
         borderColor: 'divider',
-        boxShadow: '0 8px 22px rgba(15, 107, 76, 0.07)',
+        boxShadow: (t) =>
+          t.palette.mode === 'dark'
+            ? '0 12px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)'
+            : '0 12px 32px rgba(15, 107, 76, 0.08), inset 0 1px 0 rgba(255,255,255,0.9)',
         position: 'relative',
         overflow: 'hidden',
+        backdropFilter: 'blur(6px)',
         '&::before': {
           content: '""',
           position: 'absolute',

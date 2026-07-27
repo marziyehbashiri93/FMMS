@@ -157,6 +157,7 @@ export function RtlDataTable<T, K extends string = string>({
         borderColor: 'divider',
         borderRadius: (t) => t.radius('md'),
         overflow: 'hidden',
+        bgcolor: 'background.paper',
       }}
     >
       <TableContainer sx={{ overflowX: 'auto' }}>
