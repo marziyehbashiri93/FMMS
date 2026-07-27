@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 import logging
 import re
+from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import parse_qsl, urlparse
 
@@ -17,11 +17,11 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_SERVICE = "ZC_VEHICLEDRIVER_CDS"
 _DEFAULT_ENTITY_SET = "ZC_VehicleDriver"
-_SAP_DATE_RE = re.compile(r"^/Date\((-?\d+)\)/$")
+_SAP_DATE_RE = re.compile(r"^/Date\((-?\d+)(?:[+-]\d{4})?\)/$")
 
 
 class VehicleDriverODataAdapter(ISAPVehicleDriverPort):
-    """Reads vehicle and driver assignment data from SAP OData XML."""
+    """Reads vehicle and driver assignment data from SAP OData JSON."""
 
     def __init__(
         self,
@@ -136,12 +136,19 @@ def _normalize_sap_date(raw: Any) -> str | None:
     match = _SAP_DATE_RE.fullmatch(text)
     if match:
         milliseconds = int(match.group(1))
-        return datetime.fromtimestamp(milliseconds / 1000, tz=UTC).strftime("%Y%m%d")
-    logger.warning(
-        "Invalid SAP vehicle commissioning date; marked for review",
-        extra={"raw_commissioning_date": text, "review_status": "NEEDS_REVIEW"},
+        try:
+            return datetime.fromtimestamp(
+                milliseconds / 1000,
+                tz=UTC,
+            ).strftime("%Y%m%d")
+        except (OverflowError, OSError, ValueError) as exc:
+            raise SAPIntegrationError(
+                f"Invalid SAP CommissioningDate timestamp: {text!r}."
+            ) from exc
+    raise SAPIntegrationError(
+        "Invalid SAP CommissioningDate; expected YYYYMMDD or "
+        f"/Date(milliseconds)/, got {text!r}."
     )
-    return None
 
 
 def _extract_results_page(payload: dict[str, Any]) -> tuple[list[dict[str, Any]], str]:
