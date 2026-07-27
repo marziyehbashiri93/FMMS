@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode, type SyntheticEvent } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import {
   Box,
   Dialog,
@@ -6,15 +6,14 @@ import {
   DialogTitle,
   IconButton,
   Stack,
-  Tab,
-  Tabs,
   Typography,
   useMediaQuery,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { Close } from '@mui/icons-material';
 import type { SvgIconComponent } from '@mui/icons-material';
-import { brandIconGradient } from '../theme/gradients';
+import { AppTabs } from './AppTabs';
+import { IconWell } from './IconWell';
 import { EmptyState, ErrorState, LoadingState } from './States';
 
 export type TabbedDetailModalTab = {
@@ -95,11 +94,6 @@ export function TabbedDetailModal({
     }
   }, [open]);
 
-  const handleTabChange = (_event: SyntheticEvent, nextTab: number) => {
-    if (onTabChange) onTabChange(nextTab);
-    else setInternalTab(nextTab);
-  };
-
   return (
     <Dialog
       open={open}
@@ -145,22 +139,9 @@ export function TabbedDetailModal({
         <Stack direction="row" justifyContent="space-between" alignItems="center" gap={2}>
           <Stack direction="row" alignItems="center" gap={1.5} minWidth={0}>
             {Icon && (
-              <Box
-                sx={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: (t) => t.radius('xl'),
-                  display: 'grid',
-                  placeItems: 'center',
-                  background: (t) => brandIconGradient(t.palette.primary, t.palette.secondary),
-                  color: 'secondary.dark',
-                  border: '1px solid',
-                  borderColor: 'secondary.light',
-                  flexShrink: 0,
-                }}
-              >
-                <Icon fontSize="small" />
-              </Box>
+              <IconWell tone="secondary" size={40}>
+                <Icon />
+              </IconWell>
             )}
             <Typography variant="h2" noWrap>
               {title}
@@ -215,38 +196,19 @@ export function TabbedDetailModal({
         )}
         {!loading && !error && tabs.length > 0 && (
           <>
-            <Tabs
+            <AppTabs
               value={Math.min(tab, tabs.length - 1)}
-              onChange={handleTabChange}
-              variant="scrollable"
-              scrollButtons="auto"
-              allowScrollButtonsMobile
-              sx={{
-                flexShrink: 0,
-                mt: 0,
-                mb: 0.5,
-                minHeight: 44,
-                bgcolor: 'rgba(243, 246, 244, 0.9)',
-                borderRadius: (t) => t.radius('md'),
-                px: 0.5,
-                '& .MuiTabs-indicator': {
-                  height: 3,
-                  borderRadius: (t) => t.radius('md'),
-                  bgcolor: 'secondary.main',
-                },
-                '& .MuiTab-root': {
-                  minHeight: 44,
-                  fontWeight: 700,
-                  textTransform: 'none',
-                  color: 'text.secondary',
-                  '&.Mui-selected': { color: 'primary.dark' },
-                },
+              onChange={(next) => {
+                setInternalTab(next);
+                onTabChange?.(next);
               }}
-            >
-              {tabs.map((item) => (
-                <Tab key={item.label} label={item.label} />
-              ))}
-            </Tabs>
+              ariaLabel="بخش‌های جزئیات"
+              scrollable
+              items={tabs.map((item, index) => ({
+                value: index,
+                label: item.label,
+              }))}
+            />
 
             <Box
               sx={{
