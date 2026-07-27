@@ -1,4 +1,4 @@
-import type {PaletteColor} from '@mui/material/styles';
+import type { PaletteColor } from '@mui/material/styles';
 
 /**
  * Soft copper ↔ white gradient: pale at one end, richer copper at the other.
@@ -12,10 +12,10 @@ export function brandHeroGradient(_primary: PaletteColor, secondary: PaletteColo
 
 /** Page-header rail: white → soft copper → bold copper. */
 export function brandAccentBarGradient(_primary: PaletteColor, secondary: PaletteColor): string {
-  return `linear-gradient(180deg, #FFFFFF 0%, ${secondary.light} 35%, ${secondary.main} 100%)`;
+  return `linear-gradient(180deg, ${secondary.light} 0%, ${secondary.main} 55%, ${secondary.dark} 100%)`;
 }
 
 /** Icon chip: pale copper to saturated copper. */
 export function brandIconGradient(_primary: PaletteColor, secondary: PaletteColor): string {
-  return `linear-gradient(145deg, #FFFFFF 0%, ${secondary.light} 40%, ${secondary.main} 100%)`;
+  return `linear-gradient(145deg, ${secondary.light} 0%, ${secondary.main} 100%)`;
 }
