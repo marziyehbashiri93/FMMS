@@ -70,8 +70,13 @@ class SAPTransactionManager(ISAPTransactionManager):
         )
     """
 
-    def __init__(self, repository: ISAPTransactionRepository) -> None:
+    def __init__(
+        self,
+        repository: ISAPTransactionRepository,
+        write_enabled: bool = True,
+    ) -> None:
         self._repo = repository
+        self._write_enabled = write_enabled
 
     # ------------------------------------------------------------------
     # Public API
@@ -108,6 +113,18 @@ class SAPTransactionManager(ISAPTransactionManager):
             SAPIntegrationError: If the SAP call fails after recording the
                 failure in the transaction.
         """
+        if not self._write_enabled:
+            logger.info(
+                "Skipping SAP BAPI write because SAP_WRITE is disabled",
+                extra={
+                    "object_type": object_type,
+                    "object_id": str(object_id),
+                    "idempotency_key": idempotency_key,
+                    "domain": "integration",
+                },
+            )
+            return {"sap_write_skipped": True}, ""
+
         existing = self._repo.get_by_idempotency_key(idempotency_key)
         if existing is not None:
             return self._handle_existing(
@@ -148,6 +165,16 @@ class SAPTransactionManager(ISAPTransactionManager):
             SAPRetryExhaustedError: If ``can_retry`` is ``False`` (max retries reached).
             SAPIntegrationError: If the retry attempt also fails.
         """
+        if not self._write_enabled:
+            logger.info(
+                "Skipping SAP BAPI retry because SAP_WRITE is disabled",
+                extra={
+                    "transaction_id": str(transaction_id),
+                    "domain": "integration",
+                },
+            )
+            return {"sap_write_skipped": True}, ""
+
         transaction = self._repo.get_by_id(transaction_id)
 
         if not transaction.can_retry:

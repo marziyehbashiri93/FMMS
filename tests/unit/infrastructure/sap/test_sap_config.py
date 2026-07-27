@@ -39,3 +39,29 @@ def test_vehicle_driver_defaults_match_current_cds_endpoint(monkeypatch) -> None
 
     assert config.vehicle_driver_service == "ZC_VEHICLEDRIVER_CDS"
     assert config.vehicle_driver_entity_set == "ZC_VehicleDriver"
+
+
+def test_sap_write_defaults_to_enabled(monkeypatch) -> None:
+    monkeypatch.delenv("SAP_WRITE", raising=False)
+    monkeypatch.delenv("SAP_write", raising=False)
+
+    config = SAPConfig.from_env()
+
+    assert config.write_enabled is True
+
+
+def test_sap_write_can_be_disabled(monkeypatch) -> None:
+    monkeypatch.setenv("SAP_WRITE", "False")
+
+    config = SAPConfig.from_env()
+
+    assert config.write_enabled is False
+
+
+def test_sap_write_lowercase_alias_is_supported(monkeypatch) -> None:
+    monkeypatch.delenv("SAP_WRITE", raising=False)
+    monkeypatch.setenv("SAP_write", "False")
+
+    config = SAPConfig.from_env()
+
+    assert config.write_enabled is False

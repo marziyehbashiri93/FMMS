@@ -15,6 +15,7 @@ Required environment variables (when ``SAP_USE_MOCK`` is ``False``):
 Optional environment variables:
     SAP_TIMEOUT_SECONDS — HTTP request timeout (default: 30)
     SAP_USE_MOCK        — Use MockSAPClient instead of real SAP (default: True)
+    SAP_WRITE / SAP_write — Enable BAPI write calls (default: True)
     SAP_LANG            — SAP logon language (default: EN)
     SAP_VERIFY_SSL      — Verify SAP HTTPS certificates (default: True)
     SAP_VEHICLE_DRIVER_ODATA_SERVICE — Vehicle-driver OData service
@@ -59,6 +60,7 @@ class SAPConfig:
         sysnr: SAP RFC system number.
         timeout_seconds: HTTP timeout for OData requests.
         use_mock: When ``True``, ``MockSAPClient`` is used for all calls.
+        write_enabled: When ``True``, BAPI write calls are executed.
         lang: SAP logon language.
     """
 
@@ -70,6 +72,7 @@ class SAPConfig:
     sysnr: str
     timeout_seconds: int
     use_mock: bool
+    write_enabled: bool
     lang: str
     verify_ssl: bool
     vehicle_driver_service: str
@@ -93,6 +96,7 @@ class SAPConfig:
                 credentials are missing from the environment.
         """
         use_mock = _env_bool("SAP_USE_MOCK", default=True)
+        write_enabled = _env_bool_first("SAP_WRITE", "SAP_write", default=True)
 
         base_url = os.environ.get("SAP_BASE_URL", "")
         client = os.environ.get("SAP_CLIENT", "")
@@ -171,6 +175,7 @@ class SAPConfig:
             sysnr=sysnr,
             timeout_seconds=timeout_seconds,
             use_mock=use_mock,
+            write_enabled=write_enabled,
             lang=lang,
             verify_ssl=verify_ssl,
             vehicle_driver_service=vehicle_driver_service,
@@ -189,6 +194,14 @@ def _env_bool(name: str, default: bool) -> bool:
     if raw is None:
         return default
     return raw.strip().lower() in ("true", "1", "yes")
+
+
+def _env_bool_first(*names: str, default: bool) -> bool:
+    for name in names:
+        raw = os.environ.get(name)
+        if raw is not None:
+            return raw.strip().lower() in ("true", "1", "yes")
+    return default
 
 
 def _env_first(*names: str, default: str) -> str:

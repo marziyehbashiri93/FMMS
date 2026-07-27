@@ -424,7 +424,10 @@ def get_sap_transaction_repository() -> DjangoSAPTransactionRepository:
 
 def get_sap_transaction_manager() -> SAPTransactionManager:
     """Return the sole SAP write gateway (composition-root wiring)."""
-    return SAPTransactionManager(repository=get_sap_transaction_repository())
+    return SAPTransactionManager(
+        repository=get_sap_transaction_repository(),
+        write_enabled=SAPConfig.from_env().write_enabled,
+    )
 
 
 def get_user_profile_reader() -> DjangoUserProfileReader:
