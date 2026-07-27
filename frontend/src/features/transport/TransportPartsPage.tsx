@@ -12,12 +12,8 @@ import {
   useMediaQuery,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import {
-  CheckCircleOutline,
-  Inventory2,
-  LocalShipping,
-  ShoppingCart,
-} from '@mui/icons-material';
+import { CheckCircleOutline, ShoppingCart } from '@mui/icons-material';
+import { Inventory2, LocalShipping } from '../../components/icons3d/Icons3D';
 import { api } from '../../api/client';
 import { Button } from '../../components/Button';
 import { ClearFiltersButton } from '../../components/ClearFiltersButton';

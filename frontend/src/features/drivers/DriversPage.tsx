@@ -11,12 +11,8 @@ import {
   useMediaQuery,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import {
-  PeopleAlt,
-  PersonOff,
-  Search,
-  Sync,
-} from '@mui/icons-material';
+import { PersonOff, Search } from '@mui/icons-material';
+import { PeopleAlt, Sync } from '../../components/icons3d/Icons3D';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../api/client';
 import { Button } from '../../components/Button';

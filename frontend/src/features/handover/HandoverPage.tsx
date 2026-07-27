@@ -10,13 +10,8 @@ import {
   useMediaQuery,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import {
-  CheckCircleOutline,
-  DirectionsCar,
-  DoNotDisturbAlt,
-  FactCheck,
-  Handshake,
-} from '@mui/icons-material';
+import { CheckCircleOutline, DoNotDisturbAlt } from '@mui/icons-material';
+import { DirectionsCar, FactCheck, Handshake } from '../../components/icons3d/Icons3D';
 import { api } from '../../api/client';
 import { Button } from '../../components/Button';
 import { ClearFiltersButton } from '../../components/ClearFiltersButton';

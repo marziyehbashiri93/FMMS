@@ -20,13 +20,11 @@ import { useTheme } from '@mui/material/styles';
 import {
   CheckCircleOutline,
   Close,
-  DirectionsCar,
   DoNotDisturbAlt,
-  FactCheck,
-  ReportProblem,
   Search,
   WarningAmber,
 } from '@mui/icons-material';
+import { DirectionsCar, FactCheck, ReportProblem } from '../../components/icons3d/Icons3D';
 import { api } from '../../api/client';
 import { Button } from '../../components/Button';
 import { ClearFiltersButton } from '../../components/ClearFiltersButton';

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, MenuItem, Stack, Typography, useMediaQuery } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { Inventory2, Search } from '@mui/icons-material';
+import { Search } from '@mui/icons-material';
+import { Inventory2 } from '../../components/icons3d/Icons3D';
 import { api } from '../../api/client';
 import { Button } from '../../components/Button';
 import { ClearFiltersButton } from '../../components/ClearFiltersButton';

@@ -15,7 +15,8 @@ import {
   useMediaQuery,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { Close, FactCheck, Inbox } from '@mui/icons-material';
+import { Close, Inbox } from '@mui/icons-material';
+import { FactCheck } from '../../components/icons3d/Icons3D';
 import { Link as RouterLink } from 'react-router-dom';
 import { api } from '../../api/client';
 import { Button } from '../../components/Button';

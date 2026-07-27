@@ -13,7 +13,8 @@ import {
   ToggleButtonGroup,
   Typography,
 } from '@mui/material';
-import { Cancel, CheckCircle, CheckCircleOutline, Logout, ReportProblem } from '@mui/icons-material';
+import { Cancel, CheckCircle, CheckCircleOutline, Logout } from '@mui/icons-material';
+import { ReportProblem } from '../../components/icons3d/Icons3D';
 import { Link as RouterLink } from 'react-router-dom';
 import { api } from '../../api/client';
 import { Button } from '../../components/Button';

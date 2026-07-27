@@ -18,16 +18,14 @@ import {
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import {
-  CarRepair,
   Close,
-  DirectionsCar,
   Error as ErrorIcon,
   Inbox,
   Speed,
   Search,
-  Sync,
   TaskAlt,
 } from '@mui/icons-material';
+import { CarRepair, DirectionsCar, Sync } from '../../components/icons3d/Icons3D';
 import { Link as RouterLink, useSearchParams } from 'react-router-dom';
 import { api } from '../../api/client';
 import { Button } from '../../components/Button';

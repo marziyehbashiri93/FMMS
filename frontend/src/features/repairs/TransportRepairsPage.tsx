@@ -17,14 +17,11 @@ import {
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import {
-  Build,
   CheckCircleOutline,
   Close,
-  DirectionsCar,
   DoNotDisturbAlt,
-  FactCheck,
-  LocalShipping,
 } from '@mui/icons-material';
+import { Build, DirectionsCar, FactCheck, LocalShipping } from '../../components/icons3d/Icons3D';
 import { api } from '../../api/client';
 import { Button } from '../../components/Button';
 import { ClearFiltersButton } from '../../components/ClearFiltersButton';
