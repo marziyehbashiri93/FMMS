@@ -1,16 +1,13 @@
 import {useEffect, useState} from 'react';
 import {Box, Card, CardActionArea, CardContent, Stack, Typography} from '@mui/material';
+import { ChevronLeft, ErrorOutline, Speed, TaskAlt } from '@mui/icons-material';
 import {
     Build,
     CarRepair,
-    ChevronLeft,
     DirectionsCar,
-    ErrorOutline,
     PeopleAlt,
-    Speed,
     Sync,
-    TaskAlt,
-} from '@mui/icons-material';
+} from '../../components/icons3d/Icons3D';
 import {Link as RouterLink} from 'react-router-dom';
 import {api} from '../../api/client';
 import {FeaturePage, KpiGrid} from '../../components/FeaturePage';
@@ -31,7 +28,7 @@ type QuickLink = {
     subtitle: string;
     to: string;
     icon: typeof DirectionsCar;
-    tone: 'primary' | 'warning' | 'success' | 'error' | 'info';
+    tone: 'primary' | 'secondary' | 'warning' | 'success' | 'error' | 'info';
     imageSrc?: string;
 };
 
@@ -109,7 +106,7 @@ export function DashboardPage() {
             subtitle: `${toFaNumber(queues.openFaults)} خرابی در انتظار تصمیم توزیع`,
             to: '/faults',
             icon: CarRepair,
-            tone: 'warning',
+            tone: 'secondary',
             imageSrc: '/dashboard-card-distribution.png',
         },
         {
@@ -117,7 +114,7 @@ export function DashboardPage() {
             subtitle: `${toFaNumber(queues.transportQueue)} درخواست در صف ترابری`,
             to: '/repairs',
             icon: Build,
-            tone: 'error',
+            tone: 'secondary',
             imageSrc: '/dashboard-card-transport.png',
         },
         {
@@ -143,7 +140,7 @@ export function DashboardPage() {
             subtitle: `${toFaNumber(driverSummary?.active_count)} راننده فعال`,
             to: '/drivers',
             icon: PeopleAlt,
-            tone: 'success',
+            tone: 'secondary',
         },
     ];
 
@@ -153,10 +150,10 @@ export function DashboardPage() {
                 title="نمای کلی عملیات ناوگان"
                 description="خلاصه وضعیت ناوگان، راننده‌ها و صف‌های عملیاتی در یک نگاه."
                 breadcrumbs={[{label: 'داشبورد'}]}
-                accentColor="primary.main"
+                accentColor="secondary.main"
                 accentSide="right"
                 backgroundImage={`${API_ORIGIN}/media/dashboard.png`}
-backgroundSize="1000px auto"
+backgroundSize="300px auto"
                 backgroundPosition="left center"
             />
 
@@ -183,7 +180,7 @@ backgroundSize="1000px auto"
                             label="خودروهای در تعمیر"
                             value={toFaNumber(vehicleSummary?.under_repair_fleet_count)}
                             icon={Build}
-                            tone="warning"
+                            tone="secondary"
                         />
                         <KpiCard
                             label="خودروهای خارج از سرویس"
@@ -205,7 +202,7 @@ backgroundSize="1000px auto"
                             label="راننده‌های دارای خودرو"
                             value={toFaNumber(driverSummary?.with_vehicle_count)}
                             icon={DirectionsCar}
-                            tone="info"
+                            tone="secondary"
                         />
                         <KpiCard
                             label="میانگین کارکرد خودروها"
@@ -217,7 +214,7 @@ backgroundSize="1000px auto"
                             label="میانگین خرابی در ۳۰ روز اخیر"
                             value={toFaNumber(vehicleSummary?.average_faults_last_30_days)}
                             icon={CarRepair}
-                            tone="warning"
+                            tone="secondary"
                         />
                     </KpiGrid>
 
@@ -252,8 +249,8 @@ backgroundSize="1000px auto"
                                             width: 48,
                                             height: 48,
                                             borderRadius: (t) => t.radius('lg'),
-                                            bgcolor: 'primary.light',
-                                            color: 'primary.dark',
+                                            bgcolor: 'secondary.light',
+                                            color: 'secondary.dark',
                                             display: 'grid',
                                             placeItems: 'center',
                                             flexShrink: 0,
@@ -284,7 +281,28 @@ backgroundSize="1000px auto"
 
 function SectionTitle({title}: { title: string }) {
     return (
-        <Typography variant="subtitle1" fontWeight={900} sx={{mt: {xs: 0.5, md: 1}}}>
+        <Typography
+            variant="subtitle1"
+            fontWeight={900}
+            sx={{
+                mt: { xs: 0.5, md: 1 },
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                '&::before': {
+                    content: '""',
+                    width: 4,
+                    height: 18,
+                    borderRadius: 99,
+                    bgcolor: 'secondary.main',
+                    flexShrink: 0,
+                    boxShadow: (t) =>
+                      t.palette.mode === 'dark'
+                        ? '0 0 0 3px rgba(232,137,120,0.2)'
+                        : '0 0 0 3px rgba(196,87,61,0.15)',
+                },
+            }}
+        >
             {title}
         </Typography>
     );
