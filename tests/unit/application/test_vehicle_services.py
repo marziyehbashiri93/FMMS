@@ -24,6 +24,7 @@ from apps.fault.domain.entities import Fault, FaultStatus
 from apps.fault.domain.exceptions import FaultNotFoundError
 from apps.fault.domain.interfaces.fault_repository import IFaultRepository
 from apps.fault.domain.value_objects import FaultCode, FaultDescription, FaultSeverity
+from apps.integration.domain.exceptions import SAPIntegrationError
 from apps.repair.domain.entities import RepairOrder, RepairOrderStatus
 from apps.repair.domain.interfaces.repair_repository import IRepairOrderRepository
 from apps.repair.domain.value_objects import TechnicianAssignment
@@ -662,13 +663,12 @@ class TestSyncVehiclesFromSAPService:
         )
         sap_port = FakeSAPVehicleDriverPort(vehicle_drivers=[])
 
-        result = SyncVehiclesFromSAPService(repo, sap_port, driver_repo).execute()
+        with pytest.raises(
+            SAPIntegrationError,
+            match="response contained no rows",
+        ):
+            SyncVehiclesFromSAPService(repo, sap_port, driver_repo).execute()
 
-        assert result.total_received == 0
-        assert result.created == 0
-        assert result.updated == 0
-        assert result.decommissioned == 0
-        assert result.failed == 1
         assert repo.get_by_id(existing.id).status == VehicleStatus.ACTIVE
         assert repo.decommission_calls == 0
         assert driver_repo.decommission_calls == 0

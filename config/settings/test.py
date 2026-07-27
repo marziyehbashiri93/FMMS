@@ -5,7 +5,11 @@ Overrides database to SQLite for fast, dependency-free test execution.
 PostgreSQL is used in development (docker-compose) and production.
 """
 
+import os
 from pathlib import Path
+
+# Test execution must never inherit real-SAP mode from a developer's local .env.
+os.environ["SAP_USE_MOCK"] = "True"
 
 from .base import *  # noqa: F401, F403
 from .base import BASE_DIR  # noqa: F401

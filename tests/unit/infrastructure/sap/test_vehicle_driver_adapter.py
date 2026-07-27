@@ -13,7 +13,6 @@ from infrastructure.sap.adapters.odata.vehicle_driver_odata_adapter import (
 from infrastructure.sap.client.base import ISAPClient, SAPClientError
 from infrastructure.sap.client.mock.mock_client import MockSAPClient, SAPMockScenario
 
-
 SAMPLE_ROW: dict[str, Any] = {
     "VehicleNumber": "20320",
     "LicensePlate": "237ع51-11",
@@ -91,9 +90,10 @@ class TestVehicleDriverODataAdapterSuccess:
         ("raw_date", "expected"),
         [
             ("/Date(1427328000000)/", "20150326"),
+            ("/Date(1427328000000+0330)/", "20150326"),
+            ("/Date(1427328000000-0430)/", "20150326"),
             ("20150326", "20150326"),
             (None, None),
-            ("not-a-date", None),
         ],
     )
     def test_normalizes_commissioning_date(
@@ -108,6 +108,14 @@ class TestVehicleDriverODataAdapterSuccess:
         dto = adapter.list_vehicle_drivers()[0]
 
         assert dto.commissioning_date == expected
+
+    def test_rejects_invalid_commissioning_date(self) -> None:
+        row = {**SAMPLE_ROW, "CommissioningDate": "not-a-date"}
+        client = RecordingODataClient({"d": {"results": [row]}})
+        adapter = VehicleDriverODataAdapter(client)
+
+        with pytest.raises(SAPIntegrationError, match="Invalid SAP CommissioningDate"):
+            adapter.list_vehicle_drivers()
 
     def test_reads_multiple_pages_from_d_next(self) -> None:
         first_page = {

@@ -16,6 +16,7 @@ from apps.driver.domain.entities import Driver, DriverStatus
 from apps.driver.domain.exceptions import DriverNotFoundError
 from apps.driver.domain.interfaces.driver_repository import IDriverRepository
 from apps.driver.domain.value_objects import CustomerNumber
+from apps.integration.domain.exceptions import SAPIntegrationError
 from apps.vehicle.application.dto.vehicle_dto import VehicleSAPSyncResultDTO
 from apps.vehicle.domain.entities import Vehicle, VehicleStatus
 from apps.vehicle.domain.interfaces.vehicle_repository import IVehicleRepository
@@ -116,8 +117,8 @@ class SyncVehiclesFromSAPService:
 
         sap_rows = self._sap.list_vehicle_drivers(plant=plant)
         if not sap_rows:
-            logger.warning(
-                "SAP vehicle-driver response was empty; skipping decommission",
+            logger.error(
+                "SAP vehicle-driver response was empty; sync rejected",
                 extra={
                     "domain": "vehicle",
                     "service": "SyncVehiclesFromSAPService",
@@ -127,12 +128,9 @@ class SyncVehiclesFromSAPService:
                     "review_status": "NEEDS_REVIEW",
                 },
             )
-            return VehicleSAPSyncResultDTO(
-                total_received=0,
-                created=0,
-                updated=0,
-                decommissioned=0,
-                failed=1,
+            raise SAPIntegrationError(
+                "SAP vehicle-driver response contained no rows; "
+                "decommission was skipped."
             )
 
         created = 0
