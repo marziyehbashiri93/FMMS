@@ -39,6 +39,7 @@ import { canAccessModule, navSectionsForUser } from '../app/access';
 import { isNavGroup, modules, type AppModule, type NavGroup } from '../app/modules';
 import { api } from '../api/client';
 import { ProfileModal } from '../features/auth/ProfileModal';
+import { ThemeModeToggle } from '../components/ThemeModeToggle';
 import type { AuthUser } from '../types/fmms';
 
 const drawerWidth = 244;
@@ -226,11 +227,12 @@ function BrandBlock({ compact = false, onDark = false }: { compact?: boolean; on
         src="/logo-golestan.webp"
         alt="لوگوی گروه صنعتی گلستان"
         sx={{
-          width: compact ? 40 : 44,
-          height: compact ? 28 : 32,
+          width: compact ? 40 : 48,
+          height: compact ? 28 : 36,
           objectFit: 'contain',
           flexShrink: 0,
           display: 'block',
+          filter: 'drop-shadow(0 4px 10px rgba(15,107,76,0.35))',
         }}
       />
       {!compact && (
@@ -313,7 +315,35 @@ function NavLeafButton({
           color: selected ? sidebarActive : sidebarMuted,
         }}
       >
-        <Icon fontSize={collapsed ? 'medium' : 'small'} />
+        <Box
+          sx={{
+            display: 'grid',
+            placeItems: 'center',
+            width: collapsed ? 40 : 28,
+            height: collapsed ? 40 : 28,
+            borderRadius: collapsed ? '12px' : '8px',
+            flexShrink: 0,
+            ...(collapsed
+              ? {
+                  background: selected
+                    ? 'linear-gradient(145deg, rgba(143,212,176,0.28) 0%, rgba(15,107,76,0.18) 100%)'
+                    : 'linear-gradient(145deg, rgba(255,255,255,0.06) 0%, rgba(0,0,0,0.12) 100%)',
+                  boxShadow: selected
+                    ? '0 4px 12px rgba(15,107,76,0.28), inset 0 1px 0 rgba(255,255,255,0.18)'
+                    : 'inset 0 1px 0 rgba(255,255,255,0.06)',
+                  border: '1px solid',
+                  borderColor: selected ? 'rgba(143,212,176,0.35)' : 'rgba(255,255,255,0.06)',
+                }
+              : {}),
+            '& svg': {
+              filter: selected
+                ? 'drop-shadow(0 2px 4px rgba(143,212,176,0.35))'
+                : 'drop-shadow(0 1px 2px rgba(0,0,0,0.35))',
+            },
+          }}
+        >
+          <Icon fontSize={collapsed ? 'medium' : 'small'} />
+        </Box>
         {!collapsed && (
           <Typography
             fontSize={nested ? '0.78rem' : '0.82rem'}
@@ -657,7 +687,13 @@ export function AppLayout() {
           position="sticky"
           color="inherit"
           elevation={0}
-          sx={{ borderBottom: '1px solid', borderColor: 'divider', bgcolor: 'rgba(255,255,255,0.86)', backdropFilter: 'blur(12px)' }}
+          sx={{
+            borderBottom: '1px solid',
+            borderColor: 'divider',
+            bgcolor: (t) =>
+              t.palette.mode === 'dark' ? 'rgba(21, 28, 24, 0.88)' : 'rgba(255,255,255,0.86)',
+            backdropFilter: 'blur(12px)',
+          }}
         >
           <Toolbar sx={{ gap: 1.25, minHeight: { xs: 58, md: 66 } }}>
             {isMobile && (
@@ -666,6 +702,7 @@ export function AppLayout() {
               </IconButton>
             )}
             <Box flex={1} />
+            <ThemeModeToggle />
             <HeaderProfileMenu
               user={user}
               loading={profileLoading}

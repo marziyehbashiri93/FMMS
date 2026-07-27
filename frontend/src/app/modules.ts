@@ -1,3 +1,4 @@
+import type { SvgIconComponent } from '@mui/icons-material';
 import {
   Build,
   CarRepair,
@@ -12,8 +13,7 @@ import {
   Settings,
   Sync,
   Widgets,
-} from '@mui/icons-material';
-import type { SvgIconComponent } from '@mui/icons-material';
+} from '../components/icons3d/Icons3D';
 
 export interface AppModule {
   key: string;
