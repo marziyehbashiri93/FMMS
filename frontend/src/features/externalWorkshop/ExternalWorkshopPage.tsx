@@ -7,8 +7,6 @@ import {
   Divider,
   Link,
   Stack,
-  Tab,
-  Tabs,
   Typography,
 } from '@mui/material';
 import {
@@ -16,12 +14,11 @@ import {
   AssignmentTurnedIn,
   AttachFile,
   CheckCircleOutline,
-  DirectionsCar,
-  FactCheck,
   DeleteOutline,
   ReceiptLong,
   Save,
 } from '@mui/icons-material';
+import { DirectionsCar, FactCheck } from '../../components/icons3d/Icons3D';
 import { api } from '../../api/client';
 import { Button } from '../../components/Button';
 import { FeaturePage } from '../../components/FeaturePage';
@@ -29,6 +26,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { RtlDataTable, type RtlDataTableColumn } from '../../components/RtlDataTable';
 import { RtlTextField } from '../../components/RtlTextField';
 import { ErrorState } from '../../components/States';
+import { AppTabs } from '../../components/AppTabs';
 import { StatusFilterTabs, type StatusTabOption } from '../../components/StatusFilterTabs';
 import { PlainStatusBadge } from '../../components/StatusBadge';
 import { TabbedDetailModal } from '../../components/TabbedDetailModal';
@@ -469,10 +467,16 @@ export function ExternalWorkshopPage({ mode }: { mode?: TabKey }) {
         ]}
       />
       {!mode && (
-        <Tabs value={tab} onChange={(_, value) => setTab(value)} sx={{ mb: 2 }}>
-          <Tab value="driver" icon={<DirectionsCar />} iconPosition="start" label="کارتابل راننده" />
-          <Tab value="transport" icon={<FactCheck />} iconPosition="start" label="ثبت فاکتور" />
-        </Tabs>
+        <AppTabs
+          value={tab}
+          onChange={(value) => setTab(value)}
+          ariaLabel="حالت تعمیرگاه بیرونی"
+          items={[
+            { value: 'driver', label: 'کارتابل راننده', icon: <DirectionsCar fontSize="small" /> },
+            { value: 'transport', label: 'ثبت فاکتور', icon: <FactCheck fontSize="small" /> },
+          ]}
+          sx={{ mb: 2 }}
+        />
       )}
       {activeTab === 'driver' && (
         <StatusFilterTabs

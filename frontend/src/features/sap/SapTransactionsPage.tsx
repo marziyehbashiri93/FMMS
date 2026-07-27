@@ -6,13 +6,9 @@ import {
   CardContent,
   MenuItem,
   Stack,
-  Tab,
-  Tabs,
   Typography,
-  useMediaQuery,
 } from '@mui/material';
-import { useTheme } from '@mui/material/styles';
-import { Sync } from '@mui/icons-material';
+import { Sync } from '../../components/icons3d/Icons3D';
 import { api } from '../../api/client';
 import { canRunSapFullSync } from '../../app/access';
 import { Button } from '../../components/Button';
@@ -26,6 +22,7 @@ import { EmptyState, ErrorState, LoadingState } from '../../components/States';
 import { PlainStatusBadge } from '../../components/StatusBadge';
 import { RtlDataTable, type RtlDataTableColumn } from '../../components/RtlDataTable';
 import { RtlSelectField } from '../../components/RtlSelectField';
+import { AppTabs } from '../../components/AppTabs';
 import { StatusFilterTabs, type StatusTabOption } from '../../components/StatusFilterTabs';
 import { TabbedDetailModal } from '../../components/TabbedDetailModal';
 import type {
@@ -134,9 +131,6 @@ function JsonBlock({ value }: { value: unknown }) {
  * Audit log of SAP write transactions (BAPI) and OData read-sync runs.
  */
 export function SapTransactionsPage() {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-
   const [mainTab, setMainTab] = useState<MainTab>(0);
   const [items, setItems] = useState<SAPTransaction[]>([]);
   const [syncRuns, setSyncRuns] = useState<SAPSyncRun[]>([]);
@@ -548,15 +542,15 @@ export function SapTransactionsPage() {
         </KpiGrid>
       )}
 
-      <Tabs
+      <AppTabs
         value={mainTab}
-        onChange={(_, value: MainTab) => setMainTab(value)}
-        variant={isMobile ? 'scrollable' : 'standard'}
-        sx={{ borderBottom: 1, borderColor: 'divider' }}
-      >
-        <Tab label="تراکنش‌های نوشتن (BAPI)" />
-        <Tab label="همگام‌سازی خواندن (OData)" />
-      </Tabs>
+        onChange={(value) => setMainTab(value as MainTab)}
+        ariaLabel="بخش‌های SAP"
+        items={[
+          { value: 0, label: 'تراکنش‌های نوشتن (BAPI)' },
+          { value: 1, label: 'همگام‌سازی خواندن (OData)' },
+        ]}
+      />
 
       {error && (
         <ErrorState
