@@ -10,6 +10,7 @@ from pathlib import Path
 
 # Test execution must never inherit real-SAP mode from a developer's local .env.
 os.environ["SAP_USE_MOCK"] = "True"
+os.environ["SAP_WRITE"] = "True"
 
 from .base import *  # noqa: F401, F403
 from .base import BASE_DIR  # noqa: F401
