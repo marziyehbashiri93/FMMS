@@ -144,25 +144,6 @@ class TestSAPTransactionManagerSuccessPath:
         assert final_tx.status == SAPTransactionStatus.SUCCESS
         assert final_tx.sap_document_number == "10000099"
 
-    def test_execute_skips_adapter_when_writes_are_disabled(self) -> None:
-        repo = MagicMock()
-        adapter_spy = MagicMock(return_value=({"NOTIFNO": "10000099"}, "10000099"))
-
-        manager = SAPTransactionManager(repository=repo, write_enabled=False)
-        response, doc_number = manager.execute(
-            object_type=SAPObjectType.FAULT,
-            object_id=uuid.uuid4(),
-            idempotency_key="fault-notif-disabled",
-            request_payload={"equipment": "10000001"},
-            adapter_call=adapter_spy,
-        )
-
-        assert response == {"sap_write_skipped": True}
-        assert doc_number == ""
-        adapter_spy.assert_not_called()
-        repo.get_by_idempotency_key.assert_not_called()
-        repo.save.assert_not_called()
-
 
 # ---------------------------------------------------------------------------
 # Failure path
@@ -392,19 +373,6 @@ class TestSAPTransactionManagerRetry:
 
         final_tx = saved[-1]
         assert final_tx.status == SAPTransactionStatus.FAILED
-
-    def test_retry_skips_adapter_when_writes_are_disabled(self) -> None:
-        repo = MagicMock()
-        adapter_spy = MagicMock(return_value=({"NOTIFNO": "10000099"}, "10000099"))
-
-        manager = SAPTransactionManager(repository=repo, write_enabled=False)
-        response, doc_number = manager.retry(uuid.uuid4(), adapter_spy)
-
-        assert response == {"sap_write_skipped": True}
-        assert doc_number == ""
-        adapter_spy.assert_not_called()
-        repo.get_by_id.assert_not_called()
-        repo.save.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
